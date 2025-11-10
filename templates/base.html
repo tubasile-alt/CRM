@@ -16,8 +16,9 @@
     {% if current_user.is_authenticated %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
-                <i class="bi bi-hospital"></i> Clínica Basile
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='images/logo-basile.jpg') }}" alt="Clínica Basile" height="40" class="me-2">
+                <span>Clínica Basile</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -34,6 +35,11 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'agenda' %}active{% endif %}" href="{{ url_for('agenda') }}">
                             <i class="bi bi-calendar3"></i> Agenda
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'mapa_cirurgico' %}active{% endif %}" href="{{ url_for('mapa_cirurgico') }}">
+                            <i class="bi bi-clipboard2-pulse"></i> Mapa Cirúrgico
                         </a>
                     </li>
                     <li class="nav-item">

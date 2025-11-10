@@ -1,0 +1,333 @@
+1) Mapa Semanal Cirúrgico (Day Hospital)
+Objetivo
+
+Centralizar a programação cirúrgica do day hospital em uma única visão semanal, permitindo que secretárias visualizem, criem, editem e compartilhem o “mapa” de cirurgias. Médicos podem consultar em modo leitura. O módulo substitui planilhas manuais, padroniza campos críticos (horário, sala, médico, procedimento) e gera um documento consolidado para envio por e-mail.
+
+Escopo funcional
+
+Visão semanal fixa por data-base (segunda a sábado, com opção de incluir domingo quando necessário).
+
+Linhas de horário configuráveis (intervalo padrão de 30 minutos; configurável).
+
+Colunas por dia da semana; células exibem blocos de cirurgias com horário, procedimento, médico, paciente e sala.
+
+Filtro por médico e por sala (exibição dinâmica sem recarregar a página).
+
+Criação/edição de cirurgia por modal com validação de campos.
+
+Controle de status da cirurgia: agendada, em andamento, concluída, cancelada.
+
+Exportação do mapa da semana em PDF e XLSX.
+
+Compartilhamento por e-mail do arquivo exportado para uma lista predefinida de destinatários.
+
+Log mínimo de auditoria (quem criou, quem editou, quando).
+
+Dados e modelo
+
+Tabela Surgery:
+
+id (int, chave primária)
+
+date (date, obrigatório)
+
+start_time (time, obrigatório)
+
+end_time (time, obrigatório)
+
+patient_name (string, obrigatório)
+
+procedure_name (string, obrigatório; uso livre ou chave estrangeira para catálogo de procedimentos)
+
+doctor_id (int, fk opcional para tabela User) ou doctor_name (string) se preferir acoplar menos
+
+operating_room (string, obrigatório; exemplo: “Sala 1”, “Sala 2”)
+
+notes (text, opcional)
+
+status (string; valores aceitos: agendada, em_andamento, concluida, cancelada; default: agendada)
+
+created_by (int, fk User)
+
+updated_by (int, fk User)
+
+created_at (datetime)
+
+updated_at (datetime)
+
+Índices recomendados:
+
+índice composto (date, start_time) para ordenação natural do mapa.
+
+índice em (doctor_id) e (operating_room) para filtros.
+
+Validações principais:
+
+end_time > start_time.
+
+conflito de sala: impedir sobreposição de horários na mesma sala (regra: não permitir interseção de intervalos ativos, exceto se status cancelada).
+
+campos obrigatórios não vazios.
+
+normalizar nomes (trim, capitalização padronizada).
+
+API e rotas
+
+GET /mapa-cirurgico: renderiza a página do mapa.
+
+GET /api/surgeries?week_start=YYYY-MM-DD&doctor_id=&room=: retorna JSON com todas as cirurgias da semana, com filtros opcionais.
+
+POST /api/surgeries: cria cirurgia; payload JSON com campos obrigatórios; valida conflito de sala e horário.
+
+PUT /api/surgeries/<id>: edita cirurgia; aplica mesmas validações.
+
+DELETE /api/surgeries/<id>: remove cirurgia (soft delete opcional via status cancelada).
+
+POST /api/surgeries/export: gera arquivo PDF/XLSX da semana; corpo inclui week_start, format e lista de filtros aplicados.
+
+POST /api/surgeries/share: envia por e-mail o arquivo gerado; aceita to, cc, subject, body, attachment_id.
+
+Permissões:
+
+Secretária: criar, editar, excluir, exportar e compartilhar.
+
+Médico: leitura; pode filtrar por si mesmo.
+
+Admin (se existir): todos os poderes.
+
+Interface (front-end)
+
+Estrutura da página:
+
+Cabeçalho com seletor de semana (navegação anterior/próxima; input do tipo date que aponta para a segunda-feira da semana).
+
+Filtros: multiselect de médicos; select de salas; campo de busca por paciente.
+
+Botões: “Nova cirurgia”, “Exportar semana” (submenu com PDF ou XLSX), “Compartilhar por e-mail”.
+
+Grade semanal:
+
+Colunas: segunda a sábado.
+
+Linhas: faixas horárias.
+
+Blocos de cirurgia com compactação de informação: horário inicial–final; procedimento; médico; sala; paciente.
+
+Cores por sala (paleta discreta e consistente em toda a aplicação).
+
+Indicadores de status (por exemplo, borda contínua para em_andamento, traço para cancelada; evitar uso de ícones).
+
+Modal “Nova/Editar Cirurgia”:
+
+Data, horário início/fim (time picker), sala (select), médico (select), paciente (texto), procedimento (texto ou select), observações (textarea), status (select).
+
+Validações inline; mensagem clara em conflitos de sala/horário.
+
+Exportação e compartilhamento
+
+PDF:
+
+Cabeçalho: “Mapa Semanal Cirúrgico – Clínica Basile”, período completo (ex.: 10/11/2025 a 15/11/2025).
+
+Tabela por dia, ordenada por horário, com colunas: Horário, Paciente, Procedimento, Médico, Sala, Status, Observações.
+
+Rodapé com data/hora de geração e usuário que gerou.
+
+XLSX:
+
+Uma aba por dia ou uma aba única com coluna “Data”.
+
+As mesmas colunas do PDF, com formatação de hora e filtros automáticos.
+
+Envio por e-mail:
+
+Corpo padrão personalizável.
+
+Anexo gerado no passo anterior.
+
+Registro de log do envio (quem enviou, quando, destinatários).
+
+Auditoria e histórico
+
+Gravar em created_by, updated_by, created_at, updated_at.
+
+Opcional: tabela SurgeryAudit com trilha de alterações (campo alterado, valor antigo, valor novo, timestamp, user_id).
+
+Conflitos e concorrência
+
+Lock otimista por updated_at: recusar gravação se o registro mudou entre carregamento e envio.
+
+Mensagem clara ao usuário para recarregar a página e reaplicar a alteração.
+
+Internacionalização e fuso
+
+Datas exibidas em português do Brasil.
+
+Fuso America/Sao_Paulo aplicado na renderização.
+
+O armazenamento pode permanecer em UTC para consistência, convertendo no front/back conforme necessário.
+
+Desempenho
+
+Paginação não é necessária para uma única semana; porém, use cache em memória para resultados de filtro repetidos na mesma semana.
+
+Evitar consultas N+1; consolidar consultas por semana com filtros em uma única query.
+
+2) Agenda Médica com Layers e Controle de Espera
+Objetivo
+
+Permitir que secretárias visualizem a agenda de um único médico ou de todos os médicos simultaneamente, em camadas distintas, com contagem em tempo real de pacientes aguardando. O médico, no próprio dashboard, visualiza quantos pacientes estão esperando por ele naquele momento.
+
+Escopo funcional
+
+Alternância entre visualização por médico individual e visualização de todos em camadas.
+
+Atribuição de cor fixa por médico para favorecer a leitura quando múltiplas agendas são sobrepostas.
+
+Filtro por médico (multiselect) e por status de consulta.
+
+Marcação operacional de “check-in” do paciente (passa a constar como aguardando).
+
+Contador de espera por médico exibido no dashboard do médico e em uma visão consolidada da secretária.
+
+Atualização periódica automática do contador e da agenda (intervalo configurável, por exemplo, 30 segundos).
+
+Dados e modelo
+
+Ajustes na tabela Appointment:
+
+status (string; já existente: agendado, confirmado, atendido, faltou; pode incluir cancelado se necessário).
+
+waiting (boolean, default false) para indicar se o paciente está na recepção aguardando.
+
+checked_in_time (datetime, opcional) para registrar o horário do check-in.
+
+doctor_id (int, fk User; se ainda não existir, criar).
+
+room/box (string, opcional) para identificar consultório quando aplicável.
+
+Validações:
+
+waiting só pode ser verdadeiro se o status for agendado ou confirmado.
+
+ao marcar atendido, waiting deve ser automaticamente false.
+
+API e rotas
+
+GET /agenda: renderiza a página da agenda com controles de filtro e camadas.
+
+GET /api/events?doctor_id=…&status=…: retorna eventos considerando filtros; aceitar múltiplos doctor_id.
+
+POST /api/checkin: recebe appointment_id; seta waiting=true e checked_in_time=now().
+
+POST /api/checkout: recebe appointment_id; seta waiting=false e mantém histórico de horário.
+
+GET /api/waiting_count?scope=all|doctor&doctor_id=: retorna contagem de pacientes aguardando por médico ou consolidado.
+
+Opcional: GET /api/colors/doctors: paleta de cores fixas por médico para renderização consistente.
+
+Interface (front-end)
+
+Na agenda:
+
+Seletor multiselect de médicos. Por padrão, “Todos”.
+
+Quando múltiplos médicos estão selecionados, os eventos são renderizados em camadas, cada médico com sua cor.
+
+Legenda lateral com o nome de cada médico e sua cor.
+
+Cada evento exibe título, paciente e status; ao clicar, abre modal com ações operacionais:
+
+Ações para secretária: confirmar, marcar check-in (aguardando), iniciar atendimento, alterar box/sala, reatribuir horário.
+
+Ações para médico: iniciar atendimento (quando o médico desejar, além do check-in já feito pela recepção).
+
+Botão “Imprimir agenda” mantém as camadas e a legenda.
+
+No dashboard do médico:
+
+Card adicional “Aguardando” com o total de pacientes waiting=true para aquele médico.
+
+Lista resumida opcional com nome do paciente e horário de chegada, ordenada por checked_in_time.
+
+Na visão consolidada da secretária:
+
+Tabela com colunas: Médico, Aguardando agora, Tempo médio de espera (opcional, se calculado).
+
+Atualização automática via polling.
+
+Regras de negócio
+
+Check-in:
+
+Feito pela secretária ao receber o paciente.
+
+Define waiting=true e checked_in_time=now().
+
+Caso o paciente seja remarcado, waiting=false e limpa checked_in_time.
+
+Início do atendimento:
+
+Pode ser disparado pelo médico (no prontuário) ou pela secretária (na agenda).
+
+Ao iniciar, opcionalmente setar waiting=false e registrar um started_at se desejar medir duração de consulta.
+
+Fim do atendimento:
+
+Ao registrar status “atendido”, garantir waiting=false.
+
+Falta:
+
+Se marcado como faltou, garantir waiting=false.
+
+Cores por camada
+
+Tabela em memória ou banco associando doctor_id a uma cor fixa (ex.: azul, verde, laranja, roxo, etc.).
+
+A mesma cor deve ser usada em todas as telas que exibem eventos daquele médico para consistência.
+
+Conflitos e consistência
+
+Evitar sobreposição de horários para o mesmo médico no mesmo consultório, caso a regra da clínica não permita.
+
+Mensagens claras ao tentar agendar um horário já ocupado.
+
+Desempenho e atualização
+
+As chamadas a /api/events devem aceitar vários doctor_id em lote, retornando eventos agrupados por médico, reduzindo múltiplas requisições.
+
+O contador de espera deve ser obtido de endpoint leve, retornando apenas agregados para atualização frequente.
+
+Intervalo de atualização padrão: 30 segundos; configurável.
+
+Auditoria
+
+Registrar usuário e timestamp para ações de check-in, mudança de status e remarcações.
+
+Opcional: histórico por consulta com a sequência de estados (agendado → confirmado → check-in → em_atendimento → atendido/faltou).
+
+Impressão e exportação
+
+Impressão da agenda diária com camadas visíveis e legenda de cores.
+
+Exportação diária por médico em PDF opcional.
+
+Internacionalização e fuso
+
+Manter exibição em português, com nomes de dias e meses localizados.
+
+Converter corretamente horários se o armazenamento for UTC; exibir sempre em America/Sao_Paulo.
+
+Integração entre os dois módulos
+
+O “Mapa Semanal Cirúrgico” é independente da agenda ambulatorial, mas ambos compartilham o cadastro de usuários (médicos) e seguem a mesma política de permissões.
+
+A agenda com layers atende à rotina diária de consultório; o mapa atende ao planejamento cirúrgico semanal.
+
+No dashboard:
+
+O médico visualiza seus indicadores do dia (agendados, confirmados, atendidos, faltaram) e a contagem “aguardando”.
+
+A secretária pode ter uma visão consolidada dos aguardando por médico.
+
+Exportações e compartilhamentos são específicos: o mapa exporta a semana de cirurgias; a agenda pode exportar o dia ou a semana de atendimentos.

@@ -55,6 +55,9 @@ class Appointment(db.Model):
     end_time = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.String(20), default='agendado')
     notes = db.Column(db.Text)
+    waiting = db.Column(db.Boolean, default=False)
+    checked_in_time = db.Column(db.DateTime)
+    room = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     doctor = db.relationship('User', backref='appointments')
@@ -115,3 +118,47 @@ class ChatMessage(db.Model):
     read = db.Column(db.Boolean, default=False)
     
     sender = db.relationship('User', backref='messages')
+
+class OperatingRoom(db.Model):
+    __tablename__ = 'operating_room'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    capacity = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    surgeries = db.relationship('Surgery', backref='room', lazy=True)
+
+class Surgery(db.Model):
+    __tablename__ = 'surgery'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Date, nullable=False, index=True)
+    start_time = db.Column(db.Time, nullable=False, index=True)
+    end_time = db.Column(db.Time, nullable=False)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'))
+    patient_name = db.Column(db.String(100), nullable=False)
+    procedure_id = db.Column(db.Integer, db.ForeignKey('procedure.id'))
+    procedure_name = db.Column(db.String(200), nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    operating_room_id = db.Column(db.Integer, db.ForeignKey('operating_room.id'), nullable=False, index=True)
+    status = db.Column(db.String(20), default='agendada')
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    updated_by = db.Column(db.Integer, db.ForeignKey('user.id'))
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time)
+    
+    patient = db.relationship('Patient', backref='surgeries')
+    procedure = db.relationship('Procedure', backref='surgeries')
+    doctor = db.relationship('User', foreign_keys=[doctor_id], backref='doctor_surgeries')
+    creator = db.relationship('User', foreign_keys=[created_by], backref='created_surgeries')
+    updater = db.relationship('User', foreign_keys=[updated_by], backref='updated_surgeries')
+
+class DoctorPreference(db.Model):
+    __tablename__ = 'doctor_preference'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), unique=True, nullable=False)
+    color = db.Column(db.String(7), default='#0d6efd')
+    layer_enabled = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    user = db.relationship('User', backref='preference', uselist=False)
