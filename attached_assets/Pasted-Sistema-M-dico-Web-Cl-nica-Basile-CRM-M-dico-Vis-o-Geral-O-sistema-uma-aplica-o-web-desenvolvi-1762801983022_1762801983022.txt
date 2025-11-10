@@ -1,0 +1,185 @@
+Sistema Médico Web – Clínica Basile CRM Médico
+Visão Geral
+
+O sistema é uma aplicação web desenvolvida em Flask (Python) com frontend em HTML, CSS (Bootstrap 5) e JavaScript.
+Ele foi projetado para funcionar diretamente no navegador, sem necessidade de instalação local, permitindo uso por médicos e secretárias em computadores ou tablets.
+
+O objetivo é unificar três áreas da rotina médica:
+
+Gestão de consultas e agenda
+
+Atendimento clínico com prontuário eletrônico
+
+Gestão de desempenho e CRM médico
+
+Estrutura do Sistema
+
+Arquitetura de diretórios:
+
+/medcrm_app
+│
+├── app.py                 # núcleo Flask
+├── config.py              # configurações (banco, timezone, secret key)
+├── models.py              # modelos de dados (ORM SQLAlchemy)
+├── requirements.txt       # dependências Python
+│
+├── /templates             # interface HTML (Bootstrap 5)
+├── /static/css            # estilos visuais
+└── /static/js             # scripts JavaScript
+
+Login e Perfis de Acesso
+
+A autenticação é feita com Flask-Login.
+Existem dois tipos de usuário: médico e secretária.
+
+O médico tem acesso ao dashboard, agenda, prontuário e chat.
+
+A secretária tem acesso à agenda e ao chat.
+
+Credenciais de demonstração:
+
+Médico: arthur@clinicabasiledemo.com
+ / 123456
+
+Secretária: secretaria@clinicabasiledemo.com
+ / 123456
+
+Dashboard Médico
+
+Ao fazer login, o médico vê um painel com estatísticas do dia:
+
+Pacientes agendados
+
+Pacientes confirmados
+
+Pacientes atendidos
+
+Pacientes que faltaram
+
+Esses números são atualizados automaticamente conforme os agendamentos do dia.
+Há também um espaço reservado para gráficos de CRM (como conversão de procedimentos e taxa de retorno).
+O dashboard inclui um chat interno entre médico e secretária.
+
+Agenda Médica
+
+A agenda usa a biblioteca FullCalendar, com visualizações mensal, semanal, diária e em lista.
+É possível adicionar novos agendamentos, editar horários, imprimir a agenda e visualizar feriados nacionais automaticamente.
+
+As consultas aparecem com cores conforme o status:
+
+Cinza: agendado
+
+Azul: confirmado
+
+Verde: atendido
+
+Vermelho: faltou
+
+Os dados da agenda são armazenados no banco SQLite e exibidos em tempo real via API Flask.
+
+Prontuário Eletrônico
+
+Cada paciente possui um prontuário dividido em abas:
+
+Queixa principal
+Campo livre para texto, com botão de ditado por voz.
+
+Anamnese
+Campo de texto livre com ditado, além de uma lista de procedimentos indicados (Ulthera, Morpheus8, Sculptra, Exilis, Neo, Entone).
+O médico pode selecionar múltiplos procedimentos. Essas indicações alimentam o CRM de conversão.
+
+Consulta
+Campo livre para evolução e observações, também com ditado.
+
+Conduta
+Campo de texto livre com ditado.
+O médico marca quais dos procedimentos indicados foram realizados, e essas informações são registradas para análise de conversão.
+
+Outros recursos:
+
+Adição de tags para o paciente (por exemplo: Pré-operatório, VIP, Potencial Sculptra).
+
+Cronômetro "Iniciar Atendimento" que mede a duração da consulta para fins de produtividade.
+
+Histórico das anotações anteriores, listadas por data e tipo.
+
+Ditado por Voz
+
+O sistema usa a API nativa do navegador (Web Speech API) para converter voz em texto em português do Brasil.
+Funciona diretamente no navegador, sem APIs externas, desde que o site esteja em HTTPS (como no Replit ou Render).
+O médico clica no botão "Ditado" e fala normalmente; o texto é inserido automaticamente no campo ativo.
+
+Chat Interno
+
+Há um chat simples entre médico e secretária.
+As mensagens são armazenadas no banco de dados e atualizadas a cada 5 segundos.
+É usado para comunicação rápida sobre pacientes e horários.
+
+Banco de Dados
+
+O banco usa SQLite via SQLAlchemy ORM.
+Principais tabelas:
+
+User: médicos e secretárias
+
+Patient: pacientes
+
+Appointment: agendamentos
+
+Note: anotações do prontuário (queixa, anamnese, conduta etc.)
+
+Procedure: lista de procedimentos
+
+Indication: vincula procedimentos indicados e realizados
+
+Tag e PatientTag: categorização de pacientes
+
+ChatMessage: mensagens do chat
+
+Idioma e Localização
+
+Todo o sistema está em português.
+O fuso horário é America/Sao_Paulo.
+As datas aparecem no formato brasileiro, por exemplo: “segunda-feira, 10 de novembro de 2025”.
+
+Interface
+
+A interface usa Bootstrap 5, com layout limpo e responsivo.
+Adapta-se automaticamente a diferentes tamanhos de tela (notebook ou tablet).
+Os status das consultas têm cores distintas para facilitar a visualização.
+
+Segurança
+
+O acesso é protegido por login com Flask-Login.
+As sessões são seguras e encerradas manualmente pelo usuário.
+O banco de dados fica local, mas pode ser facilmente migrado para PostgreSQL em ambiente de produção.
+
+Hospedagem e Execução
+
+O sistema foi projetado para rodar no Replit, Render ou qualquer servidor Flask.
+Comandos básicos:
+
+pip install -r requirements.txt
+flask init-db
+flask run --host=0.0.0.0 --port=8080
+
+
+O sistema ficará disponível em:
+
+https://medcrm-app.<seu-usuário>.repl.co
+
+Resumo Funcional
+Módulo	Função
+Dashboard	Mostra indicadores do dia e permite conversar com a secretária
+Agenda	Visualiza, cria e imprime agendamentos com feriados brasileiros
+Prontuário	Registra o atendimento completo, com ditado e marcação de procedimentos
+CRM interno	Registra indicações e realizações de procedimentos para cálculo de conversão
+Chat	Comunicação direta entre médico e secretária
+Tags	Classificação de pacientes por perfil
+Conclusão
+
+Este software é um sistema médico completo e funcional, projetado para uso direto no navegador.
+Ele integra gestão de agenda, prontuário eletrônico, controle de produtividade e comunicação interna.
+O diferencial está no uso de reconhecimento de voz nativo, interface leve e integração automática com o CRM de procedimentos.
+
+Em resumo, é um prontuário e CRM médico personalizados para a rotina da Clínica Basile, com fluxo digital, responsivo e pronto para uso em ambiente web.
