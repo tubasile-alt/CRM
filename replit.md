@@ -150,9 +150,24 @@ A secret key é obtida da variável de ambiente `SESSION_SECRET` ou usa uma chav
 
 10 de novembro de 2025
 
+## Segurança Implementada
+
+- **Proteção CSRF**: Implementada via Flask-WTF em todas as rotas de modificação de dados
+- **Autenticação robusta**: Flask-Login com hash seguro de senhas (Werkzeug)
+- **Controle de acesso**: Rotas protegidas com @login_required
+- **Separação de perfis**: Médico tem acesso total, secretária gerencia apenas agenda e chat
+
+## Gestão de Agenda Multi-Usuário
+
+A secretária pode visualizar e gerenciar a agenda do médico. O sistema automaticamente:
+- Identifica se o usuário é médico ou secretária
+- Permite que a secretária crie/edite agendamentos para o médico
+- Mantém os agendamentos associados ao médico correto
+
 ## Notas Importantes
 
 - O ditado por voz funciona apenas em HTTPS (como Replit)
 - O sistema está configurado para rodar na porta 5000
 - Cache desabilitado para desenvolvimento ágil
 - Responsivo para notebooks e tablets
+- Token CSRF incluído automaticamente em todas requisições AJAX

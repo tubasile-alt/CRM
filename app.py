@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_wtf.csrf import CSRFProtect
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta, date
 import pytz
@@ -12,6 +13,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 db.init_app(app)
+csrf = CSRFProtect(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -20,7 +22,7 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 def get_brazil_time():
     tz = pytz.timezone('America/Sao_Paulo')
@@ -61,6 +63,15 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+def get_doctor_id():
+    """Retorna o ID do médico - se o usuário atual é médico, retorna seu ID,
+    se é secretária, retorna o ID do primeiro médico (assumindo clínica com um médico)"""
+    if current_user.is_doctor():
+        return current_user.id
+    else:
+        doctor = User.query.filter_by(role='medico').first()
+        return doctor.id if doctor else None
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -91,7 +102,11 @@ def agenda():
 @app.route('/api/appointments')
 @login_required
 def get_appointments():
-    appointments = Appointment.query.filter_by(doctor_id=current_user.id).all()
+    doctor_id = get_doctor_id()
+    if not doctor_id:
+        return jsonify([])
+    
+    appointments = Appointment.query.filter_by(doctor_id=doctor_id).all()
     
     events = []
     for apt in appointments:
@@ -124,6 +139,10 @@ def get_appointments():
 def create_appointment():
     data = request.json
     
+    doctor_id = get_doctor_id()
+    if not doctor_id:
+        return jsonify({'success': False, 'error': 'Médico não encontrado'}), 400
+    
     patient = Patient.query.filter_by(name=data['patientName']).first()
     if not patient:
         patient = Patient(
@@ -136,7 +155,7 @@ def create_appointment():
     
     appointment = Appointment(
         patient_id=patient.id,
-        doctor_id=current_user.id,
+        doctor_id=doctor_id,
         start_time=datetime.fromisoformat(data['start']),
         end_time=datetime.fromisoformat(data['end']),
         status=data.get('status', 'agendado'),
