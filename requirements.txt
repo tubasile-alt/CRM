@@ -7,3 +7,6 @@ Werkzeug==3.0.1
 pytz==2024.1
 WeasyPrint==62.3
 openpyxl==3.1.5
+click
+Pillow
+reportlab

@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}Mapa Cirúrgico - Clínica Basile{% endblock %}
+
+{% block extra_css %}
+<style>
+.surgery-card {
+    border-left: 4px solid #198754;
+    transition: all 0.2s;
+}
+.surgery-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.room-header {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+}
+.time-slot {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+.conflict-warning {
+    border-left-color: #dc3545 !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-clipboard2-pulse"></i> Mapa Cirúrgico Semanal</h2>
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="previousWeek()">
+                <i class="bi bi-chevron-left"></i> Semana Anterior
+            </button>
+            <button class="btn btn-outline-primary" onclick="currentWeek()">Semana Atual</button>
+            <button class="btn btn-primary" onclick="nextWeek()">
+                Próxima Semana <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+        <div class="btn-group">
+            {% if current_user.is_doctor() %}
+            <button class="btn btn-success" onclick="showNewSurgeryModal()">
+                <i class="bi bi-plus-circle"></i> Nova Cirurgia
+            </button>
+            {% endif %}
+            <button class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-download"></i> Exportar
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="#" onclick="exportPDF()"><i class="bi bi-file-pdf"></i> PDF</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportExcel()"><i class="bi bi-file-excel"></i> Excel</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="week-info" class="alert alert-info mb-3">
+        Carregando...
+    </div>
+
+    <div id="surgical-map" class="row">
+        <!-- Salas serão carregadas dinamicamente -->
+    </div>
+</div>
+
+<!-- Modal Nova Cirurgia -->
+<div class="modal fade" id="newSurgeryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nova Cirurgia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="surgeryForm">
+                    <div class="mb-3">
+                        <label class="form-label">Nome do Paciente</label>
+                        <input type="text" class="form-control" name="patient_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Procedimento</label>
+                        <input type="text" class="form-control" name="procedure_type" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Sala</label>
+                        <select class="form-select" name="room_id" required>
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Data</label>
+                            <input type="date" class="form-control" name="scheduled_date" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Horário</label>
+                            <input type="time" class="form-control" name="scheduled_time" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Duração (minutos)</label>
+                        <input type="number" class="form-control" name="duration_minutes" value="60" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observações</label>
+                        <textarea class="form-control" name="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveSurgery()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentWeekStart = '{{ week_start }}';
+
+function loadWeeklyMap() {
+    fetch(`/mapa-cirurgico/api/weekly?week_start=${currentWeekStart}`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('week-info').innerHTML = `
+                <strong>Semana:</strong> ${formatDate(data.week_start)} a ${formatDate(data.week_end)}
+            `;
+            
+            const container = document.getElementById('surgical-map');
+            container.innerHTML = '';
+            
+            data.rooms.forEach(room => {
+                const roomHtml = `
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header room-header text-white">
+                                <h5 class="mb-0">${room.name}</h5>
+                            </div>
+                            <div class="card-body" id="room-${room.id}">
+                                ${room.surgeries.length === 0 ? '<p class="text-muted">Nenhuma cirurgia agendada</p>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', roomHtml);
+                
+                room.surgeries.forEach(surgery => {
+                    const surgeryCard = createSurgeryCard(surgery);
+                    document.getElementById(`room-${room.id}`).innerHTML += surgeryCard;
+                });
+            });
+            
+            // Preencher select de salas no modal
+            const roomSelect = document.querySelector('select[name="room_id"]');
+            roomSelect.innerHTML = '<option value="">Selecione...</option>';
+            data.rooms.forEach(room => {
+                roomSelect.innerHTML += `<option value="${room.id}">${room.name}</option>`;
+            });
+        });
+}
+
+function createSurgeryCard(surgery) {
+    return `
+        <div class="surgery-card card mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>${surgery.patient_name}</strong>
+                        <div class="time-slot">${surgery.scheduled_date} • ${surgery.scheduled_time} • ${surgery.duration_minutes}min</div>
+                        <small class="text-muted">${surgery.procedure_type} - Dr. ${surgery.doctor_name}</small>
+                    </div>
+                    {% if current_user.is_doctor() %}
+                    <div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgery(${surgery.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function formatDate(dateStr) {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('pt-BR');
+}
+
+function previousWeek() {
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate() - 7);
+    currentWeekStart = d.toISOString().split('T')[0];
+    loadWeeklyMap();
+}
+
+function currentWeek() {
+    const today = new Date();
+    const monday = new Date(today.setDate(today.getDate() - today.getDay() + 1));
+    currentWeekStart = monday.toISOString().split('T')[0];
+    loadWeeklyMap();
+}
+
+function nextWeek() {
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate() + 7);
+    currentWeekStart = d.toISOString().split('T')[0];
+    loadWeeklyMap();
+}
+
+function showNewSurgeryModal() {
+    new bootstrap.Modal(document.getElementById('newSurgeryModal')).show();
+}
+
+function saveSurgery() {
+    const form = document.getElementById('surgeryForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    
+    fetch('/mapa-cirurgico/api/surgery', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+            ...data,
+            room_id: parseInt(data.room_id),
+            duration_minutes: parseInt(data.duration_minutes)
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('newSurgeryModal')).hide();
+            form.reset();
+            loadWeeklyMap();
+            showSuccess('Cirurgia agendada com sucesso!');
+        } else {
+            showError(result.error || 'Erro ao agendar cirurgia');
+        }
+    });
+}
+
+function deleteSurgery(id) {
+    if (!confirm('Deseja realmente excluir esta cirurgia?')) return;
+    
+    fetch(`/mapa-cirurgico/api/surgery/${id}`, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken': getCSRFToken()}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            loadWeeklyMap();
+            showSuccess('Cirurgia excluída!');
+        } else {
+            showError(result.error);
+        }
+    });
+}
+
+function exportPDF() {
+    window.location.href = `/mapa-cirurgico/export/pdf?week_start=${currentWeekStart}`;
+}
+
+function exportExcel() {
+    window.location.href = `/mapa-cirurgico/export/excel?week_start=${currentWeekStart}`;
+}
+
+// Load initial data
+document.addEventListener('DOMContentLoaded', () => {
+    loadWeeklyMap();
+});
+</script>
+{% endblock %}

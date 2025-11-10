@@ -10,8 +10,33 @@
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>Agenda Médica</h2>
             <div>
+                <h2>Agenda Médica</h2>
+                {% if not current_user.is_doctor() %}
+                <div class="btn-group mt-2">
+                    <button class="btn btn-sm btn-outline-primary active" onclick="filterByDoctor('all')">Todos os Médicos</button>
+                    {% for doctor in doctors %}
+                    <button class="btn btn-sm btn-outline-primary" onclick="filterByDoctor({{ doctor.id }})">{{ doctor.name }}</button>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <div>
+                <!-- Contador de Espera -->
+                <div id="waitingCounter" class="badge bg-warning text-dark me-2" style="font-size: 1.1rem;">
+                    <i class="bi bi-people"></i> <span id="waitingCount">0</span> aguardando
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="bi bi-download"></i> Exportar
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="exportAgenda('pdf')"><i class="bi bi-file-pdf"></i> PDF</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="exportAgenda('excel')"><i class="bi bi-file-excel"></i> Excel</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" onclick="emailAgenda()"><i class="bi bi-envelope"></i> Enviar por Email</a></li>
+                    </ul>
+                </div>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newAppointmentModal">
                     <i class="bi bi-plus-circle"></i> Novo Agendamento
                 </button>
@@ -42,6 +67,16 @@
             </div>
             <div class="modal-body">
                 <form id="appointmentForm">
+                    {% if not current_user.is_doctor() %}
+                    <div class="mb-3">
+                        <label class="form-label">Médico</label>
+                        <select class="form-select" id="appointmentDoctor" required>
+                            {% for doctor in doctors %}
+                            <option value="{{ doctor.id }}">{{ doctor.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
                     <div class="mb-3">
                         <label class="form-label">Nome do Paciente</label>
                         <input type="text" class="form-control" id="patientName" required>
@@ -96,6 +131,14 @@
             <div class="modal-body" id="eventDetails">
             </div>
             <div class="modal-footer">
+                <div id="checkinButtons" style="display:none;">
+                    <button type="button" class="btn btn-info" onclick="checkIn()">
+                        <i class="bi bi-box-arrow-in-right"></i> Check-in
+                    </button>
+                    <button type="button" class="btn btn-success" onclick="checkOut()">
+                        <i class="bi bi-box-arrow-right"></i> Check-out (Atendido)
+                    </button>
+                </div>
                 <button type="button" class="btn btn-danger" onclick="deleteEvent()">Excluir</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                 {% if current_user.is_doctor() %}
@@ -107,8 +150,183 @@
 </div>
 {% endblock %}
 
+<!-- Modal Enviar por Email -->
+<div class="modal fade" id="emailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Enviar Agenda por Email</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Email do destinatário</label>
+                    <input type="email" class="form-control" id="emailRecipient" placeholder="email@exemplo.com">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Formato</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="emailIncludePDF" checked>
+                        <label class="form-check-label">Incluir PDF</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="emailIncludeExcel" checked>
+                        <label class="form-check-label">Incluir Excel</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="sendEmailReport()">Enviar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/locales/pt-br.global.min.js"></script>
+<script>
+// Doctors data from backend
+const doctors = {{ doctors | tojson }};
+let currentDoctorFilter = null;
+let currentEventId = null;
+let waitingInterval = null;
+
+// Initialize waiting counter auto-update
+function updateWaitingCounter() {
+    fetch('/espera/api/stats')
+        .then(r => r.json())
+        .then(stats => {
+            document.getElementById('waitingCount').textContent = stats.count || 0;
+        });
+}
+
+// Auto-update every 30 seconds
+waitingInterval = setInterval(updateWaitingCounter, 30000);
+updateWaitingCounter();
+
+// Filter by doctor
+function filterByDoctor(doctorId) {
+    currentDoctorFilter = doctorId === 'all' ? null : doctorId;
+    calendar.refetchEvents();
+    
+    // Update active button
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+}
+
+// Check-in/Check-out functions
+function checkIn() {
+    if (!currentEventId) return;
+    
+    fetch(`/espera/api/checkin/${currentEventId}`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCSRFToken()}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showSuccess('Check-in realizado!');
+            bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
+            calendar.refetchEvents();
+            updateWaitingCounter();
+        } else {
+            showError(result.error);
+        }
+    });
+}
+
+function checkOut() {
+    if (!currentEventId) return;
+    
+    fetch(`/espera/api/checkout/${currentEventId}`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCSRFToken()}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            const msg = result.data.wait_time_minutes ? 
+                `Atendimento concluído! Tempo de espera: ${result.data.wait_time_minutes} minutos` :
+                'Atendimento concluído!';
+            showSuccess(msg);
+            bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
+            calendar.refetchEvents();
+            updateWaitingCounter();
+        } else {
+            showError(result.error);
+        }
+    });
+}
+
+// Export functions
+function exportAgenda(format) {
+    const view = calendar.view;
+    const start = view.currentStart.toISOString().split('T')[0];
+    const end = view.currentEnd.toISOString().split('T')[0];
+    
+    // Include doctor_id for secretary
+    let url = `/agenda/export/${format}?start=${start}&end=${end}`;
+    if (currentDoctorFilter) {
+        url += `&doctor_id=${currentDoctorFilter}`;
+    }
+    window.location.href = url;
+}
+
+function emailAgenda() {
+    new bootstrap.Modal(document.getElementById('emailModal')).show();
+}
+
+function sendEmailReport() {
+    const recipient = document.getElementById('emailRecipient').value;
+    const includePDF = document.getElementById('emailIncludePDF').checked;
+    const includeExcel = document.getElementById('emailIncludeExcel').checked;
+    
+    if (!recipient) {
+        showError('Digite o email do destinatário');
+        return;
+    }
+    
+    const view = calendar.view;
+    const start = view.currentStart.toISOString().split('T')[0];
+    const end = view.currentEnd.toISOString().split('T')[0];
+    
+    const payload = {
+        recipient: recipient,
+        start_date: start,
+        end_date: end,
+        include_pdf: includePDF,
+        include_excel: includeExcel
+    };
+    
+    // Include doctor_id for secretary
+    if (currentDoctorFilter) {
+        payload.doctor_id = currentDoctorFilter;
+    }
+    
+    fetch('/agenda/send-email', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showSuccess('Email enviado com sucesso!');
+            bootstrap.Modal.getInstance(document.getElementById('emailModal')).hide();
+        } else {
+            showError(result.error || 'Erro ao enviar email');
+        }
+    });
+}
+</script>
 <script src="{{ url_for('static', filename='js/agenda.js') }}"></script>
 {% endblock %}

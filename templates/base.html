@@ -38,6 +38,18 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'surgical_map.index' %}active{% endif %}" href="{{ url_for('surgical_map.index') }}">
+                            <i class="bi bi-clipboard2-pulse"></i> Mapa Cirúrgico
+                        </a>
+                    </li>
+                    {% if current_user.is_doctor() %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'settings.index' %}active{% endif %}" href="{{ url_for('settings.index') }}">
+                            <i class="bi bi-gear"></i> Configurações
+                        </a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'chat' %}active{% endif %}" href="{{ url_for('chat') }}">
                             <i class="bi bi-chat-dots"></i> Chat
                         </a>

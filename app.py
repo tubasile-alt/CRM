@@ -1,10 +1,12 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, make_response
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect
+from flask_mail import Mail
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta, date
 import pytz
 import click
+from io import BytesIO
 
 from config import Config
 from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage
@@ -14,11 +16,21 @@ app.config.from_object(Config)
 
 db.init_app(app)
 csrf = CSRFProtect(app)
+mail = Mail(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Por favor, faça login para acessar esta página.'
+
+# Registrar Blueprints
+from routes.surgical_map import surgical_map_bp
+from routes.waiting_room import waiting_room_bp
+from routes.settings import settings_bp
+
+app.register_blueprint(surgical_map_bp)
+app.register_blueprint(waiting_room_bp)
+app.register_blueprint(settings_bp)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -64,13 +76,27 @@ def logout():
     return redirect(url_for('login'))
 
 def get_doctor_id():
-    """Retorna o ID do médico - se o usuário atual é médico, retorna seu ID,
-    se é secretária, retorna o ID do primeiro médico (assumindo clínica com um médico)"""
+    """Retorna o ID do médico - se o usuário atual é médico, retorna seu ID"""
     if current_user.is_doctor():
         return current_user.id
     else:
-        doctor = User.query.filter_by(role='medico').first()
-        return doctor.id if doctor else None
+        # Secretária: retorna None para permitir seleção de médico no frontend
+        return None
+        
+def get_all_doctors():
+    """Retorna todos os médicos com suas preferências de cor"""
+    from models import DoctorPreference
+    doctors = User.query.filter_by(role='medico').all()
+    result = []
+    for doctor in doctors:
+        pref = DoctorPreference.query.filter_by(user_id=doctor.id).first()
+        result.append({
+            'id': doctor.id,
+            'name': doctor.name,
+            'color': pref.color if pref else '#0d6efd',
+            'layer_enabled': pref.layer_enabled if pref else True
+        })
+    return result
 
 @app.route('/dashboard')
 @login_required
@@ -97,20 +123,34 @@ def dashboard():
 @app.route('/agenda')
 @login_required
 def agenda():
-    return render_template('agenda.html')
+    doctors = get_all_doctors()
+    return render_template('agenda.html', doctors=doctors)
 
 @app.route('/api/appointments')
 @login_required
 def get_appointments():
-    doctor_id = get_doctor_id()
-    if not doctor_id:
-        return jsonify([])
+    # Permitir filtrar por médico específico
+    doctor_id = request.args.get('doctor_id', type=int)
     
-    appointments = Appointment.query.filter_by(doctor_id=doctor_id).all()
+    # Se não especificou e é médico, usa o próprio ID
+    if not doctor_id and current_user.is_doctor():
+        doctor_id = current_user.id
+    
+    # Se especificou médico, filtra. Senão retorna todos (para secretária ver todos os médicos)
+    if doctor_id:
+        appointments = Appointment.query.filter_by(doctor_id=doctor_id).all()
+    else:
+        appointments = Appointment.query.all()
     
     events = []
     for apt in appointments:
-        color = {
+        # Get doctor color from DoctorPreference
+        from models import DoctorPreference
+        pref = DoctorPreference.query.filter_by(user_id=apt.doctor_id).first()
+        doctor_color = pref.color if pref else '#0d6efd'
+        
+        # Use status color for border
+        border_color = {
             'agendado': '#6c757d',
             'confirmado': '#0d6efd',
             'atendido': '#198754',
@@ -119,14 +159,18 @@ def get_appointments():
         
         events.append({
             'id': apt.id,
-            'title': apt.patient.name,
+            'title': f"{apt.patient.name} - Dr. {apt.doctor.name}",
             'start': apt.start_time.isoformat(),
             'end': apt.end_time.isoformat(),
-            'backgroundColor': color,
-            'borderColor': color,
+            'backgroundColor': doctor_color,
+            'borderColor': border_color,
             'extendedProps': {
                 'status': apt.status,
                 'patientId': apt.patient_id,
+                'doctorId': apt.doctor_id,
+                'doctorName': apt.doctor.name,
+                'waiting': apt.waiting,
+                'checkedInTime': apt.checked_in_time.isoformat() if apt.checked_in_time else None,
                 'phone': apt.patient.phone or '',
                 'notes': apt.notes or ''
             }
@@ -139,9 +183,11 @@ def get_appointments():
 def create_appointment():
     data = request.json
     
-    doctor_id = get_doctor_id()
+    # Se secretária, doctor_id vem do payload. Se médico, usa próprio ID
+    doctor_id = data.get('doctor_id') if not current_user.is_doctor() else get_doctor_id()
+    
     if not doctor_id:
-        return jsonify({'success': False, 'error': 'Médico não encontrado'}), 400
+        return jsonify({'success': False, 'error': 'Médico não especificado'}), 400
     
     patient = Patient.query.filter_by(name=data['patientName']).first()
     if not patient:
@@ -194,6 +240,146 @@ def delete_appointment(id):
     db.session.commit()
     
     return jsonify({'success': True})
+
+@app.route('/agenda/export/pdf', methods=['GET'])
+@login_required
+def export_agenda_pdf():
+    """Exporta agenda em PDF"""
+    from utils.exports.pdf_export import PDFExporter
+    
+    start_date = request.args.get('start', datetime.now().strftime('%Y-%m-%d'))
+    end_date = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
+    doctor_id_param = request.args.get('doctor_id', type=int)
+    
+    start = datetime.strptime(start_date, '%Y-%m-%d')
+    end = datetime.strptime(end_date, '%Y-%m-%d')
+    
+    # Determine doctor - médico usa próprio ID, secretária pode especificar
+    if current_user.is_doctor():
+        doctor_id = current_user.id
+    else:
+        doctor_id = doctor_id_param
+        if not doctor_id:
+            return jsonify({'error': 'Especifique o médico'}), 400
+    
+    doctor = User.query.get(doctor_id)
+    if not doctor:
+        return jsonify({'error': 'Médico não encontrado'}), 404
+    
+    appointments = Appointment.query.filter(
+        Appointment.doctor_id == doctor_id,
+        Appointment.start_time >= start,
+        Appointment.start_time <= end
+    ).order_by(Appointment.start_time).all()
+    
+    exporter = PDFExporter()
+    pdf_buffer = exporter.export_agenda(appointments, (start, end), doctor.name)
+    
+    return pdf_buffer.getvalue(), 200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': f'attachment; filename=agenda_{start_date}.pdf'
+    }
+
+@app.route('/agenda/export/excel', methods=['GET'])
+@login_required
+def export_agenda_excel():
+    """Exporta agenda em Excel"""
+    from utils.exports.excel_export import ExcelExporter
+    
+    start_date = request.args.get('start', datetime.now().strftime('%Y-%m-%d'))
+    end_date = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
+    doctor_id_param = request.args.get('doctor_id', type=int)
+    
+    start = datetime.strptime(start_date, '%Y-%m-%d')
+    end = datetime.strptime(end_date, '%Y-%m-%d')
+    
+    # Determine doctor - médico usa próprio ID, secretária pode especificar
+    if current_user.is_doctor():
+        doctor_id = current_user.id
+    else:
+        doctor_id = doctor_id_param
+        if not doctor_id:
+            return jsonify({'error': 'Especifique o médico'}), 400
+    
+    doctor = User.query.get(doctor_id)
+    if not doctor:
+        return jsonify({'error': 'Médico não encontrado'}), 404
+    
+    appointments = Appointment.query.filter(
+        Appointment.doctor_id == doctor_id,
+        Appointment.start_time >= start,
+        Appointment.start_time <= end
+    ).order_by(Appointment.start_time).all()
+    
+    exporter = ExcelExporter()
+    excel_buffer = exporter.export_agenda(appointments, (start, end), doctor.name)
+    
+    return excel_buffer.getvalue(), 200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': f'attachment; filename=agenda_{start_date}.xlsx'
+    }
+
+@app.route('/agenda/send-email', methods=['POST'])
+@login_required
+def send_agenda_email():
+    """Envia agenda por email"""
+    from utils.exports.pdf_export import PDFExporter
+    from utils.exports.excel_export import ExcelExporter
+    from services.email_service import EmailService
+    
+    data = request.json
+    recipient = data.get('recipient')
+    start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d')
+    end_date = datetime.strptime(data.get('end_date'), '%Y-%m-%d')
+    include_pdf = data.get('include_pdf', True)
+    include_excel = data.get('include_excel', True)
+    doctor_id_param = data.get('doctor_id')  # Safe parsing without type=int
+    
+    if not recipient:
+        return jsonify({'error': 'Email do destinatário é obrigatório'}), 400
+    
+    # Determine doctor - médico usa próprio ID, secretária pode especificar
+    if current_user.is_doctor():
+        doctor_id = current_user.id
+    else:
+        doctor_id = doctor_id_param
+        if not doctor_id:
+            return jsonify({'error': 'Especifique o médico'}), 400
+    
+    doctor = User.query.get(doctor_id)
+    if not doctor:
+        return jsonify({'error': 'Médico não encontrado'}), 404
+    
+    appointments = Appointment.query.filter(
+        Appointment.doctor_id == doctor_id,
+        Appointment.start_time >= start_date,
+        Appointment.start_time <= end_date
+    ).order_by(Appointment.start_time).all()
+    
+    pdf_buffer = None
+    excel_buffer = None
+    
+    if include_pdf:
+        exporter = PDFExporter()
+        pdf_buffer = exporter.export_agenda(appointments, (start_date, end_date), doctor.name)
+    
+    if include_excel:
+        exporter = ExcelExporter()
+        excel_buffer = exporter.export_agenda(appointments, (start_date, end_date), doctor.name)
+    
+    email_service = EmailService(mail)
+    success = email_service.send_agenda_report(
+        recipient,
+        pdf_buffer=pdf_buffer,
+        excel_buffer=excel_buffer,
+        date_range=(start_date, end_date),
+        doctor_name=doctor.name
+    )
+    
+    if success:
+        return jsonify({'success': True, 'message': 'Email enviado com sucesso'})
+    else:
+        return jsonify({'error': 'Erro ao enviar email'}), 500
 
 @app.route('/prontuario/<int:patient_id>')
 @login_required

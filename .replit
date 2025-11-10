@@ -5,6 +5,7 @@ integrations = ["flask_authentication:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
+packages = ["freetype", "glibcLocales", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -35,5 +36,5 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 37027
+localPort = 46433
 externalPort = 3000

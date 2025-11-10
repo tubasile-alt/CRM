@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações - Clínica Basile{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4"><i class="bi bi-gear"></i> Configurações do Sistema</h2>
+    
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#rooms">Salas Cirúrgicas</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#doctors">Cores dos Médicos</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#backup">Backup de Dados</a>
+        </li>
+    </ul>
+    
+    <div class="tab-content">
+        <!-- Salas Cirúrgicas -->
+        <div class="tab-pane fade show active" id="rooms">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4>Salas Cirúrgicas</h4>
+                <button class="btn btn-primary" onclick="showNewRoomModal()">
+                    <i class="bi bi-plus-circle"></i> Nova Sala
+                </button>
+            </div>
+            <div id="rooms-list"></div>
+        </div>
+        
+        <!-- Cores dos Médicos -->
+        <div class="tab-pane fade" id="doctors">
+            <h4 class="mb-3">Cores da Agenda por Médico</h4>
+            <p class="text-muted">Escolha uma cor para identificar visualmente os agendamentos de cada médico na agenda.</p>
+            <div id="doctors-list"></div>
+        </div>
+        
+        <!-- Backup -->
+        <div class="tab-pane fade" id="backup">
+            <h4 class="mb-3">Backup de Dados</h4>
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Importante:</strong> Faça backups regulares dos seus dados. Os backups são salvos comprimidos (.gz) para economia de espaço.
+            </div>
+            <button class="btn btn-success mb-3" onclick="createBackup()">
+                <i class="bi bi-cloud-download"></i> Criar Backup Agora
+            </button>
+            <div id="backup-stats" class="mb-3"></div>
+            <div id="backups-list"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Nova Sala -->
+<div class="modal fade" id="newRoomModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nova Sala Cirúrgica</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="roomForm">
+                    <div class="mb-3">
+                        <label class="form-label">Nome da Sala</label>
+                        <input type="text" class="form-control" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Capacidade</label>
+                        <input type="number" class="form-control" name="capacity" value="1" min="1">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_active" checked>
+                        <label class="form-check-label">Sala Ativa</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveRoom()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function loadRooms() {
+    fetch('/configuracoes/api/rooms')
+        .then(r => r.json())
+        .then(rooms => {
+            const list = document.getElementById('rooms-list');
+            list.innerHTML = rooms.map(room => `
+                <div class="card mb-2">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${room.name}</strong>
+                            <span class="badge ${room.is_active ? 'bg-success' : 'bg-secondary'}">
+                                ${room.is_active ? 'Ativa' : 'Inativa'}
+                            </span>
+                            <small class="text-muted ms-2">Capacidade: ${room.capacity}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteRoom(${room.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function loadDoctors() {
+    fetch('/configuracoes/api/doctor-preferences')
+        .then(r => r.json())
+        .then(doctors => {
+            const list = document.getElementById('doctors-list');
+            list.innerHTML = doctors.map(doctor => `
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <strong>${doctor.doctor_name}</strong>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Cor</label>
+                                <input type="color" class="form-control form-control-color" 
+                                       value="${doctor.color}" 
+                                       onchange="updateDoctorColor(${doctor.doctor_id}, this.value)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function loadBackups() {
+    fetch('/configuracoes/api/backup/list')
+        .then(r => r.json())
+        .then(data => {
+            const stats = document.getElementById('backup-stats');
+            stats.innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <h6>Estatísticas de Backup</h6>
+                        <p><strong>Total de backups:</strong> ${data.stats.count}</p>
+                        <p><strong>Espaço usado:</strong> ${data.stats.total_size_mb} MB</p>
+                        ${data.stats.latest ? `<p><strong>Último backup:</strong> ${new Date(data.stats.latest.modified).toLocaleString('pt-BR')}</p>` : ''}
+                    </div>
+                </div>
+            `;
+            
+            const list = document.getElementById('backups-list');
+            list.innerHTML = `<h5 class="mt-3">Backups Disponíveis</h5>`;
+            list.innerHTML += data.backups.map(backup => `
+                <div class="card mb-2">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>${backup.filename}</strong><br>
+                            <small class="text-muted">
+                                ${new Date(backup.modified).toLocaleString('pt-BR')} • 
+                                ${(backup.size / 1024 / 1024).toFixed(2)} MB
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function showNewRoomModal() {
+    new bootstrap.Modal(document.getElementById('newRoomModal')).show();
+}
+
+function saveRoom() {
+    const form = document.getElementById('roomForm');
+    const formData = new FormData(form);
+    const data = {
+        name: formData.get('name'),
+        capacity: parseInt(formData.get('capacity')),
+        is_active: formData.get('is_active') === 'on'
+    };
+    
+    fetch('/configuracoes/api/rooms', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('newRoomModal')).hide();
+            form.reset();
+            loadRooms();
+            showSuccess('Sala criada com sucesso!');
+        }
+    });
+}
+
+function deleteRoom(id) {
+    if (!confirm('Deseja realmente excluir esta sala?')) return;
+    
+    fetch(`/configuracoes/api/rooms/${id}`, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken': getCSRFToken()}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            loadRooms();
+            showSuccess('Sala excluída!');
+        }
+    });
+}
+
+function updateDoctorColor(doctorId, color) {
+    fetch('/configuracoes/api/doctor-preferences', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({ doctor_id: doctorId, color: color })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showSuccess('Cor atualizada!');
+        }
+    });
+}
+
+function createBackup() {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Criando...';
+    
+    fetch('/configuracoes/api/backup/create', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCSRFToken()}
+    })
+    .then(r => r.json())
+    .then(result => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-download"></i> Criar Backup Agora';
+        
+        if (result.success) {
+            showSuccess('Backup criado com sucesso!');
+            loadBackups();
+        } else {
+            showError(result.error);
+        }
+    });
+}
+
+// Load initial data
+document.addEventListener('DOMContentLoaded', () => {
+    loadRooms();
+    loadDoctors();
+    loadBackups();
+});
+</script>
+{% endblock %}

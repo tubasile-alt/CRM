@@ -58,6 +58,10 @@ function saveAppointment() {
     const status = document.getElementById('appointmentStatus').value;
     const notes = document.getElementById('appointmentNotes').value;
     
+    // Get doctor_id if secretary is creating appointment
+    const doctorSelect = document.getElementById('appointmentDoctor');
+    const doctorId = doctorSelect ? parseInt(doctorSelect.value) : null;
+    
     if (!patientName || !start) {
         showAlert('Por favor, preencha os campos obrigatórios.', 'danger');
         return;
@@ -66,19 +70,26 @@ function saveAppointment() {
     const startDate = new Date(start);
     const endDate = new Date(startDate.getTime() + duration * 60000);
     
+    const payload = {
+        patientName: patientName,
+        phone: phone,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        status: status,
+        notes: notes
+    };
+    
+    // Include doctor_id for secretaries
+    if (doctorId) {
+        payload.doctor_id = doctorId;
+    }
+    
     fetch('/api/appointments', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-            patientName: patientName,
-            phone: phone,
-            start: startDate.toISOString(),
-            end: endDate.toISOString(),
-            status: status,
-            notes: notes
-        })
+        body: JSON.stringify(payload)
     })
     .then(response => response.json())
     .then(data => {
