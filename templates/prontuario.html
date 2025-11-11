@@ -81,10 +81,10 @@
                         <a class="nav-link active" data-bs-toggle="tab" href="#queixa">Queixa Principal</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-bs-toggle="tab" href="#anamnese">Anamnese</a>
+                        <a class="nav-link" data-bs-toggle="tab" href="#anamnese">Anamnese / Exame Físico</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" data-bs-toggle="tab" href="#consulta">Consulta</a>
+                        <a class="nav-link" data-bs-toggle="tab" href="#diagnostico">Diagnóstico</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" data-bs-toggle="tab" href="#conduta">Conduta</a>
@@ -146,15 +146,15 @@
                         </button>
                     </div>
 
-                    <div class="tab-pane fade" id="consulta">
+                    <div class="tab-pane fade" id="diagnostico">
                         <div class="mb-3">
-                            <label class="form-label">Evolução e Observações</label>
-                            <button class="btn btn-sm btn-outline-primary float-end" onclick="startDictation('consultaText')">
+                            <label class="form-label">Diagnóstico</label>
+                            <button class="btn btn-sm btn-outline-primary float-end" onclick="startDictation('diagnosticoText')">
                                 <i class="bi bi-mic"></i> Ditado
                             </button>
                         </div>
-                        <textarea class="form-control" id="consultaText" rows="8"></textarea>
-                        <button class="btn btn-primary mt-2" onclick="saveNote('consulta')">
+                        <textarea class="form-control" id="diagnosticoText" rows="8"></textarea>
+                        <button class="btn btn-primary mt-2" onclick="saveNote('diagnostico')">
                             <i class="bi bi-save"></i> Salvar
                         </button>
                     </div>
@@ -167,6 +167,25 @@
                             </button>
                         </div>
                         <textarea class="form-control" id="condutaText" rows="8"></textarea>
+                        
+                        <!-- Seção para Cosmiatria: Procedimentos Planejados com Orçamento e Status -->
+                        <div class="mt-4" id="cosmeticConductSection" style="display:none;">
+                            <h6><i class="bi bi-check2-square"></i> Procedimentos Planejados - Execução</h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Procedimento</th>
+                                            <th style="width: 150px;">Orçamento (R$)</th>
+                                            <th style="width: 120px;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="cosmeticConductBody">
+                                        <!-- Linhas preenchidas via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                         
                         <div class="mt-3" id="conductProceduresSection">
                             <h6>Procedimentos Realizados</h6>
@@ -212,12 +231,19 @@
                                     <select class="form-select" id="newProcedureName">
                                         <option value="">Selecione o procedimento...</option>
                                         <option value="Botox">Botox (6 meses)</option>
-                                        <option value="Sculptra">Sculptra (12 meses)</option>
-                                        <option value="Morpheus8">Morpheus8 (12 meses)</option>
+                                        <option value="Preenchimento">Preenchimento (12 meses)</option>
+                                        <option value="MD Codes">MD Codes (12 meses)</option>
+                                        <option value="Pearl Fracionado">Pearl Fracionado (6 meses)</option>
                                         <option value="Ulthera">Ulthera (18 meses)</option>
-                                        <option value="Exilis">Exilis (6 meses)</option>
+                                        <option value="Morpheus">Morpheus (12 meses)</option>
+                                        <option value="Sculptra">Sculptra (18 meses)</option>
+                                        <option value="Radiesse">Radiesse (12 meses)</option>
+                                        <option value="Harmonyca">Harmonyca (12 meses)</option>
+                                        <option value="Profhilo">Profhilo (6 meses)</option>
                                         <option value="Emsculpt Neo">Emsculpt Neo (12 meses)</option>
-                                        <option value="Entone">Entone (6 meses)</option>
+                                        <option value="Exilis">Exilis (6 meses)</option>
+                                        <option value="Emtone">Emtone (6 meses)</option>
+                                        <option value="Peeling">Peeling (3 meses)</option>
                                         <option value="Outros">Outros</option>
                                     </select>
                                 </div>
@@ -251,57 +277,75 @@
                     <div class="tab-pane fade" id="transplante">
                         <h6 class="mb-3"><i class="bi bi-scissors"></i> Dados do Transplante Capilar</h6>
                         
+                        <!-- Histórico de Transplante -->
+                        <div class="mb-4">
+                            <label class="form-label"><strong>Histórico de Transplante Capilar</strong></label>
+                            <div class="mb-2">
+                                <label class="form-label">Já realizou transplante capilar anteriormente?</label>
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="previousTransplant" id="previousNo" value="nao" checked onchange="toggleTransplantLocation()">
+                                    <label class="btn btn-outline-secondary" for="previousNo">Não</label>
+                                    
+                                    <input type="radio" class="btn-check" name="previousTransplant" id="previousYes" value="sim" onchange="toggleTransplantLocation()">
+                                    <label class="btn btn-outline-primary" for="previousYes">Sim</label>
+                                </div>
+                            </div>
+                            <div id="transplantLocationSection" style="display:none;" class="mt-2">
+                                <label class="form-label">Onde foi realizado?</label>
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="transplantLocation" id="locationICB" value="ICB">
+                                    <label class="btn btn-outline-info" for="locationICB">ICB</label>
+                                    
+                                    <input type="radio" class="btn-check" name="transplantLocation" id="locationOther" value="outro_servico">
+                                    <label class="btn btn-outline-warning" for="locationOther">Outro Serviço</label>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <!-- Classificação de Norwood -->
                         <div class="mb-4">
-                            <label class="form-label"><strong>Classificação de Norwood</strong></label>
+                            <label class="form-label"><strong>Classificação de Norwood (Nível de Calvície)</strong></label>
                             <div class="row g-2">
-                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="I">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('I')">
+                                <div class="col-6 col-md-4 col-lg-2" data-norwood="1">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('1')">
                                         <div class="norwood-icon mb-1">👤</div>
-                                        <small><strong>Norwood I</strong></small>
-                                        <input type="radio" name="norwood" value="I" style="display:none;">
+                                        <small><strong>Norwood 1</strong></small>
+                                        <input type="radio" name="norwood" value="1" style="display:none;">
                                     </div>
                                 </div>
-                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="II">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('II')">
+                                <div class="col-6 col-md-4 col-lg-2" data-norwood="2">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('2')">
                                         <div class="norwood-icon mb-1">👤</div>
-                                        <small><strong>Norwood II</strong></small>
-                                        <input type="radio" name="norwood" value="II" style="display:none;">
+                                        <small><strong>Norwood 2</strong></small>
+                                        <input type="radio" name="norwood" value="2" style="display:none;">
                                     </div>
                                 </div>
-                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="III">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('III')">
+                                <div class="col-6 col-md-4 col-lg-2" data-norwood="3">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('3')">
                                         <div class="norwood-icon mb-1">👤</div>
-                                        <small><strong>Norwood III</strong></small>
-                                        <input type="radio" name="norwood" value="III" style="display:none;">
+                                        <small><strong>Norwood 3</strong></small>
+                                        <input type="radio" name="norwood" value="3" style="display:none;">
                                     </div>
                                 </div>
-                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="IV">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('IV')">
+                                <div class="col-6 col-md-4 col-lg-2" data-norwood="4">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('4')">
                                         <div class="norwood-icon mb-1">👤</div>
-                                        <small><strong>Norwood IV</strong></small>
-                                        <input type="radio" name="norwood" value="IV" style="display:none;">
+                                        <small><strong>Norwood 4</strong></small>
+                                        <input type="radio" name="norwood" value="4" style="display:none;">
                                     </div>
                                 </div>
-                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="V">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('V')">
+                                <div class="col-6 col-md-4 col-lg-2" data-norwood="5">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('5')">
                                         <div class="norwood-icon mb-1">👤</div>
-                                        <small><strong>Norwood V</strong></small>
-                                        <input type="radio" name="norwood" value="V" style="display:none;">
+                                        <small><strong>Norwood 5</strong></small>
+                                        <input type="radio" name="norwood" value="5" style="display:none;">
                                     </div>
                                 </div>
-                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="VI">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('VI')">
+                                <div class="col-6 col-md-4 col-lg-2" data-norwood="6">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('6')">
                                         <div class="norwood-icon mb-1">👤</div>
-                                        <small><strong>Norwood VI</strong></small>
-                                        <input type="radio" name="norwood" value="VI" style="display:none;">
-                                    </div>
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="VII">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('VII')">
-                                        <div class="norwood-icon mb-1">👤</div>
-                                        <small><strong>Norwood VII</strong></small>
-                                        <input type="radio" name="norwood" value="VII" style="display:none;">
+                                        <small><strong>Norwood 6</strong></small>
+                                        <input type="radio" name="norwood" value="6" style="display:none;">
                                     </div>
                                 </div>
                             </div>

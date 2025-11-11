@@ -192,6 +192,7 @@ class CosmeticProcedurePlan(db.Model):
     note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
     procedure_name = db.Column(db.String(100), nullable=False)  # Botox, Sculptra, Morpheus, etc
     planned_value = db.Column(db.Numeric(10, 2))  # Valor planejado (precisão decimal para valores monetários)
+    final_budget = db.Column(db.Numeric(10, 2))  # Orçamento final ajustado
     was_performed = db.Column(db.Boolean, default=False)  # Se foi realizado
     performed_date = db.Column(db.DateTime)  # Data de realização
     follow_up_months = db.Column(db.Integer)  # Intervalo de retorno em meses
@@ -202,7 +203,9 @@ class HairTransplant(db.Model):
     __tablename__ = 'hair_transplant'
     id = db.Column(db.Integer, primary_key=True)
     note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
-    norwood_classification = db.Column(db.String(20))  # I, II, III, IV, V, VI, VII
+    norwood_classification = db.Column(db.String(20))  # 1, 2, 3, 4, 5, 6
+    previous_transplant = db.Column(db.String(10))  # 'sim' ou 'nao'
+    transplant_location = db.Column(db.String(50))  # 'ICB' ou 'outro_servico'
     case_type = db.Column(db.String(50))  # 'primaria' ou 'secundaria'
     number_of_surgeries = db.Column(db.Integer, default=1)  # 1 ou 2 cirurgias planejadas
     body_hair_needed = db.Column(db.Boolean, default=False)

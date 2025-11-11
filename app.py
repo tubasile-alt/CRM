@@ -182,7 +182,9 @@ def get_appointments():
 @app.route('/api/appointments', methods=['POST'])
 @login_required
 def create_appointment():
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
     # Se secretária, doctor_id vem do payload. Se médico, usa próprio ID
     doctor_id = data.get('doctor_id') if not current_user.is_doctor() else get_doctor_id()
@@ -219,7 +221,9 @@ def create_appointment():
 @login_required
 def update_appointment(id):
     appointment = Appointment.query.get_or_404(id)
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
     if 'start' in data:
         appointment.start_time = datetime.fromisoformat(data['start'])
@@ -329,7 +333,10 @@ def send_agenda_email():
     from utils.exports.excel_export import ExcelExporter
     from services.email_service import EmailService
     
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'error': 'Dados inválidos'}), 400
+    
     recipient = data.get('recipient')
     start_date = datetime.strptime(data.get('start_date'), '%Y-%m-%d')
     end_date = datetime.strptime(data.get('end_date'), '%Y-%m-%d')
@@ -409,7 +416,9 @@ def save_prontuario(patient_id):
     if not current_user.is_doctor():
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
     
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
     note = Note(
         patient_id=patient_id,
@@ -463,7 +472,9 @@ def save_cosmetic_plan(patient_id):
     from models import CosmeticProcedurePlan, FollowUpReminder
     from datetime import timedelta
     
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
     # Criar nota principal
     note = Note(
@@ -482,6 +493,8 @@ def save_cosmetic_plan(patient_id):
             note_id=note.id,
             procedure_name=proc['name'],
             planned_value=float(proc['value']),
+            final_budget=float(proc.get('budget', proc['value'])),
+            was_performed=bool(proc.get('performed', False)),
             follow_up_months=int(proc['months'])
         )
         db.session.add(plan)
@@ -509,7 +522,10 @@ def generate_budget_pdf(patient_id):
     
     from utils.exports.budget_export import BudgetExporter
     
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+    
     patient = Patient.query.get_or_404(patient_id)
     
     exporter = BudgetExporter()
@@ -581,6 +597,8 @@ def save_hair_transplant(patient_id):
     transplant = HairTransplant(
         note_id=note.id,
         norwood_classification=request.form.get('norwood'),
+        previous_transplant=request.form.get('previous_transplant', 'nao'),
+        transplant_location=request.form.get('transplant_location'),
         case_type=request.form.get('case_type'),
         body_hair_needed=request.form.get('body_hair') == 'true',
         eyebrow_transplant=request.form.get('eyebrow_transplant') == 'true',
@@ -654,7 +672,9 @@ def save_hair_transplant(patient_id):
 @app.route('/api/patient/<int:patient_id>/tags', methods=['POST'])
 @login_required
 def update_patient_tags(patient_id):
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
     PatientTag.query.filter_by(patient_id=patient_id).delete()
     
@@ -706,20 +726,20 @@ def get_messages():
 @app.route('/api/chat/send', methods=['POST'])
 @login_required
 def send_message():
-    data = request.json
+    data = request.get_json(silent=True) or request.form
     
     recipient_id = data.get('recipient_id')
     if not recipient_id:
         return jsonify({'error': 'recipient_id é obrigatório'}), 400
     
-    recipient = User.query.get(recipient_id)
+    recipient = User.query.get(int(recipient_id))
     if not recipient:
         return jsonify({'error': 'Destinatário não encontrado'}), 404
     
     message = ChatMessage(
         sender_id=current_user.id,
-        recipient_id=recipient_id,
-        message=data['message']
+        recipient_id=int(recipient_id),
+        message=data.get('message', '')
     )
     
     db.session.add(message)
@@ -730,7 +750,10 @@ def send_message():
 @app.route('/api/chat/mark_read', methods=['POST'])
 @login_required
 def mark_messages_read():
-    from_user_id = request.json.get('from_user_id') if request.json else None
+    data = request.get_json(silent=True) or request.form
+    from_user_id = data.get('from_user_id')
+    if from_user_id:
+        from_user_id = int(from_user_id)
     
     query = db.session.query(ChatMessage.id).filter(
         ChatMessage.recipient_id == current_user.id

@@ -87,7 +87,9 @@ def create_surgery():
     if not current_user.is_secretary():
         return jsonify({'error': 'Apenas a secretária pode criar cirurgias'}), 403
     
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'error': 'Dados inválidos'}), 400
     
     try:
         # Validar e obter doctor_id (obrigatório)
@@ -153,7 +155,10 @@ def update_surgery(surgery_id):
     if not surgery:
         return jsonify({'error': 'Cirurgia não encontrada'}), 404
     
-    data = request.json
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'error': 'Dados inválidos'}), 400
+    
     updates = {}
     
     if 'patient_name' in data:

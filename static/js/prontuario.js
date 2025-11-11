@@ -245,19 +245,23 @@ function toggleCategoryTabs() {
     const tabPlanejamento = document.getElementById('tabPlanejamento');
     const tabTransplante = document.getElementById('tabTransplante');
     const conductProcedures = document.getElementById('conductProceduresSection');
+    const cosmeticConductSection = document.getElementById('cosmeticConductSection');
     
     if (currentCategory === 'cosmiatria') {
         tabPlanejamento.style.display = '';
         tabTransplante.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = 'none';
+        if (cosmeticConductSection) cosmeticConductSection.style.display = '';
     } else if (currentCategory === 'transplante_capilar') {
         tabPlanejamento.style.display = 'none';
         tabTransplante.style.display = '';
         if (conductProcedures) conductProcedures.style.display = 'none';
+        if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
     } else {
         tabPlanejamento.style.display = 'none';
         tabTransplante.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = '';
+        if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
     }
 }
 
@@ -277,8 +281,9 @@ function addCosmeticProcedure() {
         return;
     }
     
-    cosmeticProcedures.push({ name, value, months });
+    cosmeticProcedures.push({ name, value, months, budget: value, performed: false });
     renderCosmeticProcedures();
+    renderCosmeticConduct();
     updateCosmeticTotal();
     
     // Limpar campos
@@ -290,6 +295,7 @@ function addCosmeticProcedure() {
 function removeCosmeticProcedure(index) {
     cosmeticProcedures.splice(index, 1);
     renderCosmeticProcedures();
+    renderCosmeticConduct();
     updateCosmeticTotal();
 }
 
@@ -315,6 +321,44 @@ function renderCosmeticProcedures() {
 function updateCosmeticTotal() {
     const total = cosmeticProcedures.reduce((sum, proc) => sum + proc.value, 0);
     document.getElementById('cosmeticTotal').textContent = total.toFixed(2).replace('.', ',');
+}
+
+// ========== COSMIATRIA: ABA CONDUTA - EXECUÇÃO ==========
+function renderCosmeticConduct() {
+    const tbody = document.getElementById('cosmeticConductBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+    
+    cosmeticProcedures.forEach((proc, index) => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td>${proc.name}</td>
+            <td>
+                <input type="number" 
+                       class="form-control form-control-sm" 
+                       value="${proc.budget || proc.value}" 
+                       onchange="updateProcedureBudget(${index}, this.value)"
+                       step="0.01">
+            </td>
+            <td class="text-center">
+                <button class="btn btn-sm ${proc.performed ? 'btn-success' : 'btn-outline-secondary'}" 
+                        onclick="toggleProcedurePerformed(${index})">
+                    <i class="bi ${proc.performed ? 'bi-check-circle-fill' : 'bi-circle'}"></i>
+                    ${proc.performed ? 'Feito' : 'Não Feito'}
+                </button>
+            </td>
+        `;
+    });
+}
+
+function updateProcedureBudget(index, value) {
+    cosmeticProcedures[index].budget = parseFloat(value) || 0;
+}
+
+function toggleProcedurePerformed(index) {
+    cosmeticProcedures[index].performed = !cosmeticProcedures[index].performed;
+    renderCosmeticConduct();
 }
 
 function saveCosmeticPlan() {
@@ -390,6 +434,17 @@ function generateBudget() {
 // ========== TRANSPLANTE CAPILAR ==========
 let selectedNorwood = null;
 
+function toggleTransplantLocation() {
+    const previousYes = document.getElementById('previousYes');
+    const locationSection = document.getElementById('transplantLocationSection');
+    
+    if (previousYes && previousYes.checked) {
+        locationSection.style.display = '';
+    } else {
+        locationSection.style.display = 'none';
+    }
+}
+
 function selectNorwood(classification) {
     // Remover seleção anterior
     document.querySelectorAll('.norwood-card').forEach(card => {
@@ -413,6 +468,17 @@ function saveHairTransplant() {
     const formData = new FormData();
     formData.append('category', 'transplante_capilar');
     formData.append('norwood', selectedNorwood);
+    formData.append('previous_transplant', document.querySelector('input[name="previousTransplant"]:checked').value);
+    
+    // Se já fez transplante, adicionar local
+    const previousYes = document.getElementById('previousYes');
+    if (previousYes && previousYes.checked) {
+        const location = document.querySelector('input[name="transplantLocation"]:checked');
+        if (location) {
+            formData.append('transplant_location', location.value);
+        }
+    }
+    
     formData.append('case_type', document.querySelector('input[name="caseType"]:checked').value);
     formData.append('body_hair', document.getElementById('bodyHair').checked);
     formData.append('eyebrow_transplant', document.getElementById('eyebrowTransplant').checked);
