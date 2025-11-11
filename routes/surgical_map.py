@@ -54,15 +54,21 @@ def get_weekly_map():
         }
         
         for surgery in data['surgeries']:
+            # Calcular duração em minutos
+            start_dt = datetime.combine(datetime.today(), surgery.start_time)
+            end_dt = datetime.combine(datetime.today(), surgery.end_time)
+            duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
+            
             room_data['surgeries'].append({
                 'id': surgery.id,
                 'doctor_id': surgery.doctor_id,
                 'doctor_name': surgery.doctor.name,
                 'patient_name': surgery.patient_name,
-                'procedure_type': surgery.procedure_type,
-                'scheduled_date': surgery.scheduled_date.isoformat(),
-                'scheduled_time': surgery.scheduled_time.strftime('%H:%M'),
-                'duration_minutes': surgery.duration_minutes,
+                'procedure_name': surgery.procedure_name,
+                'date': surgery.date.isoformat(),
+                'start_time': surgery.start_time.strftime('%H:%M'),
+                'end_time': surgery.end_time.strftime('%H:%M'),
+                'duration_minutes': duration_minutes,
                 'status': surgery.status,
                 'notes': surgery.notes
             })
@@ -81,19 +87,25 @@ def create_surgery():
     data = request.json
     
     try:
-        scheduled_date = datetime.strptime(data['scheduled_date'], '%Y-%m-%d').date()
-        scheduled_time = datetime.strptime(data['scheduled_time'], '%H:%M').time()
+        date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+        start_time = datetime.strptime(data['start_time'], '%H:%M').time()
         
         surgery = surgery_service.create_surgery(
             doctor_id=current_user.id,
             patient_name=data['patient_name'],
-            procedure_type=data['procedure_type'],
-            room_id=data['room_id'],
-            scheduled_date=scheduled_date,
-            scheduled_time=scheduled_time,
+            procedure_name=data['procedure_name'],
+            operating_room_id=data['operating_room_id'],
+            date=date,
+            start_time=start_time,
             duration_minutes=data['duration_minutes'],
-            notes=data.get('notes')
+            notes=data.get('notes'),
+            created_by=current_user.id
         )
+        
+        # Calcular duração
+        start_dt = datetime.combine(datetime.today(), surgery.start_time)
+        end_dt = datetime.combine(datetime.today(), surgery.end_time)
+        duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
         
         return jsonify({
             'success': True,
@@ -101,10 +113,11 @@ def create_surgery():
                 'id': surgery.id,
                 'doctor_name': surgery.doctor.name,
                 'patient_name': surgery.patient_name,
-                'procedure_type': surgery.procedure_type,
-                'scheduled_date': surgery.scheduled_date.isoformat(),
-                'scheduled_time': surgery.scheduled_time.strftime('%H:%M'),
-                'duration_minutes': surgery.duration_minutes,
+                'procedure_name': surgery.procedure_name,
+                'date': surgery.date.isoformat(),
+                'start_time': surgery.start_time.strftime('%H:%M'),
+                'end_time': surgery.end_time.strftime('%H:%M'),
+                'duration_minutes': duration_minutes,
                 'status': surgery.status
             }
         })
@@ -130,20 +143,22 @@ def update_surgery(surgery_id):
     
     if 'patient_name' in data:
         updates['patient_name'] = data['patient_name']
-    if 'procedure_type' in data:
-        updates['procedure_type'] = data['procedure_type']
-    if 'room_id' in data:
-        updates['room_id'] = data['room_id']
-    if 'scheduled_date' in data:
-        updates['scheduled_date'] = datetime.strptime(data['scheduled_date'], '%Y-%m-%d').date()
-    if 'scheduled_time' in data:
-        updates['scheduled_time'] = datetime.strptime(data['scheduled_time'], '%H:%M').time()
+    if 'procedure_name' in data:
+        updates['procedure_name'] = data['procedure_name']
+    if 'operating_room_id' in data:
+        updates['operating_room_id'] = data['operating_room_id']
+    if 'date' in data:
+        updates['date'] = datetime.strptime(data['date'], '%Y-%m-%d').date()
+    if 'start_time' in data:
+        updates['start_time'] = datetime.strptime(data['start_time'], '%H:%M').time()
     if 'duration_minutes' in data:
         updates['duration_minutes'] = data['duration_minutes']
     if 'status' in data:
         updates['status'] = data['status']
     if 'notes' in data:
         updates['notes'] = data['notes']
+    if 'updated_by' not in updates:
+        updates['updated_by'] = current_user.id
     
     try:
         surgery = surgery_service.update_surgery(surgery_id, **updates)
