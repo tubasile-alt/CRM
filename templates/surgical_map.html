@@ -78,6 +78,15 @@
                         <input type="text" class="form-control" name="patient_name" required>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Médico Responsável</label>
+                        <select class="form-select" name="doctor_id" required>
+                            <option value="">Selecione...</option>
+                            {% for doctor in doctors %}
+                            <option value="{{ doctor.id }}">{{ doctor.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Procedimento</label>
                         <input type="text" class="form-control" name="procedure_type" required>
                     </div>
@@ -226,9 +235,14 @@ function saveSurgery() {
             'X-CSRFToken': getCSRFToken()
         },
         body: JSON.stringify({
-            ...data,
-            room_id: parseInt(data.room_id),
-            duration_minutes: parseInt(data.duration_minutes)
+            patient_name: data.patient_name,
+            doctor_id: parseInt(data.doctor_id),
+            procedure_name: data.procedure_type,
+            operating_room_id: parseInt(data.room_id),
+            date: data.scheduled_date,
+            start_time: data.scheduled_time,
+            duration_minutes: parseInt(data.duration_minutes),
+            notes: data.notes || ''
         })
     })
     .then(r => r.json())
@@ -237,11 +251,22 @@ function saveSurgery() {
             bootstrap.Modal.getInstance(document.getElementById('newSurgeryModal')).hide();
             form.reset();
             loadWeeklyMap();
-            showSuccess('Cirurgia agendada com sucesso!');
+            showAlert('Cirurgia agendada com sucesso!', 'success');
         } else {
-            showError(result.error || 'Erro ao agendar cirurgia');
+            showAlert(result.error || 'Erro ao agendar cirurgia', 'danger');
         }
+    })
+    .catch(err => {
+        showAlert('Erro ao agendar cirurgia', 'danger');
     });
+}
+
+function showSuccess(message) {
+    showAlert(message, 'success');
+}
+
+function showError(message) {
+    showAlert(message, 'danger');
 }
 
 function deleteSurgery(id) {

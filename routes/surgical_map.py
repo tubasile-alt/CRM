@@ -90,11 +90,23 @@ def create_surgery():
     data = request.json
     
     try:
+        # Validar e obter doctor_id
+        doctor_id = data.get('doctor_id')
+        if doctor_id:
+            doctor_id = int(doctor_id)
+            # Validar se é um médico válido
+            doctor = User.query.filter_by(id=doctor_id, role='medico').first()
+            if not doctor:
+                return jsonify({'error': 'Médico inválido'}), 400
+        else:
+            # Default para o médico logado
+            doctor_id = current_user.id
+        
         date = datetime.strptime(data['date'], '%Y-%m-%d').date()
         start_time = datetime.strptime(data['start_time'], '%H:%M').time()
         
         surgery = surgery_service.create_surgery(
-            doctor_id=current_user.id,
+            doctor_id=doctor_id,
             patient_name=data['patient_name'],
             procedure_name=data['procedure_name'],
             operating_room_id=data['operating_room_id'],
@@ -114,6 +126,7 @@ def create_surgery():
             'success': True,
             'surgery': {
                 'id': surgery.id,
+                'doctor_id': surgery.doctor_id,
                 'doctor_name': surgery.doctor.name,
                 'patient_name': surgery.patient_name,
                 'procedure_name': surgery.procedure_name,
