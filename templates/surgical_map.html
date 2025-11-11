@@ -157,7 +157,15 @@ function loadWeeklyMap() {
                 
                 room.surgeries.forEach(surgery => {
                     const surgeryCard = createSurgeryCard(surgery);
-                    document.getElementById(`room-${room.id}`).innerHTML += surgeryCard;
+                    const roomElement = document.getElementById(`room-${room.id}`);
+                    if (roomElement) {
+                        // Remover mensagem "Nenhuma cirurgia agendada" se existir
+                        const noSurgeriesMsg = roomElement.querySelector('p.text-muted');
+                        if (noSurgeriesMsg) {
+                            noSurgeriesMsg.remove();
+                        }
+                        roomElement.innerHTML += surgeryCard;
+                    }
                 });
             });
             
