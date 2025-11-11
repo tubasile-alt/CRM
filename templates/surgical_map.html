@@ -171,13 +171,14 @@ function loadWeeklyMap() {
 }
 
 function createSurgeryCard(surgery) {
+    const duration = formatDuration(surgery.duration_minutes);
     return `
         <div class="surgery-card card mb-2">
             <div class="card-body py-2">
                 <div class="d-flex justify-content-between">
                     <div>
                         <strong>${surgery.patient_name}</strong>
-                        <div class="time-slot">${surgery.date} • ${surgery.start_time} • ${surgery.duration_minutes}min</div>
+                        <div class="time-slot">${surgery.date} • ${surgery.start_time} • ${duration}</div>
                         <small class="text-muted">${surgery.procedure_name} - ${surgery.doctor_name}</small>
                     </div>
                     {% if current_user.is_doctor() %}
@@ -191,6 +192,19 @@ function createSurgeryCard(surgery) {
             </div>
         </div>
     `;
+}
+
+function formatDuration(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    
+    if (hours === 0) {
+        return `${mins}min`;
+    } else if (mins === 0) {
+        return `${hours}h`;
+    } else {
+        return `${hours}h${mins}`;
+    }
 }
 
 function formatDate(dateStr) {
