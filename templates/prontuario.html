@@ -168,7 +168,7 @@
                         </div>
                         <textarea class="form-control" id="condutaText" rows="8"></textarea>
                         
-                        <div class="mt-3">
+                        <div class="mt-3" id="conductProceduresSection">
                             <h6>Procedimentos Realizados</h6>
                             {% for proc in procedures %}
                             <div class="form-check">
@@ -183,6 +183,222 @@
                         
                         <button class="btn btn-primary mt-2" onclick="saveNote('conduta')">
                             <i class="bi bi-save"></i> Salvar
+                        </button>
+                    </div>
+
+                    <!-- ABA PLANEJAMENTO CLÍNICO (COSMIATRIA) -->
+                    <div class="tab-pane fade" id="planejamento">
+                        <h6 class="mb-3"><i class="bi bi-calendar-check"></i> Planejamento Clínico Cosmético</h6>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm" id="cosmeticPlanTable">
+                                <thead>
+                                    <tr>
+                                        <th>Procedimento</th>
+                                        <th style="width: 150px;">Valor (R$)</th>
+                                        <th style="width: 120px;">Retorno (meses)</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cosmeticPlanBody">
+                                    <!-- Linhas serão adicionadas via JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="row g-2">
+                                <div class="col-md-5">
+                                    <select class="form-select" id="newProcedureName">
+                                        <option value="">Selecione o procedimento...</option>
+                                        <option value="Botox">Botox (6 meses)</option>
+                                        <option value="Sculptra">Sculptra (12 meses)</option>
+                                        <option value="Morpheus8">Morpheus8 (12 meses)</option>
+                                        <option value="Ulthera">Ulthera (18 meses)</option>
+                                        <option value="Exilis">Exilis (6 meses)</option>
+                                        <option value="Emsculpt Neo">Emsculpt Neo (12 meses)</option>
+                                        <option value="Entone">Entone (6 meses)</option>
+                                        <option value="Outros">Outros</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="number" class="form-control" id="newProcedureValue" placeholder="Valor (R$)" step="0.01">
+                                </div>
+                                <div class="col-md-2">
+                                    <input type="number" class="form-control" id="newProcedureMonths" placeholder="Meses" value="6">
+                                </div>
+                                <div class="col-md-2">
+                                    <button class="btn btn-success w-100" onclick="addCosmeticProcedure()">
+                                        <i class="bi bi-plus-circle"></i> Adicionar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <strong>Total Estimado:</strong> R$ <span id="cosmeticTotal">0,00</span>
+                        </div>
+                        
+                        <button class="btn btn-primary me-2" onclick="saveCosmeticPlan()">
+                            <i class="bi bi-save"></i> Salvar Planejamento
+                        </button>
+                        <button class="btn btn-success" onclick="generateBudget()">
+                            <i class="bi bi-file-pdf"></i> Gerar Orçamento PDF
+                        </button>
+                    </div>
+
+                    <!-- ABA DADOS CIRÚRGICOS (TRANSPLANTE CAPILAR) -->
+                    <div class="tab-pane fade" id="transplante">
+                        <h6 class="mb-3"><i class="bi bi-scissors"></i> Dados do Transplante Capilar</h6>
+                        
+                        <!-- Classificação de Norwood -->
+                        <div class="mb-4">
+                            <label class="form-label"><strong>Classificação de Norwood</strong></label>
+                            <div class="row g-2">
+                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="I">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('I')">
+                                        <div class="norwood-icon mb-1">👤</div>
+                                        <small><strong>Norwood I</strong></small>
+                                        <input type="radio" name="norwood" value="I" style="display:none;">
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="II">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('II')">
+                                        <div class="norwood-icon mb-1">👤</div>
+                                        <small><strong>Norwood II</strong></small>
+                                        <input type="radio" name="norwood" value="II" style="display:none;">
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="III">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('III')">
+                                        <div class="norwood-icon mb-1">👤</div>
+                                        <small><strong>Norwood III</strong></small>
+                                        <input type="radio" name="norwood" value="III" style="display:none;">
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="IV">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('IV')">
+                                        <div class="norwood-icon mb-1">👤</div>
+                                        <small><strong>Norwood IV</strong></small>
+                                        <input type="radio" name="norwood" value="IV" style="display:none;">
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="V">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('V')">
+                                        <div class="norwood-icon mb-1">👤</div>
+                                        <small><strong>Norwood V</strong></small>
+                                        <input type="radio" name="norwood" value="V" style="display:none;">
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="VI">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('VI')">
+                                        <div class="norwood-icon mb-1">👤</div>
+                                        <small><strong>Norwood VI</strong></small>
+                                        <input type="radio" name="norwood" value="VI" style="display:none;">
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-3" style="max-width: 150px;" data-norwood="VII">
+                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('VII')">
+                                        <div class="norwood-icon mb-1">👤</div>
+                                        <small><strong>Norwood VII</strong></small>
+                                        <input type="radio" name="norwood" value="VII" style="display:none;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Upload de Imagens -->
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Anexos da Consulta</strong></label>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label class="form-label small">Foto da Consulta <span class="text-danger">*</span></label>
+                                    <input type="file" class="form-control form-control-sm" id="consultationPhoto" accept="image/*">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">Planejamento Cirúrgico</label>
+                                    <input type="file" class="form-control form-control-sm" id="surgicalPlanImage" accept="image/*">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small">Simulação Visual</label>
+                                    <input type="file" class="form-control form-control-sm" id="simulationImage" accept="image/*">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tipo de Caso -->
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Tipo de Caso</strong></label>
+                            <div class="btn-group" role="group">
+                                <input type="radio" class="btn-check" name="caseType" id="casePrimary" value="primaria" checked>
+                                <label class="btn btn-outline-primary" for="casePrimary">Cirurgia Primária</label>
+                                
+                                <input type="radio" class="btn-check" name="caseType" id="caseSecondary" value="secundaria">
+                                <label class="btn btn-outline-warning" for="caseSecondary">Cirurgia Secundária</label>
+                            </div>
+                        </div>
+
+                        <!-- Número de Cirurgias e Áreas -->
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Planejamento de Cirurgias e Áreas</strong></label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="singleSurgery" value="1" checked>
+                                        <label class="form-check-label" for="singleSurgery">Uma única cirurgia</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="twoSurgeries">
+                                        <label class="form-check-label" for="twoSurgeries">Duas cirurgias planejadas</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="bodyHair">
+                                        <label class="form-check-label" for="bodyHair">Body hair transplant</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="eyebrowTransplant">
+                                        <label class="form-check-label" for="eyebrowTransplant">Transplante de sobrancelha</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="beardTransplant">
+                                        <label class="form-check-label" for="beardTransplant">Transplante de barba</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Indicações Cirúrgicas -->
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Indicações Cirúrgicas</strong></label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="frontalTransplant">
+                                <label class="form-check-label" for="frontalTransplant">Transplante capilar frontal</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="crownTransplant">
+                                <label class="form-check-label" for="crownTransplant">Transplante capilar em coroa</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="completeTransplant">
+                                <label class="form-check-label" for="completeTransplant">Transplante capilar completo</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="completeBodyHair">
+                                <label class="form-check-label" for="completeBodyHair">Transplante capilar completo com body hair</label>
+                            </div>
+                        </div>
+
+                        <!-- Planejamento Cirúrgico -->
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Planejamento Cirúrgico</strong></label>
+                            <textarea class="form-control" id="surgicalPlanning" rows="6" 
+                                placeholder="Descreva: linha frontal, número estimado de UF, estratégia de extração, distribuição de áreas receptoras, densidade planejada..."></textarea>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="saveHairTransplant()">
+                            <i class="bi bi-save"></i> Salvar Dados Cirúrgicos
                         </button>
                     </div>
                 </div>

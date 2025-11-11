@@ -451,6 +451,204 @@ def save_prontuario(patient_id):
     
     return jsonify({'success': True, 'note_id': note.id})
 
+@app.route('/api/prontuario/<int:patient_id>/cosmetic-plan', methods=['POST'])
+@login_required
+def save_cosmetic_plan(patient_id):
+    """Salva planejamento cosmético com procedimentos e valores"""
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    from models import CosmeticProcedurePlan, FollowUpReminder
+    from datetime import timedelta
+    
+    data = request.json
+    
+    # Criar nota principal
+    note = Note(
+        patient_id=patient_id,
+        doctor_id=current_user.id,
+        note_type='cosmiatria',
+        category='cosmiatria',
+        content=f"Anamnese: {data.get('anamnese', '')}\n\nConduta: {data.get('conduta', '')}"
+    )
+    db.session.add(note)
+    db.session.flush()
+    
+    # Adicionar procedimentos ao planejamento
+    for proc in data.get('procedures', []):
+        plan = CosmeticProcedurePlan(
+            note_id=note.id,
+            procedure_name=proc['name'],
+            planned_value=float(proc['value']),
+            follow_up_months=int(proc['months'])
+        )
+        db.session.add(plan)
+        
+        # Criar lembrete automático de follow-up (usando timezone correto)
+        follow_up_date = (get_brazil_time() + timedelta(days=30 * int(proc['months']))).date()
+        reminder = FollowUpReminder(
+            patient_id=patient_id,
+            procedure_name=proc['name'],
+            scheduled_date=follow_up_date,
+            reminder_type='cosmetic_follow_up',
+            notes=f"Retorno para {proc['name']}"
+        )
+        db.session.add(reminder)
+    
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/prontuario/<int:patient_id>/generate-budget', methods=['POST'])
+@login_required
+def generate_budget_pdf(patient_id):
+    """Gera orçamento PDF de procedimentos cosméticos"""
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    from utils.exports.budget_export import BudgetExporter
+    
+    data = request.json
+    patient = Patient.query.get_or_404(patient_id)
+    
+    exporter = BudgetExporter()
+    pdf_buffer = exporter.generate_budget(
+        data.get('procedures', []),
+        patient.name,
+        current_user.name
+    )
+    
+    return pdf_buffer.getvalue(), 200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': f'attachment; filename=orcamento_{patient_id}.pdf'
+    }
+
+@app.route('/api/prontuario/<int:patient_id>/hair-transplant', methods=['POST'])
+@login_required
+def save_hair_transplant(patient_id):
+    """Salva dados de transplante capilar com uploads de imagens"""
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    
+    from models import HairTransplant, TransplantImage, FollowUpReminder
+    from werkzeug.utils import secure_filename
+    import os
+    import imghdr
+    
+    # Validação de upload de imagens
+    ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif'}
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    
+    def allowed_file(filename):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    
+    def validate_image(file):
+        """Valida se o arquivo é realmente uma imagem"""
+        if not file:
+            return False
+        
+        # Verificar extensão
+        if not allowed_file(file.filename):
+            return False
+        
+        # Verificar tamanho
+        file.seek(0, os.SEEK_END)
+        size = file.tell()
+        file.seek(0)
+        if size > MAX_FILE_SIZE:
+            return False
+        
+        # Verificar MIME type lendo os primeiros bytes
+        header = file.read(512)
+        file.seek(0)
+        file_type = imghdr.what(None, header)
+        
+        return file_type in ['jpeg', 'png', 'gif']
+    
+    # Criar nota principal
+    note = Note(
+        patient_id=patient_id,
+        doctor_id=current_user.id,
+        note_type='transplante_capilar',
+        category='transplante_capilar',
+        content=f"Queixa: {request.form.get('queixa', '')}\n\nConduta: {request.form.get('conduta', '')}"
+    )
+    db.session.add(note)
+    db.session.flush()
+    
+    # Criar registro de transplante
+    transplant = HairTransplant(
+        note_id=note.id,
+        norwood_classification=request.form.get('norwood'),
+        case_type=request.form.get('case_type'),
+        body_hair_needed=request.form.get('body_hair') == 'true',
+        eyebrow_transplant=request.form.get('eyebrow_transplant') == 'true',
+        beard_transplant=request.form.get('beard_transplant') == 'true',
+        frontal_transplant=request.form.get('frontal') == 'true',
+        crown_transplant=request.form.get('crown') == 'true',
+        complete_transplant=request.form.get('complete') == 'true',
+        complete_with_body_hair=request.form.get('complete_body_hair') == 'true',
+        surgical_planning=request.form.get('surgical_planning', ''),
+        clinical_conduct=request.form.get('conduta', '')
+    )
+    db.session.add(transplant)
+    db.session.flush()
+    
+    # Upload de imagens (com validação rigorosa)
+    upload_folder = 'uploads/transplant_images'  # Movido para fora de static/
+    os.makedirs(upload_folder, exist_ok=True)
+    
+    image_types = [
+        ('consultation_photo', 'consultation_photo'),
+        ('surgical_plan', 'surgical_plan'),
+        ('simulation', 'simulation')
+    ]
+    
+    for field_name, image_type in image_types:
+        if field_name in request.files:
+            file = request.files[field_name]
+            if file and file.filename:
+                # Validar imagem
+                if not validate_image(file):
+                    db.session.rollback()
+                    return jsonify({
+                        'success': False, 
+                        'error': f'Arquivo {file.filename} inválido. Apenas imagens JPG, PNG ou GIF até 5MB são permitidas.'
+                    }), 400
+                
+                # Gerar nome seguro
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                filename = secure_filename(f"{patient_id}_{image_type}_{int(get_brazil_time().timestamp())}.{ext}")
+                filepath = os.path.join(upload_folder, filename)
+                file.save(filepath)
+                
+                transplant_image = TransplantImage(
+                    hair_transplant_id=transplant.id,
+                    image_type=image_type,
+                    file_path=filepath
+                )
+                db.session.add(transplant_image)
+    
+    # Criar lembretes de follow-up para transplante (usando timezone correto)
+    reminders_schedule = [
+        (7, 'Revisão pós-operatória 7 dias'),
+        (180, 'Avaliação de crescimento 6 meses'),
+        (365, 'Avaliação de resultado 12 meses')
+    ]
+    
+    for days, notes in reminders_schedule:
+        follow_up_date = (get_brazil_time() + timedelta(days=days)).date()
+        reminder = FollowUpReminder(
+            patient_id=patient_id,
+            procedure_name='Transplante Capilar',
+            scheduled_date=follow_up_date,
+            reminder_type='transplant_revision',
+            notes=notes
+        )
+        db.session.add(reminder)
+    
+    db.session.commit()
+    return jsonify({'success': True})
+
 @app.route('/api/patient/<int:patient_id>/tags', methods=['POST'])
 @login_required
 def update_patient_tags(patient_id):
