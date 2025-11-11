@@ -84,23 +84,22 @@ def get_weekly_map():
 @login_required
 def create_surgery():
     """Cria nova cirurgia"""
-    if not current_user.is_doctor():
-        return jsonify({'error': 'Apenas médicos podem criar cirurgias'}), 403
+    if not current_user.is_secretary():
+        return jsonify({'error': 'Apenas a secretária pode criar cirurgias'}), 403
     
     data = request.json
     
     try:
-        # Validar e obter doctor_id
+        # Validar e obter doctor_id (obrigatório)
         doctor_id = data.get('doctor_id')
-        if doctor_id:
-            doctor_id = int(doctor_id)
-            # Validar se é um médico válido
-            doctor = User.query.filter_by(id=doctor_id, role='medico').first()
-            if not doctor:
-                return jsonify({'error': 'Médico inválido'}), 400
-        else:
-            # Default para o médico logado
-            doctor_id = current_user.id
+        if not doctor_id:
+            return jsonify({'error': 'Médico é obrigatório'}), 400
+        
+        doctor_id = int(doctor_id)
+        # Validar se é um médico válido
+        doctor = User.query.filter_by(id=doctor_id, role='medico').first()
+        if not doctor:
+            return jsonify({'error': 'Médico inválido'}), 400
         
         date = datetime.strptime(data['date'], '%Y-%m-%d').date()
         start_time = datetime.strptime(data['start_time'], '%H:%M').time()
@@ -147,12 +146,12 @@ def create_surgery():
 @login_required
 def update_surgery(surgery_id):
     """Atualiza cirurgia"""
+    if not current_user.is_secretary():
+        return jsonify({'error': 'Apenas a secretária pode editar cirurgias'}), 403
+    
     surgery = Surgery.query.get(surgery_id)
     if not surgery:
         return jsonify({'error': 'Cirurgia não encontrada'}), 404
-    
-    if not current_user.is_doctor() or surgery.doctor_id != current_user.id:
-        return jsonify({'error': 'Sem permissão'}), 403
     
     data = request.json
     updates = {}
@@ -186,12 +185,12 @@ def update_surgery(surgery_id):
 @login_required
 def delete_surgery(surgery_id):
     """Deleta cirurgia"""
+    if not current_user.is_secretary():
+        return jsonify({'error': 'Apenas a secretária pode excluir cirurgias'}), 403
+    
     surgery = Surgery.query.get(surgery_id)
     if not surgery:
         return jsonify({'error': 'Cirurgia não encontrada'}), 404
-    
-    if not current_user.is_doctor() or surgery.doctor_id != current_user.id:
-        return jsonify({'error': 'Sem permissão'}), 403
     
     try:
         surgery_service.delete_surgery(surgery_id)

@@ -128,7 +128,7 @@
             </button>
         </div>
         <div class="btn-group">
-            {% if current_user.is_doctor() %}
+            {% if current_user.is_secretary() %}
             <button class="btn btn-success" onclick="showNewSurgeryModal()">
                 <i class="bi bi-plus-circle"></i> Nova Cirurgia
             </button>
