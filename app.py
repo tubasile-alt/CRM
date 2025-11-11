@@ -9,7 +9,7 @@ import click
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder
 
 app = Flask(__name__)
 app.config.from_object(Config)
