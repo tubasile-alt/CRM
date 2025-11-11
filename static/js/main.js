@@ -4,6 +4,8 @@ function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 }
 
+window.getCSRFToken = getCsrfToken;
+
 function fetchWithCsrf(url, options = {}) {
     if (!options.headers) {
         options.headers = {};

@@ -22,7 +22,10 @@ def index():
     today = datetime.now(pytz.timezone('America/Sao_Paulo')).date()
     week_start = today - timedelta(days=today.weekday())
     
-    return render_template('surgical_map.html', week_start=week_start)
+    # Buscar médicos para seletor
+    doctors = User.query.filter_by(role='medico').order_by(User.name).all()
+    
+    return render_template('surgical_map.html', week_start=week_start, doctors=doctors)
 
 @surgical_map_bp.route('/api/weekly', methods=['GET'])
 @login_required
