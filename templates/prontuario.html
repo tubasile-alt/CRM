@@ -86,11 +86,11 @@
                     <li class="nav-item">
                         <a class="nav-link" data-bs-toggle="tab" href="#diagnostico">Diagnóstico</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" data-bs-toggle="tab" href="#conduta">Conduta</a>
-                    </li>
                     <li class="nav-item" id="tabPlanejamento" style="display:none;">
                         <a class="nav-link" data-bs-toggle="tab" href="#planejamento">Planejamento</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#conduta">Conduta</a>
                     </li>
                     <li class="nav-item" id="tabTransplante" style="display:none;">
                         <a class="nav-link" data-bs-toggle="tab" href="#transplante">Dados Cirúrgicos</a>
@@ -248,7 +248,7 @@
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <input type="number" class="form-control" id="newProcedureValue" placeholder="Valor (R$)" step="0.01">
+                                    <input type="number" class="form-control" id="newProcedureValue" placeholder="Valor (R$)" step="any" min="0">
                                 </div>
                                 <div class="col-md-2">
                                     <input type="number" class="form-control" id="newProcedureMonths" placeholder="Meses" value="6">

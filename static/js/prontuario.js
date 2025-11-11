@@ -339,7 +339,7 @@ function renderCosmeticConduct() {
                        class="form-control form-control-sm" 
                        value="${proc.budget || proc.value}" 
                        onchange="updateProcedureBudget(${index}, this.value)"
-                       step="0.01">
+                       step="any" min="0">
             </td>
             <td class="text-center">
                 <button class="btn btn-sm ${proc.performed ? 'btn-success' : 'btn-outline-secondary'}" 
