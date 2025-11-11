@@ -123,6 +123,21 @@ class ChatMessage(db.Model):
     read = db.Column(db.Boolean, default=False)
     
     sender = db.relationship('User', backref='messages')
+    reads = db.relationship('MessageRead', backref='message', cascade='all, delete-orphan')
+
+class MessageRead(db.Model):
+    __tablename__ = 'message_read'
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('chat_message.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False, index=True)
+    read_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    user = db.relationship('User')
+    
+    __table_args__ = (
+        db.UniqueConstraint('message_id', 'user_id', name='_message_user_uc'),
+        db.Index('idx_message_user', 'message_id', 'user_id')
+    )
 
 class OperatingRoom(db.Model):
     __tablename__ = 'operating_room'

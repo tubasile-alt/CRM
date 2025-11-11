@@ -9,7 +9,7 @@ import click
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -703,14 +703,53 @@ def send_message():
 @app.route('/api/chat/mark_read', methods=['POST'])
 @login_required
 def mark_messages_read():
-    ChatMessage.query.filter(
-        ChatMessage.sender_id != current_user.id,
-        ChatMessage.read == False
-    ).update({'read': True})
+    unread_message_ids = db.session.query(ChatMessage.id).filter(
+        ChatMessage.sender_id != current_user.id
+    ).outerjoin(
+        MessageRead,
+        db.and_(
+            MessageRead.message_id == ChatMessage.id,
+            MessageRead.user_id == current_user.id
+        )
+    ).filter(
+        MessageRead.id.is_(None)
+    ).all()
     
-    db.session.commit()
+    if not unread_message_ids:
+        return jsonify({'success': True, 'count': 0})
     
-    return jsonify({'success': True})
+    read_records = [
+        MessageRead(
+            message_id=msg_id[0],
+            user_id=current_user.id
+        )
+        for msg_id in unread_message_ids
+    ]
+    
+    try:
+        db.session.bulk_save_objects(read_records)
+        db.session.commit()
+        return jsonify({'success': True, 'count': len(read_records)})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/chat/unread_count')
+@login_required
+def get_unread_count():
+    count = db.session.query(ChatMessage).filter(
+        ChatMessage.sender_id != current_user.id
+    ).outerjoin(
+        MessageRead,
+        db.and_(
+            MessageRead.message_id == ChatMessage.id,
+            MessageRead.user_id == current_user.id
+        )
+    ).filter(
+        MessageRead.id.is_(None)
+    ).count()
+    
+    return jsonify({'count': count})
 
 @app.cli.command('init-db')
 def init_db():

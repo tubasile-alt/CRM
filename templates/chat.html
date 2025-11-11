@@ -2,25 +2,67 @@
 
 {% block title %}Chat - Clínica Basile{% endblock %}
 
+{% block extra_css %}
+<style>
+.online-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #28a745;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.chat-info-banner {
+    background: #e7f3ff;
+    border: 1px solid #b3d9ff;
+    border-radius: 6px;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    color: #004085;
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
-        <h2 class="mb-4">Chat Interno</h2>
+        <h2 class="mb-4">
+            <i class="bi bi-chat-dots"></i> Chat Interno
+        </h2>
     </div>
 </div>
 
 <div class="row">
     <div class="col-md-8 mx-auto">
         <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-chat-dots"></i> Conversa entre Médico e Secretária</h5>
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <span class="online-indicator"></span>
+                    Chat Geral - Clínica Basile
+                </h5>
+                <small class="text-white-50">
+                    <i class="bi bi-people"></i> Mensagens visíveis para todos
+                </small>
             </div>
             <div class="card-body">
-                <div id="chatMessages" class="border rounded p-3 mb-3 bg-light" style="height: 500px; overflow-y: auto;">
+                <div class="chat-info-banner">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Chat Geral:</strong> Todas as mensagens enviadas aqui são vistas por todos os usuários online (médicos e secretárias).
+                </div>
+                
+                <div id="chatMessages" class="border rounded p-3 mb-3 bg-light" style="height: 450px; overflow-y: auto;">
                 </div>
                 
                 <div class="input-group">
-                    <input type="text" id="messageInput" class="form-control" placeholder="Digite sua mensagem...">
+                    <input type="text" id="messageInput" class="form-control" placeholder="Digite sua mensagem para todos...">
                     <button class="btn btn-primary" onclick="sendMessage()">
                         <i class="bi bi-send"></i> Enviar
                     </button>

@@ -59,6 +59,10 @@ function markMessagesAsRead() {
         headers: {
             'Content-Type': 'application/json'
         }
+    }).then(() => {
+        if (typeof updateChatBadge === 'function') {
+            updateChatBadge();
+        }
     });
 }
 

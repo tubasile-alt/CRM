@@ -52,3 +52,29 @@ function formatDate(date) {
 function formatTime(date) {
     return new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
+
+function updateChatBadge() {
+    const badge = document.getElementById('chat-badge');
+    if (!badge) return;
+    
+    fetch('/api/chat/unread_count')
+        .then(response => response.json())
+        .then(data => {
+            const count = data.count;
+            badge.textContent = count;
+            
+            if (count > 0) {
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao atualizar badge do chat:', error);
+        });
+}
+
+if (document.getElementById('chat-badge')) {
+    updateChatBadge();
+    setInterval(updateChatBadge, 5000);
+}
