@@ -458,14 +458,23 @@
             <div class="card-body" style="max-height: 600px; overflow-y: auto;">
                 {% for note in notes %}
                 <div class="mb-3 pb-3 border-bottom">
-                    <div class="d-flex justify-content-between">
-                        <strong class="text-capitalize">{{ note.note_type }}</strong>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong class="text-capitalize">
+                                <i class="bi bi-{% if note.note_type == 'queixa' %}chat-left-text{% elif note.note_type == 'anamnese' %}clipboard-pulse{% elif note.note_type == 'diagnostico' %}clipboard-check{% else %}prescription{% endif %}"></i>
+                                {{ note.note_type|replace('_', ' ') }}
+                            </strong>
+                        </div>
                         <small class="text-muted">{{ note.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
                     </div>
-                    <p class="mb-1 small">{{ note.content[:100] }}{% if note.content|length > 100 %}...{% endif %}</p>
-                    <small class="text-muted">Por: {{ note.doctor.name }}</small>
+                    <div class="mt-2" style="white-space: pre-wrap; font-size: 0.9rem;">{{ note.content }}</div>
+                    <small class="text-muted d-block mt-2">
+                        <i class="bi bi-person-circle"></i> Por: {{ note.doctor.name }}
+                    </small>
                     {% if note.consultation_duration %}
-                    <br><small class="text-muted">Duração: {{ note.consultation_duration }} minutos</small>
+                    <small class="text-muted d-block">
+                        <i class="bi bi-clock"></i> Duração: {{ note.consultation_duration }} minutos
+                    </small>
                     {% endif %}
                 </div>
                 {% else %}
