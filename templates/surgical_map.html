@@ -177,8 +177,8 @@ function createSurgeryCard(surgery) {
                 <div class="d-flex justify-content-between">
                     <div>
                         <strong>${surgery.patient_name}</strong>
-                        <div class="time-slot">${surgery.scheduled_date} • ${surgery.scheduled_time} • ${surgery.duration_minutes}min</div>
-                        <small class="text-muted">${surgery.procedure_type} - Dr. ${surgery.doctor_name}</small>
+                        <div class="time-slot">${surgery.date} • ${surgery.start_time} • ${surgery.duration_minutes}min</div>
+                        <small class="text-muted">${surgery.procedure_name} - ${surgery.doctor_name}</small>
                     </div>
                     {% if current_user.is_doctor() %}
                     <div>
@@ -228,6 +228,12 @@ function saveSurgery() {
     const formData = new FormData(form);
     const data = Object.fromEntries(formData);
     
+    // Validar doctor_id
+    if (!data.doctor_id || data.doctor_id === '') {
+        showAlert('Selecione o médico responsável', 'danger');
+        return;
+    }
+    
     fetch('/mapa-cirurgico/api/surgery', {
         method: 'POST',
         headers: {
@@ -257,6 +263,7 @@ function saveSurgery() {
         }
     })
     .catch(err => {
+        console.error('Erro:', err);
         showAlert('Erro ao agendar cirurgia', 'danger');
     });
 }
