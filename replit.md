@@ -26,7 +26,7 @@ The front-end utilizes Bootstrap 5.3.0 for responsive design and Bootstrap Icons
     - **Hair Transplant**: Visual Norwood classification (7 interactive cards), secure image uploads (JPG/PNG/GIF, max 5MB, MIME type validation), and automated post-operative review reminders (7 days, 6 months, 12 months).
 - **Surgical Map**: Weekly visualization of surgeries, management of 4 operating rooms (Sala 1-4), fixed morning time slots (7AM, 10AM) Monday-Friday, and conflict validation (room and doctor conflicts).
 - **Digital Waiting Room**: Real-time dashboard with waiting statistics, patient list, and full check-in/checkout workflow.
-- **Internal Chat**: Real-time communication between doctor and secretary with automatic updates.
+- **Internal Chat**: 1-on-1 directed messaging system with contact selection, per-user read tracking via MessageRead table, unread message badges (global and per-contact), and real-time auto-refresh polling. Messages are private and directed to specific recipients, with a clean two-panel interface (contact list + conversation area).
 - **Configuration & Backup**: Manual database backup, SMTP email settings, and per-doctor preferences. Automated backup script (`utils/backup.py`) preserving the last 30 backups.
 - **Export & Sharing**: Professional PDF reports (ReportLab) and detailed Excel spreadsheets (OpenPyXL), with automated email sending (Flask-Mail) supporting multiple attachments.
 

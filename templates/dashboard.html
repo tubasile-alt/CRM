@@ -65,76 +65,19 @@
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-chat-dots"></i> Chat Rápido</h5>
+                <h5 class="mb-0"><i class="bi bi-chat-dots"></i> Chat Interno</h5>
             </div>
             <div class="card-body">
-                <div id="quickChat" style="height: 300px; overflow-y: auto;" class="mb-3 border rounded p-2 bg-light">
-                </div>
-                <div class="input-group">
-                    <input type="text" id="quickChatInput" class="form-control" placeholder="Digite sua mensagem...">
-                    <button class="btn btn-primary" onclick="sendQuickMessage()">
-                        <i class="bi bi-send"></i>
-                    </button>
+                <div class="text-center py-5">
+                    <i class="bi bi-chat-left-text text-primary" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3">Mensagens Direcionadas</h5>
+                    <p class="text-muted">Envie mensagens privadas para médicos e secretárias</p>
+                    <a href="{{ url_for('chat') }}" class="btn btn-primary">
+                        <i class="bi bi-arrow-right-circle"></i> Abrir Chat
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-let lastMessageId = 0;
-
-function loadQuickMessages() {
-    fetch('/api/chat/messages')
-        .then(response => response.json())
-        .then(messages => {
-            const chatDiv = document.getElementById('quickChat');
-            chatDiv.innerHTML = '';
-            
-            messages.forEach(msg => {
-                const msgDiv = document.createElement('div');
-                msgDiv.className = 'mb-2';
-                msgDiv.innerHTML = `
-                    <strong>${msg.sender}</strong> <small class="text-muted">${msg.timestamp}</small><br>
-                    ${msg.message}
-                `;
-                chatDiv.appendChild(msgDiv);
-                lastMessageId = Math.max(lastMessageId, msg.id);
-            });
-            
-            chatDiv.scrollTop = chatDiv.scrollHeight;
-        });
-}
-
-function sendQuickMessage() {
-    const input = document.getElementById('quickChatInput');
-    const message = input.value.trim();
-    
-    if (!message) return;
-    
-    fetch('/api/chat/send', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ message: message })
-    })
-    .then(response => response.json())
-    .then(() => {
-        input.value = '';
-        loadQuickMessages();
-    });
-}
-
-document.getElementById('quickChatInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        sendQuickMessage();
-    }
-});
-
-loadQuickMessages();
-setInterval(loadQuickMessages, 5000);
-</script>
 {% endblock %}
