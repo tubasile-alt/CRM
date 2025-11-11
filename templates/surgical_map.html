@@ -22,6 +22,44 @@
 .conflict-warning {
     border-left-color: #dc3545 !important;
 }
+.day-card {
+    border-left: 5px solid #0d6efd;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+.day-card:hover {
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+    transform: translateY(-3px);
+}
+.day-header {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+    padding: 12px 15px;
+}
+.slot-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+.slot-free { background-color: #198754; }
+.slot-occupied { background-color: #dc3545; }
+.slot-partial { background-color: #ffc107; }
+.room-slot {
+    padding: 8px;
+    margin: 4px 0;
+    border-radius: 6px;
+    background: #f8f9fa;
+    font-size: 0.9rem;
+}
+.stats-badge {
+    background: rgba(255,255,255,0.2);
+    padding: 4px 10px;
+    border-radius: 15px;
+    font-size: 0.85rem;
+    margin-left: 8px;
+}
 </style>
 {% endblock %}
 
@@ -58,8 +96,21 @@
         Carregando...
     </div>
 
-    <div id="surgical-map" class="row">
-        <!-- Salas serão carregadas dinamicamente -->
+    <div id="weekly-overview" class="row mb-4">
+        <!-- Visão macro da semana (seg-sex) -->
+    </div>
+
+    <div id="detailed-view" class="row" style="display: none;">
+        <!-- Detalhes do dia selecionado -->
+        <div class="col-12 mb-3">
+            <button class="btn btn-outline-secondary" onclick="showWeeklyOverview()">
+                <i class="bi bi-arrow-left"></i> Voltar para visão semanal
+            </button>
+            <h4 id="detailed-view-title" class="d-inline-block ms-3"></h4>
+        </div>
+        <div id="detailed-surgeries" class="col-12">
+            <!-- Cirurgias do dia serão carregadas aqui -->
+        </div>
     </div>
 </div>
 
@@ -130,45 +181,25 @@
 <script>
 let currentWeekStart = '{{ week_start }}';
 
+let weekData = null;
+
 function loadWeeklyMap() {
     fetch(`/mapa-cirurgico/api/weekly?week_start=${currentWeekStart}`)
         .then(r => r.json())
         .then(data => {
+            weekData = data;
             document.getElementById('week-info').innerHTML = `
                 <strong>Semana:</strong> ${formatDate(data.week_start)} a ${formatDate(data.week_end)}
             `;
             
-            const container = document.getElementById('surgical-map');
-            container.innerHTML = '';
+            // Organizar cirurgias por dia
+            const dayStats = organizeSurgeriesByDay(data);
             
-            data.rooms.forEach(room => {
-                const roomHtml = `
-                    <div class="col-md-6 mb-4">
-                        <div class="card">
-                            <div class="card-header room-header text-white">
-                                <h5 class="mb-0">${room.name}</h5>
-                            </div>
-                            <div class="card-body" id="room-${room.id}">
-                                ${room.surgeries.length === 0 ? '<p class="text-muted">Nenhuma cirurgia agendada</p>' : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                container.insertAdjacentHTML('beforeend', roomHtml);
-                
-                room.surgeries.forEach(surgery => {
-                    const surgeryCard = createSurgeryCard(surgery);
-                    const roomElement = document.getElementById(`room-${room.id}`);
-                    if (roomElement) {
-                        // Remover mensagem "Nenhuma cirurgia agendada" se existir
-                        const noSurgeriesMsg = roomElement.querySelector('p.text-muted');
-                        if (noSurgeriesMsg) {
-                            noSurgeriesMsg.remove();
-                        }
-                        roomElement.innerHTML += surgeryCard;
-                    }
-                });
-            });
+            // Renderizar visão macro
+            renderWeeklyOverview(dayStats, data.rooms.length);
+            
+            // Resetar navegação para visão semanal
+            showWeeklyOverview();
             
             // Preencher select de salas no modal
             const roomSelect = document.querySelector('select[name="room_id"]');
@@ -177,6 +208,159 @@ function loadWeeklyMap() {
                 roomSelect.innerHTML += `<option value="${room.id}">${room.name}</option>`;
             });
         });
+}
+
+function organizeSurgeriesByDay(data) {
+    const days = {};
+    const weekStart = new Date(data.week_start);
+    
+    // Criar estrutura para cada dia da semana (seg-sex)
+    for (let i = 0; i < 5; i++) {
+        const date = new Date(weekStart);
+        date.setDate(date.getDate() + i);
+        const dateStr = date.toISOString().split('T')[0];
+        
+        days[dateStr] = {
+            date: dateStr,
+            dayName: ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta'][i],
+            total: 0,
+            byRoom: {},
+            byTimeSlot: {'07:00': 0, '10:00': 0, 'outros': 0},
+            surgeries: [],
+            rooms: data.rooms.map(r => ({id: r.id, name: r.name}))
+        };
+        
+        // Inicializar contadores por sala
+        data.rooms.forEach(room => {
+            days[dateStr].byRoom[room.name] = 0;
+        });
+    }
+    
+    // Processar todas as cirurgias
+    data.rooms.forEach(room => {
+        room.surgeries.forEach(surgery => {
+            const dateStr = surgery.date;
+            if (days[dateStr]) {
+                days[dateStr].total++;
+                days[dateStr].byRoom[room.name]++;
+                days[dateStr].surgeries.push({...surgery, room_name: room.name, room_id: room.id});
+                
+                // Classificar por horário
+                const time = surgery.start_time;
+                if (time === '07:00') {
+                    days[dateStr].byTimeSlot['07:00']++;
+                } else if (time === '10:00') {
+                    days[dateStr].byTimeSlot['10:00']++;
+                } else {
+                    days[dateStr].byTimeSlot['outros']++;
+                }
+            }
+        });
+    });
+    
+    return days;
+}
+
+function renderWeeklyOverview(dayStats, numRooms) {
+    const container = document.getElementById('weekly-overview');
+    container.innerHTML = '';
+    
+    // Calcular dinamicamente: número de salas × 2 horários fixos (7AM, 10AM)
+    const slotsPerRoom = 2;
+    const totalSlots = numRooms * slotsPerRoom;
+    
+    Object.keys(dayStats).forEach(dateStr => {
+        const day = dayStats[dateStr];
+        const occupancyPercent = Math.round((day.total / totalSlots) * 100);
+        
+        const roomSlotsHtml = day.rooms.map(room => {
+            const count = day.byRoom[room.name] || 0;
+            const maxPerRoom = slotsPerRoom;
+            const indicators = Array(maxPerRoom).fill('').map((_, i) => 
+                i < count ? '<span class="slot-indicator slot-occupied"></span>' : '<span class="slot-indicator slot-free"></span>'
+            ).join('');
+            return `<div class="room-slot">${room.name}: ${indicators} (${count})</div>`;
+        }).join('');
+        
+        const timeSlotHtml = `
+            <div class="room-slot">
+                <strong>7AM:</strong> ${day.byTimeSlot['07:00']}/${numRooms}
+                <span class="ms-2"><strong>10AM:</strong> ${day.byTimeSlot['10:00']}/${numRooms}</span>
+                ${day.byTimeSlot['outros'] > 0 ? `<span class="ms-2 text-warning"><strong>Extras:</strong> ${day.byTimeSlot['outros']}</span>` : ''}
+            </div>
+        `;
+        
+        const dayCard = `
+            <div class="col-md-4 col-lg-2 mb-3">
+                <div class="card day-card" onclick="showDayDetails('${dateStr}')">
+                    <div class="day-header">
+                        <strong>${day.dayName}</strong>
+                        <span class="stats-badge">${day.total}/${totalSlots}</span>
+                        <div style="font-size: 0.85rem;">${formatDate(dateStr)}</div>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="mb-2">
+                            <small class="text-muted">Total: ${day.total} cirurgias</small>
+                            ${day.total > 0 ? `<div class="progress" style="height: 6px;"><div class="progress-bar ${occupancyPercent >= 100 ? 'bg-danger' : 'bg-success'}" style="width: ${Math.min(occupancyPercent, 100)}%"></div></div>` : ''}
+                        </div>
+                        ${roomSlotsHtml}
+                        ${timeSlotHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.insertAdjacentHTML('beforeend', dayCard);
+    });
+}
+
+function showDayDetails(date) {
+    if (!weekData) return;
+    
+    // Organizar cirurgias por dia
+    const dayStats = organizeSurgeriesByDay(weekData);
+    const day = dayStats[date];
+    
+    if (!day) return;
+    
+    // Ocultar visão semanal e mostrar detalhes
+    document.getElementById('weekly-overview').style.display = 'none';
+    document.getElementById('detailed-view').style.display = 'block';
+    
+    document.getElementById('detailed-view-title').textContent = `${day.dayName}, ${formatDate(date)} - ${day.total} cirurgias`;
+    
+    const container = document.getElementById('detailed-surgeries');
+    container.innerHTML = '';
+    
+    // Agrupar por sala
+    day.rooms.forEach(room => {
+        const roomSurgeries = day.surgeries.filter(s => s.room_id === room.id);
+        
+        const roomHtml = `
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header room-header text-white">
+                        <h5 class="mb-0">${room.name} <small>(${roomSurgeries.length} cirurgias)</small></h5>
+                    </div>
+                    <div class="card-body" id="detail-room-${room.id}">
+                        ${roomSurgeries.length === 0 ? '<p class="text-muted">Nenhuma cirurgia agendada</p>' : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', roomHtml);
+        
+        // Adicionar cards de cirurgias
+        roomSurgeries.forEach(surgery => {
+            const surgeryCard = createSurgeryCard(surgery);
+            document.getElementById(`detail-room-${room.id}`).insertAdjacentHTML('beforeend', surgeryCard);
+        });
+    });
+}
+
+function showWeeklyOverview() {
+    document.getElementById('weekly-overview').style.display = 'flex';
+    document.getElementById('detailed-view').style.display = 'none';
 }
 
 function createSurgeryCard(surgery) {
