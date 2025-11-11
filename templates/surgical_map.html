@@ -60,6 +60,57 @@
     font-size: 0.85rem;
     margin-left: 8px;
 }
+.surgery-list-toggle {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 6px 12px;
+    margin-top: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    text-align: center;
+}
+.surgery-list-toggle:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+.surgery-list {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+    margin-top: 8px;
+}
+.surgery-list.expanded {
+    max-height: 500px;
+    overflow-y: auto;
+}
+.surgery-item {
+    background: white;
+    border-left: 3px solid #198754;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+.surgery-time {
+    font-weight: bold;
+    color: #0d6efd;
+    margin-right: 6px;
+}
+.surgery-patient {
+    font-weight: 600;
+    color: #212529;
+}
+.surgery-procedure {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+.surgery-doctor {
+    color: #198754;
+    font-size: 0.8rem;
+}
 </style>
 {% endblock %}
 
@@ -182,12 +233,17 @@
 let currentWeekStart = '{{ week_start }}';
 
 let weekData = null;
+let expandedDays = {}; // Track quais dias estão expandidos
 
 function loadWeeklyMap() {
     fetch(`/mapa-cirurgico/api/weekly?week_start=${currentWeekStart}`)
         .then(r => r.json())
         .then(data => {
             weekData = data;
+            
+            // Resetar estado de expansão
+            expandedDays = {};
+            
             document.getElementById('week-info').innerHTML = `
                 <strong>Semana:</strong> ${formatDate(data.week_start)} a ${formatDate(data.week_end)}
             `;
@@ -290,10 +346,40 @@ function renderWeeklyOverview(dayStats, numRooms) {
             </div>
         `;
         
+        // Criar lista de cirurgias organizada por horário
+        let surgeryListHtml = '';
+        if (day.total > 0) {
+            // Agrupar por horário
+            const surgeryGroups = {};
+            day.surgeries.forEach(s => {
+                const timeKey = s.start_time;
+                if (!surgeryGroups[timeKey]) {
+                    surgeryGroups[timeKey] = [];
+                }
+                surgeryGroups[timeKey].push(s);
+            });
+            
+            // Ordenar por horário
+            const sortedTimes = Object.keys(surgeryGroups).sort();
+            
+            sortedTimes.forEach(timeKey => {
+                surgeryGroups[timeKey].forEach(s => {
+                    surgeryListHtml += `
+                        <div class="surgery-item">
+                            <span class="surgery-time">${s.start_time}</span>
+                            <span class="surgery-patient">${s.patient_name}</span><br>
+                            <div class="surgery-procedure">📋 ${s.procedure_name}</div>
+                            <div class="surgery-doctor">👨‍⚕️ ${s.doctor_name} • ${s.room_name}</div>
+                        </div>
+                    `;
+                });
+            });
+        }
+        
         const dayCard = `
             <div class="col-md-4 col-lg-2 mb-3">
-                <div class="card day-card" onclick="showDayDetails('${dateStr}')">
-                    <div class="day-header">
+                <div class="card day-card">
+                    <div class="day-header" onclick="showDayDetails('${dateStr}')">
                         <strong>${day.dayName}</strong>
                         <span class="stats-badge">${day.total}/${totalSlots}</span>
                         <div style="font-size: 0.85rem;">${formatDate(dateStr)}</div>
@@ -305,6 +391,15 @@ function renderWeeklyOverview(dayStats, numRooms) {
                         </div>
                         ${roomSlotsHtml}
                         ${timeSlotHtml}
+                        ${day.total > 0 ? `
+                            <div class="surgery-list-toggle" onclick="event.stopPropagation(); toggleDaySurgeries('${dateStr}')">
+                                <i class="bi bi-chevron-down" id="toggle-icon-${dateStr}"></i> 
+                                Ver ${day.total} cirurgia${day.total > 1 ? 's' : ''}
+                            </div>
+                            <div class="surgery-list" id="surgery-list-${dateStr}">
+                                ${surgeryListHtml}
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -312,6 +407,27 @@ function renderWeeklyOverview(dayStats, numRooms) {
         
         container.insertAdjacentHTML('beforeend', dayCard);
     });
+}
+
+function toggleDaySurgeries(date) {
+    const listElement = document.getElementById(`surgery-list-${date}`);
+    const iconElement = document.getElementById(`toggle-icon-${date}`);
+    
+    if (!listElement) return;
+    
+    if (expandedDays[date]) {
+        // Colapsar
+        listElement.classList.remove('expanded');
+        iconElement.classList.remove('bi-chevron-up');
+        iconElement.classList.add('bi-chevron-down');
+        expandedDays[date] = false;
+    } else {
+        // Expandir
+        listElement.classList.add('expanded');
+        iconElement.classList.remove('bi-chevron-down');
+        iconElement.classList.add('bi-chevron-up');
+        expandedDays[date] = true;
+    }
 }
 
 function showDayDetails(date) {
