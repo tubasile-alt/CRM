@@ -56,6 +56,7 @@ function saveAppointment() {
     const start = document.getElementById('appointmentStart').value;
     const duration = parseInt(document.getElementById('appointmentDuration').value);
     const status = document.getElementById('appointmentStatus').value;
+    const appointmentType = document.getElementById('appointmentType').value;
     const notes = document.getElementById('appointmentNotes').value;
     
     // Get doctor_id if secretary is creating appointment
@@ -76,6 +77,7 @@ function saveAppointment() {
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         status: status,
+        appointmentType: appointmentType,
         notes: notes
     };
     

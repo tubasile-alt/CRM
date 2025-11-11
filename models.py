@@ -55,6 +55,7 @@ class Appointment(db.Model):
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.String(20), default='agendado')
+    appointment_type = db.Column(db.String(20), default='Particular')
     notes = db.Column(db.Text)
     waiting = db.Column(db.Boolean, default=False)
     checked_in_time = db.Column(db.DateTime)

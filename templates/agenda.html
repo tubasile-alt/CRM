@@ -86,6 +86,14 @@
                         <input type="text" class="form-control" id="patientPhone">
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Tipo de Consulta</label>
+                        <select class="form-select" id="appointmentType">
+                            <option value="Particular" selected>Particular</option>
+                            <option value="Unimed">Unimed</option>
+                            <option value="Cortesia">Cortesia</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Data e Hora</label>
                         <input type="datetime-local" class="form-control" id="appointmentStart" required>
                     </div>

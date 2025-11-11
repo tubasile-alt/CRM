@@ -112,7 +112,7 @@ def dashboard():
     ).all()
     
     stats = {
-        'agendados': sum(1 for a in appointments if a.status == 'agendado'),
+        'agendados': sum(1 for a in appointments if a.status in ['agendado', 'confirmado']),
         'confirmados': sum(1 for a in appointments if a.status == 'confirmado'),
         'atendidos': sum(1 for a in appointments if a.status == 'atendido'),
         'faltaram': sum(1 for a in appointments if a.status == 'faltou')
@@ -166,6 +166,7 @@ def get_appointments():
             'borderColor': border_color,
             'extendedProps': {
                 'status': apt.status,
+                'appointmentType': apt.appointment_type or 'Particular',
                 'patientId': apt.patient_id,
                 'doctorId': apt.doctor_id,
                 'doctorName': apt.doctor.name,
@@ -205,6 +206,7 @@ def create_appointment():
         start_time=datetime.fromisoformat(data['start']),
         end_time=datetime.fromisoformat(data['end']),
         status=data.get('status', 'agendado'),
+        appointment_type=data.get('appointmentType', 'Particular'),
         notes=data.get('notes', '')
     )
     
