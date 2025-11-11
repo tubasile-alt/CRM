@@ -1,0 +1,233 @@
+SISTEMA DE ATENDIMENTO MÉDICO PERSONALIZADO POR ESPECIALIDADE
+
+(Dermatologista e Cirurgião Plástico)
+
+⸻
+
+1. Estrutura geral
+
+O sistema é um prontuário eletrônico integrado a uma plataforma de CRM médico.
+Ele adapta automaticamente a interface do atendimento conforme a especialidade e a categoria de paciente.
+No cadastro do médico, é definido se ele é Dermatologista ou Cirurgião Plástico.
+Essa informação é permanente e determina o tipo de atendimento que será exibido.
+
+⸻
+
+2. Cadastro do médico
+
+Durante o cadastro, além de nome, CRM, e-mail e senha, existe um campo chamado “especialidade”.
+As opções disponíveis são:
+	•	Dermatologista
+	•	Cirurgião Plástico
+
+Uma vez cadastrada a especialidade, ela define o tipo de atendimento e não pode ser alterada pelo próprio médico.
+
+⸻
+
+3. Abertura de prontuário
+
+Ao clicar em um paciente na agenda e iniciar o atendimento, o sistema identifica automaticamente a especialidade do médico e exibe o fluxo de atendimento correspondente.
+
+Para médicos dermatologistas, o sistema abre uma janela inicial de categorização do paciente, com três opções principais:
+	1.	Patologia (doença dermatológica)
+	2.	Cosmiatria
+	3.	Transplante capilar
+
+Cada categoria determina um fluxo próprio dentro do atendimento.
+
+⸻
+
+4. FLUXO DO ATENDIMENTO DERMATOLÓGICO
+
+4.1. Categoria: Patologia
+
+Corresponde aos atendimentos clínicos de doenças da pele.
+A anamnese segue o formato padrão existente, com campos em branco para preenchimento manual pelo médico:
+	•	Queixa principal
+	•	Anamnese
+	•	Conduta
+
+⸻
+
+4.2. Categoria: Cosmiatria
+
+Nesta categoria, o sistema abre a anamnese já com um texto padrão pré-escrito:
+
+“Paciente refere queixas cosmiátricas, buscando melhora da qualidade da pele. Sem queixas de doenças dermatológicas ativas.”
+
+Esse texto é totalmente editável, permitindo ajustes de acordo com o caso.
+
+Abaixo da anamnese surge a seção Planejamento clínico, que substitui o campo antigo de “indicação”.
+Nela, o médico pode selecionar procedimentos de uma lista e atribuir valores específicos para cada um.
+
+O planejamento clínico é montado através de checkboxes e campos de valor individual:
+	•	Botox
+	•	Sculptra
+	•	Morpheus
+	•	Ulthera
+	•	Exilis
+	•	Emsculpt Neo
+	•	Entone
+	•	Outros (campo aberto)
+
+O médico pode selecionar mais de um procedimento e preencher o valor cobrado manualmente.
+Esses valores não são fixos e ficam registrados apenas para aquele atendimento.
+
+Ao final, o médico pode clicar em Gerar orçamento, que cria um documento imprimível com:
+	•	Nome do paciente
+	•	Data
+	•	Lista dos procedimentos planejados
+	•	Valores cobrados
+	•	Total estimado
+
+Na sequência, a seção Conduta apresenta os mesmos procedimentos planejados, permitindo ao médico marcar quais foram efetivamente realizados.
+Os realizados geram o registro financeiro e alimentam o CRM.
+Os não realizados permanecem pendentes, sendo usados para acompanhamento futuro.
+
+O sistema associa automaticamente intervalos de retorno padrão (exemplo: Botox 6 meses, Sculptra 12 meses, Morpheus 12 meses).
+Após esse período, o CRM gera lembretes automáticos para a equipe entrar em contato com o paciente e oferecer o novo agendamento.
+
+⸻
+
+5. FLUXO DO ATENDIMENTO DE TRANSPLANTE CAPILAR
+
+Quando o médico seleciona “Transplante capilar” como categoria, o sistema abre uma interface totalmente diferente, voltada para planejamento cirúrgico e avaliação de calvície.
+
+⸻
+
+5.1. Queixa principal
+
+O campo de queixa principal vem preenchido automaticamente com o texto:
+“Paciente refere queixa de rarefação capilar e calvície progressiva.”
+
+Esse texto também é editável, permitindo ajustes caso o paciente apresente queixas específicas (por exemplo, falhas em áreas da barba ou sobrancelha).
+
+⸻
+
+5.2. Classificação de calvície
+
+Logo abaixo da queixa principal, o sistema exibe uma grade com imagens ilustrativas da Classificação de Norwood (do tipo 1 a 7).
+Cada imagem representa um estágio de calvície.
+O médico marca a classificação correspondente clicando em uma caixa de seleção.
+
+As classificações possíveis são:
+	•	Norwood I
+	•	Norwood II
+	•	Norwood III
+	•	Norwood IV
+	•	Norwood V
+	•	Norwood VI
+	•	Norwood VII
+
+O sistema permite selecionar apenas uma classificação por paciente.
+
+⸻
+
+5.3. Anexos da consulta
+
+Abaixo da classificação, há uma área para anexar arquivos relacionados ao caso:
+	1.	Foto tirada durante a consulta (campo obrigatório).
+	2.	Planejamento cirúrgico em formato de imagem (layout, marcações ou diagramas).
+	3.	Simulação visual feita em software paralelo (por exemplo, simulação digital do resultado esperado).
+
+Essas imagens ficam vinculadas ao prontuário e podem ser visualizadas novamente no histórico do paciente.
+
+⸻
+
+5.4. Tipo de caso
+
+O sistema apresenta uma janela com duas opções de seleção:
+	•	Cirurgia primária
+	•	Cirurgia secundária
+
+A escolha define se é a primeira cirurgia do paciente ou uma correção/reparo de transplante anterior.
+
+⸻
+
+5.5. Número de cirurgias previstas e áreas envolvidas
+
+O médico pode indicar se o paciente possui:
+	•	Indicação para uma única cirurgia
+	•	Indicação para duas cirurgias planejadas
+	•	Necessidade de body hair transplant (uso de pelos corporais)
+	•	Indicação de transplante de sobrancelha
+	•	Indicação de transplante de barba
+
+Essas opções não são exclusivas — o médico pode marcar mais de uma, configurando um atendimento multiárea.
+Exemplo: barba + cabelo, ou sobrancelha + cabelo, etc.
+
+⸻
+
+5.6. Indicação cirúrgica
+
+O sistema disponibiliza uma lista de possíveis indicações cirúrgicas, também com múltipla seleção:
+	•	Transplante capilar frontal
+	•	Transplante capilar em coroa
+	•	Transplante capilar completo
+	•	Transplante capilar completo com body hair
+	•	Transplante de sobrancelha
+	•	Transplante de barba
+
+O médico marca as opções aplicáveis ao caso do paciente.
+Essas informações ficam registradas para planejamento e relatórios.
+
+⸻
+
+5.7. Planejamento cirúrgico
+
+Abaixo das indicações, existe um campo livre de texto chamado Planejamento cirúrgico.
+É neste campo que o médico descreve a estratégia da cirurgia, incluindo:
+	•	Tipo de desenho da linha frontal
+	•	Número estimado de unidades foliculares
+	•	Estratégia de extração (área doadora, instrumentação, punch, método misto, etc.)
+	•	Distribuição de áreas receptoras
+	•	Considerações sobre densidade planejada
+	•	Combinação com body hair, se aplicável
+
+Essa seção serve como base do registro técnico e pode ser exportada junto com o prontuário.
+
+⸻
+
+5.8. Conduta
+
+A seção de conduta vem com um texto padrão que pode ser editado, mas que sempre inicia com a seguinte observação:
+
+“O transplante capilar é uma etapa do tratamento e não o tratamento completo. É fundamental a adesão ao acompanhamento clínico para manutenção dos resultados. O sucesso cirúrgico depende do controle contínuo da queda capilar e da resposta individual do paciente ao tratamento.”
+
+Esse texto reforça a orientação médica e o compromisso de seguimento.
+Abaixo dele, há um campo livre para o médico complementar informações específicas sobre a conduta pós-operatória ou recomendações clínicas.
+
+⸻
+
+5.9. Integração com o CRM
+
+Assim como no módulo cosmiátrico, o CRM registra automaticamente:
+	•	A data do procedimento cirúrgico realizado.
+	•	O tipo de transplante (frontal, coroa, completo, barba, sobrancelha, body hair).
+	•	O status (realizado, planejado, aguardando agendamento).
+
+Com base nessas informações, o sistema gera automaticamente lembretes de acompanhamento para controle pós-operatório e retorno clínico.
+Por exemplo:
+	•	Revisão médica após 7 dias
+	•	Avaliação de crescimento após 6 meses
+	•	Planejamento de segunda cirurgia se necessário
+
+Esses retornos são exibidos na aba de CRM como “Pacientes de transplante para revisão”, com nome, data prevista e tipo de cirurgia.
+
+⸻
+
+5.10. Resumo operacional do fluxo de transplante capilar
+	1.	Médico inicia atendimento → categoria escolhida: “Transplante capilar”.
+	2.	Anamnese inicia com texto padrão editável.
+	3.	Seleciona a classificação de Norwood.
+	4.	Anexa fotos da consulta e simulação.
+	5.	Define se é caso primário ou secundário.
+	6.	Indica se há múltiplas cirurgias e áreas envolvidas.
+	7.	Marca uma ou mais indicações cirúrgicas.
+	8.	Descreve o planejamento cirúrgico no campo próprio.
+	9.	Conduta final apresenta texto padrão sobre tratamento clínico complementar.
+	10.	CRM registra automaticamente o tipo de transplante e agenda acompanhamentos futuros.
+
+⸻
+
+6. VISÃO GERAL DAS TRÊS CATEGORIAS DERMATOLÓGICAS
