@@ -107,8 +107,9 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Duração (minutos)</label>
-                        <input type="number" class="form-control" name="duration_minutes" value="60" required>
+                        <label class="form-label">Duração</label>
+                        <input type="text" class="form-control" name="duration_input" value="1h" placeholder="Ex: 1h, 1h30, 2h, 30min" required>
+                        <small class="form-text text-muted">Exemplos: 1h, 1h30, 2h, 30min, 45min</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Observações</label>
@@ -245,6 +246,45 @@ function showNewSurgeryModal() {
     new bootstrap.Modal(document.getElementById('newSurgeryModal')).show();
 }
 
+function parseDuration(input) {
+    if (!input || typeof input !== 'string') {
+        return NaN;
+    }
+    
+    input = input.trim().toLowerCase();
+    
+    // Apenas minutos: "30min", "45min" - validação estrita
+    const minPattern = /^(\d+)\s*min$/;
+    const minMatch = input.match(minPattern);
+    if (minMatch) {
+        const mins = parseInt(minMatch[1]);
+        return (mins > 0 && mins <= 480) ? mins : NaN;
+    }
+    
+    // Horas e minutos: "1h30", "2h15", "1h45"
+    const hoursMinutesPattern = /^(\d+)\s*h\s*(\d+)$/;
+    const hoursMinutesMatch = input.match(hoursMinutesPattern);
+    if (hoursMinutesMatch) {
+        const hours = parseInt(hoursMinutesMatch[1]);
+        const mins = parseInt(hoursMinutesMatch[2]);
+        if (mins >= 60) return NaN;
+        const total = hours * 60 + mins;
+        return (total > 0 && total <= 480) ? total : NaN;
+    }
+    
+    // Apenas horas: "1h", "2h"
+    const hoursPattern = /^(\d+)\s*h$/;
+    const hoursMatch = input.match(hoursPattern);
+    if (hoursMatch) {
+        const hours = parseInt(hoursMatch[1]);
+        const total = hours * 60;
+        return (total > 0 && total <= 480) ? total : NaN;
+    }
+    
+    // Formato inválido
+    return NaN;
+}
+
 function saveSurgery() {
     const form = document.getElementById('surgeryForm');
     const formData = new FormData(form);
@@ -253,6 +293,13 @@ function saveSurgery() {
     // Validar doctor_id
     if (!data.doctor_id || data.doctor_id === '') {
         showAlert('Selecione o médico responsável', 'danger');
+        return;
+    }
+    
+    // Converter duração para minutos
+    const durationMinutes = parseDuration(data.duration_input);
+    if (isNaN(durationMinutes) || durationMinutes <= 0) {
+        showAlert('Formato de duração inválido. Use: 1h, 1h30, 2h ou 30min', 'danger');
         return;
     }
     
@@ -269,7 +316,7 @@ function saveSurgery() {
             operating_room_id: parseInt(data.room_id),
             date: data.scheduled_date,
             start_time: data.scheduled_time,
-            duration_minutes: parseInt(data.duration_minutes),
+            duration_minutes: durationMinutes,
             notes: data.notes || ''
         })
     })
