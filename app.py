@@ -674,12 +674,30 @@ def chat():
 @app.route('/api/chat/messages')
 @login_required
 def get_messages():
-    messages = ChatMessage.query.order_by(ChatMessage.created_at.asc()).limit(100).all()
+    with_user_id = request.args.get('with_user_id', type=int)
+    
+    if not with_user_id:
+        return jsonify({'error': 'Parâmetro with_user_id é obrigatório'}), 400
+    
+    messages = ChatMessage.query.filter(
+        db.or_(
+            db.and_(
+                ChatMessage.sender_id == current_user.id,
+                ChatMessage.recipient_id == with_user_id
+            ),
+            db.and_(
+                ChatMessage.sender_id == with_user_id,
+                ChatMessage.recipient_id == current_user.id
+            )
+        )
+    ).order_by(ChatMessage.created_at.asc()).limit(100).all()
     
     return jsonify([{
         'id': msg.id,
         'sender': msg.sender.name,
         'senderId': msg.sender_id,
+        'recipient': msg.recipient.name,
+        'recipientId': msg.recipient_id,
         'message': msg.message,
         'timestamp': msg.created_at.strftime('%H:%M'),
         'read': msg.read
@@ -690,8 +708,17 @@ def get_messages():
 def send_message():
     data = request.json
     
+    recipient_id = data.get('recipient_id')
+    if not recipient_id:
+        return jsonify({'error': 'recipient_id é obrigatório'}), 400
+    
+    recipient = User.query.get(recipient_id)
+    if not recipient:
+        return jsonify({'error': 'Destinatário não encontrado'}), 404
+    
     message = ChatMessage(
         sender_id=current_user.id,
+        recipient_id=recipient_id,
         message=data['message']
     )
     
@@ -703,9 +730,16 @@ def send_message():
 @app.route('/api/chat/mark_read', methods=['POST'])
 @login_required
 def mark_messages_read():
-    unread_message_ids = db.session.query(ChatMessage.id).filter(
-        ChatMessage.sender_id != current_user.id
-    ).outerjoin(
+    from_user_id = request.json.get('from_user_id') if request.json else None
+    
+    query = db.session.query(ChatMessage.id).filter(
+        ChatMessage.recipient_id == current_user.id
+    )
+    
+    if from_user_id:
+        query = query.filter(ChatMessage.sender_id == from_user_id)
+    
+    unread_message_ids = query.outerjoin(
         MessageRead,
         db.and_(
             MessageRead.message_id == ChatMessage.id,
@@ -737,9 +771,16 @@ def mark_messages_read():
 @app.route('/api/chat/unread_count')
 @login_required
 def get_unread_count():
-    count = db.session.query(ChatMessage).filter(
-        ChatMessage.sender_id != current_user.id
-    ).outerjoin(
+    from_user_id = request.args.get('from_user_id', type=int)
+    
+    query = db.session.query(ChatMessage).filter(
+        ChatMessage.recipient_id == current_user.id
+    )
+    
+    if from_user_id:
+        query = query.filter(ChatMessage.sender_id == from_user_id)
+    
+    count = query.outerjoin(
         MessageRead,
         db.and_(
             MessageRead.message_id == ChatMessage.id,
@@ -750,6 +791,35 @@ def get_unread_count():
     ).count()
     
     return jsonify({'count': count})
+
+@app.route('/api/chat/contacts')
+@login_required
+def get_chat_contacts():
+    users = User.query.filter(User.id != current_user.id).all()
+    
+    contacts = []
+    for user in users:
+        unread_count = db.session.query(ChatMessage).filter(
+            ChatMessage.recipient_id == current_user.id,
+            ChatMessage.sender_id == user.id
+        ).outerjoin(
+            MessageRead,
+            db.and_(
+                MessageRead.message_id == ChatMessage.id,
+                MessageRead.user_id == current_user.id
+            )
+        ).filter(
+            MessageRead.id.is_(None)
+        ).count()
+        
+        contacts.append({
+            'id': user.id,
+            'name': user.name,
+            'role': user.role,
+            'unread_count': unread_count
+        })
+    
+    return jsonify(contacts)
 
 @app.cli.command('init-db')
 def init_db():

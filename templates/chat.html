@@ -4,29 +4,150 @@
 
 {% block extra_css %}
 <style>
-.online-indicator {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    background: #28a745;
-    border-radius: 50%;
-    margin-right: 6px;
-    animation: pulse 2s infinite;
+.chat-container {
+    display: flex;
+    height: 600px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+.contacts-panel {
+    width: 300px;
+    background: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
 }
 
-.chat-info-banner {
-    background: #e7f3ff;
-    border: 1px solid #b3d9ff;
-    border-radius: 6px;
-    padding: 10px 15px;
+.contacts-header {
+    background: #0d6efd;
+    color: white;
+    padding: 15px;
+    font-weight: bold;
+    border-bottom: 1px solid #0a58ca;
+}
+
+.contacts-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.contact-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #dee2e6;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.contact-item:hover {
+    background: #e9ecef;
+}
+
+.contact-item.active {
+    background: #cfe2ff;
+    border-left: 3px solid #0d6efd;
+}
+
+.contact-name {
+    font-weight: 600;
+    color: #212529;
+}
+
+.contact-role {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.contact-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #dc3545;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.conversation-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.conversation-header {
+    background: #0d6efd;
+    color: white;
+    padding: 15px 20px;
+    border-bottom: 1px solid #0a58ca;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.conversation-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.messages-area {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background: white;
+}
+
+.message-input-area {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+.no-contact-selected {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+}
+
+.no-contact-selected i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+}
+
+.chat-message {
     margin-bottom: 15px;
-    color: #004085;
-    font-size: 0.9rem;
+    padding: 10px 15px;
+    border-radius: 10px;
+    max-width: 70%;
+    word-wrap: break-word;
+}
+
+.chat-message.sent {
+    background: #0d6efd;
+    color: white;
+    margin-left: auto;
+    text-align: right;
+}
+
+.chat-message.received {
+    background: #e9ecef;
+    color: #212529;
+}
+
+.message-text {
+    margin: 5px 0;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-top: 5px;
 }
 </style>
 {% endblock %}
@@ -41,31 +162,24 @@
 </div>
 
 <div class="row">
-    <div class="col-md-8 mx-auto">
-        <div class="card">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <span class="online-indicator"></span>
-                    Chat Geral - Clínica Basile
-                </h5>
-                <small class="text-white-50">
-                    <i class="bi bi-people"></i> Mensagens visíveis para todos
-                </small>
+    <div class="col-12">
+        <div class="chat-container">
+            <div class="contacts-panel">
+                <div class="contacts-header">
+                    <i class="bi bi-people"></i> Contatos
+                </div>
+                <div class="contacts-list" id="contactsList">
+                    <div style="padding: 20px; text-align: center; color: #6c757d;">
+                        Carregando contatos...
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div class="chat-info-banner">
-                    <i class="bi bi-info-circle"></i>
-                    <strong>Chat Geral:</strong> Todas as mensagens enviadas aqui são vistas por todos os usuários online (médicos e secretárias).
-                </div>
-                
-                <div id="chatMessages" class="border rounded p-3 mb-3 bg-light" style="height: 450px; overflow-y: auto;">
-                </div>
-                
-                <div class="input-group">
-                    <input type="text" id="messageInput" class="form-control" placeholder="Digite sua mensagem para todos...">
-                    <button class="btn btn-primary" onclick="sendMessage()">
-                        <i class="bi bi-send"></i> Enviar
-                    </button>
+
+            <div class="conversation-panel" id="conversationPanel">
+                <div class="no-contact-selected">
+                    <i class="bi bi-chat-left-dots"></i>
+                    <h4>Selecione um contato</h4>
+                    <p>Escolha um contato na lista para iniciar uma conversa</p>
                 </div>
             </div>
         </div>

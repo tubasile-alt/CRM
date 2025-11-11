@@ -118,11 +118,13 @@ class ChatMessage(db.Model):
     __tablename__ = 'chat_message'
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     message = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     read = db.Column(db.Boolean, default=False)
     
-    sender = db.relationship('User', backref='messages')
+    sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
+    recipient = db.relationship('User', foreign_keys=[recipient_id], backref='received_messages')
     reads = db.relationship('MessageRead', backref='message', cascade='all, delete-orphan')
 
 class MessageRead(db.Model):
