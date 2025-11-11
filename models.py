@@ -17,6 +17,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(200), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(20), nullable=False)
+    specialty = db.Column(db.String(50))  # 'dermatologista' ou 'cirurgiao_plastico'
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     def set_password(self, password):
@@ -68,12 +69,15 @@ class Note(db.Model):
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False)
     doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     note_type = db.Column(db.String(50), nullable=False)
+    category = db.Column(db.String(50))  # 'patologia', 'cosmiatria', 'transplante_capilar'
     content = db.Column(db.Text)
     consultation_duration = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     doctor = db.relationship('User', backref='notes')
     indications = db.relationship('Indication', backref='note', lazy=True, cascade='all, delete-orphan')
+    cosmetic_plans = db.relationship('CosmeticProcedurePlan', backref='note', lazy=True, cascade='all, delete-orphan')
+    hair_transplants = db.relationship('HairTransplant', backref='note', lazy=True, cascade='all, delete-orphan')
 
 class Procedure(db.Model):
     __tablename__ = 'procedure'
@@ -162,3 +166,66 @@ class DoctorPreference(db.Model):
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     user = db.relationship('User', backref='preference', uselist=False)
+
+# Modelos para Cosmiatria
+class CosmeticProcedurePlan(db.Model):
+    __tablename__ = 'cosmetic_procedure_plan'
+    id = db.Column(db.Integer, primary_key=True)
+    note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
+    procedure_name = db.Column(db.String(100), nullable=False)  # Botox, Sculptra, Morpheus, etc
+    planned_value = db.Column(db.Numeric(10, 2))  # Valor planejado (precisão decimal para valores monetários)
+    was_performed = db.Column(db.Boolean, default=False)  # Se foi realizado
+    performed_date = db.Column(db.DateTime)  # Data de realização
+    follow_up_months = db.Column(db.Integer)  # Intervalo de retorno em meses
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+
+# Modelos para Transplante Capilar
+class HairTransplant(db.Model):
+    __tablename__ = 'hair_transplant'
+    id = db.Column(db.Integer, primary_key=True)
+    note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
+    norwood_classification = db.Column(db.String(20))  # I, II, III, IV, V, VI, VII
+    case_type = db.Column(db.String(50))  # 'primaria' ou 'secundaria'
+    number_of_surgeries = db.Column(db.Integer, default=1)  # 1 ou 2 cirurgias planejadas
+    body_hair_needed = db.Column(db.Boolean, default=False)
+    eyebrow_transplant = db.Column(db.Boolean, default=False)
+    beard_transplant = db.Column(db.Boolean, default=False)
+    
+    # Indicações cirúrgicas (múltipla seleção via checkboxes separados)
+    frontal_transplant = db.Column(db.Boolean, default=False)
+    crown_transplant = db.Column(db.Boolean, default=False)
+    complete_transplant = db.Column(db.Boolean, default=False)
+    complete_with_body_hair = db.Column(db.Boolean, default=False)
+    
+    # Planejamento cirúrgico (texto livre)
+    surgical_planning = db.Column(db.Text)
+    
+    # Conduta (texto com padrão editável)
+    clinical_conduct = db.Column(db.Text)
+    
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    images = db.relationship('TransplantImage', backref='transplant', lazy=True, cascade='all, delete-orphan')
+
+class TransplantImage(db.Model):
+    __tablename__ = 'transplant_image'
+    id = db.Column(db.Integer, primary_key=True)
+    hair_transplant_id = db.Column(db.Integer, db.ForeignKey('hair_transplant.id'), nullable=False)
+    image_type = db.Column(db.String(50), nullable=False)  # 'consultation_photo', 'surgical_plan', 'simulation'
+    file_path = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+
+# Modelo para lembretes automáticos do CRM
+class FollowUpReminder(db.Model):
+    __tablename__ = 'follow_up_reminder'
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False)
+    procedure_name = db.Column(db.String(100), nullable=False)
+    scheduled_date = db.Column(db.Date, nullable=False, index=True)
+    reminder_type = db.Column(db.String(50))  # 'cosmetic_follow_up', 'transplant_revision'
+    status = db.Column(db.String(20), default='pending')  # 'pending', 'contacted', 'scheduled', 'completed'
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    patient = db.relationship('Patient', backref='reminders')
