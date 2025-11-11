@@ -19,12 +19,12 @@ The front-end utilizes Bootstrap 5.3.0 for responsive design and Bootstrap Icons
 
 ### Technical Implementations
 - **Authentication**: Flask-Login handles user authentication with two profiles (Médico, Secretária), using secure password hashing and CSRF protection via Flask-WTF.
-- **Multi-Doctor Agenda**: Implemented with FullCalendar, supporting multiple doctors, customizable colors per doctor, dual coloring (background for doctor, border for status), check-in/checkout workflow, and real-time wait time calculation.
+- **Multi-Doctor Agenda**: Implemented with FullCalendar, supporting multiple doctors, customizable colors per doctor, dual coloring (background for doctor, border for status), check-in/checkout workflow, real-time wait time calculation, and appointment type classification (Unimed, Particular, Cortesia).
 - **Electronic Health Record (EHR)**:
     - **Dermatology**: Standard tabs for chief complaint, anamnesis, consultation, and conduct, with voice dictation support.
     - **Cosmiatry**: Pre-filled anamnesis, an exclusive Clinical Planning tab with interactive procedure tables (Botox, Sculptra, etc.), automatic total value calculation, PDF budget generation, and automated CRM follow-up reminders.
     - **Hair Transplant**: Visual Norwood classification (7 interactive cards), secure image uploads (JPG/PNG/GIF, max 5MB, MIME type validation), and automated post-operative review reminders (7 days, 6 months, 12 months).
-- **Surgical Map**: Weekly visualization of surgeries, management of operating rooms, and conflict validation (room and doctor conflicts).
+- **Surgical Map**: Weekly visualization of surgeries, management of 4 operating rooms (Sala 1-4), fixed morning time slots (7AM, 10AM) Monday-Friday, and conflict validation (room and doctor conflicts).
 - **Digital Waiting Room**: Real-time dashboard with waiting statistics, patient list, and full check-in/checkout workflow.
 - **Internal Chat**: Real-time communication between doctor and secretary with automatic updates.
 - **Configuration & Backup**: Manual database backup, SMTP email settings, and per-doctor preferences. Automated backup script (`utils/backup.py`) preserving the last 30 backups.
@@ -32,6 +32,8 @@ The front-end utilizes Bootstrap 5.3.0 for responsive design and Bootstrap Icons
 
 ### Feature Specifications
 - **Real-time Updates**: Dashboard statistics, waiting room, and chat update automatically.
+- **Dashboard Statistics Logic**: "Agendados" counts sum of both "agendado" and "confirmado" statuses. "Confirmados", "Atendidos", and "Faltaram" remain exclusive to their respective statuses.
+- **Appointment Type System**: Each appointment can be classified as Unimed, Particular, or Cortesia (defaults to Particular). Migration script available at `migrations/add_appointment_type.py`.
 - **Data Validation**: Client-side and server-side validation for all forms.
 - **Timezone Management**: Uses `America/Sao_Paulo` for all date/time operations.
 - **Security**: CSRF protection, robust authentication, access control, regular backups, and strict image upload validation.
