@@ -462,56 +462,197 @@ def save_prontuario(patient_id):
     
     return jsonify({'success': True, 'note_id': note.id})
 
-@app.route('/api/prontuario/<int:patient_id>/cosmetic-plan', methods=['POST'])
+@app.route('/api/prontuario/<int:patient_id>/finalizar', methods=['POST'])
 @login_required
-def save_cosmetic_plan(patient_id):
-    """Salva planejamento cosmético com procedimentos e valores"""
+def finalizar_atendimento(patient_id):
+    """Finaliza atendimento salvando todos os dados em uma transação unificada"""
     if not current_user.is_doctor():
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    from models import CosmeticProcedurePlan, FollowUpReminder
-    from datetime import timedelta
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     data = request.get_json(silent=True)
     if data is None:
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
-    # Criar nota principal
-    note = Note(
-        patient_id=patient_id,
-        doctor_id=current_user.id,
-        note_type='cosmiatria',
-        category='cosmiatria',
-        content=f"Anamnese: {data.get('anamnese', '')}\n\nConduta: {data.get('conduta', '')}"
-    )
-    db.session.add(note)
-    db.session.flush()
+    # Validar que o atendimento foi iniciado
+    if not data.get('consultation_started'):
+        return jsonify({'success': False, 'error': 'É necessário iniciar o atendimento antes de finalizar'}), 400
     
-    # Adicionar procedimentos ao planejamento
-    for proc in data.get('procedures', []):
-        plan = CosmeticProcedurePlan(
-            note_id=note.id,
-            procedure_name=proc['name'],
-            planned_value=float(proc['value']),
-            final_budget=float(proc.get('budget', proc['value'])),
-            was_performed=bool(proc.get('performed', False)),
-            follow_up_months=int(proc['months'])
-        )
-        db.session.add(plan)
+    try:
+        category = data.get('category', 'patologia')
+        duration = data.get('duration')
         
-        # Criar lembrete automático de follow-up (usando timezone correto)
-        follow_up_date = (get_brazil_time() + timedelta(days=30 * int(proc['months']))).date()
-        reminder = FollowUpReminder(
-            patient_id=patient_id,
-            procedure_name=proc['name'],
-            scheduled_date=follow_up_date,
-            reminder_type='cosmetic_follow_up',
-            notes=f"Retorno para {proc['name']}"
-        )
-        db.session.add(reminder)
+        # Salvar cada seção como nota separada
+        sections = ['queixa', 'anamnese', 'diagnostico']
+        note_ids = {}
+        
+        for section in sections:
+            content = data.get(section, '').strip()
+            if content:  # Só salva se tiver conteúdo
+                note = Note(
+                    patient_id=patient_id,
+                    doctor_id=current_user.id,
+                    note_type=section,
+                    content=content
+                )
+                db.session.add(note)
+                db.session.flush()
+                note_ids[section] = note.id
+        
+        # SEMPRE criar nota de conduta se houver dados estruturados ou texto
+        conduta_content = data.get('conduta', '').strip()
+        has_procedures = (data.get('indicated_procedures') or 
+                         data.get('performed_procedures') or 
+                         data.get('cosmetic_procedures') or 
+                         data.get('transplant_data'))
+        
+        if conduta_content or has_procedures:
+            conduta_note = Note(
+                patient_id=patient_id,
+                doctor_id=current_user.id,
+                note_type='conduta',
+                content=conduta_content or '[Conduta registrada via procedimentos]',
+                consultation_duration=duration
+            )
+            db.session.add(conduta_note)
+            db.session.flush()
+            note_ids['conduta'] = conduta_note.id
+        
+        # Salvar procedimentos indicados e realizados (Patologia e Cosmiatria)
+        if category != 'transplante_capilar':
+            indicated = data.get('indicated_procedures', [])
+            performed = data.get('performed_procedures', [])
+            conduta_note_id = note_ids.get('conduta')
+            
+            if conduta_note_id:
+                # Salvar procedimentos indicados
+                for proc_id in indicated:
+                    indication = Indication(
+                        note_id=conduta_note_id,
+                        procedure_id=proc_id,
+                        indicated=True,
+                        performed=(proc_id in performed)
+                    )
+                    db.session.add(indication)
+                
+                # Salvar procedimentos realizados que não foram indicados
+                for proc_id in performed:
+                    if proc_id not in indicated:
+                        indication = Indication(
+                            note_id=conduta_note_id,
+                            procedure_id=proc_id,
+                            indicated=False,
+                            performed=True
+                        )
+                        db.session.add(indication)
+        
+        # Salvar planejamento cosmético (Cosmiatria)
+        if category == 'cosmiatria':
+            from models import CosmeticProcedurePlan, FollowUpReminder
+            from datetime import timedelta
+            
+            procedures = data.get('cosmetic_procedures', [])
+            conduta_note_id = note_ids.get('conduta')
+            
+            if conduta_note_id and procedures:
+                # Sempre criar NOVOS registros para cada atendimento (mantém histórico)
+                for proc in procedures:
+                    proc_name = proc['name']
+                    
+                    # Criar novo plano para este atendimento
+                    plan = CosmeticProcedurePlan(
+                        note_id=conduta_note_id,
+                        procedure_name=proc_name,
+                        planned_value=float(proc['value']),
+                        final_budget=float(proc.get('budget', proc['value'])),
+                        was_performed=bool(proc.get('performed', False)),
+                        follow_up_months=int(proc['months'])
+                    )
+                    db.session.add(plan)
+                    
+                    # Gerenciar lembretes de follow-up
+                    if proc.get('performed', False):
+                        # Se foi realizado, cancelar lembretes pendentes anteriores
+                        FollowUpReminder.query.filter_by(
+                            patient_id=patient_id,
+                            procedure_name=proc_name,
+                            reminder_type='cosmetic_follow_up',
+                            status='pending'
+                        ).update({'status': 'completed'})
+                    else:
+                        # Se não foi realizado, criar novo lembrete e cancelar pendentes anteriores
+                        # Primeiro cancela lembretes antigos
+                        FollowUpReminder.query.filter_by(
+                            patient_id=patient_id,
+                            procedure_name=proc_name,
+                            reminder_type='cosmetic_follow_up',
+                            status='pending'
+                        ).update({'status': 'superseded'})
+                        
+                        # Criar novo lembrete
+                        follow_up_date = (get_brazil_time() + timedelta(days=30 * int(proc['months']))).date()
+                        reminder = FollowUpReminder(
+                            patient_id=patient_id,
+                            procedure_name=proc_name,
+                            scheduled_date=follow_up_date,
+                            reminder_type='cosmetic_follow_up'
+                        )
+                        db.session.add(reminder)
+        
+        # Salvar dados de transplante capilar (Transplante Capilar)
+        if category == 'transplante_capilar':
+            from models import HairTransplant
+            
+            transplant_data = data.get('transplant_data', {})
+            conduta_note_id = note_ids.get('conduta')
+            
+            if conduta_note_id and transplant_data:
+                transplant = HairTransplant(
+                    note_id=conduta_note_id,
+                    norwood_classification=transplant_data.get('norwood'),
+                    previous_transplant=transplant_data.get('previous_transplant', 'nao'),
+                    transplant_location=transplant_data.get('transplant_location'),
+                    frontal_transplant=transplant_data.get('frontal', False),
+                    crown_transplant=transplant_data.get('crown', False),
+                    complete_transplant=transplant_data.get('complete', False),
+                    complete_with_body_hair=transplant_data.get('complete_body_hair', False),
+                    surgical_planning=transplant_data.get('surgical_planning', ''),
+                    clinical_conduct=data.get('conduta', '')
+                )
+                db.session.add(transplant)
+        
+        # Commit da transação
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Atendimento finalizado com sucesso',
+            'note_ids': note_ids
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Erro ao finalizar atendimento: {str(e)}'
+        }), 500
+
+@app.route('/api/prontuario/<int:patient_id>/cosmetic-plan', methods=['POST'])
+@login_required
+def save_cosmetic_plan(patient_id):
+    """
+    DEPRECATED: Não salva mais no banco - dados são salvos apenas ao finalizar atendimento.
+    Mantido apenas para compatibilidade, retorna sucesso sem fazer nada.
+    Use generate-budget para gerar PDF.
+    """
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
     
-    db.session.commit()
-    return jsonify({'success': True})
+    # Não salvar mais - apenas retornar sucesso
+    # Os dados serão salvos quando clicar em "Finalizar Atendimento"
+    return jsonify({
+        'success': True, 
+        'message': 'Planejamento será salvo ao finalizar o atendimento'
+    })
 
 @app.route('/api/prontuario/<int:patient_id>/generate-budget', methods=['POST'])
 @login_required

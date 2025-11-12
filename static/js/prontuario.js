@@ -246,22 +246,27 @@ function toggleCategoryTabs() {
     const tabTransplante = document.getElementById('tabTransplante');
     const conductProcedures = document.getElementById('conductProceduresSection');
     const cosmeticConductSection = document.getElementById('cosmeticConductSection');
+    const indicatedProcedures = document.getElementById('indicatedProceduresSection');
     
     if (currentCategory === 'cosmiatria') {
         tabPlanejamento.style.display = '';
         tabTransplante.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = 'none';
         if (cosmeticConductSection) cosmeticConductSection.style.display = '';
+        if (indicatedProcedures) indicatedProcedures.style.display = '';
     } else if (currentCategory === 'transplante_capilar') {
         tabPlanejamento.style.display = 'none';
         tabTransplante.style.display = '';
         if (conductProcedures) conductProcedures.style.display = 'none';
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
+        if (indicatedProcedures) indicatedProcedures.style.display = 'none';
     } else {
+        // Patologia
         tabPlanejamento.style.display = 'none';
         tabTransplante.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = '';
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
+        if (indicatedProcedures) indicatedProcedures.style.display = 'none';
     }
 }
 
@@ -362,38 +367,9 @@ function toggleProcedurePerformed(index) {
 }
 
 function saveCosmeticPlan() {
-    if (cosmeticProcedures.length === 0) {
-        showAlert('Adicione pelo menos um procedimento ao planejamento', 'warning');
-        return;
-    }
-    
-    const data = {
-        category: 'cosmiatria',
-        procedures: cosmeticProcedures,
-        anamnese: document.getElementById('anamneseText').value,
-        conduta: document.getElementById('condutaText').value
-    };
-    
-    fetch(`/api/prontuario/${patientId}/cosmetic-plan`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Planejamento cosmético salvo com sucesso!');
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showAlert(result.error || 'Erro ao salvar planejamento', 'danger');
-        }
-    })
-    .catch(error => {
-        showAlert('Erro ao salvar planejamento.', 'danger');
-        console.error(error);
-    });
+    // DEPRECATED: Não salvar mais - dados são salvos ao finalizar
+    // Apenas mostrar mensagem informativa
+    alert('Os procedimentos são salvos automaticamente ao clicar em "Finalizar Atendimento" na aba Conduta.\n\nUse o botão "Gerar Orçamento PDF" se precisar enviar o orçamento ao paciente.');
 }
 
 function generateBudget() {
@@ -522,4 +498,111 @@ function saveHairTransplant() {
         showAlert('Erro ao salvar dados de transplante.', 'danger');
         console.error(error);
     });
+}
+
+// ========== FINALIZAR ATENDIMENTO ==========
+function finalizarAtendimento() {
+    // Verificar se o atendimento foi iniciado
+    if (!timerStartTime) {
+        alert('É necessário iniciar o atendimento antes de finalizar!');
+        return;
+    }
+    
+    // Confirmar finalização
+    if (!confirm('Deseja finalizar o atendimento? Todos os dados serão salvos.')) {
+        return;
+    }
+    
+    // Calcular duração em minutos
+    const duration = Math.floor((Date.now() - timerStartTime) / 60000);
+    
+    // Coletar dados dos campos de texto
+    const queixa = document.getElementById('queixaText')?.value || '';
+    const anamnese = document.getElementById('anamneseText')?.value || '';
+    const diagnostico = document.getElementById('diagnosticoText')?.value || '';
+    const conduta = document.getElementById('condutaText')?.value || '';
+    
+    // Coletar procedimentos indicados e realizados (Patologia)
+    const indicated = Array.from(document.querySelectorAll('.indicated-proc:checked')).map(cb => parseInt(cb.value));
+    const performed = Array.from(document.querySelectorAll('.performed-proc:checked')).map(cb => parseInt(cb.value));
+    
+    // Montar payload base
+    const payload = {
+        consultation_started: true,
+        category: currentCategory,
+        duration: duration,
+        queixa: queixa,
+        anamnese: anamnese,
+        diagnostico: diagnostico,
+        conduta: conduta,
+        indicated_procedures: indicated,
+        performed_procedures: performed
+    };
+    
+    // Adicionar dados específicos de Cosmiatria
+    if (currentCategory === 'cosmiatria' && cosmeticProcedures.length > 0) {
+        payload.cosmetic_procedures = cosmeticProcedures;
+    }
+    
+    // Adicionar dados específicos de Transplante Capilar
+    if (currentCategory === 'transplante_capilar') {
+        const previousTransplant = document.querySelector('input[name="previousTransplant"]:checked')?.value || 'nao';
+        const transplantLocation = document.querySelector('input[name="transplantLocation"]:checked')?.value || '';
+        const norwood = document.getElementById('norwoodClassification')?.value || '';
+        const surgicalPlanning = document.getElementById('surgicalPlanning')?.value || '';
+        
+        payload.transplant_data = {
+            norwood: norwood,
+            previous_transplant: previousTransplant,
+            transplant_location: transplantLocation,
+            frontal: document.getElementById('frontalTransplant')?.checked || false,
+            crown: document.getElementById('crownTransplant')?.checked || false,
+            complete: document.getElementById('completeTransplant')?.checked || false,
+            complete_body_hair: document.getElementById('completeBodyHair')?.checked || false,
+            surgical_planning: surgicalPlanning
+        };
+    }
+    
+    // Mostrar loading
+    const btn = document.querySelector('button[onclick="finalizarAtendimento()"]');
+    if (btn) {
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Finalizando...';
+        
+        // Enviar para o backend
+        fetch(`/api/prontuario/${patientId}/finalizar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                // Parar cronômetro
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                timerStartTime = null;
+                
+                alert('Atendimento finalizado com sucesso!');
+                
+                // Redirecionar de volta
+                window.location.href = '/pacientes';
+            } else {
+                alert(result.error || 'Erro ao finalizar atendimento');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao finalizar atendimento. Por favor, tente novamente.');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
+    }
 }

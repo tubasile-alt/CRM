@@ -114,9 +114,6 @@
                             </button>
                         </div>
                         <textarea class="form-control" id="queixaText" rows="8"></textarea>
-                        <button class="btn btn-primary mt-2" onclick="saveNote('queixa')">
-                            <i class="bi bi-save"></i> Salvar
-                        </button>
                     </div>
 
                     <div class="tab-pane fade" id="anamnese">
@@ -128,7 +125,7 @@
                         </div>
                         <textarea class="form-control" id="anamneseText" rows="8"></textarea>
                         
-                        <div class="mt-3">
+                        <div class="mt-3" id="indicatedProceduresSection" style="display:none;">
                             <h6>Procedimentos Indicados</h6>
                             {% for proc in procedures %}
                             <div class="form-check">
@@ -140,10 +137,6 @@
                             </div>
                             {% endfor %}
                         </div>
-                        
-                        <button class="btn btn-primary mt-2" onclick="saveNote('anamnese')">
-                            <i class="bi bi-save"></i> Salvar
-                        </button>
                     </div>
 
                     <div class="tab-pane fade" id="diagnostico">
@@ -154,9 +147,6 @@
                             </button>
                         </div>
                         <textarea class="form-control" id="diagnosticoText" rows="8"></textarea>
-                        <button class="btn btn-primary mt-2" onclick="saveNote('diagnostico')">
-                            <i class="bi bi-save"></i> Salvar
-                        </button>
                     </div>
 
                     <div class="tab-pane fade" id="conduta">
@@ -200,9 +190,14 @@
                             {% endfor %}
                         </div>
                         
-                        <button class="btn btn-primary mt-2" onclick="saveNote('conduta')">
-                            <i class="bi bi-save"></i> Salvar
-                        </button>
+                        <div class="mt-4 pt-3 border-top">
+                            <button class="btn btn-success btn-lg" onclick="finalizarAtendimento()">
+                                <i class="bi bi-check-circle-fill"></i> Finalizar Atendimento
+                            </button>
+                            <small class="text-muted d-block mt-2">
+                                <i class="bi bi-info-circle"></i> Todos os dados serão salvos automaticamente
+                            </small>
+                        </div>
                     </div>
 
                     <!-- ABA PLANEJAMENTO CLÍNICO (COSMIATRIA) -->
