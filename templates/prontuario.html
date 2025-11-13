@@ -634,8 +634,8 @@
                                     {% endif %}
                                 {% endif %}
 
-                                <!-- Procedimentos Indicados (Patologia) -->
-                                {% if consultation.category == 'patologia' %}
+                                <!-- Procedimentos Indicados/Realizados (Patologia e Cosmiatria) -->
+                                {% if consultation.category in ['patologia', 'cosmiatria'] %}
                                     {% set all_indications = [] %}
                                     {% for note in consultation.all_notes %}
                                         {% if note.indications %}
@@ -646,7 +646,7 @@
                                     {% if all_indications %}
                                     <div class="mb-3">
                                         <h6 class="text-info">
-                                            <i class="bi bi-list-check"></i> Procedimentos
+                                            <i class="bi bi-list-check"></i> Procedimentos Realizados no Dia
                                         </h6>
                                         <div class="row">
                                             {% set indicated = all_indications | selectattr('indicated', 'equalto', True) | list %}
@@ -678,14 +678,17 @@
                                     {% endif %}
                                 {% endif %}
 
-                                <!-- Conduta -->
+                                <!-- Conduta (texto livre) -->
                                 {% if 'conduta' in consultation.notes_by_type %}
-                                <div class="mb-0">
-                                    <h6 class="text-primary">
-                                        <i class="bi bi-prescription2"></i> Conduta
-                                    </h6>
-                                    <p class="mb-0" style="white-space: pre-wrap;">{{ consultation.notes_by_type['conduta'].content }}</p>
-                                </div>
+                                    {% set conduta_text = consultation.notes_by_type['conduta'].content %}
+                                    {% if conduta_text and conduta_text != '[Conduta registrada via procedimentos]' %}
+                                    <div class="mb-0">
+                                        <h6 class="text-primary">
+                                            <i class="bi bi-prescription2"></i> Conduta
+                                        </h6>
+                                        <p class="mb-0" style="white-space: pre-wrap;">{{ conduta_text }}</p>
+                                    </div>
+                                    {% endif %}
                                 {% endif %}
                             </div>
                         </div>
