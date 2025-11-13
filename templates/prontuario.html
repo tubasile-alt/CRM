@@ -260,12 +260,12 @@
                             <strong>Total Estimado:</strong> R$ <span id="cosmeticTotal">0,00</span>
                         </div>
                         
-                        <button class="btn btn-primary me-2" onclick="saveCosmeticPlan()">
-                            <i class="bi bi-save"></i> Salvar Planejamento
-                        </button>
                         <button class="btn btn-success" onclick="generateBudget()">
                             <i class="bi bi-file-pdf"></i> Gerar Orçamento PDF
                         </button>
+                        <div class="alert alert-warning mt-2">
+                            <small><i class="bi bi-info-circle"></i> Os procedimentos serão salvos automaticamente ao clicar em "Finalizar Atendimento" na aba Conduta.</small>
+                        </div>
                     </div>
 
                     <!-- ABA DADOS CIRÚRGICOS (TRANSPLANTE CAPILAR) -->
@@ -484,6 +484,7 @@
 {% block extra_js %}
 <script>
 const patientId = {{ patient.id }};
+const appointmentId = {{ appointment_id if appointment_id else 'null' }};
 </script>
 <script src="{{ url_for('static', filename='js/prontuario.js') }}"></script>
 {% endblock %}

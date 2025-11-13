@@ -197,10 +197,15 @@ def create_appointment():
         patient = Patient(
             name=data['patientName'],
             phone=data.get('phone', ''),
-            email=data.get('email', '')
+            email=data.get('email', ''),
+            patient_type=data.get('patientType', 'particular')
         )
         db.session.add(patient)
         db.session.flush()
+    else:
+        # Atualizar patient_type se fornecido
+        if 'patientType' in data:
+            patient.patient_type = data['patientType']
     
     appointment = Appointment(
         patient_id=patient.id,
@@ -403,12 +408,16 @@ def prontuario(patient_id):
     
     notes = Note.query.filter_by(patient_id=patient_id).order_by(Note.created_at.desc()).all()
     
+    # Pegar appointment_id da query string (opcional)
+    appointment_id = request.args.get('appointment_id', type=int)
+    
     return render_template('prontuario.html', 
                          patient=patient, 
                          procedures=procedures,
                          tags=tags,
                          patient_tags=patient_tags,
-                         notes=notes)
+                         notes=notes,
+                         appointment_id=appointment_id)
 
 @app.route('/api/prontuario/<int:patient_id>', methods=['POST'])
 @login_required
@@ -619,6 +628,22 @@ def finalizar_atendimento(patient_id):
                     clinical_conduct=data.get('conduta', '')
                 )
                 db.session.add(transplant)
+        
+        # Atualizar status do agendamento para "atendido"
+        appointment_id = data.get('appointment_id')
+        if appointment_id:
+            appointment = Appointment.query.filter_by(
+                id=appointment_id,
+                patient_id=patient_id,
+                doctor_id=current_user.id
+            ).first()
+            
+            if appointment:
+                appointment.status = 'atendido'
+                if not appointment.checked_in_time:
+                    appointment.checked_in_time = get_brazil_time()
+            else:
+                print(f"Warning: Appointment {appointment_id} not found or not owned by current doctor")
         
         # Commit da transação
         db.session.commit()

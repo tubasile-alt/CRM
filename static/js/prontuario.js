@@ -214,6 +214,18 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function handleCategoryChange(event) {
+    // Verificar se o timer foi iniciado
+    if (!timerStartTime) {
+        event.preventDefault();
+        alert('⚠️ Por favor, inicie o atendimento antes de selecionar a categoria.\n\nClique no botão "Iniciar Atendimento" no topo da página.');
+        // Reverter para categoria anterior
+        const previousRadio = document.querySelector(`input[name="category"][value="${currentCategory}"]`);
+        if (previousRadio) {
+            previousRadio.checked = true;
+        }
+        return;
+    }
+    
     currentCategory = event.target.value;
     updateCategoryTexts();
     toggleCategoryTabs();
@@ -253,7 +265,7 @@ function toggleCategoryTabs() {
         tabTransplante.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = 'none';
         if (cosmeticConductSection) cosmeticConductSection.style.display = '';
-        if (indicatedProcedures) indicatedProcedures.style.display = '';
+        if (indicatedProcedures) indicatedProcedures.style.display = 'none';
     } else if (currentCategory === 'transplante_capilar') {
         tabPlanejamento.style.display = 'none';
         tabTransplante.style.display = '';
@@ -266,7 +278,7 @@ function toggleCategoryTabs() {
         tabTransplante.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = '';
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
-        if (indicatedProcedures) indicatedProcedures.style.display = 'none';
+        if (indicatedProcedures) indicatedProcedures.style.display = '';
     }
 }
 
@@ -538,6 +550,11 @@ function finalizarAtendimento() {
         indicated_procedures: indicated,
         performed_procedures: performed
     };
+    
+    // Incluir appointment_id se disponível
+    if (typeof appointmentId !== 'undefined' && appointmentId !== null) {
+        payload.appointment_id = appointmentId;
+    }
     
     // Adicionar dados específicos de Cosmiatria
     if (currentCategory === 'cosmiatria' && cosmeticProcedures.length > 0) {

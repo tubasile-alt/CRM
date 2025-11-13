@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
 function saveAppointment() {
     const patientName = document.getElementById('patientName').value;
     const phone = document.getElementById('patientPhone').value;
+    const patientType = document.getElementById('patientType').value;
     const start = document.getElementById('appointmentStart').value;
     const duration = parseInt(document.getElementById('appointmentDuration').value);
     const status = document.getElementById('appointmentStatus').value;
@@ -74,6 +75,7 @@ function saveAppointment() {
     const payload = {
         patientName: patientName,
         phone: phone,
+        patientType: patientType,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         status: status,
@@ -213,6 +215,7 @@ function deleteEvent() {
 
 function openPatientChart() {
     if (currentEvent && currentEvent.extendedProps.patientId) {
-        window.location.href = `/prontuario/${currentEvent.extendedProps.patientId}`;
+        const appointmentId = currentEvent.id;
+        window.location.href = `/prontuario/${currentEvent.extendedProps.patientId}?appointment_id=${appointmentId}`;
     }
 }
