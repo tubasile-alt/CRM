@@ -521,15 +521,14 @@
                                 {% endif %}
 
                                 <!-- Procedimentos Cosméticos (Cosmiatria) -->
-                                {% if consultation.category == 'cosmiatria' %}
-                                    {% set cosmetic_plans = [] %}
-                                    {% for note in consultation.all_notes %}
-                                        {% if note.cosmetic_plans %}
-                                            {% set cosmetic_plans = cosmetic_plans + note.cosmetic_plans %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    
-                                    {% if cosmetic_plans %}
+                                {% set cosmetic_plans = [] %}
+                                {% for note in consultation.all_notes %}
+                                    {% if note.cosmetic_plans %}
+                                        {% set cosmetic_plans = cosmetic_plans + note.cosmetic_plans %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if cosmetic_plans %}
                                     <div class="mb-3">
                                         <h6 class="text-success">
                                             <i class="bi bi-heart-pulse"></i> Procedimentos Estéticos Planejados
@@ -578,19 +577,17 @@
                                             </table>
                                         </div>
                                     </div>
-                                    {% endif %}
                                 {% endif %}
 
                                 <!-- Transplante Capilar -->
-                                {% if consultation.category == 'transplante_capilar' %}
-                                    {% set hair_transplants = [] %}
-                                    {% for note in consultation.all_notes %}
-                                        {% if note.hair_transplants %}
-                                            {% set hair_transplants = hair_transplants + note.hair_transplants %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    
-                                    {% if hair_transplants %}
+                                {% set hair_transplants = [] %}
+                                {% for note in consultation.all_notes %}
+                                    {% if note.hair_transplants %}
+                                        {% set hair_transplants = hair_transplants + note.hair_transplants %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if hair_transplants %}
                                     {% for ht in hair_transplants %}
                                     <div class="mb-3">
                                         <h6 class="text-success">
@@ -630,20 +627,18 @@
                                         </div>
                                         {% endif %}
                                     </div>
-                                    {% endfor %}
-                                    {% endif %}
+                                {% endfor %}
                                 {% endif %}
 
-                                <!-- Procedimentos Indicados/Realizados (Patologia e Cosmiatria) -->
-                                {% if consultation.category in ['patologia', 'cosmiatria'] %}
-                                    {% set all_indications = [] %}
-                                    {% for note in consultation.all_notes %}
-                                        {% if note.indications %}
-                                            {% set all_indications = all_indications + note.indications %}
-                                        {% endif %}
-                                    {% endfor %}
-                                    
-                                    {% if all_indications %}
+                                <!-- Procedimentos Indicados/Realizados -->
+                                {% set all_indications = [] %}
+                                {% for note in consultation.all_notes %}
+                                    {% if note.indications %}
+                                        {% set all_indications = all_indications + note.indications %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if all_indications %}
                                     <div class="mb-3">
                                         <h6 class="text-info">
                                             <i class="bi bi-list-check"></i> Procedimentos Realizados no Dia
@@ -675,7 +670,6 @@
                                             {% endif %}
                                         </div>
                                     </div>
-                                    {% endif %}
                                 {% endif %}
 
                                 <!-- Conduta (texto livre) -->
