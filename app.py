@@ -460,16 +460,16 @@ def prontuario(patient_id):
             'is_finalized': is_finalized
         })
     
-    # FALLBACK: Agrupar notas SEM appointment_id usando janela temporal (dados antigos)
+    # FALLBACK: Agrupar notas SEM appointment_id usando janela de SEGUNDOS (mesma sessão)
     notes_without_appointment.sort(key=lambda x: x.created_at, reverse=True)
     
     for note in notes_without_appointment:
         if note.id in processed_notes:
             continue
         
-        # Agrupar notas próximas do mesmo médico (2h antes, 5min depois)
-        window_start = note.created_at - timedelta(hours=2)
-        window_end = note.created_at + timedelta(minutes=5)
+        # Agrupar apenas notas criadas com menos de 2 segundos de diferença (mesma transação/sessão)
+        window_start = note.created_at - timedelta(seconds=2)
+        window_end = note.created_at + timedelta(seconds=2)
         
         grouped_notes = [n for n in notes_without_appointment
                         if n.id not in processed_notes
