@@ -70,13 +70,19 @@ class Note(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False)
     doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    appointment_id = db.Column(db.Integer, db.ForeignKey('appointment.id'), nullable=True)  # Chave de agrupamento
     note_type = db.Column(db.String(50), nullable=False)
     category = db.Column(db.String(50))  # 'patologia', 'cosmiatria', 'transplante_capilar'
     content = db.Column(db.Text)
     consultation_duration = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
+    __table_args__ = (
+        db.Index('idx_note_patient_appt_type', 'patient_id', 'appointment_id', 'note_type'),
+    )
+    
     doctor = db.relationship('User', backref='notes')
+    appointment = db.relationship('Appointment', backref='consultation_notes')
     indications = db.relationship('Indication', backref='note', lazy=True, cascade='all, delete-orphan')
     cosmetic_plans = db.relationship('CosmeticProcedurePlan', backref='note', lazy=True, cascade='all, delete-orphan')
     hair_transplants = db.relationship('HairTransplant', backref='note', lazy=True, cascade='all, delete-orphan')

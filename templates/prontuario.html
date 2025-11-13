@@ -448,33 +448,256 @@
     <div class="col-lg-4">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Histórico</h5>
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Histórico de Consultas
+                </h5>
             </div>
             <div class="card-body" style="max-height: 600px; overflow-y: auto;">
-                {% for note in notes %}
-                <div class="mb-3 pb-3 border-bottom">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <strong class="text-capitalize">
-                                <i class="bi bi-{% if note.note_type == 'queixa' %}chat-left-text{% elif note.note_type == 'anamnese' %}clipboard-pulse{% elif note.note_type == 'diagnostico' %}clipboard-check{% else %}prescription{% endif %}"></i>
-                                {{ note.note_type|replace('_', ' ') }}
-                            </strong>
+                {% if consultations %}
+                <div class="accordion" id="consultationsAccordion">
+                    {% for consultation in consultations %}
+                    <div class="accordion-item mb-2">
+                        <h2 class="accordion-header" id="heading{{ consultation.id }}">
+                            <button class="accordion-button collapsed" type="button" 
+                                    data-bs-toggle="collapse" 
+                                    data-bs-target="#collapse{{ consultation.id }}" 
+                                    aria-expanded="false" 
+                                    aria-controls="collapse{{ consultation.id }}">
+                                <div class="w-100">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong>
+                                            <i class="bi bi-calendar3"></i> 
+                                            {{ consultation.date.strftime('%d/%m/%Y %H:%M') }}
+                                            {% if not consultation.is_finalized %}
+                                            <span class="badge bg-secondary ms-1" style="font-size: 0.7em;">Rascunho</span>
+                                            {% endif %}
+                                        </strong>
+                                        <span class="badge bg-primary ms-2">
+                                            {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
+                                        </span>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        <i class="bi bi-person-circle"></i> {{ consultation.doctor.name }}
+                                        {% if consultation.duration %}
+                                        | <i class="bi bi-clock"></i> {{ consultation.duration }}min
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse{{ consultation.id }}" 
+                             class="accordion-collapse collapse" 
+                             aria-labelledby="heading{{ consultation.id }}" 
+                             data-bs-parent="#consultationsAccordion">
+                            <div class="accordion-body p-3">
+                                <!-- Queixa Principal -->
+                                {% if 'queixa' in consultation.notes_by_type %}
+                                <div class="mb-3">
+                                    <h6 class="text-primary">
+                                        <i class="bi bi-chat-left-text"></i> Queixa Principal
+                                    </h6>
+                                    <p class="mb-0" style="white-space: pre-wrap;">{{ consultation.notes_by_type['queixa'].content }}</p>
+                                </div>
+                                {% endif %}
+
+                                <!-- Anamnese -->
+                                {% if 'anamnese' in consultation.notes_by_type %}
+                                <div class="mb-3">
+                                    <h6 class="text-primary">
+                                        <i class="bi bi-clipboard-pulse"></i> Anamnese / Exame Físico
+                                    </h6>
+                                    <p class="mb-0" style="white-space: pre-wrap;">{{ consultation.notes_by_type['anamnese'].content }}</p>
+                                </div>
+                                {% endif %}
+
+                                <!-- Diagnóstico -->
+                                {% if 'diagnostico' in consultation.notes_by_type %}
+                                <div class="mb-3">
+                                    <h6 class="text-primary">
+                                        <i class="bi bi-clipboard-check"></i> Diagnóstico
+                                    </h6>
+                                    <p class="mb-0" style="white-space: pre-wrap;">{{ consultation.notes_by_type['diagnostico'].content }}</p>
+                                </div>
+                                {% endif %}
+
+                                <!-- Procedimentos Cosméticos (Cosmiatria) -->
+                                {% if consultation.category == 'cosmiatria' %}
+                                    {% set cosmetic_plans = [] %}
+                                    {% for note in consultation.all_notes %}
+                                        {% if note.cosmetic_plans %}
+                                            {% set cosmetic_plans = cosmetic_plans + note.cosmetic_plans %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if cosmetic_plans %}
+                                    <div class="mb-3">
+                                        <h6 class="text-success">
+                                            <i class="bi bi-heart-pulse"></i> Procedimentos Estéticos Planejados
+                                        </h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Procedimento</th>
+                                                        <th>Valor Planejado</th>
+                                                        <th>Orçamento Final</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for plan in cosmetic_plans %}
+                                                    <tr>
+                                                        <td>{{ plan.procedure_name }}</td>
+                                                        <td>
+                                                            {% if plan.planned_value %}
+                                                            R$ {{ "{:,.2f}".format(plan.planned_value|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                                            {% else %}
+                                                            -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if plan.final_budget %}
+                                                            R$ {{ "{:,.2f}".format(plan.final_budget|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                                            {% else %}
+                                                            -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            {% if plan.was_performed %}
+                                                            <span class="badge bg-success">Feito</span>
+                                                            {% if plan.performed_date %}
+                                                            <br><small>{{ plan.performed_date.strftime('%d/%m/%Y') }}</small>
+                                                            {% endif %}
+                                                            {% else %}
+                                                            <span class="badge bg-warning text-dark">Não Feito</span>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
+
+                                <!-- Transplante Capilar -->
+                                {% if consultation.category == 'transplante_capilar' %}
+                                    {% set hair_transplants = [] %}
+                                    {% for note in consultation.all_notes %}
+                                        {% if note.hair_transplants %}
+                                            {% set hair_transplants = hair_transplants + note.hair_transplants %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if hair_transplants %}
+                                    {% for ht in hair_transplants %}
+                                    <div class="mb-3">
+                                        <h6 class="text-success">
+                                            <i class="bi bi-scissors"></i> Dados do Transplante Capilar
+                                        </h6>
+                                        
+                                        <div class="row mb-2">
+                                            <div class="col-6">
+                                                <strong>Classificação Norwood:</strong><br>
+                                                <span class="badge bg-info">{{ ht.norwood_classification }}</span>
+                                            </div>
+                                            <div class="col-6">
+                                                <strong>Transplante Anterior:</strong><br>
+                                                {{ 'Sim' if ht.previous_transplant == 'sim' else 'Não' }}
+                                                {% if ht.previous_transplant == 'sim' and ht.transplant_location %}
+                                                ({{ 'ICB' if ht.transplant_location == 'ICB' else 'Outro Serviço' }})
+                                                {% endif %}
+                                            </div>
+                                        </div>
+
+                                        {% if ht.frontal_transplant or ht.crown_transplant or ht.complete_transplant or ht.complete_with_body_hair %}
+                                        <div class="mb-2">
+                                            <strong>Indicações Cirúrgicas:</strong><br>
+                                            <ul class="mb-0">
+                                                {% if ht.frontal_transplant %}<li>Transplante frontal</li>{% endif %}
+                                                {% if ht.crown_transplant %}<li>Transplante em coroa</li>{% endif %}
+                                                {% if ht.complete_transplant %}<li>Transplante completo</li>{% endif %}
+                                                {% if ht.complete_with_body_hair %}<li>Transplante completo com body hair</li>{% endif %}
+                                            </ul>
+                                        </div>
+                                        {% endif %}
+
+                                        {% if ht.surgical_planning %}
+                                        <div class="mb-2">
+                                            <strong>Planejamento Cirúrgico:</strong><br>
+                                            <p class="mb-0 p-2 bg-light rounded" style="white-space: pre-wrap;">{{ ht.surgical_planning }}</p>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                    {% endif %}
+                                {% endif %}
+
+                                <!-- Procedimentos Indicados (Patologia) -->
+                                {% if consultation.category == 'patologia' %}
+                                    {% set all_indications = [] %}
+                                    {% for note in consultation.all_notes %}
+                                        {% if note.indications %}
+                                            {% set all_indications = all_indications + note.indications %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if all_indications %}
+                                    <div class="mb-3">
+                                        <h6 class="text-info">
+                                            <i class="bi bi-list-check"></i> Procedimentos
+                                        </h6>
+                                        <div class="row">
+                                            {% set indicated = all_indications | selectattr('indicated', 'equalto', True) | list %}
+                                            {% set performed = all_indications | selectattr('performed', 'equalto', True) | list %}
+                                            
+                                            {% if indicated %}
+                                            <div class="col-6">
+                                                <strong class="text-muted">Indicados:</strong>
+                                                <ul class="small mb-0">
+                                                    {% for ind in indicated %}
+                                                    <li>{{ ind.procedure.name }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+                                            
+                                            {% if performed %}
+                                            <div class="col-6">
+                                                <strong class="text-success">Realizados:</strong>
+                                                <ul class="small mb-0">
+                                                    {% for ind in performed %}
+                                                    <li>{{ ind.procedure.name }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                {% endif %}
+
+                                <!-- Conduta -->
+                                {% if 'conduta' in consultation.notes_by_type %}
+                                <div class="mb-0">
+                                    <h6 class="text-primary">
+                                        <i class="bi bi-prescription2"></i> Conduta
+                                    </h6>
+                                    <p class="mb-0" style="white-space: pre-wrap;">{{ consultation.notes_by_type['conduta'].content }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
                         </div>
-                        <small class="text-muted">{{ note.created_at.strftime('%d/%m/%Y %H:%M') }}</small>
                     </div>
-                    <div class="mt-2" style="white-space: pre-wrap; font-size: 0.9rem;">{{ note.content }}</div>
-                    <small class="text-muted d-block mt-2">
-                        <i class="bi bi-person-circle"></i> Por: {{ note.doctor.name }}
-                    </small>
-                    {% if note.consultation_duration %}
-                    <small class="text-muted d-block">
-                        <i class="bi bi-clock"></i> Duração: {{ note.consultation_duration }} minutos
-                    </small>
-                    {% endif %}
+                    {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-muted">Nenhuma anotação anterior.</p>
-                {% endfor %}
+                <p class="text-muted text-center py-4">
+                    <i class="bi bi-inbox"></i><br>
+                    Nenhuma consulta finalizada registrada.
+                </p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -484,7 +707,7 @@
 {% block extra_js %}
 <script>
 const patientId = {{ patient.id }};
-const appointmentId = {{ appointment_id if appointment_id else 'null' }};
+const appointmentId = {{ appointment_id | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/prontuario.js') }}"></script>
 {% endblock %}

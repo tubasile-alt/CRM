@@ -406,7 +406,99 @@ def prontuario(patient_id):
     tags = Tag.query.all()
     patient_tags = [pt.tag_id for pt in patient.tags]
     
-    notes = Note.query.filter_by(patient_id=patient_id).order_by(Note.created_at.desc()).all()
+    # Carregar notas com todos os dados relacionados (eager loading)
+    notes = Note.query.filter_by(patient_id=patient_id)\
+        .options(
+            db.joinedload(Note.indications).joinedload(Indication.procedure),
+            db.joinedload(Note.cosmetic_plans),
+            db.joinedload(Note.hair_transplants)
+        )\
+        .order_by(Note.created_at.desc())\
+        .all()
+    
+    # Agrupar notas por consulta - PRIORIZAR appointment_id quando disponível
+    from datetime import timedelta
+    from collections import defaultdict
+    
+    consultations = []
+    processed_notes = set()
+    
+    # Indexar notas por appointment_id (O(n))
+    notes_by_appointment = defaultdict(list)
+    notes_without_appointment = []
+    
+    for note in notes:
+        if note.appointment_id:
+            notes_by_appointment[note.appointment_id].append(note)
+        else:
+            notes_without_appointment.append(note)
+    
+    # Agrupar notas POR APPOINTMENT_ID (determinístico)
+    for appt_id, appt_notes in notes_by_appointment.items():
+        # Marcar como processadas
+        for note in appt_notes:
+            processed_notes.add(note.id)
+        
+        # Separar notas por tipo
+        notes_by_type = {note.note_type: note for note in appt_notes}
+        
+        # Identificar consulta finalizada (tem consultation_duration)
+        finalized_note = next((n for n in appt_notes if n.consultation_duration), None)
+        is_finalized = finalized_note is not None
+        
+        # Usar dados da primeira nota como referência
+        first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
+        
+        consultations.append({
+            'id': appt_id,  # Usar appointment_id como ID único
+            'date': finalized_note.created_at if finalized_note else first_note.created_at,
+            'doctor': first_note.doctor,
+            'duration': finalized_note.consultation_duration if finalized_note else None,
+            'category': finalized_note.category if finalized_note else first_note.category,
+            'notes_by_type': notes_by_type,
+            'all_notes': appt_notes,
+            'is_finalized': is_finalized
+        })
+    
+    # FALLBACK: Agrupar notas SEM appointment_id usando janela temporal (dados antigos)
+    notes_without_appointment.sort(key=lambda x: x.created_at, reverse=True)
+    
+    for note in notes_without_appointment:
+        if note.id in processed_notes:
+            continue
+        
+        # Agrupar notas próximas do mesmo médico (2h antes, 5min depois)
+        window_start = note.created_at - timedelta(hours=2)
+        window_end = note.created_at + timedelta(minutes=5)
+        
+        grouped_notes = [n for n in notes_without_appointment
+                        if n.id not in processed_notes
+                        and n.doctor_id == note.doctor_id
+                        and window_start <= n.created_at <= window_end]
+        
+        # Marcar como processadas
+        for gn in grouped_notes:
+            processed_notes.add(gn.id)
+        
+        # Separar por tipo
+        notes_by_type = {gn.note_type: gn for gn in grouped_notes}
+        
+        # Identificar se foi finalizada
+        finalized_note = next((n for n in grouped_notes if n.consultation_duration), None)
+        
+        consultations.append({
+            'id': note.id,
+            'date': note.created_at,
+            'doctor': note.doctor,
+            'duration': finalized_note.consultation_duration if finalized_note else None,
+            'category': note.category,
+            'notes_by_type': notes_by_type,
+            'all_notes': grouped_notes,
+            'is_finalized': finalized_note is not None
+        })
+    
+    # Reordenar por data (mais recente primeiro)
+    consultations.sort(key=lambda x: x['date'], reverse=True)
     
     # Pegar appointment_id da query string (opcional)
     appointment_id = request.args.get('appointment_id', type=int)
@@ -417,6 +509,7 @@ def prontuario(patient_id):
                          tags=tags,
                          patient_tags=patient_tags,
                          notes=notes,
+                         consultations=consultations,
                          appointment_id=appointment_id)
 
 @app.route('/api/prontuario/<int:patient_id>', methods=['POST'])
@@ -432,6 +525,7 @@ def save_prontuario(patient_id):
     note = Note(
         patient_id=patient_id,
         doctor_id=current_user.id,
+        appointment_id=data.get('appointment_id'),  # Novo campo para agrupamento
         note_type=data['type'],
         content=data['content'],
         consultation_duration=data.get('duration')
@@ -489,6 +583,7 @@ def finalizar_atendimento(patient_id):
     try:
         category = data.get('category', 'patologia')
         duration = data.get('duration')
+        appointment_id = data.get('appointment_id')  # Chave de agrupamento
         
         # Salvar cada seção como nota separada
         sections = ['queixa', 'anamnese', 'diagnostico']
@@ -500,8 +595,10 @@ def finalizar_atendimento(patient_id):
                 note = Note(
                     patient_id=patient_id,
                     doctor_id=current_user.id,
+                    appointment_id=appointment_id,  # Agrupa consultas
                     note_type=section,
-                    content=content
+                    content=content,
+                    category=category  # Adicionar categoria
                 )
                 db.session.add(note)
                 db.session.flush()
@@ -518,7 +615,9 @@ def finalizar_atendimento(patient_id):
             conduta_note = Note(
                 patient_id=patient_id,
                 doctor_id=current_user.id,
+                appointment_id=appointment_id,  # Agrupa consultas
                 note_type='conduta',
+                category=category,  # Adicionar categoria
                 content=conduta_content or '[Conduta registrada via procedimentos]',
                 consultation_duration=duration
             )
