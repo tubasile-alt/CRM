@@ -411,7 +411,7 @@ def prontuario(patient_id):
         .options(
             db.joinedload(Note.indications).joinedload(Indication.procedure),
             db.joinedload(Note.cosmetic_plans),
-            db.joinedload(Note.hair_transplants)
+            db.joinedload(Note.hair_transplants).joinedload(HairTransplant.images)
         )\
         .order_by(Note.created_at.desc())\
         .all()

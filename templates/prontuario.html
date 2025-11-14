@@ -540,6 +540,7 @@
                                                         <th>Procedimento</th>
                                                         <th>Valor Planejado</th>
                                                         <th>Orçamento Final</th>
+                                                        <th>Retorno (meses)</th>
                                                         <th>Status</th>
                                                     </tr>
                                                 </thead>
@@ -557,6 +558,13 @@
                                                         <td>
                                                             {% if plan.final_budget %}
                                                             R$ {{ "{:,.2f}".format(plan.final_budget|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                                            {% else %}
+                                                            -
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if plan.follow_up_months is not none %}
+                                                            {{ plan.follow_up_months }} meses
                                                             {% else %}
                                                             -
                                                             {% endif %}
@@ -597,15 +605,60 @@
                                         <div class="row mb-2">
                                             <div class="col-6">
                                                 <strong>Classificação Norwood:</strong><br>
-                                                <span class="badge bg-info">{{ ht.norwood_classification }}</span>
+                                                <span class="badge bg-info">{{ ht.norwood_classification if ht.norwood_classification else 'Não informado' }}</span>
                                             </div>
                                             <div class="col-6">
-                                                <strong>Transplante Anterior:</strong><br>
-                                                {{ 'Sim' if ht.previous_transplant == 'sim' else 'Não' }}
-                                                {% if ht.previous_transplant == 'sim' and ht.transplant_location %}
-                                                ({{ 'ICB' if ht.transplant_location == 'ICB' else 'Outro Serviço' }})
+                                                <strong>Tipo de Caso:</strong><br>
+                                                {% if ht.case_type == 'primaria' %}
+                                                <span class="badge bg-primary">Cirurgia Primária</span>
+                                                {% elif ht.case_type == 'secundaria' %}
+                                                <span class="badge bg-warning">Cirurgia Secundária</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">Não informado</span>
                                                 {% endif %}
                                             </div>
+                                        </div>
+                                        
+                                        <div class="row mb-2">
+                                            <div class="col-6">
+                                                <strong>Transplante Anterior:</strong><br>
+                                                {% if ht.previous_transplant == 'sim' %}
+                                                Sim
+                                                {% if ht.transplant_location %}
+                                                ({{ 'ICB' if ht.transplant_location == 'ICB' else 'Outro Serviço' }})
+                                                {% endif %}
+                                                {% elif ht.previous_transplant == 'nao' %}
+                                                Não
+                                                {% else %}
+                                                <span class="text-muted">Não informado</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="col-6">
+                                                <strong>Número de Cirurgias:</strong><br>
+                                                {% if ht.number_of_surgeries is not none %}
+                                                {{ ht.number_of_surgeries }} cirurgia(s) planejada(s)
+                                                {% else %}
+                                                <span class="text-muted">Não informado</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-2">
+                                            <strong>Áreas Adicionais:</strong><br>
+                                            <ul class="mb-0 list-unstyled">
+                                                <li>
+                                                    <i class="bi bi-{{ 'check-circle-fill text-success' if ht.body_hair_needed else 'x-circle text-muted' }}"></i>
+                                                    Body hair transplant: {{ 'Sim' if ht.body_hair_needed else 'Não' }}
+                                                </li>
+                                                <li>
+                                                    <i class="bi bi-{{ 'check-circle-fill text-success' if ht.eyebrow_transplant else 'x-circle text-muted' }}"></i>
+                                                    Transplante de sobrancelha: {{ 'Sim' if ht.eyebrow_transplant else 'Não' }}
+                                                </li>
+                                                <li>
+                                                    <i class="bi bi-{{ 'check-circle-fill text-success' if ht.beard_transplant else 'x-circle text-muted' }}"></i>
+                                                    Transplante de barba: {{ 'Sim' if ht.beard_transplant else 'Não' }}
+                                                </li>
+                                            </ul>
                                         </div>
 
                                         {% if ht.frontal_transplant or ht.crown_transplant or ht.complete_transplant or ht.complete_with_body_hair %}
@@ -624,6 +677,39 @@
                                         <div class="mb-2">
                                             <strong>Planejamento Cirúrgico:</strong><br>
                                             <p class="mb-0 p-2 bg-light rounded" style="white-space: pre-wrap;">{{ ht.surgical_planning }}</p>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if ht.clinical_conduct %}
+                                        <div class="mb-2">
+                                            <strong>Conduta Clínica:</strong><br>
+                                            <p class="mb-0 p-2 bg-light rounded" style="white-space: pre-wrap;">{{ ht.clinical_conduct }}</p>
+                                        </div>
+                                        {% endif %}
+                                        
+                                        {% if ht.images %}
+                                        <div class="mb-2">
+                                            <strong>Imagens do Transplante:</strong><br>
+                                            <div class="row g-2 mt-1">
+                                                {% for img in ht.images %}
+                                                <div class="col-4">
+                                                    <div class="card">
+                                                        <img src="{{ url_for('static', filename='uploads/' + img.file_path) }}" 
+                                                             class="card-img-top" 
+                                                             alt="{{ img.image_type }}"
+                                                             style="max-height: 150px; object-fit: cover;">
+                                                        <div class="card-body p-2 text-center">
+                                                            <small class="text-muted">
+                                                                {% if img.image_type == 'consultation_photo' %}Foto Consulta
+                                                                {% elif img.image_type == 'surgical_plan' %}Planejamento
+                                                                {% elif img.image_type == 'simulation' %}Simulação
+                                                                {% else %}{{ img.image_type }}{% endif %}
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
                                         </div>
                                         {% endif %}
                                     </div>
