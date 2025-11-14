@@ -607,8 +607,8 @@ function finalizarAtendimento() {
                 
                 alert('Atendimento finalizado com sucesso!');
                 
-                // Redirecionar de volta
-                window.location.href = '/pacientes';
+                // Redirecionar de volta para a agenda
+                window.location.href = '/agenda';
             } else {
                 alert(result.error || 'Erro ao finalizar atendimento');
                 btn.disabled = false;
