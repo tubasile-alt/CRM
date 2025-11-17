@@ -202,7 +202,37 @@ function savePatientTags() {
 let currentCategory = 'patologia';
 let cosmeticProcedures = [];
 
+async function loadExistingPlans() {
+    if (!patientId) return;
+    
+    try {
+        const response = await fetch(`/api/prontuario/${patientId}/cosmetic-plans`);
+        const data = await response.json();
+        
+        if (data.success && data.plans && data.plans.length > 0) {
+            cosmeticProcedures = data.plans.map(plan => ({
+                id: plan.id,
+                name: plan.procedure_name,
+                value: plan.planned_value,
+                months: plan.follow_up_months || 6,
+                budget: plan.final_budget || plan.planned_value,
+                performed: plan.was_performed || false
+            }));
+            
+            renderCosmeticProcedures();
+            renderCosmeticConduct();
+            updateCosmeticTotal();
+            
+            console.log(`${data.plans.length} planejamento(s) carregado(s) com sucesso`);
+        }
+    } catch (error) {
+        console.error('Erro ao carregar planejamentos:', error);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    loadExistingPlans();
+    
     // Listener para mudança de categoria
     const categoryInputs = document.querySelectorAll('input[name="category"]');
     categoryInputs.forEach(input => {
@@ -273,10 +303,10 @@ function toggleCategoryTabs() {
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
         if (indicatedProcedures) indicatedProcedures.style.display = 'none';
     } else {
-        // Patologia
+        // Patologia - NÃO mostra checkboxes de procedimentos realizados
         tabPlanejamento.style.display = 'none';
         tabTransplante.style.display = 'none';
-        if (conductProcedures) conductProcedures.style.display = '';
+        if (conductProcedures) conductProcedures.style.display = 'none';  // OCULTADO
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
         if (indicatedProcedures) indicatedProcedures.style.display = '';
     }
@@ -327,12 +357,37 @@ function renderCosmeticProcedures() {
             <td class="text-end">R$ ${proc.value.toFixed(2).replace('.', ',')}</td>
             <td class="text-center">${proc.months} meses</td>
             <td class="text-center">
-                <button class="btn btn-sm btn-danger" onclick="removeCosmeticProcedure(${index})">
+                <button class="btn btn-sm btn-primary me-1" onclick="editCosmeticProcedure(${index})" title="Editar">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="removeCosmeticProcedure(${index})" title="Remover">
                     <i class="bi bi-trash"></i>
                 </button>
             </td>
         `;
     });
+}
+
+function editCosmeticProcedure(index) {
+    const proc = cosmeticProcedures[index];
+    
+    // Preencher os campos do formulário com os dados do procedimento
+    document.getElementById('newProcedureName').value = proc.name;
+    document.getElementById('newProcedureValue').value = proc.value;
+    document.getElementById('newProcedureMonths').value = proc.months;
+    
+    // Remover o procedimento antigo da lista
+    cosmeticProcedures.splice(index, 1);
+    
+    // Atualizar as visualizações
+    renderCosmeticProcedures();
+    renderCosmeticConduct();
+    updateCosmeticTotal();
+    
+    // Focar no botão de adicionar
+    document.getElementById('newProcedureName').focus();
+    
+    showAlert('Procedimento carregado para edição. Modifique os dados e clique em "Adicionar ao Planejamento".', 'info');
 }
 
 function updateCosmeticTotal() {

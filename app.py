@@ -1197,5 +1197,63 @@ def init_db():
             click.echo('  Médico: arthur@clinicabasiledemo.com / 123456')
             click.echo('  Secretária: secretaria@clinicabasiledemo.com / 123456')
 
+@app.route('/api/prontuario/<int:patient_id>/cosmetic-plans', methods=['GET'])
+@login_required
+def get_cosmetic_plans(patient_id):
+    """Retorna todos os planos cosméticos de um paciente"""
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    from models import CosmeticProcedurePlan, Note
+    
+    plans = db.session.query(CosmeticProcedurePlan).join(Note).filter(
+        Note.patient_id == patient_id
+    ).order_by(CosmeticProcedurePlan.id.desc()).all()
+    
+    plans_data = []
+    for plan in plans:
+        plans_data.append({
+            'id': plan.id,
+            'procedure_name': plan.procedure_name,
+            'planned_value': plan.planned_value,
+            'final_budget': plan.final_budget,
+            'was_performed': plan.was_performed,
+            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
+            'follow_up_months': plan.follow_up_months,
+            'created_at': plan.note.created_at.isoformat() if plan.note else None
+        })
+    
+    return jsonify({'success': True, 'plans': plans_data})
+
+@app.route('/api/prontuario/cosmetic-plan/<int:plan_id>', methods=['PATCH'])
+@login_required
+def update_cosmetic_plan(plan_id):
+    """Atualiza um plano cosmético existente"""
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    from models import CosmeticProcedurePlan
+    
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+    
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    
+    if 'planned_value' in data:
+        plan.planned_value = float(data['planned_value'])
+    if 'final_budget' in data:
+        plan.final_budget = float(data['final_budget'])
+    if 'was_performed' in data:
+        plan.was_performed = bool(data['was_performed'])
+        if plan.was_performed and not plan.performed_date:
+            plan.performed_date = get_brazil_time().date()
+    if 'follow_up_months' in data:
+        plan.follow_up_months = int(data['follow_up_months'])
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Plano atualizado com sucesso'})
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
