@@ -667,12 +667,23 @@ def finalizar_atendimento(patient_id):
                     proc_name = proc['name']
                     
                     # Criar novo plano para este atendimento
+                    from datetime import datetime as dt
+                    
+                    # Processar data de realização se fornecida
+                    performed_date_value = None
+                    if proc.get('performedDate'):
+                        try:
+                            performed_date_value = dt.strptime(proc['performedDate'], '%Y-%m-%d').date()
+                        except:
+                            performed_date_value = None
+                    
                     plan = CosmeticProcedurePlan(
                         note_id=conduta_note_id,
                         procedure_name=proc_name,
                         planned_value=float(proc['value']),
                         final_budget=float(proc.get('budget', proc['value'])),
                         was_performed=bool(proc.get('performed', False)),
+                        performed_date=performed_date_value,
                         follow_up_months=int(proc['months'])
                     )
                     db.session.add(plan)

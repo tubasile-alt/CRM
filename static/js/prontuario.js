@@ -203,30 +203,13 @@ let currentCategory = 'patologia';
 let cosmeticProcedures = [];
 
 async function loadExistingPlans() {
-    if (!patientId) {
-        console.log('patientId não definido, abortando carregamento');
-        return;
-    }
-    
-    console.log('[DEBUG] Iniciando carregamento de planejamentos para paciente', patientId);
+    if (!patientId) return;
     
     try {
-        const url = `/api/prontuario/${patientId}/cosmetic-plans`;
-        console.log('[DEBUG] Fazendo fetch para:', url);
-        
-        const response = await fetch(url);
-        console.log('[DEBUG] Status da resposta:', response.status, response.statusText);
-        
-        if (!response.ok) {
-            console.error('[DEBUG] Resposta não OK:', response.status);
-            return;
-        }
+        const response = await fetch(`/api/prontuario/${patientId}/cosmetic-plans`);
+        if (!response.ok) return;
         
         const data = await response.json();
-        console.log('[DEBUG] Dados recebidos:', data);
-        console.log('[DEBUG] data.success:', data.success);
-        console.log('[DEBUG] data.plans:', data.plans);
-        console.log('[DEBUG] Número de plans:', data.plans ? data.plans.length : 0);
         
         if (data.success && data.plans && data.plans.length > 0) {
             cosmeticProcedures = data.plans.map(plan => ({
@@ -235,29 +218,19 @@ async function loadExistingPlans() {
                 value: parseFloat(plan.planned_value) || 0,
                 months: plan.follow_up_months || 6,
                 budget: parseFloat(plan.final_budget || plan.planned_value) || 0,
-                performed: plan.was_performed || false
+                performed: plan.was_performed || false,
+                performedDate: plan.performed_date || null
             }));
             
-            console.log('[DEBUG] cosmeticProcedures após map:', cosmeticProcedures);
-            
             // Renderizar apenas se os elementos existirem
-            const planBody = document.getElementById('cosmeticPlanBody');
-            console.log('[DEBUG] elemento cosmeticPlanBody existe?', planBody !== null);
-            
-            if (planBody) {
+            if (document.getElementById('cosmeticPlanBody')) {
                 renderCosmeticProcedures();
                 renderCosmeticConduct();
                 updateCosmeticTotal();
-                console.log(`[SUCCESS] ${data.plans.length} planejamento(s) renderizado(s)`);
-            } else {
-                console.warn('[WARN] Elemento cosmeticPlanBody não encontrado - guardando dados para renderizar depois');
             }
-        } else {
-            console.log('[INFO] Nenhum planejamento encontrado ou resposta inválida:', data);
         }
     } catch (error) {
-        console.error('[ERROR] Erro ao carregar planejamentos:', error);
-        console.error('[ERROR] Stack trace:', error.stack);
+        console.error('Erro ao carregar planejamentos:', error);
     }
 }
 
@@ -440,6 +413,9 @@ function renderCosmeticConduct() {
     tbody.innerHTML = '';
     
     cosmeticProcedures.forEach((proc, index) => {
+        // Apenas usar data se o procedimento foi realizado E tem data definida
+        const procedureDate = proc.performedDate || '';
+        
         const row = tbody.insertRow();
         row.innerHTML = `
             <td>${proc.name}</td>
@@ -449,6 +425,14 @@ function renderCosmeticConduct() {
                        value="${proc.budget || proc.value}" 
                        onchange="updateProcedureBudget(${index}, this.value)"
                        step="any" min="0">
+            </td>
+            <td>
+                <input type="date" 
+                       class="form-control form-control-sm" 
+                       value="${procedureDate}"
+                       onchange="updateProcedureDate(${index}, this.value)"
+                       ${!proc.performed ? 'disabled' : ''}
+                       placeholder="${proc.performed ? 'Selecione a data' : ''}">
             </td>
             <td class="text-center">
                 <button class="btn btn-sm ${proc.performed ? 'btn-success' : 'btn-outline-secondary'}" 
@@ -465,8 +449,23 @@ function updateProcedureBudget(index, value) {
     cosmeticProcedures[index].budget = parseFloat(value) || 0;
 }
 
+function updateProcedureDate(index, dateValue) {
+    cosmeticProcedures[index].performedDate = dateValue;
+}
+
 function toggleProcedurePerformed(index) {
     cosmeticProcedures[index].performed = !cosmeticProcedures[index].performed;
+    
+    // Se marcou como "Feito" e não tem data, definir hoje como padrão
+    if (cosmeticProcedures[index].performed && !cosmeticProcedures[index].performedDate) {
+        cosmeticProcedures[index].performedDate = new Date().toISOString().split('T')[0];
+    }
+    
+    // Se desmarcou como "Feito", limpar a data
+    if (!cosmeticProcedures[index].performed) {
+        cosmeticProcedures[index].performedDate = null;
+    }
+    
     renderCosmeticConduct();
 }
 
