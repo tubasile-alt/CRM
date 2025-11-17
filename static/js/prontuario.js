@@ -208,9 +208,25 @@ async function loadExistingPlans() {
         return;
     }
     
+    console.log('[DEBUG] Iniciando carregamento de planejamentos para paciente', patientId);
+    
     try {
-        const response = await fetch(`/api/prontuario/${patientId}/cosmetic-plans`);
+        const url = `/api/prontuario/${patientId}/cosmetic-plans`;
+        console.log('[DEBUG] Fazendo fetch para:', url);
+        
+        const response = await fetch(url);
+        console.log('[DEBUG] Status da resposta:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            console.error('[DEBUG] Resposta não OK:', response.status);
+            return;
+        }
+        
         const data = await response.json();
+        console.log('[DEBUG] Dados recebidos:', data);
+        console.log('[DEBUG] data.success:', data.success);
+        console.log('[DEBUG] data.plans:', data.plans);
+        console.log('[DEBUG] Número de plans:', data.plans ? data.plans.length : 0);
         
         if (data.success && data.plans && data.plans.length > 0) {
             cosmeticProcedures = data.plans.map(plan => ({
@@ -222,19 +238,26 @@ async function loadExistingPlans() {
                 performed: plan.was_performed || false
             }));
             
+            console.log('[DEBUG] cosmeticProcedures após map:', cosmeticProcedures);
+            
             // Renderizar apenas se os elementos existirem
-            if (document.getElementById('cosmeticPlanBody')) {
+            const planBody = document.getElementById('cosmeticPlanBody');
+            console.log('[DEBUG] elemento cosmeticPlanBody existe?', planBody !== null);
+            
+            if (planBody) {
                 renderCosmeticProcedures();
                 renderCosmeticConduct();
                 updateCosmeticTotal();
+                console.log(`[SUCCESS] ${data.plans.length} planejamento(s) renderizado(s)`);
+            } else {
+                console.warn('[WARN] Elemento cosmeticPlanBody não encontrado - guardando dados para renderizar depois');
             }
-            
-            console.log(`${data.plans.length} planejamento(s) carregado(s) com sucesso`);
         } else {
-            console.log('Nenhum planejamento encontrado ou resposta inválida:', data);
+            console.log('[INFO] Nenhum planejamento encontrado ou resposta inválida:', data);
         }
     } catch (error) {
-        console.error('Erro ao carregar planejamentos:', error);
+        console.error('[ERROR] Erro ao carregar planejamentos:', error);
+        console.error('[ERROR] Stack trace:', error.stack);
     }
 }
 
