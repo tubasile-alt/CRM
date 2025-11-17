@@ -1236,6 +1236,63 @@ def get_cosmetic_plans(patient_id):
     
     return jsonify({'success': True, 'plans': plans_data})
 
+@app.route('/api/prontuario/<int:patient_id>/cosmetic-plans-grouped', methods=['GET'])
+@login_required
+def get_cosmetic_plans_grouped(patient_id):
+    """Retorna planos cosméticos agrupados por data de consulta"""
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    from models import CosmeticProcedurePlan, Note, Appointment
+    from collections import defaultdict
+    
+    plans = db.session.query(CosmeticProcedurePlan, Note).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    ).filter(
+        Note.patient_id == patient_id
+    ).order_by(Note.created_at.desc()).all()
+    
+    grouped_plans = defaultdict(list)
+    consultation_info = {}
+    
+    for plan, note in plans:
+        consultation_key = note.appointment_id if note.appointment_id else f"note_{note.id}"
+        
+        if consultation_key not in consultation_info:
+            appointment = None
+            if note.appointment_id:
+                appointment = Appointment.query.get(note.appointment_id)
+            
+            consultation_info[consultation_key] = {
+                'date': note.created_at.isoformat(),
+                'appointment_id': note.appointment_id,
+                'doctor_name': note.doctor.name if note.doctor else 'Desconhecido',
+                'display_date': note.created_at.strftime('%d/%m/%Y %H:%M')
+            }
+        
+        grouped_plans[consultation_key].append({
+            'id': plan.id,
+            'procedure_name': plan.procedure_name,
+            'planned_value': float(plan.planned_value) if plan.planned_value else 0,
+            'final_budget': float(plan.final_budget) if plan.final_budget else 0,
+            'was_performed': plan.was_performed,
+            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
+            'follow_up_months': plan.follow_up_months,
+            'created_at': plan.created_at.isoformat() if plan.created_at else None
+        })
+    
+    result = []
+    for consultation_key, procedures in grouped_plans.items():
+        result.append({
+            'consultation_key': consultation_key,
+            'consultation_info': consultation_info[consultation_key],
+            'procedures': procedures
+        })
+    
+    result.sort(key=lambda x: x['consultation_info']['date'], reverse=True)
+    
+    return jsonify({'success': True, 'grouped_plans': result})
+
 @app.route('/api/prontuario/cosmetic-plan/<int:plan_id>', methods=['PATCH'])
 @login_required
 def update_cosmetic_plan(plan_id):

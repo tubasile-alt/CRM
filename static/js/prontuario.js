@@ -201,28 +201,37 @@ function savePatientTags() {
 // ========== GESTÃO DE CATEGORIAS ==========
 let currentCategory = 'patologia';
 let cosmeticProcedures = [];
+let groupedCosmeticPlans = [];
 
 async function loadExistingPlans() {
     if (!patientId) return;
     
     try {
-        const response = await fetch(`/api/prontuario/${patientId}/cosmetic-plans`);
+        const response = await fetch(`/api/prontuario/${patientId}/cosmetic-plans-grouped`);
         if (!response.ok) return;
         
         const data = await response.json();
         
-        if (data.success && data.plans && data.plans.length > 0) {
-            cosmeticProcedures = data.plans.map(plan => ({
-                id: plan.id,
-                name: plan.procedure_name,
-                value: parseFloat(plan.planned_value) || 0,
-                months: plan.follow_up_months || 6,
-                budget: parseFloat(plan.final_budget || plan.planned_value) || 0,
-                performed: plan.was_performed || false,
-                performedDate: plan.performed_date || null
-            }));
+        if (data.success && data.grouped_plans && data.grouped_plans.length > 0) {
+            groupedCosmeticPlans = data.grouped_plans;
             
-            // Renderizar apenas se os elementos existirem
+            cosmeticProcedures = [];
+            data.grouped_plans.forEach(group => {
+                group.procedures.forEach(plan => {
+                    cosmeticProcedures.push({
+                        id: plan.id,
+                        name: plan.procedure_name,
+                        value: parseFloat(plan.planned_value) || 0,
+                        months: plan.follow_up_months || 6,
+                        budget: parseFloat(plan.final_budget || plan.planned_value) || 0,
+                        performed: plan.was_performed || false,
+                        performedDate: plan.performed_date || null,
+                        consultationKey: group.consultation_key,
+                        consultationDate: group.consultation_info.display_date
+                    });
+                });
+            });
+            
             if (document.getElementById('cosmeticPlanBody')) {
                 renderCosmeticProcedures();
                 renderCosmeticConduct();
@@ -356,25 +365,104 @@ function removeCosmeticProcedure(index) {
     updateCosmeticTotal();
 }
 
+function highlightConsultationGroup(consultationKey) {
+    if (currentCategory !== 'cosmiatria') {
+        return;
+    }
+    
+    setTimeout(() => {
+        const groupElement = document.getElementById(`group-${consultationKey}`);
+        if (groupElement) {
+            document.querySelectorAll('.consultation-group-header').forEach(el => {
+                el.classList.remove('highlighted-group');
+            });
+            
+            groupElement.classList.add('highlighted-group');
+            groupElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            setTimeout(() => {
+                groupElement.classList.remove('highlighted-group');
+            }, 3000);
+        }
+    }, 300);
+}
+
 function renderCosmeticProcedures() {
     const tbody = document.getElementById('cosmeticPlanBody');
     tbody.innerHTML = '';
     
-    cosmeticProcedures.forEach((proc, index) => {
-        const row = tbody.insertRow();
-        row.innerHTML = `
-            <td>${proc.name}</td>
-            <td class="text-end">R$ ${proc.value.toFixed(2).replace('.', ',')}</td>
-            <td class="text-center">${proc.months} meses</td>
-            <td class="text-center">
-                <button class="btn btn-sm btn-primary me-1" onclick="editCosmeticProcedure(${index})" title="Editar">
-                    <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" onclick="removeCosmeticProcedure(${index})" title="Remover">
-                    <i class="bi bi-trash"></i>
-                </button>
+    const newProcedures = cosmeticProcedures.filter(p => !p.id);
+    
+    if (newProcedures.length > 0) {
+        const headerRow = tbody.insertRow();
+        headerRow.className = 'consultation-group-header';
+        headerRow.id = 'group-new';
+        headerRow.innerHTML = `
+            <td colspan="4" class="bg-success bg-opacity-10 border-top border-bottom border-2 border-success">
+                <div class="d-flex align-items-center py-2">
+                    <i class="bi bi-plus-circle me-2 text-success"></i>
+                    <strong class="text-success">Nova Consulta (não salvo)</strong>
+                    <span class="ms-2 text-muted small">(${newProcedures.length} procedimento${newProcedures.length > 1 ? 's' : ''})</span>
+                </div>
             </td>
         `;
+        
+        newProcedures.forEach(proc => {
+            const globalIndex = cosmeticProcedures.findIndex(p => p === proc);
+            const row = tbody.insertRow();
+            row.className = 'consultation-group-item';
+            row.innerHTML = `
+                <td class="ps-4">${proc.name}</td>
+                <td class="text-end">R$ ${proc.value.toFixed(2).replace('.', ',')}</td>
+                <td class="text-center">${proc.months} meses</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-primary me-1" onclick="editCosmeticProcedure(${globalIndex})" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="removeCosmeticProcedure(${globalIndex})" title="Remover">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+        });
+    }
+    
+    if (groupedCosmeticPlans.length === 0 && newProcedures.length === 0) {
+        return;
+    }
+    
+    groupedCosmeticPlans.forEach(group => {
+        const headerRow = tbody.insertRow();
+        headerRow.className = 'consultation-group-header';
+        headerRow.id = `group-${group.consultation_key}`;
+        headerRow.innerHTML = `
+            <td colspan="4" class="bg-light border-top border-bottom border-2">
+                <div class="d-flex align-items-center py-2">
+                    <i class="bi bi-calendar3 me-2 text-primary"></i>
+                    <strong>Consulta de ${group.consultation_info.display_date}</strong>
+                    <span class="ms-2 text-muted small">(${group.procedures.length} procedimento${group.procedures.length > 1 ? 's' : ''})</span>
+                </div>
+            </td>
+        `;
+        
+        group.procedures.forEach(proc => {
+            const globalIndex = cosmeticProcedures.findIndex(p => p.id === proc.id);
+            const row = tbody.insertRow();
+            row.className = 'consultation-group-item';
+            row.innerHTML = `
+                <td class="ps-4">${proc.procedure_name}</td>
+                <td class="text-end">R$ ${parseFloat(proc.planned_value).toFixed(2).replace('.', ',')}</td>
+                <td class="text-center">${proc.follow_up_months} meses</td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-primary me-1" onclick="editCosmeticProcedure(${globalIndex})" title="Editar">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="removeCosmeticProcedure(${globalIndex})" title="Remover">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            `;
+        });
     });
 }
 
