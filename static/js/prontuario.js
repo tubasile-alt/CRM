@@ -232,9 +232,9 @@ async function loadExistingPlans() {
             cosmeticProcedures = data.plans.map(plan => ({
                 id: plan.id,
                 name: plan.procedure_name,
-                value: plan.planned_value,
+                value: parseFloat(plan.planned_value) || 0,
                 months: plan.follow_up_months || 6,
-                budget: plan.final_budget || plan.planned_value,
+                budget: parseFloat(plan.final_budget || plan.planned_value) || 0,
                 performed: plan.was_performed || false
             }));
             
