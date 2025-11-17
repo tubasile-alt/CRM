@@ -1,0 +1,37 @@
+Segue uma sugestão **bem descritiva, clara e objetiva**, detalhando exatamente as mudanças necessárias no sistema com base no que sua imagem mostra e no que você marcou:
+
+---
+
+## Sugestão de mudanças no sistema — descrição detalhada
+
+1. **Separação de planejamentos por data de consulta**
+
+   Atualmente, o sistema exibe todos os procedimentos do planejamento em uma única lista contínua, independentemente da data da consulta em que foram adicionados. Isso faz com que procedimentos de consultas anteriores sejam misturados com os procedimentos da consulta atual.
+
+   Sugere-se que o sistema organize os planejamentos por data, criando seções separadas. Cada seção deve ser identificada claramente com a data da consulta correspondente. Dessa forma, os procedimentos adicionados no dia 17/11, por exemplo, ficam agrupados exclusivamente sob essa data, enquanto os procedimentos inseridos em consultas como a do dia 06/11 permanecem agrupados em uma área própria.
+
+2. **Vinculação direta do planejamento à consulta do histórico**
+
+   No histórico de consultas, cada registro exibe queixa principal, anamnese, diagnóstico e conduta. Entretanto, o planejamento realizado no painel esquerdo não aparece vinculado diretamente à consulta selecionada no histórico.
+
+   Sugere-se que, ao abrir uma consulta no histórico (por exemplo, a consulta de 17/11/2025), o sistema mostre apenas o planejamento relacionado àquela consulta específica. Isso garantirá que o profissional visualize imediatamente quais procedimentos foram planejados naquela data, sem confusões com sessões anteriores.
+
+3. **Evitar sobreposição e repetição de procedimentos entre consultas diferentes**
+
+   É possível observar que procedimentos de datas anteriores (como Exilis e Botox da consulta de 06/11) continuam aparecendo como se tivessem sido adicionados novamente na consulta atual.
+
+   Sugere-se que o sistema impeça a replicação automática de procedimentos antigos em novas consultas, a menos que o usuário escolha explicitamente reaproveitar ou copiar um planejamento anterior. Essa função deve ser opcional e nunca automática.
+
+4. **Organização visual mais clara dos blocos de planejamento**
+
+   Além da separação por data, recomenda-se que cada bloco de planejamento tenha uma identificação visual clara, como cabeçalho com a data e informações resumidas. Isso permitirá que o profissional compreenda rapidamente a qual consulta cada conjunto de procedimentos pertence, sem depender de anotações manuais.
+
+5. **Consistência entre conduta e planejamento**
+
+   A conduta registrada no histórico da consulta (como “botox 40u”) deve estar sincronizada com o planejamento exibido no painel esquerdo, evitando divergências.
+
+   Sugere-se que o sistema estabeleça um vínculo automático entre o que é descrito na conduta e o planejamento correspondente, garantindo coerência e facilitando revisões posteriores.
+
+---
+
+Se quiser, posso reescrever essas sugestões em formato de documento profissional para enviar ao desenvolvedor, ou transformá-las em uma proposta de melhorias de UX/UI.
