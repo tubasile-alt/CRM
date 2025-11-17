@@ -203,7 +203,10 @@ let currentCategory = 'patologia';
 let cosmeticProcedures = [];
 
 async function loadExistingPlans() {
-    if (!patientId) return;
+    if (!patientId) {
+        console.log('patientId não definido, abortando carregamento');
+        return;
+    }
     
     try {
         const response = await fetch(`/api/prontuario/${patientId}/cosmetic-plans`);
@@ -219,11 +222,16 @@ async function loadExistingPlans() {
                 performed: plan.was_performed || false
             }));
             
-            renderCosmeticProcedures();
-            renderCosmeticConduct();
-            updateCosmeticTotal();
+            // Renderizar apenas se os elementos existirem
+            if (document.getElementById('cosmeticPlanBody')) {
+                renderCosmeticProcedures();
+                renderCosmeticConduct();
+                updateCosmeticTotal();
+            }
             
             console.log(`${data.plans.length} planejamento(s) carregado(s) com sucesso`);
+        } else {
+            console.log('Nenhum planejamento encontrado ou resposta inválida:', data);
         }
     } catch (error) {
         console.error('Erro ao carregar planejamentos:', error);
@@ -231,7 +239,8 @@ async function loadExistingPlans() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    loadExistingPlans();
+    // Carregar planos existentes ao iniciar
+    setTimeout(loadExistingPlans, 500);
     
     // Listener para mudança de categoria
     const categoryInputs = document.querySelectorAll('input[name="category"]');
@@ -259,6 +268,11 @@ function handleCategoryChange(event) {
     currentCategory = event.target.value;
     updateCategoryTexts();
     toggleCategoryTabs();
+    
+    // Se mudou para Cosmiatria e ainda não carregou os planos, carregar agora
+    if (currentCategory === 'cosmiatria' && cosmeticProcedures.length === 0) {
+        loadExistingPlans();
+    }
 }
 
 function updateCategoryTexts() {
