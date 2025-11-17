@@ -474,9 +474,18 @@
                                             <span class="badge bg-secondary ms-1" style="font-size: 0.7em;">Rascunho</span>
                                             {% endif %}
                                         </strong>
-                                        <span class="badge bg-primary ms-2">
-                                            {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
-                                        </span>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-primary">
+                                                {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
+                                            </span>
+                                            {% if consultation.appointment_id %}
+                                            <button class="btn btn-sm btn-outline-primary" 
+                                                    onclick="event.stopPropagation(); window.location.href='/prontuario/{{ patient.id }}?appointment_id={{ consultation.appointment_id }}'"
+                                                    title="Editar consulta">
+                                                <i class="bi bi-pencil-square"></i> Editar
+                                            </button>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                     <small class="text-muted d-block mt-1">
                                         <i class="bi bi-person-circle"></i> {{ consultation.doctor.name }}
@@ -532,59 +541,33 @@
                                 
                                 {% if cosmetic_plans %}
                                     <div class="mb-3">
-                                        <h6 class="text-success">
-                                            <i class="bi bi-heart-pulse"></i> Procedimentos Estéticos Planejados
+                                        <h6 class="text-success mb-2">
+                                            <i class="bi bi-heart-pulse"></i> Planejamento e Execução
                                         </h6>
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-bordered">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Procedimento</th>
-                                                        <th>Valor Planejado</th>
-                                                        <th>Orçamento Final</th>
-                                                        <th>Retorno (meses)</th>
-                                                        <th>Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {% for plan in cosmetic_plans %}
-                                                    <tr>
-                                                        <td>{{ plan.procedure_name }}</td>
-                                                        <td>
-                                                            {% if plan.planned_value %}
-                                                            R$ {{ "{:,.2f}".format(plan.planned_value|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
-                                                            {% else %}
-                                                            -
-                                                            {% endif %}
-                                                        </td>
-                                                        <td>
-                                                            {% if plan.final_budget %}
-                                                            R$ {{ "{:,.2f}".format(plan.final_budget|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
-                                                            {% else %}
-                                                            -
-                                                            {% endif %}
-                                                        </td>
-                                                        <td class="text-center">
-                                                            {% if plan.follow_up_months is not none %}
-                                                            {{ plan.follow_up_months }} meses
-                                                            {% else %}
-                                                            -
-                                                            {% endif %}
-                                                        </td>
-                                                        <td>
-                                                            {% if plan.was_performed %}
-                                                            <span class="badge bg-success">Feito</span>
-                                                            {% if plan.performed_date %}
-                                                            <br><small>{{ plan.performed_date.strftime('%d/%m/%Y') }}</small>
-                                                            {% endif %}
-                                                            {% else %}
-                                                            <span class="badge bg-warning text-dark">Não Feito</span>
-                                                            {% endif %}
-                                                        </td>
-                                                    </tr>
-                                                    {% endfor %}
-                                                </tbody>
-                                            </table>
+                                        <div class="list-group">
+                                            {% for plan in cosmetic_plans %}
+                                            <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+                                                <div class="d-flex align-items-center">
+                                                    <i class="bi bi-{% if plan.was_performed %}check-circle-fill text-success{% else %}x-circle-fill text-danger{% endif %} me-2 fs-5"></i>
+                                                    <div>
+                                                        <strong>{{ plan.procedure_name }}</strong> - 
+                                                        <span class="text-muted">
+                                                            R$ {{ "{:,.2f}".format((plan.final_budget or plan.planned_value)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
+                                                        </span>
+                                                        {% if plan.was_performed and plan.performed_date %}
+                                                        <br><small class="text-muted">Realizado em: {{ plan.performed_date.strftime('%d/%m/%Y') }}</small>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    {% if plan.was_performed %}
+                                                    <span class="badge bg-success">FEITO</span>
+                                                    {% else %}
+                                                    <span class="badge bg-danger">PENDENTE</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% endfor %}
                                         </div>
                                     </div>
                                 {% endif %}
