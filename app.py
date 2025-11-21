@@ -439,6 +439,12 @@ def prontuario(patient_id):
         for note in appt_notes:
             processed_notes.add(note.id)
         
+        # Forçar carregamento dos dados relacionados ENQUANTO a sessão está ativa
+        for note in appt_notes:
+            _ = note.cosmetic_plans
+            _ = note.hair_transplants
+            _ = note.indications
+        
         # Separar notas por tipo
         notes_by_type = {note.note_type: note for note in appt_notes}
         
@@ -479,6 +485,12 @@ def prontuario(patient_id):
         # Marcar como processadas
         for gn in grouped_notes:
             processed_notes.add(gn.id)
+        
+        # Forçar carregamento dos dados relacionados ENQUANTO a sessão está ativa
+        for gn in grouped_notes:
+            _ = gn.cosmetic_plans
+            _ = gn.hair_transplants
+            _ = gn.indications
         
         # Separar por tipo
         notes_by_type = {gn.note_type: gn for gn in grouped_notes}
