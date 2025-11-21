@@ -536,8 +536,8 @@
                                 <!-- Procedimentos Cosméticos (Cosmiatria) -->
                                 {% set cosmetic_plans = [] %}
                                 {% for note in consultation.all_notes %}
-                                    {% if note.cosmetic_plans %}
-                                        {% set cosmetic_plans = cosmetic_plans + note.cosmetic_plans %}
+                                    {% if note._cosmetic_plans_data %}
+                                        {% set cosmetic_plans = cosmetic_plans + note._cosmetic_plans_data %}
                                     {% endif %}
                                 {% endfor %}
                                 
