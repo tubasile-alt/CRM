@@ -752,6 +752,25 @@ def finalizar_atendimento(patient_id):
                             reminder_type='cosmetic_follow_up'
                         )
                         db.session.add(reminder)
+            
+            # CRIAR CHECKOUT AUTOMATICAMENTE para procedimentos realizados
+            checkout_amount = data.get('checkout_amount', 0)
+            checkout_procedures = data.get('checkout_procedures', [])
+            
+            if checkout_amount > 0 and appointment_id and checkout_procedures:
+                payment = Payment(
+                    appointment_id=appointment_id,
+                    patient_id=patient_id,
+                    total_amount=checkout_amount,
+                    consultation_type='Particular',
+                    payment_method='pendente',
+                    status='pendente',
+                    procedures=[{
+                        'name': proc['name'],
+                        'value': proc.get('budget', proc.get('value', 0))
+                    } for proc in checkout_procedures]
+                )
+                db.session.add(payment)
         
         # Salvar dados de transplante capilar (Transplante Capilar)
         if category == 'transplante_capilar':

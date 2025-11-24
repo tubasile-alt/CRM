@@ -761,6 +761,12 @@ function finalizarAtendimento() {
     // Adicionar dados específicos de Cosmiatria
     if (currentCategory === 'cosmiatria' && cosmeticProcedures.length > 0) {
         payload.cosmetic_procedures = cosmeticProcedures;
+        
+        // Calcular total dos procedimentos realizados
+        const performedProcedures = cosmeticProcedures.filter(p => p.performed);
+        const totalPerformed = performedProcedures.reduce((sum, p) => sum + (p.budget || p.value), 0);
+        payload.checkout_amount = totalPerformed;
+        payload.checkout_procedures = performedProcedures;
     }
     
     // Adicionar dados específicos de Transplante Capilar
