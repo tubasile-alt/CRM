@@ -775,7 +775,13 @@ def finalizar_atendimento(patient_id):
             # CRIAR CHECKOUT AUTOMATICAMENTE para procedimentos realizados
             checkout_amount = data.get('checkout_amount', 0)
             checkout_procedures = data.get('checkout_procedures', [])
-            consultation_type = data.get('consultation_type', 'Particular')  # Get from data
+            
+            # Determinar consultation_type baseado no tipo de paciente ou agendamento
+            patient = Patient.query.get(patient_id)
+            if patient and patient.patient_type == 'transplante_capilar':
+                consultation_type = 'Transplante Capilar'
+            else:
+                consultation_type = data.get('consultation_type', 'Particular')
             
             if checkout_procedures:  # Se tem procedimentos, criar checkout
                 # Adicionar valor da consulta conforme tipo
@@ -784,9 +790,9 @@ def finalizar_atendimento(patient_id):
                     'value': float(proc.get('budget', proc.get('value', 0)))
                 } for proc in checkout_procedures]
                 
-                # Adicionar consulta base se for Particular ou Implante Capilar
+                # Adicionar consulta base se for Particular, Implante Capilar ou Transplante Capilar
                 total_amount = checkout_amount
-                if consultation_type in ['Particular', 'Implante Capilar']:
+                if consultation_type in ['Particular', 'Implante Capilar', 'Transplante Capilar']:
                     consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
                     if consultation_fee > 0:
                         procedures_list.insert(0, {
