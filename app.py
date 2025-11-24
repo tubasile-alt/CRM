@@ -395,6 +395,22 @@ def send_agenda_email():
     else:
         return jsonify({'error': 'Erro ao enviar email'}), 500
 
+@app.route('/api/patient/<int:patient_id>/attention-note', methods=['POST'])
+@login_required
+def save_attention_note(patient_id):
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+    
+    patient = Patient.query.get_or_404(patient_id)
+    patient.attention_note = data.get('attention_note', '')
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
 @app.route('/prontuario/<int:patient_id>')
 @login_required
 def prontuario(patient_id):

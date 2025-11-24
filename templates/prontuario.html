@@ -3,14 +3,71 @@
 {% block title %}Prontuário - {{ patient.name }}{% endblock %}
 
 {% block content %}
+<script>
+function calculateAge(birthDate) {
+    if (!birthDate) return null;
+    const today = new Date();
+    const birth = new Date(birthDate + 'T00:00:00');
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+    }
+    return age >= 0 ? age : null;
+}
+
+const patientBirth = '{{ patient.birth_date }}';
+const age = calculateAge(patientBirth);
+
+function openAttentionModal() {
+    document.getElementById('attentionText').value = document.getElementById('attentionContent').textContent;
+    new bootstrap.Modal(document.getElementById('attentionModal')).show();
+}
+
+function saveAttentionNote() {
+    const content = document.getElementById('attentionText').value;
+    fetch(`/api/patient/{{ patient.id }}/attention-note`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({attention_note: content})
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            document.getElementById('attentionContent').textContent = content;
+            document.getElementById('attentionBadge').style.display = content ? 'inline' : 'none';
+            bootstrap.Modal.getInstance(document.getElementById('attentionModal')).hide();
+            showAlert('Anotação salva!', 'success');
+        } else {
+            showAlert(result.error || 'Erro ao salvar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao salvar anotação', 'danger');
+    });
+}
+</script>
+
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
-                <h2>Prontuário: {{ patient.name }}</h2>
+                <h2>
+                    Prontuário: {{ patient.name }}
+                    {% if age %}
+                    <small class="text-muted">({{ age }} anos)</small>
+                    {% endif %}
+                </h2>
                 <p class="text-muted mb-0">
                     {% if patient.phone %}<i class="bi bi-telephone"></i> {{ patient.phone }} | {% endif %}
                     {% if patient.email %}<i class="bi bi-envelope"></i> {{ patient.email }}{% endif %}
+                    <button class="btn btn-sm btn-warning ms-2" onclick="openAttentionModal()">
+                        <i class="bi bi-exclamation-circle"></i> Atenção
+                    </button>
+                    <span id="attentionBadge" class="badge bg-danger ms-2" style="display: {% if patient.attention_note %}inline{% else %}none{% endif %};">
+                        <i class="bi bi-exclamation-triangle"></i> Anotação
+                    </span>
                 </p>
             </div>
             <button class="btn btn-outline-secondary" onclick="history.back()">
@@ -20,6 +77,31 @@
     </div>
 </div>
 
+<!-- Modal de Atenção -->
+<div class="modal fade" id="attentionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-exclamation-circle"></i> Anotação de Atenção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Informações importantes sobre o paciente:</label>
+                <textarea class="form-control" id="attentionText" rows="6" placeholder="Ex: Alérgico a penicilina, tem medo de agulhas, etc..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="saveAttentionNote()">
+                    <i class="bi bi-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="attentionContent" style="display:none;">{{ patient.attention_note or '' }}</div>
+
+{% if current_user.is_doctor() %}
 <div class="row mb-3">
     <div class="col-12">
         <div class="card">
@@ -44,7 +126,9 @@
         </div>
     </div>
 </div>
+{% endif %}
 
+{% if current_user.is_doctor() %}
 <div class="row mb-3">
     <div class="col-12">
         <div class="card bg-light">
@@ -71,6 +155,11 @@
         </div>
     </div>
 </div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-lock"></i> Histórico de atendimentos visível apenas para médicos.
+</div>
+{% endif %}
 
 <div class="row">
     <div class="col-lg-8">

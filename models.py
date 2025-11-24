@@ -42,6 +42,7 @@ class Patient(db.Model):
     cpf = db.Column(db.String(14))
     address = db.Column(db.String(200))
     patient_type = db.Column(db.String(50), default='particular')
+    attention_note = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
