@@ -775,13 +775,7 @@ def finalizar_atendimento(patient_id):
             # CRIAR CHECKOUT AUTOMATICAMENTE para procedimentos realizados
             checkout_amount = data.get('checkout_amount', 0)
             checkout_procedures = data.get('checkout_procedures', [])
-            
-            # Determinar consultation_type baseado no tipo de paciente ou agendamento
-            patient = Patient.query.get(patient_id)
-            if patient and patient.patient_type == 'transplante_capilar':
-                consultation_type = 'Transplante Capilar'
-            else:
-                consultation_type = data.get('consultation_type', 'Particular')
+            consultation_type = data.get('consultation_type', 'Particular')  # Get from data
             
             if checkout_procedures:  # Se tem procedimentos, criar checkout
                 # Adicionar valor da consulta conforme tipo
