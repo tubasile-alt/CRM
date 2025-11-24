@@ -764,9 +764,17 @@ function finalizarAtendimento() {
         
         // Calcular total dos procedimentos realizados
         const performedProcedures = cosmeticProcedures.filter(p => p.performed);
-        const totalPerformed = performedProcedures.reduce((sum, p) => sum + (p.budget || p.value), 0);
-        payload.checkout_amount = totalPerformed;
-        payload.checkout_procedures = performedProcedures;
+        const totalPerformed = performedProcedures.reduce((sum, p) => sum + (parseFloat(p.budget) || parseFloat(p.value)), 0);
+        
+        if (totalPerformed > 0) {
+            payload.checkout_amount = totalPerformed;
+            payload.checkout_procedures = performedProcedures.map(p => ({
+                name: p.name,
+                value: parseFloat(p.budget) || parseFloat(p.value),
+                budget: parseFloat(p.budget) || parseFloat(p.value)
+            }));
+            console.log('Checkout criado:', { amount: totalPerformed, procedures: payload.checkout_procedures });
+        }
     }
     
     // Adicionar dados específicos de Transplante Capilar

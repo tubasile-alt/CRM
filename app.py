@@ -761,16 +761,17 @@ def finalizar_atendimento(patient_id):
                 payment = Payment(
                     appointment_id=appointment_id,
                     patient_id=patient_id,
-                    total_amount=checkout_amount,
+                    total_amount=float(checkout_amount),
                     consultation_type='Particular',
                     payment_method='pendente',
                     status='pendente',
                     procedures=[{
-                        'name': proc['name'],
-                        'value': proc.get('budget', proc.get('value', 0))
+                        'name': proc.get('name', 'Procedimento'),
+                        'value': float(proc.get('budget', proc.get('value', 0)))
                     } for proc in checkout_procedures]
                 )
                 db.session.add(payment)
+                print(f"✓ PAYMENT CRIADO: R${checkout_amount} - Paciente {patient_id} - Appointment {appointment_id}")
         
         # Salvar dados de transplante capilar (Transplante Capilar)
         if category == 'transplante_capilar':
