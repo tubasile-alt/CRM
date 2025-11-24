@@ -165,6 +165,9 @@ function showEventDetails(event) {
                 <option value="faltou" ${props.status === 'faltou' ? 'selected' : ''}>Faltou</option>
             </select>
             <button class="btn btn-sm btn-primary mt-2" onclick="updateEventStatus()">Atualizar Status</button>
+            <button class="btn btn-sm btn-info mt-2" onclick="openPatientChart()">
+                <i class="bi bi-file-text"></i> Abrir Prontuário
+            </button>
         </div>
     `;
     
