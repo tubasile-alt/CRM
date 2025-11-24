@@ -784,16 +784,17 @@ def finalizar_atendimento(patient_id):
                     'value': float(proc.get('budget', proc.get('value', 0)))
                 } for proc in checkout_procedures]
                 
-                # Adicionar consulta base se for Particular, Implante Capilar ou Transplante Capilar
+                # Adicionar taxa de consulta conforme tipo de consulta (não baseado em tipo de paciente)
+                # O tipo de consulta determina se cobra: Particular, Implante Capilar, Transplante Capilar = R$400
+                # Retorno, UNIMD, Cortesia = sem cobrança
                 total_amount = checkout_amount
-                if consultation_type in ['Particular', 'Implante Capilar', 'Transplante Capilar']:
-                    consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
-                    if consultation_fee > 0:
-                        procedures_list.insert(0, {
-                            'name': f'Consulta {consultation_type}',
-                            'value': consultation_fee
-                        })
-                        total_amount += consultation_fee
+                consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
+                if consultation_fee > 0:
+                    procedures_list.insert(0, {
+                        'name': f'Consulta {consultation_type}',
+                        'value': consultation_fee
+                    })
+                    total_amount += consultation_fee
                 
                 payment = Payment(
                     appointment_id=appointment_id,  # Pode ser None
@@ -1414,13 +1415,16 @@ def update_cosmetic_plan(plan_id):
     return jsonify({'success': True, 'message': 'Plano atualizado com sucesso'})
 
 # CHECKOUT ROUTES
+# Tipos de consulta e seus valores - determina se cobra ou não
 CONSULTATION_PRICES = {
-    'Particular': 400.0,
-    'Unimed': 0.0,
-    'Retorno': 0.0,
-    'Transplante Capilar': 400.0,
-    'Cortesia': 0.0,
-    'Consulta Cortesia': 0.0
+    'Particular': 400.0,           # Cobra R$400
+    'Implante Capilar': 400.0,     # Cobra R$400
+    'Transplante Capilar': 400.0,  # Cobra R$400
+    'Retorno': 0.0,                # Não cobra
+    'UNIMD': 0.0,                  # Não cobra
+    'Unimed': 0.0,                 # Não cobra (variação)
+    'Cortesia': 0.0,               # Não cobra
+    'Consulta Cortesia': 0.0       # Não cobra
 }
 
 @app.route('/api/checkout/pending', methods=['GET'])
