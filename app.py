@@ -1412,12 +1412,12 @@ def get_pending_checkouts():
     
     today = get_brazil_time().date()
     
+    # Buscar TODOS os checkouts do dia (pendentes E pagos)
     payments = Payment.query.filter(
-        db.func.date(Payment.created_at) == today,
-        Payment.status == 'pendente'
+        db.func.date(Payment.created_at) == today
     ).all()
     
-    print(f"DEBUG: Found {len(payments)} pending payments")
+    print(f"DEBUG: Found {len(payments)} payments for today")
     
     data = []
     for payment in payments:
@@ -1430,9 +1430,12 @@ def get_pending_checkouts():
             'consultation_type': payment.consultation_type,
             'total_amount': float(payment.total_amount),
             'procedures': payment.procedures or [],
-            'created_at': payment.created_at.strftime('%H:%M')
+            'created_at': payment.created_at.strftime('%H:%M'),
+            'status': payment.status,
+            'paid_at': payment.paid_at.strftime('%H:%M') if payment.paid_at else None,
+            'payment_method': payment.payment_method
         })
-        print(f"  - Payment {payment.id}: {patient.name if patient else '?'} R${payment.total_amount}")
+        print(f"  - Payment {payment.id}: {patient.name if patient else '?'} R${payment.total_amount} - {payment.status}")
     
     return jsonify({'success': True, 'checkouts': data})
 
