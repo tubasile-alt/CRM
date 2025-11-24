@@ -29,7 +29,11 @@ document.addEventListener('DOMContentLoaded', function() {
             // Carregar eventos sem filtro de data para mostrar histórico completo
         },
         events: function(info, successCallback, failureCallback) {
-            fetch('/api/appointments')
+            let url = '/api/appointments';
+            if (currentDoctorFilter) {
+                url += `?doctor_id=${currentDoctorFilter}`;
+            }
+            fetch(url)
                 .then(r => r.json())
                 .then(events => successCallback(events))
                 .catch(err => failureCallback(err));
