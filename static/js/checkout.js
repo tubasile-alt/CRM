@@ -15,7 +15,7 @@ function loadCheckouts() {
             if (result.success) {
                 displayCheckouts(result.checkouts);
             } else {
-                showError(result.error || 'Erro ao carregar checkouts');
+                showAlert(result.error || 'Erro ao carregar checkouts', 'danger');
             }
         })
         .catch(err => console.error('Erro:', err));
@@ -95,7 +95,7 @@ function updateInstallments() {
 function completePayment() {
     const method = document.getElementById('paymentMethod').value;
     if (!method) {
-        showError('Selecione uma forma de pagamento');
+        showAlert('Selecione uma forma de pagamento', 'danger');
         return;
     }
     
@@ -104,8 +104,7 @@ function completePayment() {
     fetch(`/api/checkout/${currentPaymentId}/pay`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             payment_method: method,
@@ -115,15 +114,15 @@ function completePayment() {
     .then(r => r.json())
     .then(result => {
         if (result.success) {
-            showSuccess('Pagamento registrado com sucesso!');
+            showAlert('Pagamento registrado com sucesso!', 'success');
             bootstrap.Modal.getInstance(document.getElementById('paymentModal')).hide();
-            loadCheckouts();
+            setTimeout(loadCheckouts, 500);
         } else {
-            showError(result.error || 'Erro ao registrar pagamento');
+            showAlert(result.error || 'Erro ao registrar pagamento', 'danger');
         }
     })
     .catch(err => {
         console.error('Erro:', err);
-        showError('Erro ao processar pagamento');
+        showAlert('Erro ao processar pagamento', 'danger');
     });
 }
