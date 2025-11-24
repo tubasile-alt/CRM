@@ -439,22 +439,22 @@ def prontuario(patient_id):
         for note in appt_notes:
             processed_notes.add(note.id)
         
-        # Forçar carregamento e extração dos dados relacionados ENQUANTO a sessão está ativa
+        # Forçar carregamento de dados relacionados ENQUANTO a sessão está ativa
+        all_cosmetic_plans = []
         for note in appt_notes:
             _ = note.cosmetic_plans
             _ = note.hair_transplants
             _ = note.indications
-            # Converter objetos SQLAlchemy para dicts para persistir após sessão fechar
-            note._cosmetic_plans_data = [
-                {
-                    'procedure_name': p.procedure_name,
-                    'planned_value': p.planned_value,
-                    'final_budget': p.final_budget,
-                    'was_performed': p.was_performed,
-                    'performed_date': p.performed_date,
-                    'follow_up_months': p.follow_up_months
-                } for p in note.cosmetic_plans
-            ]
+            # Extrair procedimentos cosméticos enquanto dados estão acessíveis
+            for plan in note.cosmetic_plans:
+                all_cosmetic_plans.append({
+                    'procedure_name': plan.procedure_name,
+                    'planned_value': plan.planned_value,
+                    'final_budget': plan.final_budget,
+                    'was_performed': plan.was_performed,
+                    'performed_date': plan.performed_date,
+                    'follow_up_months': plan.follow_up_months
+                })
         
         # Separar notas por tipo
         notes_by_type = {note.note_type: note for note in appt_notes}
@@ -474,6 +474,7 @@ def prontuario(patient_id):
             'category': finalized_note.category if finalized_note else first_note.category,
             'notes_by_type': notes_by_type,
             'all_notes': appt_notes,
+            'cosmetic_plans': all_cosmetic_plans,
             'is_finalized': is_finalized
         })
     
@@ -497,22 +498,22 @@ def prontuario(patient_id):
         for gn in grouped_notes:
             processed_notes.add(gn.id)
         
-        # Forçar carregamento e extração dos dados relacionados ENQUANTO a sessão está ativa
+        # Forçar carregamento de dados relacionados ENQUANTO a sessão está ativa
+        all_cosmetic_plans = []
         for gn in grouped_notes:
             _ = gn.cosmetic_plans
             _ = gn.hair_transplants
             _ = gn.indications
-            # Converter objetos SQLAlchemy para dicts para persistir após sessão fechar
-            gn._cosmetic_plans_data = [
-                {
-                    'procedure_name': p.procedure_name,
-                    'planned_value': p.planned_value,
-                    'final_budget': p.final_budget,
-                    'was_performed': p.was_performed,
-                    'performed_date': p.performed_date,
-                    'follow_up_months': p.follow_up_months
-                } for p in gn.cosmetic_plans
-            ]
+            # Extrair procedimentos cosméticos enquanto dados estão acessíveis
+            for plan in gn.cosmetic_plans:
+                all_cosmetic_plans.append({
+                    'procedure_name': plan.procedure_name,
+                    'planned_value': plan.planned_value,
+                    'final_budget': plan.final_budget,
+                    'was_performed': plan.was_performed,
+                    'performed_date': plan.performed_date,
+                    'follow_up_months': plan.follow_up_months
+                })
         
         # Separar por tipo
         notes_by_type = {gn.note_type: gn for gn in grouped_notes}
@@ -528,6 +529,7 @@ def prontuario(patient_id):
             'category': note.category,
             'notes_by_type': notes_by_type,
             'all_notes': grouped_notes,
+            'cosmetic_plans': all_cosmetic_plans,
             'is_finalized': finalized_note is not None
         })
     

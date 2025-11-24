@@ -534,20 +534,13 @@
                                 {% endif %}
 
                                 <!-- Procedimentos Cosméticos (Cosmiatria) -->
-                                {% set cosmetic_plans = [] %}
-                                {% for note in consultation.all_notes %}
-                                    {% if note._cosmetic_plans_data %}
-                                        {% set cosmetic_plans = cosmetic_plans + note._cosmetic_plans_data %}
-                                    {% endif %}
-                                {% endfor %}
-                                
-                                {% if cosmetic_plans %}
+                                {% if consultation.cosmetic_plans %}
                                     <div class="mb-3">
                                         <h6 class="text-success mb-2">
                                             <i class="bi bi-heart-pulse"></i> Planejamento e Execução
                                         </h6>
                                         <div class="list-group">
-                                            {% for plan in cosmetic_plans %}
+                                            {% for plan in consultation.cosmetic_plans %}
                                             <div class="list-group-item d-flex justify-content-between align-items-center py-2">
                                                 <div class="d-flex align-items-center">
                                                     <i class="bi bi-{% if plan.was_performed %}check-circle-fill text-success{% else %}x-circle-fill text-danger{% endif %} me-2 fs-5"></i>
