@@ -23,8 +23,10 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             }
         }
         
+        // Atualizar o campo com a transcrição final
         if (activeTextarea && finalTranscript) {
             activeTextarea.value += finalTranscript;
+            activeTextarea.dispatchEvent(new Event('input'));
         }
     };
     
@@ -46,13 +48,24 @@ function startDictation(textareaId) {
     }
     
     activeTextarea = document.getElementById(textareaId);
+    if (!activeTextarea) {
+        showAlert('Campo de texto não encontrado.', 'danger');
+        return;
+    }
+    
     const button = event.target.closest('button');
     
     if (button.classList.contains('dictation-active')) {
         stopDictation();
     } else {
         try {
-            recognition.start();
+            // Resetar o reconhecimento antes de iniciar
+            if (recognition) {
+                recognition.stop();
+                setTimeout(() => {
+                    recognition.start();
+                }, 100);
+            }
             button.classList.add('dictation-active');
             button.innerHTML = '<i class="bi bi-mic-fill"></i> Gravando...';
         } catch (error) {
@@ -258,19 +271,29 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function handleCategoryChange(event) {
-    // Verificar se o timer foi iniciado
-    if (!timerStartTime) {
-        event.preventDefault();
-        alert('⚠️ Por favor, inicie o atendimento antes de selecionar a categoria.\n\nClique no botão "Iniciar Atendimento" no topo da página.');
-        // Reverter para categoria anterior
-        const previousRadio = document.querySelector(`input[name="category"][value="${currentCategory}"]`);
-        if (previousRadio) {
-            previousRadio.checked = true;
+    const newCategory = event.target.value;
+    
+    // Para Cosmiatria e Transplante Capilar: auto-iniciar o timer
+    if (newCategory === 'cosmiatria' || newCategory === 'transplante_capilar') {
+        if (!timerStartTime) {
+            // Auto-iniciar o atendimento
+            startConsultation();
         }
-        return;
+    } else if (newCategory === 'patologia') {
+        // Para Patologia: requerer clique manual
+        if (!timerStartTime) {
+            event.preventDefault();
+            alert('⚠️ Por favor, inicie o atendimento antes de selecionar a categoria.\n\nClique no botão "Iniciar Atendimento" no topo da página.');
+            // Reverter para categoria anterior
+            const previousRadio = document.querySelector(`input[name="category"][value="${currentCategory}"]`);
+            if (previousRadio) {
+                previousRadio.checked = true;
+            }
+            return;
+        }
     }
     
-    currentCategory = event.target.value;
+    currentCategory = newCategory;
     updateCategoryTexts();
     toggleCategoryTabs();
     
