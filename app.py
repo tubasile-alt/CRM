@@ -757,9 +757,9 @@ def finalizar_atendimento(patient_id):
             checkout_amount = data.get('checkout_amount', 0)
             checkout_procedures = data.get('checkout_procedures', [])
             
-            if checkout_amount > 0 and appointment_id and checkout_procedures:
+            if checkout_amount > 0 and checkout_procedures:
                 payment = Payment(
-                    appointment_id=appointment_id,
+                    appointment_id=appointment_id,  # Pode ser None
                     patient_id=patient_id,
                     total_amount=float(checkout_amount),
                     consultation_type='Particular',
@@ -771,7 +771,7 @@ def finalizar_atendimento(patient_id):
                     } for proc in checkout_procedures]
                 )
                 db.session.add(payment)
-                print(f"✓ PAYMENT CRIADO: R${checkout_amount} - Paciente {patient_id} - Appointment {appointment_id}")
+                print(f"✓✓✓ PAYMENT CRIADO: R${checkout_amount} - Paciente {patient_id} - APT {appointment_id} - Procedures: {len(checkout_procedures)}")
         
         # Salvar dados de transplante capilar (Transplante Capilar)
         if category == 'transplante_capilar':
@@ -1402,19 +1402,22 @@ def get_pending_checkouts():
         Payment.status == 'pendente'
     ).all()
     
+    print(f"DEBUG: Found {len(payments)} pending payments")
+    
     data = []
     for payment in payments:
-        apt = payment.appointment
         patient = payment.patient
+        apt_id = payment.appointment_id if payment.appointment_id else 'N/A'
         data.append({
             'id': payment.id,
-            'appointment_id': apt.id,
-            'patient_name': patient.name,
+            'appointment_id': apt_id,
+            'patient_name': patient.name if patient else 'Desconhecido',
             'consultation_type': payment.consultation_type,
             'total_amount': float(payment.total_amount),
             'procedures': payment.procedures or [],
             'created_at': payment.created_at.strftime('%H:%M')
         })
+        print(f"  - Payment {payment.id}: {patient.name if patient else '?'} R${payment.total_amount}")
     
     return jsonify({'success': True, 'checkouts': data})
 
