@@ -317,6 +317,7 @@ function saveAttentionNote() {
                             </table>
                         </div>
                         
+                        {% if current_user.is_doctor() %}
                         <div class="mb-3">
                             <div class="row g-2">
                                 <div class="col-md-5">
@@ -352,14 +353,17 @@ function saveAttentionNote() {
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                         
                         <div class="alert alert-info">
                             <strong>Total Estimado:</strong> R$ <span id="cosmeticTotal">0,00</span>
                         </div>
                         
+                        {% if current_user.is_doctor() %}
                         <button class="btn btn-success" onclick="generateBudget()">
                             <i class="bi bi-file-pdf"></i> Gerar Orçamento PDF
                         </button>
+                        {% endif %}
                         <div class="alert alert-warning mt-2">
                             <small><i class="bi bi-info-circle"></i> Os procedimentos serão salvos automaticamente ao clicar em "Finalizar Atendimento" na aba Conduta.</small>
                         </div>
@@ -375,20 +379,20 @@ function saveAttentionNote() {
                             <div class="mb-2">
                                 <label class="form-label">Já realizou transplante capilar anteriormente?</label>
                                 <div class="btn-group w-100" role="group">
-                                    <input type="radio" class="btn-check" name="previousTransplant" id="previousNo" value="nao" checked onchange="toggleTransplantLocation()">
+                                    <input type="radio" class="btn-check" name="previousTransplant" id="previousNo" value="nao" checked onchange="toggleTransplantLocation()" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     <label class="btn btn-outline-secondary" for="previousNo">Não</label>
                                     
-                                    <input type="radio" class="btn-check" name="previousTransplant" id="previousYes" value="sim" onchange="toggleTransplantLocation()">
+                                    <input type="radio" class="btn-check" name="previousTransplant" id="previousYes" value="sim" onchange="toggleTransplantLocation()" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     <label class="btn btn-outline-primary" for="previousYes">Sim</label>
                                 </div>
                             </div>
                             <div id="transplantLocationSection" style="display:none;" class="mt-2">
                                 <label class="form-label">Onde foi realizado?</label>
                                 <div class="btn-group w-100" role="group">
-                                    <input type="radio" class="btn-check" name="transplantLocation" id="locationICB" value="ICB">
+                                    <input type="radio" class="btn-check" name="transplantLocation" id="locationICB" value="ICB" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     <label class="btn btn-outline-info" for="locationICB">ICB</label>
                                     
-                                    <input type="radio" class="btn-check" name="transplantLocation" id="locationOther" value="outro_servico">
+                                    <input type="radio" class="btn-check" name="transplantLocation" id="locationOther" value="outro_servico" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     <label class="btn btn-outline-warning" for="locationOther">Outro Serviço</label>
                                 </div>
                             </div>
@@ -399,51 +403,52 @@ function saveAttentionNote() {
                             <label class="form-label"><strong>Classificação de Norwood (Nível de Calvície)</strong></label>
                             <div class="row g-2">
                                 <div class="col-6 col-md-4 col-lg-2" data-norwood="1">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('1')">
+                                    <div class="card norwood-card text-center p-2" onclick="{% if current_user.is_doctor() %}selectNorwood('1'){% endif %}" style="{% if not current_user.is_doctor() %}cursor: default; opacity: 0.7;{% endif %}">
                                         <div class="norwood-icon mb-1">👤</div>
                                         <small><strong>Norwood 1</strong></small>
-                                        <input type="radio" name="norwood" value="1" style="display:none;">
+                                        <input type="radio" name="norwood" value="1" style="display:none;" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-4 col-lg-2" data-norwood="2">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('2')">
+                                    <div class="card norwood-card text-center p-2" onclick="{% if current_user.is_doctor() %}selectNorwood('2'){% endif %}" style="{% if not current_user.is_doctor() %}cursor: default; opacity: 0.7;{% endif %}">
                                         <div class="norwood-icon mb-1">👤</div>
                                         <small><strong>Norwood 2</strong></small>
-                                        <input type="radio" name="norwood" value="2" style="display:none;">
+                                        <input type="radio" name="norwood" value="2" style="display:none;" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-4 col-lg-2" data-norwood="3">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('3')">
+                                    <div class="card norwood-card text-center p-2" onclick="{% if current_user.is_doctor() %}selectNorwood('3'){% endif %}" style="{% if not current_user.is_doctor() %}cursor: default; opacity: 0.7;{% endif %}">
                                         <div class="norwood-icon mb-1">👤</div>
                                         <small><strong>Norwood 3</strong></small>
-                                        <input type="radio" name="norwood" value="3" style="display:none;">
+                                        <input type="radio" name="norwood" value="3" style="display:none;" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-4 col-lg-2" data-norwood="4">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('4')">
+                                    <div class="card norwood-card text-center p-2" onclick="{% if current_user.is_doctor() %}selectNorwood('4'){% endif %}" style="{% if not current_user.is_doctor() %}cursor: default; opacity: 0.7;{% endif %}">
                                         <div class="norwood-icon mb-1">👤</div>
                                         <small><strong>Norwood 4</strong></small>
-                                        <input type="radio" name="norwood" value="4" style="display:none;">
+                                        <input type="radio" name="norwood" value="4" style="display:none;" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-4 col-lg-2" data-norwood="5">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('5')">
+                                    <div class="card norwood-card text-center p-2" onclick="{% if current_user.is_doctor() %}selectNorwood('5'){% endif %}" style="{% if not current_user.is_doctor() %}cursor: default; opacity: 0.7;{% endif %}">
                                         <div class="norwood-icon mb-1">👤</div>
                                         <small><strong>Norwood 5</strong></small>
-                                        <input type="radio" name="norwood" value="5" style="display:none;">
+                                        <input type="radio" name="norwood" value="5" style="display:none;" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     </div>
                                 </div>
                                 <div class="col-6 col-md-4 col-lg-2" data-norwood="6">
-                                    <div class="card norwood-card text-center p-2" onclick="selectNorwood('6')">
+                                    <div class="card norwood-card text-center p-2" onclick="{% if current_user.is_doctor() %}selectNorwood('6'){% endif %}" style="{% if not current_user.is_doctor() %}cursor: default; opacity: 0.7;{% endif %}">
                                         <div class="norwood-icon mb-1">👤</div>
                                         <small><strong>Norwood 6</strong></small>
-                                        <input type="radio" name="norwood" value="6" style="display:none;">
+                                        <input type="radio" name="norwood" value="6" style="display:none;" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Upload de Imagens -->
+                        {% if current_user.is_doctor() %}
                         <div class="mb-3">
                             <label class="form-label"><strong>Anexos da Consulta</strong></label>
                             <div class="row g-2">
@@ -461,15 +466,16 @@ function saveAttentionNote() {
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
 
                         <!-- Tipo de Caso -->
                         <div class="mb-3">
                             <label class="form-label"><strong>Tipo de Caso</strong></label>
                             <div class="btn-group" role="group">
-                                <input type="radio" class="btn-check" name="caseType" id="casePrimary" value="primaria" checked>
+                                <input type="radio" class="btn-check" name="caseType" id="casePrimary" value="primaria" checked {% if not current_user.is_doctor() %}disabled{% endif %}>
                                 <label class="btn btn-outline-primary" for="casePrimary">Cirurgia Primária</label>
                                 
-                                <input type="radio" class="btn-check" name="caseType" id="caseSecondary" value="secundaria">
+                                <input type="radio" class="btn-check" name="caseType" id="caseSecondary" value="secundaria" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                 <label class="btn btn-outline-warning" for="caseSecondary">Cirurgia Secundária</label>
                             </div>
                         </div>
@@ -480,25 +486,25 @@ function saveAttentionNote() {
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="singleSurgery" value="1" checked>
+                                        <input class="form-check-input" type="checkbox" id="singleSurgery" value="1" checked {% if not current_user.is_doctor() %}disabled{% endif %}>
                                         <label class="form-check-label" for="singleSurgery">Uma única cirurgia</label>
                                     </div>
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="twoSurgeries">
+                                        <input class="form-check-input" type="checkbox" id="twoSurgeries" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                         <label class="form-check-label" for="twoSurgeries">Duas cirurgias planejadas</label>
                                     </div>
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="bodyHair">
+                                        <input class="form-check-input" type="checkbox" id="bodyHair" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                         <label class="form-check-label" for="bodyHair">Body hair transplant</label>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="eyebrowTransplant">
+                                        <input class="form-check-input" type="checkbox" id="eyebrowTransplant" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                         <label class="form-check-label" for="eyebrowTransplant">Transplante de sobrancelha</label>
                                     </div>
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="beardTransplant">
+                                        <input class="form-check-input" type="checkbox" id="beardTransplant" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                         <label class="form-check-label" for="beardTransplant">Transplante de barba</label>
                                     </div>
                                 </div>
@@ -509,19 +515,19 @@ function saveAttentionNote() {
                         <div class="mb-3">
                             <label class="form-label"><strong>Indicações Cirúrgicas</strong></label>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="frontalTransplant">
+                                <input class="form-check-input" type="checkbox" id="frontalTransplant" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                 <label class="form-check-label" for="frontalTransplant">Transplante capilar frontal</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="crownTransplant">
+                                <input class="form-check-input" type="checkbox" id="crownTransplant" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                 <label class="form-check-label" for="crownTransplant">Transplante capilar em coroa</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="completeTransplant">
+                                <input class="form-check-input" type="checkbox" id="completeTransplant" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                 <label class="form-check-label" for="completeTransplant">Transplante capilar completo</label>
                             </div>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="completeBodyHair">
+                                <input class="form-check-input" type="checkbox" id="completeBodyHair" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                 <label class="form-check-label" for="completeBodyHair">Transplante capilar completo com body hair</label>
                             </div>
                         </div>
@@ -530,12 +536,14 @@ function saveAttentionNote() {
                         <div class="mb-3">
                             <label class="form-label"><strong>Planejamento Cirúrgico</strong></label>
                             <textarea class="form-control" id="surgicalPlanning" rows="6" 
-                                placeholder="Descreva: linha frontal, número estimado de UF, estratégia de extração, distribuição de áreas receptoras, densidade planejada..."></textarea>
+                                placeholder="Descreva: linha frontal, número estimado de UF, estratégia de extração, distribuição de áreas receptoras, densidade planejada..." {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
                         </div>
 
+                        {% if current_user.is_doctor() %}
                         <button class="btn btn-primary" onclick="saveHairTransplant()">
                             <i class="bi bi-save"></i> Salvar Dados Cirúrgicos
                         </button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -575,7 +583,7 @@ function saveAttentionNote() {
                                             <span class="badge bg-primary">
                                                 {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
                                             </span>
-                                            {% if consultation.appointment_id %}
+                                            {% if current_user.is_doctor() and consultation.appointment_id %}
                                             <button class="btn btn-sm btn-outline-primary" 
                                                     onclick="event.stopPropagation(); window.location.href='/prontuario/{{ patient.id }}?appointment_id={{ consultation.appointment_id }}'"
                                                     title="Editar consulta">
