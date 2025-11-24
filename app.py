@@ -785,8 +785,8 @@ def finalizar_atendimento(patient_id):
                 } for proc in checkout_procedures]
                 
                 # Adicionar taxa de consulta conforme tipo de consulta (não baseado em tipo de paciente)
-                # O tipo de consulta determina se cobra: Particular, Implante Capilar, Transplante Capilar = R$400
-                # Retorno, UNIMD, Cortesia = sem cobrança
+                # O tipo de consulta determina se cobra: Particular, Transplante Capilar = R$400
+                # Retorno, UNIMED, Cortesia = sem cobrança
                 total_amount = checkout_amount
                 consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
                 if consultation_fee > 0:
@@ -1418,11 +1418,9 @@ def update_cosmetic_plan(plan_id):
 # Tipos de consulta e seus valores - determina se cobra ou não
 CONSULTATION_PRICES = {
     'Particular': 400.0,           # Cobra R$400
-    'Implante Capilar': 400.0,     # Cobra R$400
     'Transplante Capilar': 400.0,  # Cobra R$400
     'Retorno': 0.0,                # Não cobra
-    'UNIMD': 0.0,                  # Não cobra
-    'Unimed': 0.0,                 # Não cobra (variação)
+    'UNIMED': 0.0,                 # Não cobra
     'Cortesia': 0.0,               # Não cobra
     'Consulta Cortesia': 0.0       # Não cobra
 }
