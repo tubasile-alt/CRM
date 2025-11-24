@@ -257,3 +257,20 @@ class FollowUpReminder(db.Model):
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     patient = db.relationship('Patient', backref='reminders')
+
+class Payment(db.Model):
+    __tablename__ = 'payment'
+    id = db.Column(db.Integer, primary_key=True)
+    appointment_id = db.Column(db.Integer, db.ForeignKey('appointment.id'), nullable=False, index=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
+    total_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    payment_method = db.Column(db.String(50), nullable=False)  # 'dinheiro', 'cartao', 'pix'
+    installments = db.Column(db.Integer, default=1)  # para cartão de crédito
+    status = db.Column(db.String(20), default='pendente')  # 'pendente', 'pago', 'cancelado'
+    procedures = db.Column(db.JSON)  # Array de procedimentos com valores
+    consultation_type = db.Column(db.String(50))  # UNIMD, particular, retorno, implante, cortesia
+    created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
+    paid_at = db.Column(db.DateTime)
+    
+    appointment = db.relationship('Appointment', backref='payments')
+    patient = db.relationship('Patient', backref='payments')

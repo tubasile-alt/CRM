@@ -7,6 +7,25 @@
 {% endblock %}
 
 {% block content %}
+<!-- TAB NAVIGATION FOR SECRETARY -->
+{% if not current_user.is_doctor() %}
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda-content" type="button" role="tab">
+            <i class="bi bi-calendar-event"></i> Agenda
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="checkout-tab" data-bs-toggle="tab" data-bs-target="#checkout-content" type="button" role="tab">
+            <i class="bi bi-credit-card"></i> Checkout
+        </button>
+    </li>
+</ul>
+{% endif %}
+
+<div class="tab-content">
+    <div class="tab-pane fade show active" id="agenda-content" role="tabpanel">
+
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -56,6 +75,28 @@
             </div>
         </div>
     </div>
+</div>
+
+    </div>
+
+    <!-- CHECKOUT TAB FOR SECRETARY -->
+    {% if not current_user.is_doctor() %}
+    <div class="tab-pane fade" id="checkout-content" role="tabpanel">
+        <div class="container-fluid mt-4">
+            <h3 class="mb-4">
+                <i class="bi bi-credit-card"></i> Checkout - Cobrança de Consultas
+            </h3>
+            
+            <div id="checkoutList" class="row">
+                <div class="col-12">
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-hourglass-split"></i> Carregando checkouts pendentes...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <div class="modal fade" id="newAppointmentModal" tabindex="-1">
@@ -199,6 +240,47 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-primary" onclick="sendEmailReport()">Enviar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Pagamento -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registrar Pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="paymentInfo" class="mb-3">
+                    <p><strong id="patientNamePayment"></strong></p>
+                    <p>Valor: <strong id="paymentAmount" class="text-success"></strong></p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Forma de Pagamento</label>
+                    <select class="form-select" id="paymentMethod" onchange="updateInstallments()">
+                        <option value="">Selecione...</option>
+                        <option value="dinheiro">💵 Dinheiro</option>
+                        <option value="pix">🔐 PIX</option>
+                        <option value="cartao">💳 Cartão de Crédito</option>
+                    </select>
+                </div>
+                <div class="mb-3" id="installmentsDiv" style="display:none;">
+                    <label class="form-label">Parcelamento</label>
+                    <select class="form-select" id="installments">
+                        <option value="1">1x</option>
+                        <option value="2">2x</option>
+                        <option value="3">3x</option>
+                        <option value="6">6x</option>
+                        <option value="12">12x</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="completePayment()">Registrar Pagamento</button>
             </div>
         </div>
     </div>
@@ -349,4 +431,5 @@ function sendEmailReport() {
 }
 </script>
 <script src="{{ url_for('static', filename='js/agenda.js') }}"></script>
+<script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
 {% endblock %}

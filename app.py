@@ -9,7 +9,7 @@ import click
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -1358,6 +1358,99 @@ def update_cosmetic_plan(plan_id):
     db.session.commit()
     
     return jsonify({'success': True, 'message': 'Plano atualizado com sucesso'})
+
+# CHECKOUT ROUTES
+CONSULTATION_PRICES = {
+    'Particular': 400.0,
+    'Unimed': 0.0,
+    'Retorno': 0.0,
+    'Transplante Capilar': 400.0,
+    'Cortesia': 0.0,
+    'Consulta Cortesia': 0.0
+}
+
+@app.route('/api/checkout/pending', methods=['GET'])
+@login_required
+def get_pending_checkouts():
+    if not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Apenas secretárias'}), 403
+    
+    today = get_brazil_time().date()
+    
+    payments = Payment.query.filter(
+        db.func.date(Payment.created_at) == today,
+        Payment.status == 'pendente'
+    ).all()
+    
+    data = []
+    for payment in payments:
+        apt = payment.appointment
+        patient = payment.patient
+        data.append({
+            'id': payment.id,
+            'appointment_id': apt.id,
+            'patient_name': patient.name,
+            'consultation_type': payment.consultation_type,
+            'total_amount': float(payment.total_amount),
+            'procedures': payment.procedures or [],
+            'created_at': payment.created_at.strftime('%H:%M')
+        })
+    
+    return jsonify({'success': True, 'checkouts': data})
+
+@app.route('/api/checkout/create', methods=['POST'])
+@login_required
+def create_checkout():
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    data = request.get_json(silent=True)
+    if not data or 'appointment_id' not in data:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+    
+    appointment = Appointment.query.get(data['appointment_id'])
+    if not appointment:
+        return jsonify({'success': False, 'error': 'Consulta não encontrada'}), 404
+    
+    consultation_type = data.get('consultation_type', appointment.appointment_type or 'Particular')
+    amount = CONSULTATION_PRICES.get(consultation_type, 0.0)
+    
+    payment = Payment(
+        appointment_id=appointment.id,
+        patient_id=appointment.patient_id,
+        total_amount=amount,
+        consultation_type=consultation_type,
+        payment_method='pendente',
+        procedures=data.get('procedures', [])
+    )
+    
+    db.session.add(payment)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'payment_id': payment.id})
+
+@app.route('/api/checkout/<int:payment_id>/pay', methods=['POST'])
+@login_required
+def process_payment(payment_id):
+    if not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Apenas secretárias'}), 403
+    
+    data = request.get_json(silent=True)
+    if not data or 'payment_method' not in data:
+        return jsonify({'success': False, 'error': 'Método de pagamento obrigatório'}), 400
+    
+    payment = Payment.query.get(payment_id)
+    if not payment:
+        return jsonify({'success': False, 'error': 'Pagamento não encontrado'}), 404
+    
+    payment.payment_method = data['payment_method']
+    payment.installments = data.get('installments', 1)
+    payment.status = 'pago'
+    payment.paid_at = get_brazil_time()
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Pagamento registrado com sucesso!'})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
