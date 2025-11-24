@@ -750,7 +750,8 @@ function finalizarAtendimento() {
         diagnostico: diagnostico,
         conduta: conduta,
         indicated_procedures: indicated,
-        performed_procedures: performed
+        performed_procedures: performed,
+        consultation_type: document.querySelector('input[name="patient_type"]')?.value || 'Particular'
     };
     
     // Incluir appointment_id se disponível

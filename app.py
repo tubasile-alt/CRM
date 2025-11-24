@@ -756,22 +756,37 @@ def finalizar_atendimento(patient_id):
             # CRIAR CHECKOUT AUTOMATICAMENTE para procedimentos realizados
             checkout_amount = data.get('checkout_amount', 0)
             checkout_procedures = data.get('checkout_procedures', [])
+            consultation_type = data.get('consultation_type', 'Particular')  # Get from data
             
-            if checkout_amount > 0 and checkout_procedures:
+            if checkout_procedures:  # Se tem procedimentos, criar checkout
+                # Adicionar valor da consulta conforme tipo
+                procedures_list = [{
+                    'name': proc.get('name', 'Procedimento'),
+                    'value': float(proc.get('budget', proc.get('value', 0)))
+                } for proc in checkout_procedures]
+                
+                # Adicionar consulta base se for Particular ou Implante Capilar
+                total_amount = checkout_amount
+                if consultation_type in ['Particular', 'Implante Capilar']:
+                    consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
+                    if consultation_fee > 0:
+                        procedures_list.insert(0, {
+                            'name': f'Consulta {consultation_type}',
+                            'value': consultation_fee
+                        })
+                        total_amount += consultation_fee
+                
                 payment = Payment(
                     appointment_id=appointment_id,  # Pode ser None
                     patient_id=patient_id,
-                    total_amount=float(checkout_amount),
-                    consultation_type='Particular',
+                    total_amount=float(total_amount),
+                    consultation_type=consultation_type,
                     payment_method='pendente',
                     status='pendente',
-                    procedures=[{
-                        'name': proc.get('name', 'Procedimento'),
-                        'value': float(proc.get('budget', proc.get('value', 0)))
-                    } for proc in checkout_procedures]
+                    procedures=procedures_list
                 )
                 db.session.add(payment)
-                print(f"✓✓✓ PAYMENT CRIADO: R${checkout_amount} - Paciente {patient_id} - APT {appointment_id} - Procedures: {len(checkout_procedures)}")
+                print(f"✓✓✓ PAYMENT CRIADO: R${total_amount} - {consultation_type} - Paciente {patient_id} - Procedures: {len(procedures_list)}")
         
         # Salvar dados de transplante capilar (Transplante Capilar)
         if category == 'transplante_capilar':
