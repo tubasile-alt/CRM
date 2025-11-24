@@ -417,7 +417,7 @@ def save_attention_note(patient_id):
 @app.route('/prontuario/<int:patient_id>')
 @login_required
 def prontuario(patient_id):
-    if not current_user.is_doctor():
+    if not current_user.is_doctor() and not current_user.is_secretary():
         return redirect(url_for('agenda'))
     
     patient = Patient.query.get_or_404(patient_id)
