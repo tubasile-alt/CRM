@@ -155,12 +155,6 @@ function saveAttentionNote() {
         </div>
     </div>
 </div>
-{% else %}
-<div class="alert alert-info">
-    <i class="bi bi-lock"></i> Histórico de atendimentos visível apenas para médicos.
-</div>
-{% endif %}
-
 <div class="row">
     <div class="col-lg-8">
         <div class="card">
@@ -198,11 +192,13 @@ function saveAttentionNote() {
                     <div class="tab-pane fade show active" id="queixa">
                         <div class="mb-3">
                             <label class="form-label">Queixa Principal</label>
+                            {% if current_user.is_doctor() %}
                             <button class="btn btn-sm btn-outline-primary float-end" onclick="startDictation('queixaText')">
                                 <i class="bi bi-mic"></i> Ditado
                             </button>
+                            {% endif %}
                         </div>
-                        <textarea class="form-control" id="queixaText" rows="8"></textarea>
+                        <textarea class="form-control" id="queixaText" rows="8" {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
                     </div>
 
                     <div class="tab-pane fade" id="anamnese">
