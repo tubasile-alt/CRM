@@ -142,6 +142,9 @@ def get_appointments():
     else:
         appointments = Appointment.query.all()
     
+    # Remover qualquer filtro de data - mostrar TODOS os eventos, incluindo antigos
+    # (FullCalendar pode enviar start/end, mas ignoramos para mostrar histórico completo)
+    
     events = []
     for apt in appointments:
         # Get doctor color from DoctorPreference

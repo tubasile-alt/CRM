@@ -25,7 +25,15 @@ document.addEventListener('DOMContentLoaded', function() {
         selectable: true,
         selectMirror: true,
         dayMaxEvents: true,
-        events: '/api/appointments',
+        datesSet: function(info) {
+            // Carregar eventos sem filtro de data para mostrar histórico completo
+        },
+        events: function(info, successCallback, failureCallback) {
+            fetch('/api/appointments')
+                .then(r => r.json())
+                .then(events => successCallback(events))
+                .catch(err => failureCallback(err));
+        },
         
         eventClick: function(info) {
             currentEvent = info.event;
