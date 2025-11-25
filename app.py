@@ -104,18 +104,51 @@ def dashboard():
     if not current_user.is_doctor():
         return redirect(url_for('agenda'))
     
+    from datetime import timedelta
+    
     today = get_brazil_time().date()
     
-    appointments = Appointment.query.filter(
+    # Hoje
+    today_appointments = Appointment.query.filter(
         db.func.date(Appointment.start_time) == today,
         Appointment.doctor_id == current_user.id
     ).all()
     
+    # Esta semana (segunda a domingo)
+    monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
+    week_appointments = Appointment.query.filter(
+        Appointment.doctor_id == current_user.id,
+        Appointment.start_time >= datetime.combine(monday, datetime.min.time()),
+        Appointment.start_time <= datetime.combine(sunday, datetime.max.time())
+    ).all()
+    
+    # Este mês
+    first_day = today.replace(day=1)
+    if today.month == 12:
+        last_day = first_day.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+    else:
+        last_day = first_day.replace(month=today.month + 1, day=1) - timedelta(days=1)
+    
+    month_appointments = Appointment.query.filter(
+        Appointment.doctor_id == current_user.id,
+        Appointment.start_time >= datetime.combine(first_day, datetime.min.time()),
+        Appointment.start_time <= datetime.combine(last_day, datetime.max.time())
+    ).all()
+    
     stats = {
-        'agendados': sum(1 for a in appointments if a.status in ['agendado', 'confirmado']),
-        'confirmados': sum(1 for a in appointments if a.status == 'confirmado'),
-        'atendidos': sum(1 for a in appointments if a.status == 'atendido'),
-        'faltaram': sum(1 for a in appointments if a.status == 'faltou')
+        'agendados': sum(1 for a in today_appointments if a.status in ['agendado', 'confirmado']),
+        'confirmados': sum(1 for a in today_appointments if a.status == 'confirmado'),
+        'atendidos': sum(1 for a in today_appointments if a.status == 'atendido'),
+        'faltaram': sum(1 for a in today_appointments if a.status == 'faltou'),
+        # Por semana
+        'unimed_week': sum(1 for a in week_appointments if a.appointment_type == 'UNIMED'),
+        'particular_week': sum(1 for a in week_appointments if a.appointment_type == 'Particular'),
+        'transplante_week': sum(1 for a in week_appointments if a.appointment_type == 'Transplante Capilar'),
+        # Por mês
+        'unimed_month': sum(1 for a in month_appointments if a.appointment_type == 'UNIMED'),
+        'particular_month': sum(1 for a in month_appointments if a.appointment_type == 'Particular'),
+        'transplante_month': sum(1 for a in month_appointments if a.appointment_type == 'Transplante Capilar'),
     }
     
     return render_template('dashboard.html', stats=stats)
