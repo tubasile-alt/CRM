@@ -537,118 +537,141 @@
 </div>
 
 <div class="modal fade" id="newAppointmentModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable" style="max-width: 900px;">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Novo Agendamento</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="padding: 15px;">
                 <form id="appointmentForm">
                     {% if not current_user.is_doctor() %}
-                    <div class="mb-3">
-                        <label class="form-label">Médico</label>
-                        <select class="form-select" id="appointmentDoctor" required>
-                            {% for doctor in doctors %}
-                            <option value="{{ doctor.id }}">{{ doctor.name }}</option>
-                            {% endfor %}
-                        </select>
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Médico</label>
+                            <select class="form-select form-select-sm" id="appointmentDoctor" required>
+                                {% for doctor in doctors %}
+                                <option value="{{ doctor.id }}">{{ doctor.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
                     {% endif %}
-                    <div class="mb-3">
-                        <label class="form-label"><strong>Nome do Paciente *</strong></label>
-                        <input type="text" class="form-control" id="patientName" required>
+                    
+                    <div class="row mb-2">
+                        <div class="col-8">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;"><strong>Nome Paciente *</strong></label>
+                            <input type="text" class="form-control form-control-sm" id="patientName" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">CPF</label>
+                            <input type="text" class="form-control form-control-sm" id="patientCPF" placeholder="000.000.000-00">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">CPF</label>
-                        <input type="text" class="form-control" id="patientCPF" placeholder="000.000.000-00">
+                    
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Nascimento</label>
+                            <input type="date" class="form-control form-control-sm" id="patientBirthDate">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Telefone</label>
+                            <input type="tel" class="form-control form-control-sm" id="patientPhone">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Data de Nascimento</label>
-                        <input type="date" class="form-control" id="patientBirthDate">
+                    
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Endereço</label>
+                            <input type="text" class="form-control form-control-sm" id="patientAddress">
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Cidade</label>
+                            <input type="text" class="form-control form-control-sm" id="patientCity">
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Paciente</label>
+                            <select class="form-select form-select-sm" id="patientType">
+                                <option value="particular" selected>Particular</option>
+                                <option value="unimed">Unimed</option>
+                                <option value="cortesia">Cortesia</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Telefone</label>
-                        <input type="tel" class="form-control" id="patientPhone">
+                    
+                    <div class="row mb-2">
+                        <div class="col-4">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Mãe</label>
+                            <input type="text" class="form-control form-control-sm" id="patientMotherName" placeholder="Nome da mãe">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Indicação</label>
+                            <input type="text" class="form-control form-control-sm" id="patientIndicationSource" placeholder="Quem indicou">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Ocupação</label>
+                            <input type="text" class="form-control form-control-sm" id="patientOccupation">
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Endereço</label>
-                        <input type="text" class="form-control" id="patientAddress">
+                    
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;"><strong>Tipo Consulta *</strong></label>
+                            <select class="form-select form-select-sm" id="appointmentType" required>
+                                <option value="">-- Selecione --</option>
+                                <option value="Particular" selected>Particular</option>
+                                <option value="Botox">Botox</option>
+                                <option value="Retorno Botox">Retorno Botox</option>
+                                <option value="Laser">Laser</option>
+                                <option value="Preenchimento">Preenchimento</option>
+                                <option value="Ulthera">Ulthera</option>
+                                <option value="Infiltração Capilar">Infiltração Capilar</option>
+                                <option value="Soroterapia">Soroterapia</option>
+                                <option value="Pequena Cirurgia">Pequena Cirurgia</option>
+                                <option value="Retirada de Ponto">Retirada de Ponto</option>
+                                <option value="Nitrogênio Líquido">Nitrogênio Líquido</option>
+                                <option value="Transplante Capilar">Transplante Capilar</option>
+                                <option value="Retorno">Retorno</option>
+                                <option value="UNIMED">UNIMED</option>
+                                <option value="Cortesia">Cortesia</option>
+                            </select>
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Duração</label>
+                            <select class="form-select form-select-sm" id="appointmentDuration">
+                                <option value="30">30 min</option>
+                                <option value="60" selected>60 min</option>
+                                <option value="90">90 min</option>
+                                <option value="120">120 min</option>
+                            </select>
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Status</label>
+                            <select class="form-select form-select-sm" id="appointmentStatus">
+                                <option value="agendado">Agendado</option>
+                                <option value="confirmado">Confirmado</option>
+                            </select>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Cidade</label>
-                        <input type="text" class="form-control" id="patientCity">
+                    
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Data e Hora</label>
+                            <input type="datetime-local" class="form-control form-control-sm" id="appointmentStart" required>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Nome da Mãe</label>
-                        <input type="text" class="form-control" id="patientMotherName">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Quem Indicou</label>
-                        <input type="text" class="form-control" id="patientIndicationSource">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Ocupação</label>
-                        <input type="text" class="form-control" id="patientOccupation">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tipo de Paciente</label>
-                        <select class="form-select" id="patientType">
-                            <option value="particular" selected>Particular</option>
-                            <option value="unimed">Unimed</option>
-                            <option value="cortesia">Cortesia</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label"><strong>Tipo de Consulta *</strong></label>
-                        <select class="form-select" id="appointmentType" required>
-                            <option value="">-- Selecione --</option>
-                            <option value="Particular" selected>Particular</option>
-                            <option value="Botox">Botox</option>
-                            <option value="Retorno Botox">Retorno Botox</option>
-                            <option value="Laser">Laser</option>
-                            <option value="Preenchimento">Preenchimento</option>
-                            <option value="Ulthera">Ulthera</option>
-                            <option value="Infiltração Capilar">Infiltração Capilar</option>
-                            <option value="Soroterapia">Soroterapia</option>
-                            <option value="Pequena Cirurgia">Pequena Cirurgia</option>
-                            <option value="Retirada de Ponto">Retirada de Ponto</option>
-                            <option value="Nitrogênio Líquido">Nitrogênio Líquido</option>
-                            <option value="Transplante Capilar">Transplante Capilar</option>
-                            <option value="Retorno">Retorno</option>
-                            <option value="UNIMED">UNIMED</option>
-                            <option value="Cortesia">Cortesia</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Data e Hora</label>
-                        <input type="datetime-local" class="form-control" id="appointmentStart" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Duração (minutos)</label>
-                        <select class="form-select" id="appointmentDuration">
-                            <option value="30">30 minutos</option>
-                            <option value="60" selected>60 minutos</option>
-                            <option value="90">90 minutos</option>
-                            <option value="120">120 minutos</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Status</label>
-                        <select class="form-select" id="appointmentStatus">
-                            <option value="agendado">Agendado</option>
-                            <option value="confirmado">Confirmado</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Observações</label>
-                        <textarea class="form-control" id="appointmentNotes" rows="3"></textarea>
+                    
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Observações</label>
+                            <textarea class="form-control form-control-sm" id="appointmentNotes" rows="2" style="font-size: 0.85rem;"></textarea>
+                        </div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="saveAppointment()">Salvar</button>
+            <div class="modal-footer" style="padding: 10px;">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="saveAppointment()">Salvar</button>
             </div>
         </div>
     </div>
