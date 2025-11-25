@@ -4,6 +4,274 @@
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css" rel="stylesheet">
+<style>
+.daily-agenda-container {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 20px;
+}
+
+.mini-calendar {
+    position: sticky;
+    top: 20px;
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.mini-calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.mini-calendar-header button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0;
+}
+
+.mini-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.mini-calendar-day {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px;
+    color: #666;
+}
+
+.mini-calendar-date {
+    text-align: center;
+    padding: 8px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #f8f9fa;
+    transition: all 0.2s;
+}
+
+.mini-calendar-date:hover {
+    background: #e9ecef;
+}
+
+.mini-calendar-date.selected {
+    background: #0d6efd;
+    color: white;
+    font-weight: bold;
+}
+
+.mini-calendar-date.today {
+    border: 2px solid #0d6efd;
+}
+
+.daily-schedule {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    overflow: hidden;
+}
+
+.schedule-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 2px solid #f0f0f0;
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+}
+
+.schedule-header h3 {
+    margin: 0;
+}
+
+.schedule-nav {
+    display: flex;
+    gap: 10px;
+}
+
+.schedule-nav button {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.schedule-nav button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.view-toggle {
+    display: flex;
+    gap: 5px;
+}
+
+.view-toggle button {
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.view-toggle button.active {
+    background: rgba(255, 255, 255, 0.4);
+    border-color: white;
+}
+
+.hourly-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 0;
+    height: 600px;
+    overflow-y: auto;
+}
+
+.time-column {
+    border-right: 2px solid #f0f0f0;
+    background: #f8f9fa;
+    padding: 0;
+}
+
+.hour-slot {
+    height: 60px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+.appointments-grid {
+    position: relative;
+    padding: 10px;
+}
+
+.appointment-block {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    overflow: hidden;
+    border-left: 4px solid;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.appointment-block:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.appointment-time {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.appointment-name {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.appointment-type {
+    font-size: 11px;
+    opacity: 0.8;
+}
+
+/* Cores por tipo de consulta */
+.appointment-particular {
+    background: #fff3cd;
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+.appointment-retorno {
+    background: #cfe2ff;
+    border-left-color: #0d6efd;
+    color: #084298;
+}
+
+.appointment-unimed {
+    background: #d1e7dd;
+    border-left-color: #198754;
+    color: #0f5132;
+}
+
+.appointment-cortesia {
+    background: #e2e3e5;
+    border-left-color: #6c757d;
+    color: #383d41;
+}
+
+.appointment-transplante {
+    background: #f8d7da;
+    border-left-color: #dc3545;
+    color: #842029;
+}
+
+.status-confirmado {
+    opacity: 1;
+}
+
+.status-agendado {
+    opacity: 0.8;
+}
+
+.status-faltou {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.status-atendido {
+    opacity: 0.7;
+    font-style: italic;
+}
+
+.empty-schedule {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    color: #999;
+    font-size: 16px;
+}
+
+@media (max-width: 768px) {
+    .daily-agenda-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .mini-calendar {
+        position: static;
+    }
+}
+
+#calendar {
+    display: none;
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -26,12 +294,11 @@
 <div class="tab-content">
     <div class="tab-pane fade show active" id="agenda-content" role="tabpanel">
 
-<div class="row">
+<div class="row mb-4">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div style="width: 100%;">
                 <h2 class="mb-3">Agenda Médica</h2>
-                <!-- Contador de Espera -->
                 <div id="waitingCounter" class="badge bg-warning text-dark mb-3" style="font-size: 1.1rem;">
                     <i class="bi bi-people"></i> <span id="waitingCount">0</span> aguardando
                 </div>
@@ -54,8 +321,6 @@
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="#" onclick="exportAgenda('pdf')"><i class="bi bi-file-pdf"></i> PDF</a></li>
                             <li><a class="dropdown-item" href="#" onclick="exportAgenda('excel')"><i class="bi bi-file-excel"></i> Excel</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="#" onclick="emailAgenda()"><i class="bi bi-envelope"></i> Email</a></li>
                         </ul>
                     </div>
                     <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
@@ -67,12 +332,30 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div id="calendar"></div>
+<div class="daily-agenda-container">
+    <!-- MINI CALENDAR -->
+    <div class="mini-calendar" id="miniCalendar"></div>
+    
+    <!-- DAILY SCHEDULE -->
+    <div class="daily-schedule">
+        <div class="schedule-header">
+            <h3 id="scheduleDate"></h3>
+            <div class="schedule-nav">
+                <button onclick="previousDay()"><i class="bi bi-chevron-left"></i> Anterior</button>
+                <button onclick="todayDay()">Hoje</button>
+                <button onclick="nextDay()">Próximo <i class="bi bi-chevron-right"></i></button>
             </div>
+            <div class="view-toggle">
+                <button class="active" id="dayViewBtn" onclick="switchView('day')">Dia</button>
+                <button id="monthViewBtn" onclick="switchView('month')">Mês</button>
+            </div>
+        </div>
+        <div id="dayViewContent" class="hourly-grid">
+            <div class="time-column" id="timeColumn"></div>
+            <div class="appointments-grid" id="appointmentsGrid"></div>
+        </div>
+        <div id="monthViewContent" style="display: none;">
+            <div id="calendar"></div>
         </div>
     </div>
 </div>
@@ -132,12 +415,6 @@
                             <option value="particular" selected>Particular</option>
                             <option value="unimed">Unimed</option>
                             <option value="cortesia">Cortesia</option>
-                            <option value="botox">Botox</option>
-                            <option value="preenchimento">Preenchimento</option>
-                            <option value="laser">Laser</option>
-                            <option value="morpheus">Morpheus</option>
-                            <option value="ulthera">Ulthera</option>
-                            <option value="transplante_capilar">Transplante Capilar</option>
                         </select>
                     </div>
                     <div class="mb-3">
@@ -168,8 +445,6 @@
                         <select class="form-select" id="appointmentStatus">
                             <option value="agendado">Agendado</option>
                             <option value="confirmado">Confirmado</option>
-                            <option value="atendido">Atendido</option>
-                            <option value="faltou">Faltou</option>
                         </select>
                     </div>
                     <div class="mb-3">
@@ -208,228 +483,20 @@
     </div>
 </div>
 
-<!-- Modal Enviar por Email -->
-<div class="modal fade" id="emailModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Enviar Agenda por Email</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Email do destinatário</label>
-                    <input type="email" class="form-control" id="emailRecipient" placeholder="email@exemplo.com">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Formato</label>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="emailIncludePDF" checked>
-                        <label class="form-check-label">Incluir PDF</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="emailIncludeExcel" checked>
-                        <label class="form-check-label">Incluir Excel</label>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="sendEmailReport()">Enviar</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Pagamento -->
-<div class="modal fade" id="paymentModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Registrar Pagamento</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="paymentInfo" class="mb-3">
-                    <p><strong id="patientNamePayment"></strong></p>
-                    <p>Valor: <strong id="paymentAmount" class="text-success"></strong></p>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Forma de Pagamento</label>
-                    <select class="form-select" id="paymentMethod" onchange="updateInstallments()">
-                        <option value="">Selecione...</option>
-                        <option value="dinheiro">💵 Dinheiro</option>
-                        <option value="pix">🔐 PIX</option>
-                        <option value="cartao">💳 Cartão de Crédito</option>
-                    </select>
-                </div>
-                <div class="mb-3" id="installmentsDiv" style="display:none;">
-                    <label class="form-label">Parcelamento</label>
-                    <select class="form-select" id="installments">
-                        <option value="1">1x</option>
-                        <option value="2">2x</option>
-                        <option value="3">3x</option>
-                        <option value="6">6x</option>
-                        <option value="12">12x</option>
-                    </select>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-success" onclick="completePayment()">Registrar Pagamento</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Role indicator for JavaScript - Define ANTES de agenda.js
 window.isSecretary = {% if not current_user.is_doctor() %}true{% else %}false{% endif %};
+const doctors = {{ doctors | tojson }};
+let currentDoctorFilter = null;
+let currentEvent = null;
+let calendar;
+let selectedDate = new Date();
+let currentView = 'day';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/locales/pt-br.global.min.js"></script>
-<script>
-// Doctors data from backend
-const doctors = {{ doctors | tojson }};
-let currentDoctorFilter = null;
-let currentEventId = null;
-let waitingInterval = null;
-
-// Initialize waiting counter auto-update
-function updateWaitingCounter() {
-    fetch('/espera/api/stats')
-        .then(r => r.json())
-        .then(stats => {
-            document.getElementById('waitingCount').textContent = stats.count || 0;
-        });
-}
-
-// Auto-update every 30 seconds
-waitingInterval = setInterval(updateWaitingCounter, 30000);
-updateWaitingCounter();
-
-// Filter by doctor
-function filterByDoctor(doctorId) {
-    currentDoctorFilter = doctorId === 'all' ? null : doctorId;
-    calendar.refetchEvents();
-    
-    // Update active button
-    document.querySelectorAll('.btn-group .btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    event.target.classList.add('active');
-}
-
-// Check-in/Check-out functions
-function checkIn() {
-    if (!currentEventId) return;
-    
-    fetch(`/espera/api/checkin/${currentEventId}`, {
-        method: 'POST',
-        headers: {'X-CSRFToken': getCSRFToken()}
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showSuccess('Check-in realizado!');
-            bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
-            calendar.refetchEvents();
-            updateWaitingCounter();
-        } else {
-            showError(result.error);
-        }
-    });
-}
-
-function checkOut() {
-    if (!currentEventId) return;
-    
-    fetch(`/espera/api/checkout/${currentEventId}`, {
-        method: 'POST',
-        headers: {'X-CSRFToken': getCSRFToken()}
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            const msg = result.data.wait_time_minutes ? 
-                `Atendimento concluído! Tempo de espera: ${result.data.wait_time_minutes} minutos` :
-                'Atendimento concluído!';
-            showSuccess(msg);
-            bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
-            calendar.refetchEvents();
-            updateWaitingCounter();
-        } else {
-            showError(result.error);
-        }
-    });
-}
-
-// Export functions
-function exportAgenda(format) {
-    const view = calendar.view;
-    const start = view.currentStart.toISOString().split('T')[0];
-    const end = view.currentEnd.toISOString().split('T')[0];
-    
-    // Include doctor_id for secretary
-    let url = `/agenda/export/${format}?start=${start}&end=${end}`;
-    if (currentDoctorFilter) {
-        url += `&doctor_id=${currentDoctorFilter}`;
-    }
-    window.location.href = url;
-}
-
-function emailAgenda() {
-    new bootstrap.Modal(document.getElementById('emailModal')).show();
-}
-
-function sendEmailReport() {
-    const recipient = document.getElementById('emailRecipient').value;
-    const includePDF = document.getElementById('emailIncludePDF').checked;
-    const includeExcel = document.getElementById('emailIncludeExcel').checked;
-    
-    if (!recipient) {
-        showError('Digite o email do destinatário');
-        return;
-    }
-    
-    const view = calendar.view;
-    const start = view.currentStart.toISOString().split('T')[0];
-    const end = view.currentEnd.toISOString().split('T')[0];
-    
-    const payload = {
-        recipient: recipient,
-        start_date: start,
-        end_date: end,
-        include_pdf: includePDF,
-        include_excel: includeExcel
-    };
-    
-    // Include doctor_id for secretary
-    if (currentDoctorFilter) {
-        payload.doctor_id = currentDoctorFilter;
-    }
-    
-    fetch('/agenda/send-email', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken()
-        },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showSuccess('Email enviado com sucesso!');
-            bootstrap.Modal.getInstance(document.getElementById('emailModal')).hide();
-        } else {
-            showError(result.error || 'Erro ao enviar email');
-        }
-    });
-}
-</script>
 <script src="{{ url_for('static', filename='js/agenda.js') }}"></script>
 <script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
 {% endblock %}

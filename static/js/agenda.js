@@ -1,7 +1,192 @@
-let calendar;
-let currentEvent = null;
+let appointmentsList = [];
 
 document.addEventListener('DOMContentLoaded', function() {
+    initializeDayView();
+    initializeMonthCalendar();
+    loadAppointments();
+    updateWaitingCounter();
+    setInterval(updateWaitingCounter, 30000);
+    renderMiniCalendar();
+    renderDayView();
+});
+
+function initializeDayView() {
+    document.getElementById('scheduleDate').textContent = formatDateBR(selectedDate);
+    renderTimeColumn();
+}
+
+function renderTimeColumn() {
+    const timeColumn = document.getElementById('timeColumn');
+    timeColumn.innerHTML = '';
+    for (let hour = 7; hour <= 19; hour++) {
+        const slot = document.createElement('div');
+        slot.className = 'hour-slot';
+        slot.textContent = String(hour).padStart(2, '0') + ':00';
+        timeColumn.appendChild(slot);
+    }
+}
+
+function renderMiniCalendar() {
+    const miniCalendar = document.getElementById('miniCalendar');
+    const today = new Date();
+    const currentMonth = selectedDate.getMonth();
+    const currentYear = selectedDate.getFullYear();
+    
+    let html = `
+        <div class="mini-calendar-header">
+            <button onclick="previousMonth()"><i class="bi bi-chevron-left"></i></button>
+            <div style="font-size: 14px; font-weight: 600; min-width: 120px; text-align: center;">
+                ${new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            </div>
+            <button onclick="nextMonth()"><i class="bi bi-chevron-right"></i></button>
+        </div>
+        <div class="mini-calendar-grid">
+            <div class="mini-calendar-day">Dom</div>
+            <div class="mini-calendar-day">Seg</div>
+            <div class="mini-calendar-day">Ter</div>
+            <div class="mini-calendar-day">Qua</div>
+            <div class="mini-calendar-day">Qui</div>
+            <div class="mini-calendar-day">Sex</div>
+            <div class="mini-calendar-day">Sab</div>
+    `;
+    
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    
+    for (let i = 0; i < firstDay; i++) {
+        html += '<div class="mini-calendar-date" style="color: #ccc;"></div>';
+    }
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(currentYear, currentMonth, day);
+        const isSelected = date.toDateString() === selectedDate.toDateString();
+        const isToday = date.toDateString() === today.toDateString();
+        
+        html += `
+            <div class="mini-calendar-date ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}" 
+                 onclick="selectDate(new Date(${currentYear}, ${currentMonth}, ${day}))">
+                ${day}
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    miniCalendar.innerHTML = html;
+}
+
+function renderDayView() {
+    const appointmentsGrid = document.getElementById('appointmentsGrid');
+    appointmentsGrid.innerHTML = '';
+    
+    const dayAppointments = appointmentsList.filter(app => {
+        const appDate = new Date(app.start).toDateString();
+        return appDate === selectedDate.toDateString() && (!currentDoctorFilter || app.doctor_id == currentDoctorFilter);
+    });
+    
+    if (dayAppointments.length === 0) {
+        appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
+        return;
+    }
+    
+    dayAppointments.forEach(app => {
+        const start = new Date(app.start);
+        const end = new Date(app.end);
+        const durationMinutes = (end - start) / (1000 * 60);
+        const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 1;
+        const height = durationMinutes;
+        
+        const typeClass = getAppointmentTypeClass(app.appointmentType);
+        const statusClass = `status-${app.status}`;
+        
+        const block = document.createElement('div');
+        block.className = `appointment-block ${typeClass} ${statusClass}`;
+        block.style.top = topPosition + 'px';
+        block.style.height = Math.max(height, 50) + 'px';
+        block.onclick = () => selectAppointment(app);
+        
+        block.innerHTML = `
+            <div class="appointment-time">${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}</div>
+            <div class="appointment-name">${app.title}</div>
+            <div class="appointment-type">${app.appointmentType}</div>
+        `;
+        
+        appointmentsGrid.appendChild(block);
+    });
+}
+
+function getAppointmentTypeClass(type) {
+    if (type.includes('Transplante')) return 'appointment-transplante';
+    if (type.includes('Particular')) return 'appointment-particular';
+    if (type.includes('Retorno')) return 'appointment-retorno';
+    if (type.includes('UNIMED')) return 'appointment-unimed';
+    if (type.includes('Cortesia')) return 'appointment-cortesia';
+    return 'appointment-particular';
+}
+
+function selectDate(date) {
+    selectedDate = new Date(date);
+    renderMiniCalendar();
+    renderDayView();
+    document.getElementById('scheduleDate').textContent = formatDateBR(selectedDate);
+}
+
+function selectAppointment(app) {
+    currentEvent = {
+        id: app.id,
+        title: app.title,
+        start: new Date(app.start),
+        end: new Date(app.end),
+        extendedProps: app
+    };
+    showEventDetails(currentEvent);
+}
+
+function previousDay() {
+    selectedDate.setDate(selectedDate.getDate() - 1);
+    selectDate(new Date(selectedDate));
+}
+
+function nextDay() {
+    selectedDate.setDate(selectedDate.getDate() + 1);
+    selectDate(new Date(selectedDate));
+}
+
+function todayDay() {
+    selectDate(new Date());
+}
+
+function previousMonth() {
+    selectedDate.setMonth(selectedDate.getMonth() - 1);
+    renderMiniCalendar();
+}
+
+function nextMonth() {
+    selectedDate.setMonth(selectedDate.getMonth() + 1);
+    renderMiniCalendar();
+}
+
+function switchView(view) {
+    currentView = view;
+    const dayContent = document.getElementById('dayViewContent');
+    const monthContent = document.getElementById('monthViewContent');
+    const dayBtn = document.getElementById('dayViewBtn');
+    const monthBtn = document.getElementById('monthViewBtn');
+    
+    if (view === 'day') {
+        dayContent.style.display = 'grid';
+        monthContent.style.display = 'none';
+        dayBtn.classList.add('active');
+        monthBtn.classList.remove('active');
+    } else {
+        dayContent.style.display = 'none';
+        monthContent.style.display = 'block';
+        dayBtn.classList.remove('active');
+        monthBtn.classList.add('active');
+        if (!calendar) initializeMonthCalendar();
+    }
+}
+
+function initializeMonthCalendar() {
     const calendarEl = document.getElementById('calendar');
     
     calendar = new FullCalendar.Calendar(calendarEl, {
@@ -10,24 +195,14 @@ document.addEventListener('DOMContentLoaded', function() {
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+            right: ''
         },
         buttonText: {
-            today: 'Hoje',
-            month: 'Mês',
-            week: 'Semana',
-            day: 'Dia',
-            list: 'Lista'
+            today: 'Hoje'
         },
         height: 'auto',
         navLinks: true,
-        editable: true,
-        selectable: true,
-        selectMirror: true,
-        dayMaxEvents: true,
-        datesSet: function(info) {
-            // Carregar eventos sem filtro de data para mostrar histórico completo
-        },
+        editable: false,
         events: function(info, successCallback, failureCallback) {
             let url = '/api/appointments';
             if (currentDoctorFilter) {
@@ -38,111 +213,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(events => successCallback(events))
                 .catch(err => failureCallback(err));
         },
-        
         eventClick: function(info) {
             currentEvent = info.event;
             showEventDetails(info.event);
-        },
-        
-        eventDrop: function(info) {
-            updateEventTime(info.event);
-        },
-        
-        eventResize: function(info) {
-            updateEventTime(info.event);
-        },
-        
-        select: function(info) {
-            document.getElementById('appointmentStart').value = info.startStr.slice(0, 16);
-            const modal = new bootstrap.Modal(document.getElementById('newAppointmentModal'));
-            modal.show();
         }
     });
     
     calendar.render();
-});
-
-function saveAppointment() {
-    const patientName = document.getElementById('patientName').value;
-    const phone = document.getElementById('patientPhone').value;
-    const patientType = document.getElementById('patientType').value;
-    const start = document.getElementById('appointmentStart').value;
-    const duration = parseInt(document.getElementById('appointmentDuration').value);
-    const status = document.getElementById('appointmentStatus').value;
-    const appointmentType = document.getElementById('appointmentType').value;
-    const notes = document.getElementById('appointmentNotes').value;
-    
-    // Get doctor_id if secretary is creating appointment
-    const doctorSelect = document.getElementById('appointmentDoctor');
-    const doctorId = doctorSelect ? parseInt(doctorSelect.value) : null;
-    
-    if (!patientName || !start) {
-        showAlert('Por favor, preencha os campos obrigatórios.', 'danger');
-        return;
-    }
-    
-    const startDate = new Date(start);
-    const endDate = new Date(startDate.getTime() + duration * 60000);
-    
-    const payload = {
-        patientName: patientName,
-        phone: phone,
-        patientType: patientType,
-        start: startDate.toISOString(),
-        end: endDate.toISOString(),
-        status: status,
-        appointmentType: appointmentType,
-        notes: notes
-    };
-    
-    // Include doctor_id for secretaries
-    if (doctorId) {
-        payload.doctor_id = doctorId;
-    }
-    
-    fetch('/api/appointments', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('Agendamento criado com sucesso!');
-            calendar.refetchEvents();
-            bootstrap.Modal.getInstance(document.getElementById('newAppointmentModal')).hide();
-            document.getElementById('appointmentForm').reset();
-        }
-    })
-    .catch(error => {
-        showAlert('Erro ao criar agendamento.', 'danger');
-        console.error(error);
-    });
 }
 
-function updateEventTime(event) {
-    fetch(`/api/appointments/${event.id}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            start: event.start.toISOString(),
-            end: event.end.toISOString()
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showAlert('Horário atualizado com sucesso!');
-        }
-    })
-    .catch(error => {
-        showAlert('Erro ao atualizar horário.', 'danger');
-        console.error(error);
+function loadAppointments() {
+    let url = '/api/appointments';
+    if (currentDoctorFilter) {
+        url += `?doctor_id=${currentDoctorFilter}`;
+    }
+    
+    fetch(url)
+        .then(r => r.json())
+        .then(events => {
+            appointmentsList = events;
+            renderDayView();
+            if (calendar) calendar.refetchEvents();
+        });
+}
+
+function formatDateBR(date) {
+    const days = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return `${days[date.getDay()]}, ${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
+}
+
+function formatDateTime(date) {
+    const d = new Date(date);
+    return d.toLocaleDateString('pt-BR') + ' ' + d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+}
+
+function filterByDoctor(doctorId) {
+    currentDoctorFilter = doctorId === 'all' ? null : doctorId;
+    loadAppointments();
+    if (calendar) calendar.refetchEvents();
+    
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
     });
+    event.target.classList.add('active');
+}
+
+function updateWaitingCounter() {
+    fetch('/espera/api/stats')
+        .then(r => r.json())
+        .then(stats => {
+            document.getElementById('waitingCount').textContent = stats.count || 0;
+        });
 }
 
 function showEventDetails(event) {
@@ -159,14 +281,11 @@ function showEventDetails(event) {
     };
     
     const appointmentTypes = ['Particular', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
-    
-    // Check if user is secretary
     const isSecretary = window.isSecretary === true;
     
     let detailsHtml = '';
     
     if (isSecretary) {
-        // Secretary view - editable fields
         detailsHtml = `
             <div class="mb-3">
                 <label class="form-label"><strong>Paciente</strong></label>
@@ -205,7 +324,6 @@ function showEventDetails(event) {
             </div>
         `;
     } else {
-        // Doctor view - read-only
         detailsHtml = `
             <p><strong>Paciente:</strong> ${patientName}</p>
             <p><strong>Data/Hora:</strong> ${formatDateTime(event.start)}</p>
@@ -228,7 +346,6 @@ function showEventDetails(event) {
     
     document.getElementById('eventDetails').innerHTML = detailsHtml;
     
-    // Update modal footer buttons
     const footer = document.querySelector('#eventDetailModal .modal-footer');
     let saveBtn = document.getElementById('saveEditBtn');
     
@@ -277,7 +394,7 @@ function saveAppointmentEdits() {
     .then(data => {
         if (data.success) {
             showAlert('Agendamento atualizado com sucesso!');
-            calendar.refetchEvents();
+            loadAppointments();
             bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
         } else {
             showAlert(data.error || 'Erro ao atualizar agendamento', 'danger');
@@ -305,7 +422,7 @@ function updateEventStatus() {
     .then(data => {
         if (data.success) {
             showAlert('Status atualizado com sucesso!');
-            calendar.refetchEvents();
+            loadAppointments();
             bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
         }
     })
@@ -327,7 +444,7 @@ function deleteEvent() {
     .then(data => {
         if (data.success) {
             showAlert('Agendamento excluído com sucesso!');
-            calendar.refetchEvents();
+            loadAppointments();
             bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
         }
     })
@@ -342,4 +459,85 @@ function openPatientChart() {
         const appointmentId = currentEvent.id;
         window.location.href = `/prontuario/${currentEvent.extendedProps.patientId}?appointment_id=${appointmentId}`;
     }
+}
+
+function saveAppointment() {
+    const patientName = document.getElementById('patientName').value;
+    const phone = document.getElementById('patientPhone').value;
+    const start = document.getElementById('appointmentStart').value;
+    const duration = parseInt(document.getElementById('appointmentDuration').value);
+    const status = document.getElementById('appointmentStatus').value;
+    const appointmentType = document.getElementById('appointmentType').value;
+    const notes = document.getElementById('appointmentNotes').value;
+    
+    let doctor_id = null;
+    if (window.isSecretary) {
+        doctor_id = document.getElementById('appointmentDoctor').value;
+    }
+    
+    const startDate = new Date(start);
+    const endDate = new Date(startDate.getTime() + duration * 60000);
+    
+    const payload = {
+        title: patientName,
+        phone: phone,
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        status: status,
+        appointmentType: appointmentType,
+        notes: notes
+    };
+    
+    if (doctor_id) {
+        payload.doctor_id = doctor_id;
+    }
+    
+    fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Agendamento criado com sucesso!');
+            loadAppointments();
+            bootstrap.Modal.getInstance(document.getElementById('newAppointmentModal')).hide();
+            document.getElementById('appointmentForm').reset();
+        } else {
+            showAlert(data.error || 'Erro ao criar agendamento', 'danger');
+        }
+    })
+    .catch(error => {
+        showAlert('Erro ao salvar agendamento', 'danger');
+        console.error(error);
+    });
+}
+
+function exportAgenda(format) {
+    const start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).toISOString().split('T')[0];
+    const end = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).toISOString().split('T')[0];
+    
+    let url = `/agenda/export/${format}?start=${start}&end=${end}`;
+    if (currentDoctorFilter) {
+        url += `&doctor_id=${currentDoctorFilter}`;
+    }
+    window.location.href = url;
+}
+
+function showAlert(message, type = 'success') {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    
+    const container = document.querySelector('.container-fluid') || document.body;
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 }
