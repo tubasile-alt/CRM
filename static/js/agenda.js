@@ -109,10 +109,13 @@ function renderDayView() {
         block.onclick = () => selectAppointment(app);
         
         block.innerHTML = `
-            <div class="appointment-time">${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}</div>
-            <div class="appointment-name">${patientName}</div>
-            <div class="appointment-type">${app.appointmentType || 'Particular'}</div>
-            <div class="appointment-type" style="font-size: 10px; opacity: 0.7;">${app.patientType || 'Paciente'}</div>
+            <div class="appointment-content">
+                <div class="appointment-name">${patientName}</div>
+                <div class="appointment-row">
+                    <div class="appointment-cell appointment-patient-type"><strong>Pac:</strong> ${app.patientType || 'Particular'}</div>
+                    <div class="appointment-cell appointment-consult-type"><strong>Cons:</strong> ${app.appointmentType || 'Particular'}</div>
+                </div>
+            </div>
         `;
         
         appointmentsGrid.appendChild(block);

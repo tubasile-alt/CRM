@@ -215,15 +215,40 @@
     margin-bottom: 3px;
 }
 
+.appointment-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.appointment-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    font-size: 11px;
+}
+
+.appointment-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .appointment-name {
-    font-size: 13px;
     font-weight: 600;
+    font-size: 12px;
+    grid-column: 1 / -1;
     margin-bottom: 2px;
 }
 
-.appointment-type {
-    font-size: 11px;
-    opacity: 0.8;
+.appointment-patient-type {
+    font-size: 10px;
+    opacity: 0.85;
+}
+
+.appointment-consult-type {
+    font-size: 10px;
+    opacity: 0.85;
 }
 
 /* Cores por tipo de consulta */
