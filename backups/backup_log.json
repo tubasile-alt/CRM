@@ -1,0 +1,30 @@
+[
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-25T16:16:12.500841",
+    "file": "sqlite_dump_20251125_161612.sql.gz",
+    "size": 2491,
+    "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-25T16:16:25.775644",
+    "file": "sqlite_dump_20251125_161625.sql.gz",
+    "size": 2491,
+    "compressed": true
+  },
+  {
+    "type": "postgresql",
+    "timestamp": "2025-11-25T16:16:32.952050",
+    "file": "postgres_dump_20251125_161625.sql.gz",
+    "size": 5225,
+    "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-25T16:16:37.846688",
+    "file": "sqlite_dump_20251125_161637.sql.gz",
+    "size": 2491,
+    "compressed": true
+  }
+]
