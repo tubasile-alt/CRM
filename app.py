@@ -227,11 +227,20 @@ def get_appointments():
             'faltou': '#dc3545'
         }.get(apt.status, '#6c757d')
         
+        # Converter para São Paulo time e remover timezone do ISO string para evitar confusão no frontend
+        tz_sp = pytz.timezone('America/Sao_Paulo')
+        start_sp = apt.start_time.astimezone(tz_sp)
+        end_sp = apt.end_time.astimezone(tz_sp)
+        
+        # Remove timezone info para enviar como naive datetime (evita double conversion)
+        start_iso = start_sp.replace(tzinfo=None).isoformat()
+        end_iso = end_sp.replace(tzinfo=None).isoformat()
+        
         events.append({
             'id': apt.id,
             'title': f"{apt.patient.name} - Dr. {apt.doctor.name}",
-            'start': apt.start_time.isoformat(),
-            'end': apt.end_time.isoformat(),
+            'start': start_iso,
+            'end': end_iso,
             'backgroundColor': doctor_color,
             'borderColor': border_color,
             'extendedProps': {
