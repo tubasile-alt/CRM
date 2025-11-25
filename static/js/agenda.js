@@ -222,7 +222,12 @@ function openNewAppointmentAtTime(hour) {
     const date = new Date(selectedDate);
     date.setHours(hour, 0, 0, 0);
     
-    document.getElementById('appointmentStart').value = date.toISOString().slice(0, 16);
+    // Separar data e hora
+    const dateStr = date.toISOString().split('T')[0];
+    const timeStr = String(hour).padStart(2, '0') + ':00';
+    
+    document.getElementById('appointmentDate').value = dateStr;
+    document.getElementById('appointmentTime').value = timeStr;
     document.getElementById('appointmentDuration').value = '30';
     
     const modal = new bootstrap.Modal(document.getElementById('newAppointmentModal'));
@@ -580,7 +585,8 @@ function saveAppointment() {
     const motherName = document.getElementById('patientMotherName').value;
     const indicationSource = document.getElementById('patientIndicationSource').value;
     const occupation = document.getElementById('patientOccupation').value;
-    const start = document.getElementById('appointmentStart').value;
+    const appointmentDate = document.getElementById('appointmentDate').value;
+    const appointmentTime = document.getElementById('appointmentTime').value;
     const duration = parseInt(document.getElementById('appointmentDuration').value) || 30;
     const status = document.getElementById('appointmentStatus').value;
     const appointmentType = document.getElementById('appointmentType').value;
@@ -591,7 +597,7 @@ function saveAppointment() {
         return;
     }
     
-    if (!start) {
+    if (!appointmentDate || !appointmentTime) {
         showAlert('Por favor, selecione data e hora do agendamento', 'warning');
         return;
     }
@@ -605,7 +611,9 @@ function saveAppointment() {
         }
     }
     
-    const startDate = new Date(start);
+    // Combinar data e hora
+    const dateTimeStr = `${appointmentDate}T${appointmentTime}:00`;
+    const startDate = new Date(dateTimeStr);
     if (isNaN(startDate.getTime())) {
         showAlert('Data/hora inválida. Por favor, tente novamente', 'danger');
         return;
