@@ -546,7 +546,7 @@ function openPatientChart() {
 }
 
 function saveAppointment() {
-    const patientName = document.getElementById('patientName').value;
+    const patientName = document.getElementById('patientName').value.trim();
     const phone = document.getElementById('patientPhone').value;
     const cpf = document.getElementById('patientCPF').value;
     const birthDate = document.getElementById('patientBirthDate').value;
@@ -556,17 +556,35 @@ function saveAppointment() {
     const indicationSource = document.getElementById('patientIndicationSource').value;
     const occupation = document.getElementById('patientOccupation').value;
     const start = document.getElementById('appointmentStart').value;
-    const duration = parseInt(document.getElementById('appointmentDuration').value);
+    const duration = parseInt(document.getElementById('appointmentDuration').value) || 30;
     const status = document.getElementById('appointmentStatus').value;
     const appointmentType = document.getElementById('appointmentType').value;
     const notes = document.getElementById('appointmentNotes').value;
     
+    if (!patientName) {
+        showAlert('Por favor, preencha o nome do paciente', 'warning');
+        return;
+    }
+    
+    if (!start) {
+        showAlert('Por favor, selecione data e hora do agendamento', 'warning');
+        return;
+    }
+    
     let doctor_id = null;
     if (window.isSecretary) {
         doctor_id = document.getElementById('appointmentDoctor').value;
+        if (!doctor_id) {
+            showAlert('Por favor, selecione um médico', 'warning');
+            return;
+        }
     }
     
     const startDate = new Date(start);
+    if (isNaN(startDate.getTime())) {
+        showAlert('Data/hora inválida. Por favor, tente novamente', 'danger');
+        return;
+    }
     const endDate = new Date(startDate.getTime() + duration * 60000);
     
     const payload = {
