@@ -264,14 +264,37 @@ def create_appointment():
             name=data['patientName'],
             phone=data.get('phone', ''),
             email=data.get('email', ''),
+            cpf=data.get('cpf', ''),
+            birth_date=data.get('birth_date', None),
+            address=data.get('address', ''),
+            city=data.get('city', ''),
+            mother_name=data.get('mother_name', ''),
+            indication_source=data.get('indication_source', ''),
+            occupation=data.get('occupation', ''),
             patient_type=data.get('patientType', 'particular')
         )
         db.session.add(patient)
         db.session.flush()
     else:
-        # Atualizar patient_type se fornecido
+        # Atualizar dados do paciente se fornecidos
         if 'patientType' in data:
             patient.patient_type = data['patientType']
+        if 'phone' in data:
+            patient.phone = data['phone']
+        if 'cpf' in data:
+            patient.cpf = data['cpf']
+        if 'birth_date' in data and data['birth_date']:
+            patient.birth_date = data['birth_date']
+        if 'address' in data:
+            patient.address = data['address']
+        if 'city' in data:
+            patient.city = data['city']
+        if 'mother_name' in data:
+            patient.mother_name = data['mother_name']
+        if 'indication_source' in data:
+            patient.indication_source = data['indication_source']
+        if 'occupation' in data:
+            patient.occupation = data['occupation']
     
     appointment = Appointment(
         patient_id=patient.id,
