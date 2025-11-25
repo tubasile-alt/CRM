@@ -464,38 +464,9 @@ function deleteEvent() {
 }
 
 function openPatientChart() {
-    if (!currentEvent) {
-        showAlert('Nenhum agendamento selecionado', 'danger');
-        return;
-    }
-    
-    const props = currentEvent.extendedProps;
-    const appointmentId = currentEvent.id;
-    const patientId = props.patientId;
-    const patientName = currentEvent.title ? currentEvent.title.split(' - ')[0] : '';
-    
-    console.log('Opening patient chart:', { patientId, appointmentId, patientName });
-    
-    if (patientId) {
-        window.location.href = `/prontuario/${patientId}?appointment_id=${appointmentId}`;
-    } else if (patientName) {
-        // Se não temos patientId, tenta buscar pelo nome
-        fetch(`/api/patients/search?name=${encodeURIComponent(patientName)}`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.success && data.patients && data.patients.length > 0) {
-                    const patient = data.patients[0];
-                    window.location.href = `/prontuario/${patient.id}?appointment_id=${appointmentId}`;
-                } else {
-                    showAlert('Paciente não encontrado', 'warning');
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao buscar paciente:', error);
-                showAlert('Erro ao buscar prontuário', 'danger');
-            });
-    } else {
-        showAlert('Não foi possível abrir o prontuário', 'danger');
+    if (currentEvent && currentEvent.extendedProps.patientId) {
+        const appointmentId = currentEvent.id;
+        window.location.href = `/prontuario/${currentEvent.extendedProps.patientId}?appointment_id=${appointmentId}`;
     }
 }
 

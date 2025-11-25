@@ -227,27 +227,6 @@ def get_appointments():
     
     return jsonify(events)
 
-@app.route('/api/patients/search')
-@login_required
-def search_patients():
-    """Busca pacientes pelo nome"""
-    name = request.args.get('name', '').strip()
-    
-    if not name:
-        return jsonify({'success': False, 'patients': []})
-    
-    # Buscar pacientes que correspondem ao nome (case-insensitive)
-    patients = Patient.query.filter(
-        Patient.name.ilike(f'%{name}%')
-    ).all()
-    
-    result = {
-        'success': True,
-        'patients': [{'id': p.id, 'name': p.name, 'phone': p.phone} for p in patients]
-    }
-    
-    return jsonify(result)
-
 @app.route('/api/appointments', methods=['POST'])
 @login_required
 def create_appointment():

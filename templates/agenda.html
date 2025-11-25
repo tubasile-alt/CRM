@@ -559,11 +559,13 @@
             <div class="modal-body" id="eventDetails">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-info" onclick="openPatientChart()"><i class="bi bi-file-medical"></i> Abrir Prontuário</button>
-                {% if current_user.is_doctor() %}
-                <button type="button" class="btn btn-danger" onclick="deleteEvent()">Excluir</button>
-                {% endif %}
+                {% if not current_user.is_doctor() %}
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                {% else %}
+                <button type="button" class="btn btn-danger" onclick="deleteEvent()">Excluir</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="openPatientChart()">Abrir Prontuário</button>
+                {% endif %}
             </div>
         </div>
     </div>
