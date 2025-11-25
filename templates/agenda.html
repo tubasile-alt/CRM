@@ -7,9 +7,17 @@
 <style>
 .daily-agenda-container {
     display: grid;
-    grid-template-columns: 220px 1fr;
-    gap: 25px;
+    grid-template-columns: 220px 1px 1fr;
+    gap: 0;
     margin-top: 20px;
+}
+
+.daily-agenda-divider {
+    position: relative;
+    width: 2px;
+    background: linear-gradient(to bottom, #d9d9d9, #f0f0f0);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+    margin: 0 15px;
 }
 
 .mini-calendar {
@@ -20,6 +28,7 @@
     padding: 20px;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
     height: fit-content;
+    z-index: 10;
 }
 
 .mini-calendar-header {
@@ -364,6 +373,9 @@
 <div class="daily-agenda-container">
     <!-- MINI CALENDAR -->
     <div class="mini-calendar" id="miniCalendar"></div>
+    
+    <!-- DIVIDER -->
+    <div class="daily-agenda-divider"></div>
     
     <!-- DAILY SCHEDULE -->
     <div class="daily-schedule">
