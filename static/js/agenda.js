@@ -687,13 +687,21 @@ function deleteEvent() {
 }
 
 function openPatientChart() {
-    console.log('openPatientChart called');
-    console.log('currentEvent:', currentEvent);
-    console.log('patientId:', currentEvent?.extendedProps?.patientId);
+    if (!currentEvent) {
+        alert('Erro: Agendamento não encontrado. Tente novamente.');
+        return;
+    }
     
-    if (currentEvent && currentEvent.extendedProps.patientId) {
+    // Acessar patientId (pode estar em diferentes níveis de aninhamento)
+    let patientId = currentEvent.extendedProps?.patientId;
+    
+    // Se não encontrou, tenta no aninhamento duplo (há um bug na estrutura)
+    if (!patientId && currentEvent.extendedProps?.extendedProps?.patientId) {
+        patientId = currentEvent.extendedProps.extendedProps.patientId;
+    }
+    
+    if (patientId) {
         const appointmentId = currentEvent.id;
-        const patientId = currentEvent.extendedProps.patientId;
         
         // Fechar modal antes de redirecionar
         const modal = bootstrap.Modal.getInstance(document.getElementById('eventDetailModal'));
@@ -704,7 +712,6 @@ function openPatientChart() {
             window.location.href = `/prontuario/${patientId}?appointment_id=${appointmentId}`;
         }, 200);
     } else {
-        console.error('Erro: currentEvent ou patientId não encontrado');
         alert('Erro: Não foi possível abrir o prontuário. Tente novamente.');
     }
 }
