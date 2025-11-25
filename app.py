@@ -236,6 +236,11 @@ def get_appointments():
         start_iso = start_sp.replace(tzinfo=None).isoformat()
         end_iso = end_sp.replace(tzinfo=None).isoformat()
         
+        # Buscar código do paciente para este médico
+        from models import PatientDoctor
+        pd = PatientDoctor.query.filter_by(patient_id=apt.patient_id, doctor_id=apt.doctor_id).first()
+        patient_code = pd.patient_code if pd else None
+        
         events.append({
             'id': apt.id,
             'title': f"{apt.patient.name} - Dr. {apt.doctor.name}",
@@ -247,6 +252,8 @@ def get_appointments():
                 'status': apt.status,
                 'appointmentType': apt.appointment_type or 'Particular',
                 'patientId': apt.patient_id,
+                'patientCode': patient_code,
+                'patientType': apt.patient.patient_type or 'Particular',
                 'doctorId': apt.doctor_id,
                 'doctorName': apt.doctor.name,
                 'waiting': apt.waiting,

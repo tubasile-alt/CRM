@@ -165,6 +165,7 @@ function renderDayView() {
         
         const appointmentType = app.extendedProps?.appointmentType || app.appointmentType || 'Particular';
         const patientType = app.extendedProps?.patientType || app.patientType || 'Particular';
+        const patientCode = app.extendedProps?.patientCode || '-';
         const status = app.extendedProps?.status || app.status || 'agendado';
         const typeClass = getAppointmentTypeClass(appointmentType);
         const statusClass = `status-${status}`;
@@ -206,10 +207,11 @@ function renderDayView() {
         
         block.innerHTML = `
             <div class="appointment-content">
-                <div class="appointment-name">${patientName}</div>
-                <div class="appointment-row">
-                    <div class="appointment-cell appointment-patient-type"><strong>Pac:</strong> ${patientType}</div>
-                    <div class="appointment-cell appointment-consult-type"><strong>Cons:</strong> ${appointmentType}</div>
+                <div class="appointment-info-line">
+                    <span class="appointment-name">${patientName}</span>
+                    <span class="appointment-code">#${patientCode}</span>
+                    <span class="appointment-type-label">${patientType}</span>
+                    <span class="appointment-consult-label">${appointmentType}</span>
                 </div>
             </div>
         `;
