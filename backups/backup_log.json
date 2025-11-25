@@ -26,5 +26,26 @@
     "file": "sqlite_dump_20251125_161637.sql.gz",
     "size": 2491,
     "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-25T16:18:11.587491",
+    "file": "sqlite_dump_20251125_161811.sql.gz",
+    "size": 2491,
+    "compressed": true
+  },
+  {
+    "type": "postgresql",
+    "timestamp": "2025-11-25T16:18:19.355382",
+    "file": "postgres_dump_20251125_161811.sql.gz",
+    "size": 5223,
+    "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-25T16:18:22.763030",
+    "file": "sqlite_dump_20251125_161822.sql.gz",
+    "size": 2139,
+    "compressed": true
   }
 ]
