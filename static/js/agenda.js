@@ -85,6 +85,8 @@ function renderTimeColumn() {
         const slot = document.createElement('div');
         slot.className = 'hour-slot';
         slot.textContent = String(hour).padStart(2, '0') + ':00';
+        slot.style.cursor = 'pointer';
+        slot.onclick = () => openNewAppointmentAtTime(hour);
         timeColumn.appendChild(slot);
     }
 }
@@ -212,6 +214,29 @@ function selectDate(date) {
     renderMiniCalendar();
     renderDayView();
     document.getElementById('scheduleDate').textContent = formatDateBR(selectedDate);
+}
+
+function openNewAppointmentAtTime(hour) {
+    clearAppointmentForm();
+    
+    const date = new Date(selectedDate);
+    date.setHours(hour, 0, 0, 0);
+    
+    document.getElementById('appointmentStart').value = date.toISOString().slice(0, 16);
+    document.getElementById('appointmentDuration').value = '30';
+    
+    const modal = new bootstrap.Modal(document.getElementById('newAppointmentModal'));
+    modal.show();
+    
+    document.getElementById('patientName').focus();
+}
+
+function clearAppointmentForm() {
+    const form = document.getElementById('appointmentForm');
+    form.reset();
+    document.getElementById('selectedPatientId').value = '';
+    document.getElementById('patientCode').value = '';
+    document.getElementById('patientSuggestions').style.display = 'none';
 }
 
 function selectAppointment(app) {
