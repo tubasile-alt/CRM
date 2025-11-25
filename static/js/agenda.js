@@ -124,6 +124,13 @@ function renderDayView() {
 
 function getAppointmentTypeClass(type) {
     if (!type) return 'appointment-particular';
+    if (type.includes('Botox')) return 'appointment-botox';
+    if (type.includes('Laser')) return 'appointment-laser';
+    if (type.includes('Preenchimento')) return 'appointment-preenchimento';
+    if (type.includes('Ulthera')) return 'appointment-ulthera';
+    if (type.includes('Infiltração')) return 'appointment-infiltracao';
+    if (type.includes('Soroterapia')) return 'appointment-soroterapia';
+    if (type.includes('Pequena')) return 'appointment-pequena';
     if (type.includes('Transplante')) return 'appointment-transplante';
     if (type.includes('Particular')) return 'appointment-particular';
     if (type.includes('Retorno')) return 'appointment-retorno';
@@ -289,7 +296,7 @@ function showEventDetails(event) {
         'faltou': 'Faltou'
     };
     
-    const appointmentTypes = ['Particular', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
+    const appointmentTypes = ['Particular', 'Botox', 'Laser', 'Preenchimento', 'Ulthera', 'Infiltração Capilar', 'Soroterapia', 'Pequena Cirurgia', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
     const isSecretary = window.isSecretary === true;
     
     let detailsHtml = '';
