@@ -687,9 +687,25 @@ function deleteEvent() {
 }
 
 function openPatientChart() {
+    console.log('openPatientChart called');
+    console.log('currentEvent:', currentEvent);
+    console.log('patientId:', currentEvent?.extendedProps?.patientId);
+    
     if (currentEvent && currentEvent.extendedProps.patientId) {
         const appointmentId = currentEvent.id;
-        window.location.href = `/prontuario/${currentEvent.extendedProps.patientId}?appointment_id=${appointmentId}`;
+        const patientId = currentEvent.extendedProps.patientId;
+        
+        // Fechar modal antes de redirecionar
+        const modal = bootstrap.Modal.getInstance(document.getElementById('eventDetailModal'));
+        if (modal) modal.hide();
+        
+        // Pequeno delay para permitir o modal fechar
+        setTimeout(() => {
+            window.location.href = `/prontuario/${patientId}?appointment_id=${appointmentId}`;
+        }, 200);
+    } else {
+        console.error('Erro: currentEvent ou patientId não encontrado');
+        alert('Erro: Não foi possível abrir o prontuário. Tente novamente.');
     }
 }
 
