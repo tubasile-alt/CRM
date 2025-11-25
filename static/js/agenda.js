@@ -507,7 +507,7 @@ function saveAppointment() {
     const endDate = new Date(startDate.getTime() + duration * 60000);
     
     const payload = {
-        title: patientName,
+        patientName: patientName,
         phone: phone,
         cpf: cpf,
         birth_date: birthDate,
