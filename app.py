@@ -40,6 +40,18 @@ def get_brazil_time():
     tz = pytz.timezone('America/Sao_Paulo')
     return datetime.now(tz)
 
+def parse_datetime_with_tz(iso_string):
+    """Parse ISO datetime string and add Brazil timezone"""
+    tz = pytz.timezone('America/Sao_Paulo')
+    dt = datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
+    # If naive, assume it's in Brazil timezone
+    if dt.tzinfo is None:
+        dt = tz.localize(dt)
+    else:
+        # Convert to Brazil timezone if it has timezone info
+        dt = dt.astimezone(tz)
+    return dt
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -246,8 +258,8 @@ def create_appointment():
     appointment = Appointment(
         patient_id=patient.id,
         doctor_id=doctor_id,
-        start_time=datetime.fromisoformat(data['start']),
-        end_time=datetime.fromisoformat(data['end']),
+        start_time=parse_datetime_with_tz(data['start']),
+        end_time=parse_datetime_with_tz(data['end']),
         status=data.get('status', 'agendado'),
         appointment_type=data.get('appointmentType', 'Particular'),
         notes=data.get('notes', '')
@@ -267,9 +279,9 @@ def update_appointment(id):
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
     if 'start' in data:
-        appointment.start_time = datetime.fromisoformat(data['start'])
+        appointment.start_time = parse_datetime_with_tz(data['start'])
     if 'end' in data:
-        appointment.end_time = datetime.fromisoformat(data['end'])
+        appointment.end_time = parse_datetime_with_tz(data['end'])
     if 'status' in data:
         appointment.status = data['status']
     if 'notes' in data:
