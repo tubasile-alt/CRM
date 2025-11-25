@@ -209,9 +209,9 @@ function renderDayView() {
             <div class="appointment-content">
                 <div class="appointment-info-line">
                     <span class="appointment-name">${patientName}</span>
-                    <span class="appointment-code">#${patientCode}</span>
-                    <span class="appointment-type-label">${patientType}</span>
-                    <span class="appointment-consult-label">${appointmentType}</span>
+                    <span class="appointment-code">cod:${patientCode}</span>
+                    <span class="appointment-type-label">pac:${patientType}</span>
+                    <span class="appointment-consult-label">cons:${appointmentType}</span>
                 </div>
             </div>
         `;
