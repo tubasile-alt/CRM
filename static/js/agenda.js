@@ -96,7 +96,7 @@ function renderDayView() {
         const height = durationMinutes;
         
         const typeClass = getAppointmentTypeClass(app.appointmentType);
-        const statusClass = `status-${app.status}`;
+        const statusClass = `status-${app.status || 'agendado'}`;
         
         const block = document.createElement('div');
         block.className = `appointment-block ${typeClass} ${statusClass}`;
@@ -107,7 +107,8 @@ function renderDayView() {
         block.innerHTML = `
             <div class="appointment-time">${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}</div>
             <div class="appointment-name">${app.title}</div>
-            <div class="appointment-type">${app.appointmentType}</div>
+            <div class="appointment-type">${app.appointmentType || 'Particular'}</div>
+            <div class="appointment-type" style="font-size: 10px; opacity: 0.7;">${app.patientType || 'Paciente'}</div>
         `;
         
         appointmentsGrid.appendChild(block);

@@ -309,6 +309,8 @@
                     <button class="btn btn-sm btn-outline-primary" onclick="filterByDoctor({{ doctor.id }})">{{ doctor.name }}</button>
                     {% endfor %}
                 </div>
+                {% else %}
+                <!-- Médico vê apenas suas consultas -->
                 {% endif %}
                 <div class="d-flex gap-2 flex-wrap">
                     <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newAppointmentModal">
