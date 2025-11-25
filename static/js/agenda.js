@@ -622,19 +622,19 @@ function saveAppointment() {
     
     const payload = {
         patientName: patientName,
-        phone: phone,
-        cpf: cpf,
-        birth_date: birthDate,
-        address: address,
-        city: city,
-        mother_name: motherName,
-        indication_source: indicationSource,
-        occupation: occupation,
+        phone: phone || null,
+        cpf: cpf || null,
+        birth_date: birthDate || null,
+        address: address || null,
+        city: city || null,
+        mother_name: motherName || null,
+        indication_source: indicationSource || null,
+        occupation: occupation || null,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         status: status,
         appointmentType: appointmentType,
-        notes: notes
+        notes: notes || null
     };
     
     if (doctor_id) {

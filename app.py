@@ -260,17 +260,27 @@ def create_appointment():
     
     patient = Patient.query.filter_by(name=data['patientName']).first()
     if not patient:
+        # Converter strings vazias para None para campos opcionais
+        birth_date_val = data.get('birth_date') or None
+        phone_val = data.get('phone') or None
+        cpf_val = data.get('cpf') or None
+        address_val = data.get('address') or None
+        city_val = data.get('city') or None
+        mother_name_val = data.get('mother_name') or None
+        indication_source_val = data.get('indication_source') or None
+        occupation_val = data.get('occupation') or None
+        
         patient = Patient(
             name=data['patientName'],
-            phone=data.get('phone', ''),
+            phone=phone_val,
             email=data.get('email', ''),
-            cpf=data.get('cpf', ''),
-            birth_date=data.get('birth_date', None),
-            address=data.get('address', ''),
-            city=data.get('city', ''),
-            mother_name=data.get('mother_name', ''),
-            indication_source=data.get('indication_source', ''),
-            occupation=data.get('occupation', ''),
+            cpf=cpf_val,
+            birth_date=birth_date_val,
+            address=address_val,
+            city=city_val,
+            mother_name=mother_name_val,
+            indication_source=indication_source_val,
+            occupation=occupation_val,
             patient_type=data.get('patientType', 'particular')
         )
         db.session.add(patient)
