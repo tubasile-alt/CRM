@@ -115,6 +115,7 @@ function renderDayView() {
 }
 
 function getAppointmentTypeClass(type) {
+    if (!type) return 'appointment-particular';
     if (type.includes('Transplante')) return 'appointment-transplante';
     if (type.includes('Particular')) return 'appointment-particular';
     if (type.includes('Retorno')) return 'appointment-retorno';
