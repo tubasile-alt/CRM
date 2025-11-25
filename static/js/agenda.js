@@ -98,8 +98,10 @@ function renderDayView() {
         // Extrair apenas o nome do paciente (sem nome do médico)
         const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
         
-        const typeClass = getAppointmentTypeClass(app.appointmentType);
-        const status = app.status || 'agendado';
+        const appointmentType = app.extendedProps?.appointmentType || app.appointmentType || 'Particular';
+        const patientType = app.extendedProps?.patientType || app.patientType || 'Particular';
+        const status = app.extendedProps?.status || app.status || 'agendado';
+        const typeClass = getAppointmentTypeClass(appointmentType);
         const statusClass = `status-${status}`;
         
         const block = document.createElement('div');
@@ -112,8 +114,8 @@ function renderDayView() {
             <div class="appointment-content">
                 <div class="appointment-name">${patientName}</div>
                 <div class="appointment-row">
-                    <div class="appointment-cell appointment-patient-type"><strong>Pac:</strong> ${app.patientType || 'Particular'}</div>
-                    <div class="appointment-cell appointment-consult-type"><strong>Cons:</strong> ${app.appointmentType || 'Particular'}</div>
+                    <div class="appointment-cell appointment-patient-type"><strong>Pac:</strong> ${patientType}</div>
+                    <div class="appointment-cell appointment-consult-type"><strong>Cons:</strong> ${appointmentType}</div>
                 </div>
             </div>
         `;
