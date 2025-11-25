@@ -282,66 +282,6 @@
     color: #842029;
 }
 
-.appointment-retorno-botox {
-    background: #d8c9f5;
-    border-left-color: #6a1b9a;
-    color: #4a148c;
-}
-
-.appointment-retirada {
-    background: #ffccbc;
-    border-left-color: #bf360c;
-    color: #6d4c41;
-}
-
-.appointment-nitrogenio {
-    background: #b3e5fc;
-    border-left-color: #01579b;
-    color: #01579b;
-}
-
-.appointment-botox {
-    background: #e7d4f5;
-    border-left-color: #7b1fa2;
-    color: #5a189a;
-}
-
-.appointment-laser {
-    background: #ffe0e0;
-    border-left-color: #c1121f;
-    color: #c1121f;
-}
-
-.appointment-preenchimento {
-    background: #ffd6e8;
-    border-left-color: #a4161a;
-    color: #a4161a;
-}
-
-.appointment-ulthera {
-    background: #d4f1f4;
-    border-left-color: #003d5b;
-    color: #003d5b;
-}
-
-.appointment-infiltracao {
-    background: #c7ffd8;
-    border-left-color: #0b6623;
-    color: #0b6623;
-}
-
-.appointment-soroterapia {
-    background: #fff8dc;
-    border-left-color: #8b5a00;
-    color: #8b5a00;
-}
-
-.appointment-pequena {
-    background: #e8d5f0;
-    border-left-color: #6a1b9a;
-    color: #6a1b9a;
-}
-
 .status-confirmado {
     opacity: 1;
 }
@@ -550,40 +490,12 @@
                     </div>
                     {% endif %}
                     <div class="mb-3">
-                        <label class="form-label">Nome do Paciente <span class="text-danger">*</span></label>
+                        <label class="form-label">Nome do Paciente</label>
                         <input type="text" class="form-control" id="patientName" required>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">CPF</label>
-                        <input type="text" class="form-control" id="patientCPF" placeholder="000.000.000-00">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Data de Nascimento</label>
-                        <input type="date" class="form-control" id="patientBirthDate">
-                    </div>
-                    <div class="mb-3">
                         <label class="form-label">Telefone</label>
-                        <input type="tel" class="form-control" id="patientPhone">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Endereço</label>
-                        <input type="text" class="form-control" id="patientAddress">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Cidade</label>
-                        <input type="text" class="form-control" id="patientCity">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Nome da Mãe</label>
-                        <input type="text" class="form-control" id="patientMotherName">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Quem Indicou</label>
-                        <input type="text" class="form-control" id="patientReferredBy">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Ocupação</label>
-                        <input type="text" class="form-control" id="patientOccupation">
+                        <input type="text" class="form-control" id="patientPhone">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Tipo de Paciente</label>
@@ -596,21 +508,11 @@
                     <div class="mb-3">
                         <label class="form-label">Tipo de Consulta</label>
                         <select class="form-select" id="appointmentType">
-                            <option value="Particular" selected>Particular</option>
-                            <option value="Botox">Botox</option>
-                            <option value="Retorno Botox">Retorno Botox</option>
-                            <option value="Laser">Laser</option>
-                            <option value="Preenchimento">Preenchimento</option>
-                            <option value="Ulthera">Ulthera</option>
-                            <option value="Infiltração Capilar">Infiltração Capilar</option>
-                            <option value="Soroterapia">Soroterapia</option>
-                            <option value="Pequena Cirurgia">Pequena Cirurgia</option>
-                            <option value="Retirada de Ponto">Retirada de Ponto</option>
-                            <option value="Nitrogênio Líquido">Nitrogênio Líquido</option>
-                            <option value="Transplante Capilar">Transplante Capilar</option>
-                            <option value="Retorno">Retorno</option>
-                            <option value="UNIMED">UNIMED</option>
-                            <option value="Cortesia">Cortesia</option>
+                            <option value="Particular" selected>Particular - R$400</option>
+                            <option value="Transplante Capilar">Transplante Capilar - R$400</option>
+                            <option value="Retorno">Retorno - Sem Cobrança</option>
+                            <option value="UNIMED">UNIMED - Sem Cobrança</option>
+                            <option value="Cortesia">Cortesia - Sem Cobrança</option>
                         </select>
                     </div>
                     <div class="mb-3">

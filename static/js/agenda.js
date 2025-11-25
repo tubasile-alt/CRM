@@ -124,16 +124,6 @@ function renderDayView() {
 
 function getAppointmentTypeClass(type) {
     if (!type) return 'appointment-particular';
-    if (type === 'Retorno Botox') return 'appointment-retorno-botox';
-    if (type.includes('Botox')) return 'appointment-botox';
-    if (type.includes('Laser')) return 'appointment-laser';
-    if (type.includes('Preenchimento')) return 'appointment-preenchimento';
-    if (type.includes('Ulthera')) return 'appointment-ulthera';
-    if (type.includes('Infiltração')) return 'appointment-infiltracao';
-    if (type.includes('Soroterapia')) return 'appointment-soroterapia';
-    if (type.includes('Pequena')) return 'appointment-pequena';
-    if (type.includes('Retirada')) return 'appointment-retirada';
-    if (type.includes('Nitrogênio')) return 'appointment-nitrogenio';
     if (type.includes('Transplante')) return 'appointment-transplante';
     if (type.includes('Particular')) return 'appointment-particular';
     if (type.includes('Retorno')) return 'appointment-retorno';
@@ -299,7 +289,7 @@ function showEventDetails(event) {
         'faltou': 'Faltou'
     };
     
-    const appointmentTypes = ['Particular', 'Botox', 'Retorno Botox', 'Laser', 'Preenchimento', 'Ulthera', 'Infiltração Capilar', 'Soroterapia', 'Pequena Cirurgia', 'Retirada de Ponto', 'Nitrogênio Líquido', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
+    const appointmentTypes = ['Particular', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
     const isSecretary = window.isSecretary === true;
     
     let detailsHtml = '';
@@ -512,13 +502,6 @@ function openPatientChart() {
 function saveAppointment() {
     const patientName = document.getElementById('patientName').value;
     const phone = document.getElementById('patientPhone').value;
-    const cpf = document.getElementById('patientCPF').value;
-    const birthDate = document.getElementById('patientBirthDate').value;
-    const address = document.getElementById('patientAddress').value;
-    const city = document.getElementById('patientCity').value;
-    const motherName = document.getElementById('patientMotherName').value;
-    const referredBy = document.getElementById('patientReferredBy').value;
-    const occupation = document.getElementById('patientOccupation').value;
     const start = document.getElementById('appointmentStart').value;
     const duration = parseInt(document.getElementById('appointmentDuration').value);
     const status = document.getElementById('appointmentStatus').value;
@@ -536,13 +519,6 @@ function saveAppointment() {
     const payload = {
         title: patientName,
         phone: phone,
-        cpf: cpf,
-        birth_date: birthDate,
-        address: address,
-        city: city,
-        mother_name: motherName,
-        referred_by: referredBy,
-        occupation: occupation,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         status: status,
