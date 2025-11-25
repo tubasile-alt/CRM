@@ -611,14 +611,27 @@ function saveAppointment() {
         }
     }
     
-    // Combinar data e hora
+    // Combinar data e hora - manter como strings locais sem conversão de timezone
     const dateTimeStr = `${appointmentDate}T${appointmentTime}:00`;
     const startDate = new Date(dateTimeStr);
     if (isNaN(startDate.getTime())) {
         showAlert('Data/hora inválida. Por favor, tente novamente', 'danger');
         return;
     }
+    
+    // Calcular end date e converter para string local
     const endDate = new Date(startDate.getTime() + duration * 60000);
+    
+    // Converter para ISO string mantendo hora local
+    function toLocalISOString(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+    }
     
     const payload = {
         patientName: patientName,
@@ -630,8 +643,8 @@ function saveAppointment() {
         mother_name: motherName || null,
         indication_source: indicationSource || null,
         occupation: occupation || null,
-        start: startDate.toISOString(),
-        end: endDate.toISOString(),
+        start: toLocalISOString(startDate),
+        end: toLocalISOString(endDate),
         status: status,
         appointmentType: appointmentType,
         notes: notes || null
