@@ -147,6 +147,10 @@ function updateEventTime(event) {
 
 function showEventDetails(event) {
     const props = event.extendedProps;
+    const patientName = event.title.split(' - ')[0];
+    const startDateTime = event.start.toISOString().slice(0, 16);
+    const endDateTime = event.end.toISOString().slice(0, 16);
+    
     const statusLabels = {
         'agendado': 'Agendado',
         'confirmado': 'Confirmado',
@@ -154,30 +158,137 @@ function showEventDetails(event) {
         'faltou': 'Faltou'
     };
     
-    const detailsHtml = `
-        <p><strong>Paciente:</strong> ${event.title}</p>
-        <p><strong>Data/Hora:</strong> ${formatDateTime(event.start)}</p>
-        <p><strong>Status:</strong> <span class="badge bg-secondary">${statusLabels[props.status]}</span></p>
-        ${props.phone ? `<p><strong>Telefone:</strong> ${props.phone}</p>` : ''}
-        ${props.notes ? `<p><strong>Observações:</strong> ${props.notes}</p>` : ''}
-        <div class="mt-3">
-            <label class="form-label">Alterar Status:</label>
-            <select class="form-select" id="eventStatusUpdate">
-                <option value="agendado" ${props.status === 'agendado' ? 'selected' : ''}>Agendado</option>
-                <option value="confirmado" ${props.status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
-                <option value="atendido" ${props.status === 'atendido' ? 'selected' : ''}>Atendido</option>
-                <option value="faltou" ${props.status === 'faltou' ? 'selected' : ''}>Faltou</option>
-            </select>
-            <button class="btn btn-sm btn-primary mt-2" onclick="updateEventStatus()">Atualizar Status</button>
-            <button class="btn btn-sm btn-info mt-2" onclick="openPatientChart()">
-                <i class="bi bi-file-text"></i> Abrir Prontuário
-            </button>
-        </div>
-    `;
+    const appointmentTypes = ['Particular', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
+    
+    // Check if user is secretary
+    const isSecretary = window.isSecretary === true;
+    
+    let detailsHtml = '';
+    
+    if (isSecretary) {
+        // Secretary view - editable fields
+        detailsHtml = `
+            <div class="mb-3">
+                <label class="form-label"><strong>Paciente</strong></label>
+                <input type="text" class="form-control" id="editPatientName" value="${patientName}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label"><strong>Data/Hora Início</strong></label>
+                <input type="datetime-local" class="form-control" id="editStartTime" value="${startDateTime}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label"><strong>Data/Hora Fim</strong></label>
+                <input type="datetime-local" class="form-control" id="editEndTime" value="${endDateTime}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label"><strong>Telefone</strong></label>
+                <input type="tel" class="form-control" id="editPhone" value="${props.phone || ''}">
+            </div>
+            <div class="mb-3">
+                <label class="form-label"><strong>Tipo de Consulta</strong></label>
+                <select class="form-select" id="editAppointmentType">
+                    ${appointmentTypes.map(type => `<option value="${type}" ${props.appointmentType === type ? 'selected' : ''}>${type}</option>`).join('')}
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label"><strong>Status</strong></label>
+                <select class="form-select" id="editStatus">
+                    <option value="agendado" ${props.status === 'agendado' ? 'selected' : ''}>Agendado</option>
+                    <option value="confirmado" ${props.status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
+                    <option value="atendido" ${props.status === 'atendido' ? 'selected' : ''}>Atendido</option>
+                    <option value="faltou" ${props.status === 'faltou' ? 'selected' : ''}>Faltou</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label"><strong>Observações</strong></label>
+                <textarea class="form-control" id="editNotes" rows="3">${props.notes || ''}</textarea>
+            </div>
+        `;
+    } else {
+        // Doctor view - read-only
+        detailsHtml = `
+            <p><strong>Paciente:</strong> ${patientName}</p>
+            <p><strong>Data/Hora:</strong> ${formatDateTime(event.start)}</p>
+            <p><strong>Tipo:</strong> ${props.appointmentType}</p>
+            <p><strong>Status:</strong> <span class="badge bg-secondary">${statusLabels[props.status]}</span></p>
+            ${props.phone ? `<p><strong>Telefone:</strong> ${props.phone}</p>` : ''}
+            ${props.notes ? `<p><strong>Observações:</strong> ${props.notes}</p>` : ''}
+            <div class="mt-3">
+                <label class="form-label">Alterar Status:</label>
+                <select class="form-select" id="eventStatusUpdate">
+                    <option value="agendado" ${props.status === 'agendado' ? 'selected' : ''}>Agendado</option>
+                    <option value="confirmado" ${props.status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
+                    <option value="atendido" ${props.status === 'atendido' ? 'selected' : ''}>Atendido</option>
+                    <option value="faltou" ${props.status === 'faltou' ? 'selected' : ''}>Faltou</option>
+                </select>
+                <button class="btn btn-sm btn-primary mt-2" onclick="updateEventStatus()">Atualizar Status</button>
+            </div>
+        `;
+    }
     
     document.getElementById('eventDetails').innerHTML = detailsHtml;
+    
+    // Update modal footer buttons
+    const footer = document.querySelector('#eventDetailModal .modal-footer');
+    let saveBtn = document.getElementById('saveEditBtn');
+    
+    if (isSecretary) {
+        if (!saveBtn) {
+            saveBtn = document.createElement('button');
+            saveBtn.id = 'saveEditBtn';
+            saveBtn.type = 'button';
+            saveBtn.className = 'btn btn-success';
+            saveBtn.innerHTML = '<i class="bi bi-save"></i> Salvar Alterações';
+            saveBtn.onclick = saveAppointmentEdits;
+            footer.insertBefore(saveBtn, footer.firstChild);
+        }
+        document.getElementById('checkinButtons').style.display = 'none';
+    } else {
+        if (saveBtn) saveBtn.remove();
+        document.getElementById('checkinButtons').style.display = 'block';
+    }
+    
     const modal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
     modal.show();
+}
+
+function saveAppointmentEdits() {
+    const payload = {
+        patientName: document.getElementById('editPatientName').value,
+        start: document.getElementById('editStartTime').value + ':00',
+        end: document.getElementById('editEndTime').value + ':00',
+        phone: document.getElementById('editPhone').value,
+        appointmentType: document.getElementById('editAppointmentType').value,
+        status: document.getElementById('editStatus').value,
+        notes: document.getElementById('editNotes').value
+    };
+    
+    if (!payload.patientName || !payload.start || !payload.end) {
+        showAlert('Por favor, preencha os campos obrigatórios', 'danger');
+        return;
+    }
+    
+    fetch(`/api/appointments/${currentEvent.id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Agendamento atualizado com sucesso!');
+            calendar.refetchEvents();
+            bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
+        } else {
+            showAlert(data.error || 'Erro ao atualizar agendamento', 'danger');
+        }
+    })
+    .catch(error => {
+        showAlert('Erro ao salvar alterações', 'danger');
+        console.error(error);
+    });
 }
 
 function updateEventStatus() {
