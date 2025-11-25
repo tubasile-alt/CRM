@@ -196,14 +196,6 @@
             <div class="modal-body" id="eventDetails">
             </div>
             <div class="modal-footer">
-                <div id="checkinButtons" style="display:none;">
-                    <button type="button" class="btn btn-info" onclick="checkIn()">
-                        <i class="bi bi-box-arrow-in-right"></i> Check-in
-                    </button>
-                    <button type="button" class="btn btn-success" onclick="checkOut()">
-                        <i class="bi bi-box-arrow-right"></i> Check-out (Atendido)
-                    </button>
-                </div>
                 {% if not current_user.is_doctor() %}
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                 {% else %}

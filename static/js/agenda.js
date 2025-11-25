@@ -242,10 +242,8 @@ function showEventDetails(event) {
             saveBtn.onclick = saveAppointmentEdits;
             footer.insertBefore(saveBtn, footer.firstChild);
         }
-        document.getElementById('checkinButtons').style.display = 'none';
     } else {
         if (saveBtn) saveBtn.remove();
-        document.getElementById('checkinButtons').style.display = 'block';
     }
     
     const modal = new bootstrap.Modal(document.getElementById('eventDetailModal'));
