@@ -840,3 +840,18 @@ function finalizarAtendimento() {
         });
     }
 }
+
+// Auto-open attention modal if there's content when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const attentionContent = document.getElementById('attentionContent');
+    if (attentionContent && attentionContent.textContent.trim()) {
+        // Delay slightly to ensure page is fully loaded
+        setTimeout(() => {
+            const attentionText = document.getElementById('attentionText');
+            if (attentionText) {
+                attentionText.value = attentionContent.textContent;
+                new bootstrap.Modal(document.getElementById('attentionModal')).show();
+            }
+        }, 300);
+    }
+});
