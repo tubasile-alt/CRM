@@ -29,39 +29,39 @@
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2>Agenda Médica</h2>
+            <div style="width: 100%;">
+                <h2 class="mb-3">Agenda Médica</h2>
+                <!-- Contador de Espera -->
+                <div id="waitingCounter" class="badge bg-warning text-dark mb-3" style="font-size: 1.1rem;">
+                    <i class="bi bi-people"></i> <span id="waitingCount">0</span> aguardando
+                </div>
                 {% if not current_user.is_doctor() %}
-                <div class="btn-group mt-2">
-                    <button class="btn btn-sm btn-outline-primary active" onclick="filterByDoctor('all')">Todos os Médicos</button>
+                <div class="btn-group w-100 mb-3">
+                    <button class="btn btn-sm btn-outline-primary active" onclick="filterByDoctor('all')">Todos</button>
                     {% for doctor in doctors %}
                     <button class="btn btn-sm btn-outline-primary" onclick="filterByDoctor({{ doctor.id }})">{{ doctor.name }}</button>
                     {% endfor %}
                 </div>
                 {% endif %}
-            </div>
-            <div>
-                <!-- Contador de Espera -->
-                <div id="waitingCounter" class="badge bg-warning text-dark me-2" style="font-size: 1.1rem;">
-                    <i class="bi bi-people"></i> <span id="waitingCount">0</span> aguardando
-                </div>
-                <div class="btn-group">
-                    <button class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
-                        <i class="bi bi-download"></i> Exportar
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newAppointmentModal">
+                        <i class="bi bi-plus-circle"></i> <span class="d-none d-md-inline">Novo Agendamento</span><span class="d-md-none">Novo</span>
                     </button>
-                    <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="#" onclick="exportAgenda('pdf')"><i class="bi bi-file-pdf"></i> PDF</a></li>
-                        <li><a class="dropdown-item" href="#" onclick="exportAgenda('excel')"><i class="bi bi-file-excel"></i> Excel</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" onclick="emailAgenda()"><i class="bi bi-envelope"></i> Enviar por Email</a></li>
-                    </ul>
+                    <div class="btn-group">
+                        <button class="btn btn-success btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="bi bi-download"></i> <span class="d-none d-md-inline">Exportar</span>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="exportAgenda('pdf')"><i class="bi bi-file-pdf"></i> PDF</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="exportAgenda('excel')"><i class="bi bi-file-excel"></i> Excel</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="emailAgenda()"><i class="bi bi-envelope"></i> Email</a></li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                        <i class="bi bi-printer"></i> <span class="d-none d-md-inline">Imprimir</span>
+                    </button>
                 </div>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#newAppointmentModal">
-                    <i class="bi bi-plus-circle"></i> Novo Agendamento
-                </button>
-                <button class="btn btn-outline-secondary" onclick="window.print()">
-                    <i class="bi bi-printer"></i> Imprimir
-                </button>
             </div>
         </div>
     </div>
