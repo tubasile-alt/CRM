@@ -59,14 +59,18 @@ def get_brazil_time():
     return datetime.now(tz)
 
 def parse_datetime_with_tz(iso_string):
-    """Parse ISO datetime string and add Brazil timezone"""
+    """Parse ISO datetime string and set Brazil timezone as default"""
     tz = pytz.timezone('America/Sao_Paulo')
-    dt = datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
-    # If naive, assume it's in Brazil timezone
+    
+    # Remove 'Z' suffix if present and parse
+    iso_string = iso_string.replace('Z', '')
+    dt = datetime.fromisoformat(iso_string)
+    
+    # If naive (no timezone), assume it's already in São Paulo time
     if dt.tzinfo is None:
         dt = tz.localize(dt)
     else:
-        # Convert to Brazil timezone if it has timezone info
+        # If it has timezone info, convert to São Paulo timezone
         dt = dt.astimezone(tz)
     return dt
 
