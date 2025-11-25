@@ -124,6 +124,7 @@ function renderDayView() {
 
 function getAppointmentTypeClass(type) {
     if (!type) return 'appointment-particular';
+    if (type === 'Retorno Botox') return 'appointment-retorno-botox';
     if (type.includes('Botox')) return 'appointment-botox';
     if (type.includes('Laser')) return 'appointment-laser';
     if (type.includes('Preenchimento')) return 'appointment-preenchimento';
@@ -131,6 +132,8 @@ function getAppointmentTypeClass(type) {
     if (type.includes('Infiltração')) return 'appointment-infiltracao';
     if (type.includes('Soroterapia')) return 'appointment-soroterapia';
     if (type.includes('Pequena')) return 'appointment-pequena';
+    if (type.includes('Retirada')) return 'appointment-retirada';
+    if (type.includes('Nitrogênio')) return 'appointment-nitrogenio';
     if (type.includes('Transplante')) return 'appointment-transplante';
     if (type.includes('Particular')) return 'appointment-particular';
     if (type.includes('Retorno')) return 'appointment-retorno';
@@ -296,7 +299,7 @@ function showEventDetails(event) {
         'faltou': 'Faltou'
     };
     
-    const appointmentTypes = ['Particular', 'Botox', 'Laser', 'Preenchimento', 'Ulthera', 'Infiltração Capilar', 'Soroterapia', 'Pequena Cirurgia', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
+    const appointmentTypes = ['Particular', 'Botox', 'Retorno Botox', 'Laser', 'Preenchimento', 'Ulthera', 'Infiltração Capilar', 'Soroterapia', 'Pequena Cirurgia', 'Retirada de Ponto', 'Nitrogênio Líquido', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
     const isSecretary = window.isSecretary === true;
     
     let detailsHtml = '';
