@@ -2,11 +2,6 @@
 
 {% block title %}Agenda - Clínica Basile{% endblock %}
 
-<script>
-// Role indicator for JavaScript
-window.isSecretary = {% if not current_user.is_doctor() %}true{% else %}false{% endif %};
-</script>
-
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css" rel="stylesheet">
 {% endblock %}
@@ -209,9 +204,11 @@ window.isSecretary = {% if not current_user.is_doctor() %}true{% else %}false{% 
                         <i class="bi bi-box-arrow-right"></i> Check-out (Atendido)
                     </button>
                 </div>
+                {% if not current_user.is_doctor() %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                {% else %}
                 <button type="button" class="btn btn-danger" onclick="deleteEvent()">Excluir</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                {% if current_user.is_doctor() %}
                 <button type="button" class="btn btn-primary" onclick="openPatientChart()">Abrir Prontuário</button>
                 {% endif %}
             </div>
@@ -295,6 +292,10 @@ window.isSecretary = {% if not current_user.is_doctor() %}true{% else %}false{% 
 {% endblock %}
 
 {% block extra_js %}
+<script>
+// Role indicator for JavaScript - Define ANTES de agenda.js
+window.isSecretary = {% if not current_user.is_doctor() %}true{% else %}false{% endif %};
+</script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/locales/pt-br.global.min.js"></script>
 <script>
