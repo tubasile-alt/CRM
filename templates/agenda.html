@@ -6,29 +6,28 @@
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css" rel="stylesheet">
 <style>
 .daily-agenda-container {
-    display: grid;
-    grid-template-columns: 220px 1px 1fr;
+    display: flex;
     gap: 0;
     margin-top: 20px;
+    align-items: flex-start;
 }
 
 .daily-agenda-divider {
-    position: relative;
     width: 2px;
     background: linear-gradient(to bottom, #d9d9d9, #f0f0f0);
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
     margin: 0 15px;
+    flex-shrink: 0;
 }
 
 .mini-calendar {
-    position: sticky;
-    top: 100px;
+    width: 220px;
+    flex-shrink: 0;
     background: white;
     border-radius: 8px;
     padding: 20px;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
     height: fit-content;
-    z-index: 10;
 }
 
 .mini-calendar-header {
@@ -90,6 +89,8 @@
     border-radius: 8px;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
     overflow: hidden;
+    flex: 1;
+    min-width: 0;
 }
 
 .schedule-header {
@@ -271,8 +272,11 @@
 
 @media (max-width: 1024px) {
     .daily-agenda-container {
-        grid-template-columns: 180px 1fr;
-        gap: 15px;
+        gap: 10px;
+    }
+    
+    .mini-calendar {
+        width: 180px;
     }
     
     .schedule-nav {
@@ -283,17 +287,21 @@
 
 @media (max-width: 768px) {
     .daily-agenda-container {
-        grid-template-columns: 1fr;
+        flex-direction: column;
         gap: 20px;
     }
     
     .mini-calendar {
-        position: static;
+        width: 100%;
         order: 2;
     }
     
     .daily-schedule {
         order: 1;
+    }
+    
+    .daily-agenda-divider {
+        display: none;
     }
     
     .schedule-header {
