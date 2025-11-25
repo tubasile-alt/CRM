@@ -384,8 +384,19 @@ function updateWaitingCounter() {
 function showEventDetails(event) {
     const props = event.extendedProps;
     const patientName = event.title.split(' - ')[0];
-    const startDateTime = event.start.toISOString().slice(0, 16);
-    const endDateTime = event.end.toISOString().slice(0, 16);
+    
+    // Converter para formato local sem timezone conversion
+    function formatToLocalDateTime(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+    
+    const startDateTime = formatToLocalDateTime(event.start);
+    const endDateTime = formatToLocalDateTime(event.end);
     
     const statusLabels = {
         'agendado': 'Agendado',
@@ -482,10 +493,15 @@ function showEventDetails(event) {
 }
 
 function saveAppointmentEdits() {
+    // Pegar valores do formulário (datetime-local já está em formato local)
+    const startStr = document.getElementById('editStartTime').value;
+    const endStr = document.getElementById('editEndTime').value;
+    
+    // Adicionar :00 para segundos
     const payload = {
         patientName: document.getElementById('editPatientName').value,
-        start: document.getElementById('editStartTime').value + ':00',
-        end: document.getElementById('editEndTime').value + ':00',
+        start: startStr + ':00',
+        end: endStr + ':00',
         phone: document.getElementById('editPhone').value,
         appointmentType: document.getElementById('editAppointmentType').value,
         status: document.getElementById('editStatus').value,
