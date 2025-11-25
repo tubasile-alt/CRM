@@ -95,8 +95,12 @@ function renderDayView() {
         const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 1;
         const height = durationMinutes;
         
+        // Extrair apenas o nome do paciente (sem nome do médico)
+        const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
+        
         const typeClass = getAppointmentTypeClass(app.appointmentType);
-        const statusClass = `status-${app.status || 'agendado'}`;
+        const status = app.status || 'agendado';
+        const statusClass = `status-${status}`;
         
         const block = document.createElement('div');
         block.className = `appointment-block ${typeClass} ${statusClass}`;
@@ -106,7 +110,7 @@ function renderDayView() {
         
         block.innerHTML = `
             <div class="appointment-time">${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}</div>
-            <div class="appointment-name">${app.title}</div>
+            <div class="appointment-name">${patientName}</div>
             <div class="appointment-type">${app.appointmentType || 'Particular'}</div>
             <div class="appointment-type" style="font-size: 10px; opacity: 0.7;">${app.patientType || 'Paciente'}</div>
         `;
