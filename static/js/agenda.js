@@ -512,6 +512,13 @@ function openPatientChart() {
 function saveAppointment() {
     const patientName = document.getElementById('patientName').value;
     const phone = document.getElementById('patientPhone').value;
+    const cpf = document.getElementById('patientCPF').value;
+    const birthDate = document.getElementById('patientBirthDate').value;
+    const address = document.getElementById('patientAddress').value;
+    const city = document.getElementById('patientCity').value;
+    const motherName = document.getElementById('patientMotherName').value;
+    const referredBy = document.getElementById('patientReferredBy').value;
+    const occupation = document.getElementById('patientOccupation').value;
     const start = document.getElementById('appointmentStart').value;
     const duration = parseInt(document.getElementById('appointmentDuration').value);
     const status = document.getElementById('appointmentStatus').value;
@@ -529,6 +536,13 @@ function saveAppointment() {
     const payload = {
         title: patientName,
         phone: phone,
+        cpf: cpf,
+        birth_date: birthDate,
+        address: address,
+        city: city,
+        mother_name: motherName,
+        referred_by: referredBy,
+        occupation: occupation,
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         status: status,

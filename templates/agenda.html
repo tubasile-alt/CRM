@@ -550,12 +550,40 @@
                     </div>
                     {% endif %}
                     <div class="mb-3">
-                        <label class="form-label">Nome do Paciente</label>
+                        <label class="form-label">Nome do Paciente <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="patientName" required>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">CPF</label>
+                        <input type="text" class="form-control" id="patientCPF" placeholder="000.000.000-00">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Data de Nascimento</label>
+                        <input type="date" class="form-control" id="patientBirthDate">
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Telefone</label>
-                        <input type="text" class="form-control" id="patientPhone">
+                        <input type="tel" class="form-control" id="patientPhone">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Endereço</label>
+                        <input type="text" class="form-control" id="patientAddress">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cidade</label>
+                        <input type="text" class="form-control" id="patientCity">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nome da Mãe</label>
+                        <input type="text" class="form-control" id="patientMotherName">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Quem Indicou</label>
+                        <input type="text" class="form-control" id="patientReferredBy">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ocupação</label>
+                        <input type="text" class="form-control" id="patientOccupation">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Tipo de Paciente</label>
