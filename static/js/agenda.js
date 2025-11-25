@@ -173,7 +173,36 @@ function renderDayView() {
         block.className = `appointment-block ${typeClass} ${statusClass}`;
         block.style.top = topPosition + 'px';
         block.style.height = Math.max(height, 50) + 'px';
-        block.onclick = () => selectAppointment(app);
+        block.style.cursor = 'grab';
+        block.draggable = true;
+        block.dataset.appointmentId = app.id;
+        block.dataset.duration = durationMinutes;
+        
+        // Evitar abrir detalhes ao arrastar
+        let isDragging = false;
+        block.addEventListener('mousedown', () => {
+            isDragging = false;
+        });
+        block.addEventListener('mousemove', () => {
+            isDragging = true;
+        });
+        block.addEventListener('click', (e) => {
+            if (!isDragging) {
+                selectAppointment(app);
+            }
+        });
+        
+        // Drag and drop events
+        block.addEventListener('dragstart', (e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('appointmentId', app.id);
+            e.dataTransfer.setData('duration', durationMinutes);
+            block.style.opacity = '0.6';
+        });
+        
+        block.addEventListener('dragend', () => {
+            block.style.opacity = '1';
+        });
         
         block.innerHTML = `
             <div class="appointment-content">
@@ -186,6 +215,72 @@ function renderDayView() {
         `;
         
         appointmentsGrid.appendChild(block);
+    });
+    
+    // Adicionar suporte para drop na grid
+    appointmentsGrid.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+    });
+    
+    appointmentsGrid.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const appointmentId = e.dataTransfer.getData('appointmentId');
+        const duration = parseInt(e.dataTransfer.getData('duration'));
+        
+        // Calcular a nova hora baseada na posição do drop
+        const grid = appointmentsGrid.getBoundingClientRect();
+        const dropY = e.clientY - grid.top;
+        
+        // Cada hora tem 60px de altura (7am-7pm = 12 horas = 720px)
+        const hourOffset = Math.round(dropY / 60);
+        const newHour = 7 + Math.max(0, Math.min(12, hourOffset));
+        const newMinutes = (dropY % 60 < 30) ? 0 : 30;
+        
+        // Criar nova data/hora
+        const newStart = new Date(selectedDate);
+        newStart.setHours(newHour, newMinutes, 0, 0);
+        const newEnd = new Date(newStart.getTime() + duration * 60000);
+        
+        // Converter para string local
+        function toLocalISOString(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+        }
+        
+        // Enviar atualização para o backend
+        fetch(`/api/appointments/${appointmentId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                start: toLocalISOString(newStart),
+                end: toLocalISOString(newEnd)
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                loadAppointments();
+            } else {
+                showAlert('Erro ao atualizar horário', 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Erro ao arrastar agendamento', 'danger');
+            console.error(error);
+        });
     });
 }
 
@@ -520,7 +615,12 @@ function saveAppointmentEdits() {
         },
         body: JSON.stringify(payload)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             showAlert('Agendamento atualizado com sucesso!');
@@ -677,7 +777,12 @@ function saveAppointment() {
         },
         body: JSON.stringify(payload)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             showAlert('Agendamento criado com sucesso!');
