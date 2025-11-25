@@ -9,7 +9,7 @@ import click
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor
 from utils.database_backup import backup_manager
 
 app = Flask(__name__)
@@ -307,6 +307,15 @@ def create_appointment():
     )
     
     db.session.add(appointment)
+    db.session.flush()
+    
+    # Criar ou obter registro PatientDoctor com código crescente
+    pd = PatientDoctor.query.filter_by(patient_id=patient.id, doctor_id=doctor_id).first()
+    if not pd:
+        max_code = db.session.query(db.func.max(PatientDoctor.patient_code)).filter_by(doctor_id=doctor_id).scalar() or 0
+        pd = PatientDoctor(patient_id=patient.id, doctor_id=doctor_id, patient_code=max_code + 1)
+        db.session.add(pd)
+    
     db.session.commit()
     
     return jsonify({'success': True, 'id': appointment.id})
@@ -348,6 +357,43 @@ def update_appointment(id):
     db.session.commit()
     
     return jsonify({'success': True})
+
+@app.route('/api/patients/search')
+@login_required
+def search_patients():
+    query = request.args.get('q', '').strip()
+    doctor_id = request.args.get('doctor_id', None)
+    
+    if not query or len(query) < 2:
+        return jsonify([])
+    
+    # Buscar pacientes por nome
+    patients = Patient.query.filter(Patient.name.ilike(f'%{query}%')).limit(10).all()
+    
+    result = []
+    for patient in patients:
+        patient_data = {
+            'id': patient.id,
+            'name': patient.name,
+            'cpf': patient.cpf or '',
+            'birth_date': patient.birth_date.isoformat() if patient.birth_date else '',
+            'phone': patient.phone or '',
+            'address': patient.address or '',
+            'city': patient.city or '',
+            'mother_name': patient.mother_name or '',
+            'indication_source': patient.indication_source or '',
+            'occupation': patient.occupation or '',
+            'patient_type': patient.patient_type or 'particular'
+        }
+        
+        # Se foi passado doctor_id, buscar código do paciente
+        if doctor_id:
+            pd = PatientDoctor.query.filter_by(patient_id=patient.id, doctor_id=doctor_id).first()
+            patient_data['patient_code'] = pd.patient_code if pd else None
+        
+        result.append(patient_data)
+    
+    return jsonify(result)
 
 @app.route('/api/appointments/<int:id>', methods=['DELETE'])
 @login_required

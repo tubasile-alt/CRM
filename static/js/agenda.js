@@ -8,7 +8,70 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(updateWaitingCounter, 30000);
     renderMiniCalendar();
     renderDayView();
+    setupPatientAutocomplete();
 });
+
+function setupPatientAutocomplete() {
+    const patientInput = document.getElementById('patientName');
+    const suggestionsDiv = document.getElementById('patientSuggestions');
+    
+    patientInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (query.length < 2) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        let doctorId = null;
+        if (window.isSecretary && document.getElementById('appointmentDoctor')) {
+            doctorId = document.getElementById('appointmentDoctor').value;
+        }
+        
+        fetch(`/api/patients/search?q=${encodeURIComponent(query)}&doctor_id=${doctorId}`)
+            .then(r => r.json())
+            .then(patients => {
+                suggestionsDiv.innerHTML = '';
+                if (patients.length === 0) {
+                    suggestionsDiv.style.display = 'none';
+                    return;
+                }
+                
+                patients.forEach(patient => {
+                    const div = document.createElement('div');
+                    div.className = 'p-2 border-bottom cursor-pointer';
+                    div.style.cursor = 'pointer';
+                    const code = patient.patient_code ? `(${patient.patient_code})` : '';
+                    div.textContent = `${patient.name} ${code}`;
+                    div.onclick = () => selectPatient(patient);
+                    suggestionsDiv.appendChild(div);
+                });
+                
+                suggestionsDiv.style.display = 'block';
+            });
+    });
+    
+    document.addEventListener('click', (e) => {
+        if (e.target !== patientInput && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+}
+
+function selectPatient(patient) {
+    document.getElementById('selectedPatientId').value = patient.id;
+    document.getElementById('patientName').value = patient.name;
+    document.getElementById('patientCode').value = patient.patient_code || '';
+    document.getElementById('patientCPF').value = patient.cpf;
+    document.getElementById('patientBirthDate').value = patient.birth_date;
+    document.getElementById('patientPhone').value = patient.phone;
+    document.getElementById('patientAddress').value = patient.address;
+    document.getElementById('patientCity').value = patient.city;
+    document.getElementById('patientMotherName').value = patient.mother_name;
+    document.getElementById('patientIndicationSource').value = patient.indication_source;
+    document.getElementById('patientOccupation').value = patient.occupation;
+    document.getElementById('patientType').value = patient.patient_type;
+    document.getElementById('patientSuggestions').style.display = 'none';
+}
 
 function initializeDayView() {
     document.getElementById('scheduleDate').textContent = formatDateBR(selectedDate);

@@ -53,6 +53,22 @@ class Patient(db.Model):
     notes = db.relationship('Note', backref='patient', lazy=True, cascade='all, delete-orphan')
     tags = db.relationship('PatientTag', backref='patient', lazy=True, cascade='all, delete-orphan')
 
+class PatientDoctor(db.Model):
+    __tablename__ = 'patient_doctor'
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    patient_code = db.Column(db.Integer, nullable=False)  # Código crescente por médico
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    __table_args__ = (
+        db.UniqueConstraint('patient_id', 'doctor_id', name='unique_patient_doctor'),
+        db.Index('idx_doctor_code', 'doctor_id', 'patient_code'),
+    )
+    
+    patient = db.relationship('Patient', backref='doctor_codes')
+    doctor = db.relationship('User', backref='patient_codes')
+
 class Appointment(db.Model):
     __tablename__ = 'appointment'
     id = db.Column(db.Integer, primary_key=True)
