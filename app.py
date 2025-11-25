@@ -274,6 +274,23 @@ def update_appointment(id):
         appointment.status = data['status']
     if 'notes' in data:
         appointment.notes = data['notes']
+    if 'appointmentType' in data:
+        appointment.appointment_type = data['appointmentType']
+    
+    # Update patient phone if provided
+    if 'phone' in data:
+        appointment.patient.phone = data['phone']
+    
+    # Update patient name if provided (find or update existing)
+    if 'patientName' in data and data['patientName'] != appointment.patient.name:
+        # Check if patient with new name already exists
+        existing_patient = Patient.query.filter_by(name=data['patientName']).first()
+        if existing_patient:
+            # Link appointment to existing patient
+            appointment.patient_id = existing_patient.id
+        else:
+            # Update patient name
+            appointment.patient.name = data['patientName']
     
     db.session.commit()
     
