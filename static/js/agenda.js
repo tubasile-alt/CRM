@@ -544,20 +544,22 @@ function showEventDetails(event) {
             </div>
         `;
     } else {
+        const appointmentType = props.appointmentType || 'Particular';
+        const status = props.status || 'agendado';
         detailsHtml = `
             <p><strong>Paciente:</strong> ${patientName}</p>
             <p><strong>Data/Hora:</strong> ${formatDateTime(event.start)}</p>
-            <p><strong>Tipo:</strong> ${props.appointmentType}</p>
-            <p><strong>Status:</strong> <span class="badge bg-secondary">${statusLabels[props.status]}</span></p>
+            <p><strong>Tipo:</strong> ${appointmentType}</p>
+            <p><strong>Status:</strong> <span class="badge bg-secondary">${statusLabels[status]}</span></p>
             ${props.phone ? `<p><strong>Telefone:</strong> ${props.phone}</p>` : ''}
             ${props.notes ? `<p><strong>Observações:</strong> ${props.notes}</p>` : ''}
             <div class="mt-3">
                 <label class="form-label">Alterar Status:</label>
                 <select class="form-select" id="eventStatusUpdate">
-                    <option value="agendado" ${props.status === 'agendado' ? 'selected' : ''}>Agendado</option>
-                    <option value="confirmado" ${props.status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
-                    <option value="atendido" ${props.status === 'atendido' ? 'selected' : ''}>Atendido</option>
-                    <option value="faltou" ${props.status === 'faltou' ? 'selected' : ''}>Faltou</option>
+                    <option value="agendado" ${status === 'agendado' ? 'selected' : ''}>Agendado</option>
+                    <option value="confirmado" ${status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
+                    <option value="atendido" ${status === 'atendido' ? 'selected' : ''}>Atendido</option>
+                    <option value="faltou" ${status === 'faltou' ? 'selected' : ''}>Faltou</option>
                 </select>
                 <button class="btn btn-sm btn-primary mt-2" onclick="updateEventStatus()">Atualizar Status</button>
             </div>
