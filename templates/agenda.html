@@ -746,6 +746,7 @@ window.isSecretary = {% if not current_user.is_doctor() %}true{% else %}false{% 
 window.isDoctor = {% if current_user.is_doctor() %}true{% else %}false{% endif %};
 window.currentDoctorId = {{ current_user.id if current_user.is_doctor() else 'null' }};
 const doctors = {{ doctors | tojson }};
+let currentDoctorFilter = null;
 let currentEvent = null;
 let calendar;
 let selectedDate = new Date();
