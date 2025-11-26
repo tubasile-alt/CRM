@@ -1,6 +1,11 @@
 let appointmentsList = [];
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Para médicos, inicializar o filtro com seu próprio ID (se fornecido)
+    if (window.isDoctor && window.currentDoctorId) {
+        currentDoctorFilter = parseInt(window.currentDoctorId);
+    }
+    
     initializeDayView();
     initializeMonthCalendar();
     loadAppointments();

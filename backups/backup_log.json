@@ -341,5 +341,33 @@
     "file": "sqlite_dump_20251126_113612.sql.gz",
     "size": 0,
     "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-26T12:34:34.647542",
+    "file": "sqlite_dump_20251126_123434.sql.gz",
+    "size": 2139,
+    "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-26T13:05:18.892067",
+    "file": "sqlite_dump_20251126_130518.sql.gz",
+    "size": 2139,
+    "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-26T17:36:22.353164",
+    "file": "sqlite_dump_20251126_173622.sql.gz",
+    "size": 2139,
+    "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-26T17:45:28.198548",
+    "file": "sqlite_dump_20251126_174528.sql.gz",
+    "size": 2139,
+    "compressed": true
   }
 ]
