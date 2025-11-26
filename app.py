@@ -1607,8 +1607,8 @@ CONSULTATION_PRICES = {
 @app.route('/api/checkout/pending', methods=['GET'])
 @login_required
 def get_pending_checkouts():
-    if not current_user.is_secretary():
-        return jsonify({'success': False, 'error': 'Apenas secretárias'}), 403
+    if not current_user.is_secretary() and not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     today = get_brazil_time().date()
     
