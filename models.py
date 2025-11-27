@@ -227,7 +227,11 @@ class CosmeticProcedurePlan(db.Model):
     was_performed = db.Column(db.Boolean, default=False)  # Se foi realizado
     performed_date = db.Column(db.DateTime)  # Data de realização
     follow_up_months = db.Column(db.Integer)  # Intervalo de retorno em meses
+    observations = db.Column(db.Text)  # Observações sobre o procedimento
     created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 # Modelos para Transplante Capilar
 class HairTransplant(db.Model):

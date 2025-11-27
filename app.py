@@ -925,7 +925,8 @@ def finalizar_atendimento(patient_id):
                         final_budget=float(proc.get('budget', proc['value'])),
                         was_performed=bool(proc.get('performed', False)),
                         performed_date=performed_date_value,
-                        follow_up_months=int(proc['months'])
+                        follow_up_months=int(proc['months']),
+                        observations=proc.get('observations', '')
                     )
                     db.session.add(plan)
                     
