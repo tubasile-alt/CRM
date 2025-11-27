@@ -752,7 +752,7 @@ function saveAppointment() {
     
     let doctor_id = null;
     if (window.isSecretary) {
-        doctor_id = document.getElementById('appointmentDoctor').value;
+        doctor_id = parseInt(document.getElementById('appointmentDoctor').value);
         if (!doctor_id) {
             showAlert('Por favor, selecione um médico', 'warning');
             return;
