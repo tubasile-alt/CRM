@@ -763,6 +763,30 @@ function finalizarAtendimento() {
         payload.appointment_id = appointmentId;
     }
     
+    // Adicionar indicação de transplante (na aba Conduta)
+    const transplantIndication = document.querySelector('input[name="transplantIndication"]:checked');
+    if (transplantIndication) {
+        payload.transplant_indication = transplantIndication.value;
+    }
+    
+    // Adicionar dados de planejamento cirúrgico se categoria é transplante
+    if (currentCategory === 'transplante_capilar') {
+        payload.surgical_planning = {
+            norwood: document.querySelector('input[name="norwood"]:checked')?.value || null,
+            previous_transplant: document.querySelector('input[name="previousTransplant"]:checked')?.value || 'nao',
+            transplant_location: document.querySelector('input[name="transplantLocation"]:checked')?.value || null,
+            case_type: document.querySelector('input[name="caseType"]:checked')?.value || 'primaria',
+            body_hair: document.getElementById('bodyHair')?.checked || false,
+            eyebrow_transplant: document.getElementById('eyebrowTransplant')?.checked || false,
+            beard_transplant: document.getElementById('beardTransplant')?.checked || false,
+            frontal: document.getElementById('frontalTransplant')?.checked || false,
+            crown: document.getElementById('crownTransplant')?.checked || false,
+            complete: document.getElementById('completeTransplant')?.checked || false,
+            complete_body_hair: document.getElementById('completeBodyHair')?.checked || false,
+            surgical_planning_text: document.getElementById('surgicalPlanning')?.value || ''
+        };
+    }
+    
     // Adicionar dados específicos de Cosmiatria
     if (currentCategory === 'cosmiatria' && cosmeticProcedures.length > 0) {
         payload.cosmetic_procedures = cosmeticProcedures;

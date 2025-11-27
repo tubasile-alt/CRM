@@ -176,7 +176,7 @@ function saveAttentionNote() {
                         <a class="nav-link" data-bs-toggle="tab" href="#conduta">Conduta</a>
                     </li>
                     <li class="nav-item" id="tabTransplante" style="display:none;">
-                        <a class="nav-link" data-bs-toggle="tab" href="#transplante">Dados Cirúrgicos</a>
+                        <a class="nav-link" data-bs-toggle="tab" href="#transplante">Planejamento Cirúrgico</a>
                     </li>
                 </ul>
             </div>
@@ -250,6 +250,18 @@ function saveAttentionNote() {
                             {% endif %}
                         </div>
                         <textarea class="form-control" id="condutaText" rows="8" {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
+                        
+                        <!-- Indicação de Transplante Capilar -->
+                        <div class="mt-4 mb-3">
+                            <label class="form-label"><strong>Indicação de Transplante Capilar</strong></label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="transplantIndication" id="transplantNo" value="nao" checked {% if not current_user.is_doctor() %}disabled{% endif %}>
+                                <label class="btn btn-outline-secondary" for="transplantNo">Não</label>
+                                
+                                <input type="radio" class="btn-check" name="transplantIndication" id="transplantYes" value="sim" {% if not current_user.is_doctor() %}disabled{% endif %}>
+                                <label class="btn btn-outline-info" for="transplantYes">Sim</label>
+                            </div>
+                        </div>
                         
                         <!-- Seção para Cosmiatria: Procedimentos Planejados com Orçamento e Status -->
                         <div class="mt-4" id="cosmeticConductSection" style="display:none;">
@@ -371,9 +383,9 @@ function saveAttentionNote() {
                         </div>
                     </div>
 
-                    <!-- ABA DADOS CIRÚRGICOS (TRANSPLANTE CAPILAR) -->
+                    <!-- ABA PLANEJAMENTO CIRÚRGICO (TRANSPLANTE CAPILAR) -->
                     <div class="tab-pane fade" id="transplante">
-                        <h6 class="mb-3"><i class="bi bi-scissors"></i> Dados do Transplante Capilar</h6>
+                        <h6 class="mb-3"><i class="bi bi-scissors"></i> Planejamento Cirúrgico</h6>
                         
                         <!-- Histórico de Transplante -->
                         <div class="mb-4">
@@ -541,11 +553,9 @@ function saveAttentionNote() {
                                 placeholder="Descreva: linha frontal, número estimado de UF, estratégia de extração, distribuição de áreas receptoras, densidade planejada..." {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
                         </div>
 
-                        {% if current_user.is_doctor() %}
-                        <button class="btn btn-primary" onclick="saveHairTransplant()">
-                            <i class="bi bi-save"></i> Salvar Dados Cirúrgicos
-                        </button>
-                        {% endif %}
+                        <div class="alert alert-info mt-3">
+                            <small><i class="bi bi-info-circle"></i> O planejamento cirúrgico será salvo automaticamente ao clicar em "Finalizar Atendimento" na aba Conduta.</small>
+                        </div>
                     </div>
                 </div>
             </div>
