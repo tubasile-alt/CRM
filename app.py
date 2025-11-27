@@ -273,10 +273,12 @@ def create_appointment():
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
     # Se secretária, doctor_id vem do payload. Se médico, usa próprio ID
-    doctor_id = data.get('doctor_id') if not current_user.is_doctor() else get_doctor_id()
-    
-    # DEBUG: Log doctor_id
-    print(f"DEBUG: is_secretary={not current_user.is_doctor()}, doctor_id from data={data.get('doctor_id')}, final doctor_id={doctor_id}, type={type(doctor_id)}", flush=True)
+    if not current_user.is_doctor():
+        doctor_id = data.get('doctor_id')
+        if doctor_id:
+            doctor_id = int(doctor_id)  # Converter string para int
+    else:
+        doctor_id = get_doctor_id()
     
     if not doctor_id:
         return jsonify({'success': False, 'error': 'Médico não especificado'}), 400
