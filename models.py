@@ -36,7 +36,6 @@ class Patient(db.Model):
     __tablename__ = 'patient'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    name_lower = db.Column(db.String(100), nullable=False, index=True)  # Para busca case-insensitive
     phone = db.Column(db.String(20))
     email = db.Column(db.String(120))
     birth_date = db.Column(db.Date)
