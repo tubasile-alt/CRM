@@ -148,14 +148,22 @@ function renderDayView() {
     const appointmentsGrid = document.getElementById('appointmentsGrid');
     appointmentsGrid.innerHTML = '';
     
+    console.log('Renderizando dia:', selectedDate.toDateString(), 'Total agendamentos:', appointmentsList.length, 'Filter:', currentDoctorFilter);
+    
     const dayAppointments = appointmentsList.filter(app => {
         // Parse data sem timezone issues - pega apenas a parte da data (YYYY-MM-DD)
         const appDateStr = app.start.split('T')[0]; // "2025-11-27" da string ISO
         const selectedDateStr = selectedDate.getFullYear() + '-' + 
                                String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
                                String(selectedDate.getDate()).padStart(2, '0');
-        return appDateStr === selectedDateStr && (!currentDoctorFilter || app.doctor_id == currentDoctorFilter);
+        const match = appDateStr === selectedDateStr && (!currentDoctorFilter || app.extendedProps?.doctorId == currentDoctorFilter);
+        if (!match) {
+            console.log(`  Filtrado fora: ${app.title} | ${appDateStr} vs ${selectedDateStr} | doctorId: ${app.extendedProps?.doctorId}`);
+        }
+        return match;
     });
+    
+    console.log('Agendamentos após filtro:', dayAppointments.length);
     
     if (dayAppointments.length === 0) {
         appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
@@ -452,6 +460,10 @@ function loadAppointments() {
         .then(r => r.json())
         .then(events => {
             appointmentsList = events;
+            console.log('=== Agendamentos carregados:', events.length, 'Total:', events);
+            events.forEach(e => {
+                console.log(`  ${e.title} | start: ${e.start} | doctor_id: ${e.extendedProps?.doctorId}`);
+            });
             renderDayView();
             if (calendar) calendar.refetchEvents();
         });
