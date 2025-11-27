@@ -149,8 +149,12 @@ function renderDayView() {
     appointmentsGrid.innerHTML = '';
     
     const dayAppointments = appointmentsList.filter(app => {
-        const appDate = new Date(app.start).toDateString();
-        return appDate === selectedDate.toDateString() && (!currentDoctorFilter || app.doctor_id == currentDoctorFilter);
+        // Parse data sem timezone issues - pega apenas a parte da data (YYYY-MM-DD)
+        const appDateStr = app.start.split('T')[0]; // "2025-11-27" da string ISO
+        const selectedDateStr = selectedDate.getFullYear() + '-' + 
+                               String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                               String(selectedDate.getDate()).padStart(2, '0');
+        return appDateStr === selectedDateStr && (!currentDoctorFilter || app.doctor_id == currentDoctorFilter);
     });
     
     if (dayAppointments.length === 0) {
