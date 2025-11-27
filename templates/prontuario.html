@@ -860,12 +860,39 @@ function saveAttentionNote() {
                                 <!-- Conduta (texto livre) -->
                                 {% if 'conduta' in consultation.notes_by_type %}
                                     {% set conduta_text = consultation.notes_by_type['conduta'].content %}
+                                    {% set conduta_note = consultation.notes_by_type['conduta'] %}
                                     {% if conduta_text and conduta_text != '[Conduta registrada via procedimentos]' %}
-                                    <div class="mb-0">
+                                    <div class="mb-3">
                                         <h6 class="text-primary">
                                             <i class="bi bi-prescription2"></i> Conduta
                                         </h6>
                                         <p class="mb-0" style="white-space: pre-wrap;">{{ conduta_text }}</p>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- Indicação de Transplante Capilar -->
+                                    {% if conduta_note.transplant_indication %}
+                                    <div class="mb-3">
+                                        <h6 class="text-warning">
+                                            <i class="bi bi-exclamation-triangle"></i> Indicação de Transplante Capilar
+                                        </h6>
+                                        <div class="btn-group" role="group">
+                                            {% if conduta_note.transplant_indication == 'sim' %}
+                                            <button type="button" class="btn btn-sm btn-info">Sim</button>
+                                            {% else %}
+                                            <button type="button" class="btn btn-sm btn-secondary">Não</button>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    <!-- Planejamento Cirúrgico (JSON) -->
+                                    {% if conduta_note.surgical_planning %}
+                                    <div class="mb-0">
+                                        <h6 class="text-success">
+                                            <i class="bi bi-scissors"></i> Planejamento Cirúrgico (Aba Conduta)
+                                        </h6>
+                                        <div class="p-2 bg-light rounded small" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">{{ conduta_note.surgical_planning }}</div>
                                     </div>
                                     {% endif %}
                                 {% endif %}
