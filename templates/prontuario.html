@@ -308,6 +308,7 @@ function saveAttentionNote() {
                                         <th>Procedimento</th>
                                         <th style="width: 150px;">Valor (R$)</th>
                                         <th style="width: 120px;">Retorno (meses)</th>
+                                        <th>Observações</th>
                                         <th style="width: 50px;"></th>
                                     </tr>
                                 </thead>
@@ -319,7 +320,7 @@ function saveAttentionNote() {
                         
                         {% if current_user.is_doctor() %}
                         <div class="mb-3">
-                            <div class="row g-2">
+                            <div class="row g-2 mb-2">
                                 <div class="col-md-5">
                                     <select class="form-select" id="newProcedureName">
                                         <option value="">Selecione o procedimento...</option>
@@ -352,6 +353,7 @@ function saveAttentionNote() {
                                     </button>
                                 </div>
                             </div>
+                            <textarea class="form-control form-control-sm" id="newProcedureObservations" placeholder="Observações sobre o procedimento (ex: orientações especiais, pontos importantes, etc)" rows="2"></textarea>
                         </div>
                         {% endif %}
                         

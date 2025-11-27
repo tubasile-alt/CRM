@@ -359,6 +359,7 @@ function addCosmeticProcedure() {
     const name = document.getElementById('newProcedureName').value;
     const value = parseFloat(document.getElementById('newProcedureValue').value) || 0;
     const months = parseInt(document.getElementById('newProcedureMonths').value) || 6;
+    const observations = document.getElementById('newProcedureObservations').value || '';
     
     if (!name) {
         showAlert('Selecione um procedimento', 'warning');
@@ -370,7 +371,7 @@ function addCosmeticProcedure() {
         return;
     }
     
-    cosmeticProcedures.push({ name, value, months, budget: value, performed: false });
+    cosmeticProcedures.push({ name, value, months, budget: value, performed: false, observations });
     renderCosmeticProcedures();
     renderCosmeticConduct();
     updateCosmeticTotal();
@@ -379,6 +380,7 @@ function addCosmeticProcedure() {
     document.getElementById('newProcedureName').value = '';
     document.getElementById('newProcedureValue').value = '';
     document.getElementById('newProcedureMonths').value = '6';
+    document.getElementById('newProcedureObservations').value = '';
 }
 
 function removeCosmeticProcedure(index) {
@@ -438,6 +440,7 @@ function renderCosmeticProcedures() {
                 <td class="ps-4">${proc.name}</td>
                 <td class="text-end">R$ ${proc.value.toFixed(2).replace('.', ',')}</td>
                 <td class="text-center">${proc.months} meses</td>
+                <td><small>${proc.observations || '-'}</small></td>
                 <td class="text-center">
                     <button class="btn btn-sm btn-primary me-1" onclick="editCosmeticProcedure(${globalIndex})" title="Editar">
                         <i class="bi bi-pencil"></i>
@@ -476,6 +479,7 @@ function renderCosmeticProcedures() {
                 <td class="ps-4">${proc.procedure_name}</td>
                 <td class="text-end">R$ ${parseFloat(proc.planned_value).toFixed(2).replace('.', ',')}</td>
                 <td class="text-center">${proc.follow_up_months} meses</td>
+                <td><small>${proc.observations || '-'}</small></td>
                 <td class="text-center">
                     <button class="btn btn-sm btn-primary me-1" onclick="editCosmeticProcedure(${globalIndex})" title="Editar">
                         <i class="bi bi-pencil"></i>
