@@ -544,5 +544,12 @@
     "file": "sqlite_dump_20251127_171246.sql.gz",
     "size": 2139,
     "compressed": true
+  },
+  {
+    "type": "sqlite",
+    "timestamp": "2025-11-27T17:14:56.755379",
+    "file": "sqlite_dump_20251127_171456.sql.gz",
+    "size": 2139,
+    "compressed": true
   }
 ]

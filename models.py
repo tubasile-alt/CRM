@@ -52,6 +52,9 @@ class Patient(db.Model):
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
     notes = db.relationship('Note', backref='patient', lazy=True, cascade='all, delete-orphan')
     tags = db.relationship('PatientTag', backref='patient', lazy=True, cascade='all, delete-orphan')
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 class PatientDoctor(db.Model):
     __tablename__ = 'patient_doctor'
