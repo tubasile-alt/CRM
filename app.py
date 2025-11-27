@@ -853,6 +853,9 @@ def finalizar_atendimento(patient_id):
                          data.get('transplant_data'))
         
         if conduta_content or has_procedures:
+            # Capturar indicação de transplante
+            transplant_indication = data.get('transplant_indication', 'nao')
+            
             conduta_note = Note(
                 patient_id=patient_id,
                 doctor_id=current_user.id,
@@ -860,7 +863,8 @@ def finalizar_atendimento(patient_id):
                 note_type='conduta',
                 category=category,  # Adicionar categoria
                 content=conduta_content or '[Conduta registrada via procedimentos]',
-                consultation_duration=duration
+                consultation_duration=duration,
+                transplant_indication=transplant_indication
             )
             db.session.add(conduta_note)
             db.session.flush()
@@ -998,21 +1002,28 @@ def finalizar_atendimento(patient_id):
         # Salvar dados de transplante capilar (Transplante Capilar)
         if category == 'transplante_capilar':
             from models import HairTransplant
+            import json
             
-            transplant_data = data.get('transplant_data', {})
+            surgical_planning = data.get('surgical_planning', {})
             conduta_note_id = note_ids.get('conduta')
             
-            if conduta_note_id and transplant_data:
+            # Atualizar nota com planejamento cirúrgico
+            if conduta_note_id:
+                conduta_note = Note.query.get(conduta_note_id)
+                if conduta_note:
+                    conduta_note.surgical_planning = json.dumps(surgical_planning) if surgical_planning else None
+            
+            if conduta_note_id and surgical_planning:
                 transplant = HairTransplant(
                     note_id=conduta_note_id,
-                    norwood_classification=transplant_data.get('norwood'),
-                    previous_transplant=transplant_data.get('previous_transplant', 'nao'),
-                    transplant_location=transplant_data.get('transplant_location'),
-                    frontal_transplant=transplant_data.get('frontal', False),
-                    crown_transplant=transplant_data.get('crown', False),
-                    complete_transplant=transplant_data.get('complete', False),
-                    complete_with_body_hair=transplant_data.get('complete_body_hair', False),
-                    surgical_planning=transplant_data.get('surgical_planning', ''),
+                    norwood_classification=surgical_planning.get('norwood'),
+                    previous_transplant=surgical_planning.get('previous_transplant', 'nao'),
+                    transplant_location=surgical_planning.get('transplant_location'),
+                    frontal_transplant=surgical_planning.get('frontal', False),
+                    crown_transplant=surgical_planning.get('crown', False),
+                    complete_transplant=surgical_planning.get('complete', False),
+                    complete_with_body_hair=surgical_planning.get('complete_body_hair', False),
+                    surgical_planning=surgical_planning.get('surgical_planning_text', ''),
                     clinical_conduct=data.get('conduta', '')
                 )
                 db.session.add(transplant)

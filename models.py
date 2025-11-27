@@ -99,6 +99,8 @@ class Note(db.Model):
     category = db.Column(db.String(50))  # 'patologia', 'cosmiatria', 'transplante_capilar'
     content = db.Column(db.Text)
     consultation_duration = db.Column(db.Integer)
+    transplant_indication = db.Column(db.String(10), default='nao')  # 'sim' ou 'nao'
+    surgical_planning = db.Column(db.Text)  # JSON com planejamento cirúrgico
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     __table_args__ = (
