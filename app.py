@@ -459,19 +459,29 @@ def get_appointment_notes(id):
 @app.route('/api/notes/<int:note_id>', methods=['PUT'])
 @login_required
 def update_note(note_id):
-    note = Note.query.get_or_404(note_id)
-    data = request.get_json()
-    
-    if 'content' in data:
-        note.content = data['content']
-    
-    db.session.commit()
-    return jsonify({'success': True})
+    try:
+        note = Note.query.get_or_404(note_id)
+        data = request.get_json()
+        
+        if 'content' in data:
+            note.content = data['content']
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao atualizar nota: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/appointments/<int:id>', methods=['DELETE'])
 @login_required
 def delete_appointment(id):
     appointment = Appointment.query.get_or_404(id)
+    
+    # Deletar todas as notas associadas
+    Note.query.filter_by(appointment_id=id).delete()
+    
+    # Deletar o agendamento
     db.session.delete(appointment)
     db.session.commit()
     
