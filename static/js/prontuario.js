@@ -1000,3 +1000,112 @@ function deleteConsultation(consultationId, dateStr) {
         showAlert('Erro ao deletar consulta', 'danger');
     });
 }
+
+// ============ EVOLUTION FUNCTIONS ============
+function openEvolutionModal() {
+    const now = new Date();
+    document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
+    document.getElementById('evolutionContent').value = '';
+    new bootstrap.Modal(document.getElementById('evolutionModal')).show();
+}
+
+function saveEvolution() {
+    const content = document.getElementById('evolutionContent').value.trim();
+    const date = document.getElementById('evolutionDate').value;
+    
+    if (!content) {
+        showAlert('Descrição vazia!', 'warning');
+        return;
+    }
+    
+    fetch(`/api/patient/${patientId}/evolution`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            content: content,
+            evolution_date: date
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Evolução salva com sucesso!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('evolutionModal')).hide();
+            loadTimeline();
+        } else {
+            showAlert(result.error || 'Erro ao salvar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao salvar evolução', 'danger');
+    });
+}
+
+function loadTimeline() {
+    fetch(`/api/patient/${patientId}/evolutions`)
+        .then(r => r.json())
+        .then(evolutions => {
+            renderTimeline(evolutions);
+        })
+        .catch(err => console.error('Erro ao carregar evoluções:', err));
+}
+
+function renderTimeline(evolutions) {
+    const container = document.getElementById('timelineContainer');
+    container.innerHTML = '';
+    
+    if (evolutions.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">Nenhuma evolução registrada ainda.</p>';
+        return;
+    }
+    
+    evolutions.forEach((evo, index) => {
+        const card = document.createElement('div');
+        card.className = 'card mb-3 border-success';
+        card.innerHTML = `
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="card-title text-success">
+                            <i class="bi bi-arrow-right-circle"></i> Evolução - ${evo.date}
+                        </h6>
+                        <p class="card-text">${evo.content}</p>
+                        <small class="text-muted">Dr. ${evo.doctor}</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function deleteEvolution(evoId) {
+    if (!confirm('Tem certeza que deseja deletar esta evolução?')) return;
+    
+    fetch(`/api/evolution/${evoId}`, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Evolução deletada!', 'success');
+            loadTimeline();
+        } else {
+            showAlert(result.error || 'Erro ao deletar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao deletar evolução', 'danger');
+    });
+}
+
+// Carregar timeline ao abrir a página
+document.addEventListener('DOMContentLoaded', function() {
+    loadTimeline();
+});

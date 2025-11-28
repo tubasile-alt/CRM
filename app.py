@@ -717,9 +717,13 @@ def prontuario(patient_id):
         # Usar dados da primeira nota como referência
         first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
         
+        # Obter appointment para pegar a data correta
+        appointment = Appointment.query.get(appt_id)
+        consultation_date = appointment.start_time if appointment else (finalized_note.created_at if finalized_note else first_note.created_at)
+        
         consultations.append({
             'id': appt_id,  # Usar appointment_id como ID único
-            'date': finalized_note.created_at if finalized_note else first_note.created_at,
+            'date': consultation_date,
             'doctor': first_note.doctor,
             'duration': finalized_note.consultation_duration if finalized_note else None,
             'category': finalized_note.category if finalized_note else first_note.category,
@@ -1760,3 +1764,83 @@ def process_payment(payment_id):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+# ============ EVOLUTION ENDPOINTS ============
+@app.route('/api/patient/<int:patient_id>/evolutions', methods=['GET'])
+@login_required
+def get_evolutions(patient_id):
+    """Listar todas as evoluções do paciente"""
+    evolutions = Evolution.query.filter_by(patient_id=patient_id).order_by(Evolution.evolution_date.asc()).all()
+    result = []
+    for evo in evolutions:
+        result.append({
+            'id': evo.id,
+            'date': evo.evolution_date.strftime('%d/%m/%Y %H:%M'),
+            'content': evo.content,
+            'doctor': evo.doctor.name,
+            'evolution_date': evo.evolution_date.isoformat()
+        })
+    return jsonify(result)
+
+@app.route('/api/patient/<int:patient_id>/evolution', methods=['POST'])
+@login_required
+def create_evolution(patient_id):
+    """Criar nova evolução"""
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    data = request.get_json()
+    if not data or 'content' not in data:
+        return jsonify({'success': False, 'error': 'Conteúdo vazio'}), 400
+    
+    evolution_date = data.get('evolution_date')
+    if evolution_date:
+        try:
+            evolution_date = datetime.fromisoformat(evolution_date)
+        except:
+            evolution_date = get_brazil_time()
+    else:
+        evolution_date = get_brazil_time()
+    
+    evo = Evolution(
+        patient_id=patient_id,
+        doctor_id=current_user.id,
+        evolution_date=evolution_date,
+        content=data['content']
+    )
+    db.session.add(evo)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'id': evo.id})
+
+@app.route('/api/evolution/<int:evo_id>', methods=['PUT'])
+@login_required
+def update_evolution(evo_id):
+    """Editar evolução"""
+    evo = Evolution.query.get_or_404(evo_id)
+    if evo.doctor_id != current_user.id and not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    data = request.get_json()
+    if 'content' in data:
+        evo.content = data['content']
+    if 'evolution_date' in data:
+        try:
+            evo.evolution_date = datetime.fromisoformat(data['evolution_date'])
+        except:
+            pass
+    
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/evolution/<int:evo_id>', methods=['DELETE'])
+@login_required
+def delete_evolution(evo_id):
+    """Deletar evolução"""
+    evo = Evolution.query.get_or_404(evo_id)
+    if evo.doctor_id != current_user.id and not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    db.session.delete(evo)
+    db.session.commit()
+    return jsonify({'success': True})
