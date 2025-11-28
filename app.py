@@ -9,7 +9,7 @@ import click
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution
 from utils.database_backup import backup_manager
 
 app = Flask(__name__)
@@ -1760,11 +1760,6 @@ def process_payment(payment_id):
     
     db.session.commit()
     
-    return jsonify({'success': True, 'message': 'Pagamento registrado com sucesso!'})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
 # ============ EVOLUTION ENDPOINTS ============
 @app.route('/api/patient/<int:patient_id>/evolutions', methods=['GET'])
 @login_required
@@ -1844,3 +1839,6 @@ def delete_evolution(evo_id):
     db.session.delete(evo)
     db.session.commit()
     return jsonify({'success': True})
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
