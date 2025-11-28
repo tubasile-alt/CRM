@@ -27,16 +27,26 @@ function setupPatientAutocomplete() {
             return;
         }
         
-        let doctorId = null;
+        let doctorId = '';
         if (window.isSecretary && document.getElementById('appointmentDoctor')) {
-            doctorId = document.getElementById('appointmentDoctor').value;
+            doctorId = document.getElementById('appointmentDoctor').value || '';
         }
         
-        fetch(`/api/patients/search?q=${encodeURIComponent(query)}&doctor_id=${doctorId}`)
-            .then(r => r.json())
+        // Build URL - only include doctor_id if it has a value
+        const url = doctorId 
+            ? `/api/patients/search?q=${encodeURIComponent(query)}&doctor_id=${doctorId}`
+            : `/api/patients/search?q=${encodeURIComponent(query)}`;
+        
+        fetch(url)
+            .then(r => {
+                if (!r.ok) {
+                    throw new Error(`HTTP error! status: ${r.status}`);
+                }
+                return r.json();
+            })
             .then(patients => {
                 suggestionsDiv.innerHTML = '';
-                if (patients.length === 0) {
+                if (!Array.isArray(patients) || patients.length === 0) {
                     suggestionsDiv.style.display = 'none';
                     return;
                 }
@@ -52,6 +62,10 @@ function setupPatientAutocomplete() {
                 });
                 
                 suggestionsDiv.style.display = 'block';
+            })
+            .catch(err => {
+                console.error('Erro ao buscar pacientes:', err);
+                suggestionsDiv.style.display = 'none';
             });
     });
     

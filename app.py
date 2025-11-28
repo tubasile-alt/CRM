@@ -404,6 +404,15 @@ def search_patients():
     if not query or len(query) < 2:
         return jsonify([])
     
+    # Convert doctor_id to int if provided and valid
+    if doctor_id and doctor_id != 'null':
+        try:
+            doctor_id = int(doctor_id)
+        except (ValueError, TypeError):
+            doctor_id = None
+    else:
+        doctor_id = None
+    
     # Buscar pacientes por nome (case-insensitive)
     patients = Patient.query.filter(Patient.name.ilike(f'%{query}%')).limit(10).all()
     
@@ -423,7 +432,7 @@ def search_patients():
             'patient_type': patient.patient_type or 'particular'
         }
         
-        # Se foi passado doctor_id, buscar código do paciente
+        # Se foi passado doctor_id válido, buscar código do paciente
         if doctor_id:
             pd = PatientDoctor.query.filter_by(patient_id=patient.id, doctor_id=doctor_id).first()
             patient_data['patient_code'] = pd.patient_code if pd else None
