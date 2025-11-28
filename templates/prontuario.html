@@ -870,8 +870,8 @@ function saveAttentionNote() {
                                     </div>
                                     {% endif %}
                                     
-                                    <!-- Indicação de Transplante Capilar -->
-                                    {% if conduta_note.transplant_indication %}
+                                    <!-- Indicação de Transplante Capilar - Apenas para Transplante Capilar -->
+                                    {% if consultation.category == 'transplante_capilar' and conduta_note.transplant_indication %}
                                     <div class="mb-3">
                                         <h6 class="text-warning">
                                             <i class="bi bi-exclamation-triangle"></i> Indicação de Transplante Capilar
@@ -886,8 +886,8 @@ function saveAttentionNote() {
                                     </div>
                                     {% endif %}
                                     
-                                    <!-- Planejamento Cirúrgico (JSON) -->
-                                    {% if conduta_note.surgical_planning %}
+                                    <!-- Planejamento Cirúrgico (JSON) - Apenas para Transplante Capilar -->
+                                    {% if consultation.category == 'transplante_capilar' and conduta_note.surgical_planning %}
                                     <div class="mb-0">
                                         <h6 class="text-success">
                                             <i class="bi bi-scissors"></i> Planejamento Cirúrgico (Aba Conduta)
