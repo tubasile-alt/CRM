@@ -892,7 +892,42 @@ function saveAttentionNote() {
                                         <h6 class="text-success">
                                             <i class="bi bi-scissors"></i> Planejamento Cirúrgico (Aba Conduta)
                                         </h6>
-                                        <div class="p-2 bg-light rounded small" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">{{ conduta_note.surgical_planning }}</div>
+                                        <div class="card card-body bg-light">
+                                            <script>
+                                                (function() {
+                                                    try {
+                                                        const planData = JSON.parse('{{ conduta_note.surgical_planning | safe }}');
+                                                        const labels = {
+                                                            'norwood': 'Escala Norwood',
+                                                            'previous_transplant': 'Transplante Anterior',
+                                                            'transplant_location': 'Local do Transplante',
+                                                            'case_type': 'Tipo de Caso',
+                                                            'body_hair': 'Pêlo Corporal',
+                                                            'eyebrow_transplant': 'Transplante Sobrancelha',
+                                                            'beard_transplant': 'Transplante Barba',
+                                                            'frontal': 'Frontal',
+                                                            'crown': 'Coroa',
+                                                            'complete': 'Completo',
+                                                            'complete_body_hair': 'Pêlo Corporal Completo',
+                                                            'surgical_planning_text': 'Observações'
+                                                        };
+                                                        
+                                                        let html = '<dl class="row mb-0 small">';
+                                                        for (const [key, val] of Object.entries(planData)) {
+                                                            if (val !== null && val !== false && val !== '') {
+                                                                const label = labels[key] || key;
+                                                                const display = typeof val === 'boolean' ? (val ? 'Sim' : 'Não') : val;
+                                                                html += `<dt class="col-sm-5 text-muted">${label}:</dt><dd class="col-sm-7"><strong>${display}</strong></dd>`;
+                                                            }
+                                                        }
+                                                        html += '</dl>';
+                                                        document.currentScript.parentElement.innerHTML += html;
+                                                    } catch (e) {
+                                                        console.error('Erro ao parsear planejamento:', e);
+                                                    }
+                                                })();
+                                            </script>
+                                        </div>
                                     </div>
                                     {% endif %}
                                 {% endif %}
