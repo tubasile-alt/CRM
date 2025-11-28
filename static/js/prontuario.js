@@ -883,3 +883,70 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300);
     }
 });
+
+// Editar data da consulta
+function editConsultationDate(consultationId, dateTime) {
+    document.getElementById('editConsultationId').value = consultationId;
+    document.getElementById('editConsultationDateTime').value = dateTime;
+    new bootstrap.Modal(document.getElementById('editConsultationModal')).show();
+}
+
+// Salvar edição da consulta
+function saveConsultationEdit() {
+    const consultationId = document.getElementById('editConsultationId').value;
+    const dateTime = document.getElementById('editConsultationDateTime').value;
+    
+    if (!dateTime) {
+        showAlert('Por favor, selecione uma data e hora', 'warning');
+        return;
+    }
+    
+    // Converter para datetime Python
+    const date = new Date(dateTime);
+    const pythonDateTime = date.toISOString().slice(0, 19).replace('T', ' ');
+    
+    fetch(`/api/appointments/${consultationId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({start_time: dateTime})
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Consulta atualizada com sucesso!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editConsultationModal')).hide();
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showAlert(result.error || 'Erro ao atualizar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao atualizar consulta', 'danger');
+    });
+}
+
+// Deletar consulta
+function deleteConsultation(consultationId, dateStr) {
+    if (!confirm(`Tem certeza que deseja deletar a consulta de ${dateStr}?\n\nEsta ação não pode ser desfeita.`)) {
+        return;
+    }
+    
+    fetch(`/api/appointments/${consultationId}`, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Consulta deletada com sucesso!', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showAlert(result.error || 'Erro ao deletar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao deletar consulta', 'danger');
+    });
+}

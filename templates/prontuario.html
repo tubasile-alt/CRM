@@ -599,12 +599,24 @@ function saveAttentionNote() {
                                             <span class="badge bg-primary">
                                                 {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
                                             </span>
-                                            {% if current_user.is_doctor() and consultation.appointment_id %}
+                                            {% if current_user.is_doctor() %}
+                                            <button class="btn btn-sm btn-outline-warning" 
+                                                    onclick="event.stopPropagation(); editConsultationDate({{ consultation.id }}, '{{ consultation.date.strftime('%Y-%m-%dT%H:%M') }}')"
+                                                    title="Editar data e informações">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" 
+                                                    onclick="event.stopPropagation(); deleteConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y') }}')"
+                                                    title="Deletar consulta">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            {% if consultation.appointment_id %}
                                             <button class="btn btn-sm btn-outline-primary" 
                                                     onclick="event.stopPropagation(); window.location.href='/prontuario/{{ patient.id }}?appointment_id={{ consultation.appointment_id }}'"
-                                                    title="Editar consulta">
-                                                <i class="bi bi-pencil-square"></i> Editar
+                                                    title="Editar consulta completa">
+                                                <i class="bi bi-pencil-square"></i>
                                             </button>
+                                            {% endif %}
                                             {% endif %}
                                         </div>
                                     </div>
@@ -942,6 +954,31 @@ function saveAttentionNote() {
                     Nenhuma consulta finalizada registrada.
                 </p>
                 {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Edição de Data da Consulta -->
+<div class="modal fade" id="editConsultationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Consulta</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editConsultationId">
+                <div class="mb-3">
+                    <label class="form-label">Data e Hora</label>
+                    <input type="datetime-local" id="editConsultationDateTime" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="saveConsultationEdit()">
+                    <i class="bi bi-save"></i> Salvar
+                </button>
             </div>
         </div>
     </div>
