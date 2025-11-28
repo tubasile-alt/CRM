@@ -926,12 +926,18 @@ function saveConsultationEdit() {
     // Array de promessas para atualizar cada nota
     const updatePromises = [];
     
-    // Atualizar data da consulta
+    // Atualizar data da consulta - calcular end_time (1 hora depois por padrão)
+    const start = new Date(dateTime);
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    
     updatePromises.push(
         fetch(`/api/appointments/${consultationId}`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({start_time: dateTime})
+            body: JSON.stringify({
+                start: dateTime,
+                end: end.toISOString().slice(0, 16).replace('T', ' ')
+            })
         })
     );
     
