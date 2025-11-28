@@ -441,6 +441,33 @@ def search_patients():
     
     return jsonify(result)
 
+@app.route('/api/appointments/<int:id>/notes', methods=['GET'])
+@login_required
+def get_appointment_notes(id):
+    appointment = Appointment.query.get_or_404(id)
+    notes = Note.query.filter_by(appointment_id=id).all()
+    
+    result = {}
+    for note in notes:
+        result[note.note_type] = {
+            'id': note.id,
+            'content': note.content or ''
+        }
+    
+    return jsonify(result)
+
+@app.route('/api/notes/<int:note_id>', methods=['PUT'])
+@login_required
+def update_note(note_id):
+    note = Note.query.get_or_404(note_id)
+    data = request.get_json()
+    
+    if 'content' in data:
+        note.content = data['content']
+    
+    db.session.commit()
+    return jsonify({'success': True})
+
 @app.route('/api/appointments/<int:id>', methods=['DELETE'])
 @login_required
 def delete_appointment(id):

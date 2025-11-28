@@ -961,23 +961,51 @@ function saveAttentionNote() {
 
 <!-- Modal de Edição de Data da Consulta -->
 <div class="modal fade" id="editConsultationModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-warning">
                 <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Consulta</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                 <input type="hidden" id="editConsultationId">
+                
                 <div class="mb-3">
-                    <label class="form-label">Data e Hora</label>
+                    <label class="form-label"><strong>Data e Hora</strong></label>
                     <input type="datetime-local" id="editConsultationDateTime" class="form-control">
                 </div>
+                
+                <hr>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Queixa Principal</strong></label>
+                    <textarea id="editQueixa" class="form-control" rows="2" placeholder="Ex: Dor na cabeça..."></textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Anamnese / Exame Físico</strong></label>
+                    <textarea id="editAnamnese" class="form-control" rows="3" placeholder="Ex: Paciente refere..."></textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Diagnóstico</strong></label>
+                    <textarea id="editDiagnostico" class="form-control" rows="3" placeholder="Ex: Diagnóstico de..."></textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label"><strong>Conduta</strong></label>
+                    <textarea id="editConduta" class="form-control" rows="3" placeholder="Ex: Prescrever..."></textarea>
+                </div>
+                
+                <input type="hidden" id="editQueixaId">
+                <input type="hidden" id="editAnamneseId">
+                <input type="hidden" id="editDiagnosticoId">
+                <input type="hidden" id="editCondutaId">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-warning" onclick="saveConsultationEdit()">
-                    <i class="bi bi-save"></i> Salvar
+                    <i class="bi bi-save"></i> Salvar Alterações
                 </button>
             </div>
         </div>

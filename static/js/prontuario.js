@@ -888,7 +888,29 @@ document.addEventListener('DOMContentLoaded', function() {
 function editConsultationDate(consultationId, dateTime) {
     document.getElementById('editConsultationId').value = consultationId;
     document.getElementById('editConsultationDateTime').value = dateTime;
-    new bootstrap.Modal(document.getElementById('editConsultationModal')).show();
+    
+    // Carregar notas da consulta
+    fetch(`/api/appointments/${consultationId}/notes`)
+        .then(r => r.json())
+        .then(notes => {
+            document.getElementById('editQueixa').value = notes.queixa?.content || '';
+            document.getElementById('editQueixaId').value = notes.queixa?.id || '';
+            
+            document.getElementById('editAnamnese').value = notes.anamnese?.content || '';
+            document.getElementById('editAnamneseId').value = notes.anamnese?.id || '';
+            
+            document.getElementById('editDiagnostico').value = notes.diagnostico?.content || '';
+            document.getElementById('editDiagnosticoId').value = notes.diagnostico?.id || '';
+            
+            document.getElementById('editConduta').value = notes.conduta?.content || '';
+            document.getElementById('editCondutaId').value = notes.conduta?.id || '';
+            
+            new bootstrap.Modal(document.getElementById('editConsultationModal')).show();
+        })
+        .catch(err => {
+            console.error('Erro ao carregar notas:', err);
+            new bootstrap.Modal(document.getElementById('editConsultationModal')).show();
+        });
 }
 
 // Salvar edição da consulta
@@ -901,29 +923,51 @@ function saveConsultationEdit() {
         return;
     }
     
-    // Converter para datetime Python
-    const date = new Date(dateTime);
-    const pythonDateTime = date.toISOString().slice(0, 19).replace('T', ' ');
+    // Array de promessas para atualizar cada nota
+    const updatePromises = [];
     
-    fetch(`/api/appointments/${consultationId}`, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({start_time: dateTime})
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Consulta atualizada com sucesso!', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('editConsultationModal')).hide();
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            showAlert(result.error || 'Erro ao atualizar', 'danger');
+    // Atualizar data da consulta
+    updatePromises.push(
+        fetch(`/api/appointments/${consultationId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({start_time: dateTime})
+        })
+    );
+    
+    // Atualizar cada nota individualmente
+    const fields = ['Queixa', 'Anamnese', 'Diagnostico', 'Conduta'];
+    fields.forEach(field => {
+        const noteId = document.getElementById(`edit${field}Id`).value;
+        const content = document.getElementById(`edit${field}`).value;
+        
+        if (noteId) {
+            updatePromises.push(
+                fetch(`/api/notes/${noteId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content: content})
+                })
+            );
         }
-    })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro ao atualizar consulta', 'danger');
     });
+    
+    // Esperar todas as atualizações
+    Promise.all(updatePromises)
+        .then(responses => Promise.all(responses.map(r => r.json())))
+        .then(results => {
+            if (results.every(r => r.success)) {
+                showAlert('Consulta atualizada com sucesso!', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('editConsultationModal')).hide();
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showAlert('Erro ao atualizar algumas informações', 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Erro:', err);
+            showAlert('Erro ao atualizar consulta', 'danger');
+        });
 }
 
 // Deletar consulta
