@@ -1047,12 +1047,12 @@ function saveEvolution() {
 }
 
 function loadTimeline() {
-    Promise.all([
-        fetch(`/api/patient/${patientId}/evolutions`).then(r => r.json()),
-        window.consultations || Promise.resolve([])
-    ]).then(([evolutions, consultations]) => {
-        renderTimeline(evolutions, consultations || []);
-    }).catch(err => console.error('Erro ao carregar timeline:', err));
+    fetch(`/api/patient/${patientId}/evolutions`)
+        .then(r => r.json())
+        .then(evolutions => {
+            renderTimeline(evolutions, []);
+        })
+        .catch(err => console.error('Erro ao carregar timeline:', err));
 }
 
 function renderTimeline(evolutions, consultations = []) {
