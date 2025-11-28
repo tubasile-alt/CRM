@@ -569,6 +569,7 @@ function saveAttentionNote() {
     <div class="col-lg-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between">
+                <script type='application/json' id='consultationsData'>{{ consultations | tojson }}</script>
                 <h5 class="mb-0"><i class="bi bi-diagram-2"></i> Linha do Tempo - Consultas e Evoluções</h5>
                 {% if current_user.is_doctor() %}
                 <button class="btn btn-sm btn-success" onclick="openEvolutionModal()"><i class="bi bi-plus"></i> Evolução</button>

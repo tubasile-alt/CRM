@@ -257,6 +257,8 @@ async function loadExistingPlans() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Passar consultações para a timeline
+    window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
     // Carregar planos existentes ao iniciar
     setTimeout(loadExistingPlans, 500);
     
@@ -871,6 +873,8 @@ function finalizarAtendimento() {
 
 // Auto-open attention modal if there's content when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    // Passar consultações para a timeline
+    window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
     const attentionContent = document.getElementById('attentionContent');
     if (attentionContent && attentionContent.textContent.trim()) {
         // Delay slightly to ensure page is fully loaded
@@ -1043,44 +1047,97 @@ function saveEvolution() {
 }
 
 function loadTimeline() {
-    fetch(`/api/patient/${patientId}/evolutions`)
-        .then(r => r.json())
-        .then(evolutions => {
-            renderTimeline(evolutions);
-        })
-        .catch(err => console.error('Erro ao carregar evoluções:', err));
+    Promise.all([
+        fetch(`/api/patient/${patientId}/evolutions`).then(r => r.json()),
+        window.consultations || Promise.resolve([])
+    ]).then(([evolutions, consultations]) => {
+        renderTimeline(evolutions, consultations || []);
+    }).catch(err => console.error('Erro ao carregar timeline:', err));
 }
 
-function renderTimeline(evolutions) {
+function renderTimeline(evolutions, consultations = []) {
     const container = document.getElementById('timelineContainer');
     container.innerHTML = '';
     
-    if (evolutions.length === 0) {
-        container.innerHTML = '<p class="text-muted text-center">Nenhuma evolução registrada ainda.</p>';
+    // Combinar consultas e evoluções
+    const items = [];
+    
+    // Adicionar última consulta se existir
+    if (consultations && consultations.length > 0) {
+        const lastConsult = consultations[0];
+        items.push({
+            type: 'consultation',
+            date: lastConsult.date,
+            dateObj: new Date(lastConsult.date),
+            category: lastConsult.category,
+            doctor: lastConsult.doctor,
+            id: lastConsult.id
+        });
+    }
+    
+    // Adicionar evoluções
+    evolutions.forEach(evo => {
+        items.push({
+            type: 'evolution',
+            date: evo.date,
+            dateObj: new Date(evo.evolution_date),
+            content: evo.content,
+            doctor: evo.doctor,
+            id: evo.id
+        });
+    });
+    
+    // Ordenar por data
+    items.sort((a, b) => a.dateObj - b.dateObj);
+    
+    if (items.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">Nenhuma consulta ou evolução registrada.</p>';
         return;
     }
     
-    evolutions.forEach((evo, index) => {
-        const card = document.createElement('div');
-        card.className = 'card mb-3 border-success';
-        card.innerHTML = `
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h6 class="card-title text-success">
-                            <i class="bi bi-arrow-right-circle"></i> Evolução - ${evo.date}
-                        </h6>
-                        <p class="card-text">${evo.content}</p>
-                        <small class="text-muted">Dr. ${evo.doctor}</small>
+    // Renderizar timeline
+    const timeline = document.createElement('div');
+    timeline.className = 'timeline-container';
+    
+    items.forEach((item, idx) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = `timeline-item ${item.type}`;
+        
+        if (item.type === 'consultation') {
+            itemDiv.innerHTML = `
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-label">
+                        <i class="bi bi-calendar-check"></i> Consulta
                     </div>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
-                        <i class="bi bi-trash"></i>
-                    </button>
+                    <div class="timeline-date">${item.date}</div>
+                    <div class="timeline-text">
+                        <strong>${item.category}</strong> com Dr. ${item.doctor.name}
+                    </div>
                 </div>
-            </div>
-        `;
-        container.appendChild(card);
+            `;
+        } else {
+            itemDiv.innerHTML = `
+                <div class="timeline-dot"></div>
+                <div class="timeline-content">
+                    <div class="timeline-label">
+                        <i class="bi bi-arrow-right-circle"></i> Evolução
+                    </div>
+                    <div class="timeline-date">${item.date}</div>
+                    <div class="timeline-text">${item.content}</div>
+                    <small class="text-muted">Dr. ${item.doctor}</small>
+                    <div class="timeline-actions">
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${item.id})">
+                            <i class="bi bi-trash"></i> Deletar
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        timeline.appendChild(itemDiv);
     });
+    
+    container.appendChild(timeline);
 }
 
 function deleteEvolution(evoId) {
@@ -1107,5 +1164,7 @@ function deleteEvolution(evoId) {
 
 // Carregar timeline ao abrir a página
 document.addEventListener('DOMContentLoaded', function() {
+    // Passar consultações para a timeline
+    window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
     loadTimeline();
 });
