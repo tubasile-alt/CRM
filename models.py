@@ -288,6 +288,18 @@ class FollowUpReminder(db.Model):
     
     patient = db.relationship('Patient', backref='reminders')
 
+class Evolution(db.Model):
+    __tablename__ = 'evolution'
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    evolution_date = db.Column(db.DateTime, default=get_brazil_time, nullable=False, index=True)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
+    
+    patient = db.relationship('Patient', backref='evolutions')
+    doctor = db.relationship('User', backref='evolutions')
+
 class Payment(db.Model):
     __tablename__ = 'payment'
     id = db.Column(db.Integer, primary_key=True)
