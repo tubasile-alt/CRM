@@ -1010,15 +1010,39 @@ function openEvolutionModal() {
     const now = new Date();
     document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
     document.getElementById('evolutionContent').value = '';
+    document.getElementById('evolutionConsultation').value = '';
+    loadConsultationsDropdown();
     new bootstrap.Modal(document.getElementById('evolutionModal')).show();
+}
+
+function loadConsultationsDropdown() {
+    fetch(`/api/patient/${patientId}/consultations`)
+        .then(r => r.json())
+        .then(data => {
+            const select = document.getElementById('evolutionConsultation');
+            select.innerHTML = '<option value="">-- Selecione uma consulta --</option>';
+            (data.consultations || []).forEach(consultation => {
+                const option = document.createElement('option');
+                option.value = consultation.id;
+                option.textContent = `${consultation.date} - ${consultation.category || 'Consulta'}`;
+                select.appendChild(option);
+            });
+        })
+        .catch(err => console.error('Erro ao carregar consultas:', err));
 }
 
 function saveEvolution() {
     const content = document.getElementById('evolutionContent').value.trim();
     const date = document.getElementById('evolutionDate').value;
+    const consultationId = document.getElementById('evolutionConsultation').value;
     
     if (!content) {
         showAlert('Descrição vazia!', 'warning');
+        return;
+    }
+    
+    if (!consultationId) {
+        showAlert('Selecione uma consulta!', 'warning');
         return;
     }
     
@@ -1027,7 +1051,8 @@ function saveEvolution() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             content: content,
-            evolution_date: date
+            evolution_date: date,
+            consultation_id: parseInt(consultationId)
         })
     })
     .then(r => r.json())

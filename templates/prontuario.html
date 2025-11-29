@@ -1038,6 +1038,12 @@ function saveAttentionNote() {
             </div>
             <div class="modal-body">
                 <div class="mb-3">
+                    <label class="form-label"><strong>Consulta do Histórico *</strong></label>
+                    <select id="evolutionConsultation" class="form-select" required>
+                        <option value="">-- Selecione uma consulta --</option>
+                    </select>
+                </div>
+                <div class="mb-3">
                     <label class="form-label"><strong>Data da Evolução</strong></label>
                     <input type="datetime-local" id="evolutionDate" class="form-control">
                 </div>

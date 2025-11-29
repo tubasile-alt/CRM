@@ -304,12 +304,14 @@ class Evolution(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
     doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    consultation_id = db.Column(db.Integer, db.ForeignKey('appointment.id'), nullable=True)  # Linkado com consulta
     evolution_date = db.Column(db.DateTime, default=get_brazil_time, nullable=False, index=True)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
     
     patient = db.relationship('Patient', backref='evolutions')
     doctor = db.relationship('User', backref='evolutions')
+    consultation = db.relationship('Appointment', backref='evolutions')
 
 class Payment(db.Model):
     __tablename__ = 'payment'
