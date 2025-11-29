@@ -200,6 +200,44 @@ def dashboard():
         else:
             procedures_pending[proc_name] += 1
     
+    # Dados de procedimentos por mês (últimos 6 meses)
+    procedures_by_month = defaultdict(lambda: {'completed': 0, 'pending': 0})
+    
+    if note_ids:
+        # Últimos 6 meses
+        for i in range(6):
+            month_date = today - timedelta(days=30*i)
+            month_key = month_date.strftime('%b %Y')
+            procedures_by_month[month_key] = {'completed': 0, 'pending': 0}
+        
+        # Contar indicações por mês
+        indications = Indication.query.filter(Indication.note_id.in_(note_ids)).all()
+        for ind in indications:
+            note = Note.query.get(ind.note_id)
+            if note:
+                month_key = note.created_at.strftime('%b %Y')
+                if month_key in procedures_by_month:
+                    if ind.performed:
+                        procedures_by_month[month_key]['completed'] += 1
+                    elif ind.indicated:
+                        procedures_by_month[month_key]['pending'] += 1
+        
+        # Contar planos cosméticos por mês
+        for plan in cosmetic_plans:
+            note = Note.query.get(plan.note_id)
+            if note:
+                month_key = note.created_at.strftime('%b %Y')
+                if month_key in procedures_by_month:
+                    if plan.was_performed:
+                        procedures_by_month[month_key]['completed'] += 1
+                    else:
+                        procedures_by_month[month_key]['pending'] += 1
+    
+    # Ordenar por data
+    import json
+    months_list = sorted(procedures_by_month.keys(), reverse=True)[:6]
+    procedures_by_month_ordered = {m: procedures_by_month[m] for m in reversed(months_list)}
+    
     stats = {
         'agendados': sum(1 for a in today_appointments if a.status in ['agendado', 'confirmado']),
         'confirmados': sum(1 for a in today_appointments if a.status == 'confirmado'),
@@ -216,6 +254,8 @@ def dashboard():
         # Procedimentos
         'procedures_completed': dict(procedures_completed),
         'procedures_pending': dict(procedures_pending),
+        'procedures_by_month': procedures_by_month_ordered,
+        'procedures_by_month_json': json.dumps(procedures_by_month_ordered),
     }
     
     return render_template('dashboard.html', stats=stats)
