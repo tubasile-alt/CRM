@@ -1150,7 +1150,13 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
     document.getElementById('evolutionContent').value = '';
     document.getElementById('evolutionConsultation').value = consultationId;
-    document.querySelector('label[for="evolutionConsultation"]').textContent = `✓ Consulta: ${consultationDate}`;
+    
+    // Atualizar label se existir
+    const label = document.querySelector('label[for="evolutionConsultation"]');
+    if (label) {
+        label.textContent = `✓ Consulta: ${consultationDate}`;
+    }
+    
     new bootstrap.Modal(document.getElementById('evolutionModal')).show();
 }
 
