@@ -653,6 +653,11 @@ function saveAttentionNote() {
                                                 {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
                                             </span>
                                             {% if current_user.is_doctor() %}
+                                            <button class="btn btn-sm btn-outline-success" 
+                                                    onclick="event.stopPropagation(); openEvolutionFromConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y %H:%M') }}')"
+                                                    title="Adicionar evolução para esta consulta">
+                                                <i class="bi bi-plus-circle"></i> Evolução
+                                            </button>
                                             <button class="btn btn-sm btn-outline-warning" 
                                                     onclick="event.stopPropagation(); editConsultationDate({{ consultation.id }}, '{{ consultation.date.strftime('%Y-%m-%dT%H:%M') }}')"
                                                     title="Editar data e informações">
