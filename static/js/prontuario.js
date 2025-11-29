@@ -1074,96 +1074,88 @@ function saveEvolution() {
 function loadTimeline() {
     fetch(`/api/patient/${patientId}/evolutions`)
         .then(r => r.json())
-        .then(evolutions => {
-            renderTimeline(evolutions, []);
+        .then(consultations => {
+            renderTimeline(consultations);
         })
         .catch(err => console.error('Erro ao carregar timeline:', err));
 }
 
-function renderTimeline(evolutions, consultations = []) {
+function renderTimeline(consultations = []) {
     const container = document.getElementById('timelineContainer');
     container.innerHTML = '';
     
-    // Combinar consultas e evoluções
-    const items = [];
-    
-    // Adicionar última consulta se existir
-    if (consultations && consultations.length > 0) {
-        const lastConsult = consultations[0];
-        items.push({
-            type: 'consultation',
-            date: lastConsult.date,
-            dateObj: new Date(lastConsult.date),
-            category: lastConsult.category,
-            doctor: lastConsult.doctor,
-            id: lastConsult.id
-        });
-    }
-    
-    // Adicionar evoluções
-    evolutions.forEach(evo => {
-        items.push({
-            type: 'evolution',
-            date: evo.date,
-            dateObj: new Date(evo.evolution_date),
-            content: evo.content,
-            doctor: evo.doctor,
-            id: evo.id
-        });
-    });
-    
-    // Ordenar por data
-    items.sort((a, b) => a.dateObj - b.dateObj);
-    
-    if (items.length === 0) {
+    if (!consultations || consultations.length === 0) {
         container.innerHTML = '<p class="text-muted text-center">Nenhuma consulta ou evolução registrada.</p>';
         return;
     }
     
-    // Renderizar timeline
-    const timeline = document.createElement('div');
-    timeline.className = 'timeline-container';
-    
-    items.forEach((item, idx) => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = `timeline-item ${item.type}`;
+    // Renderizar cada consulta com suas evoluções
+    consultations.forEach((consultation, idx) => {
+        const consultDiv = document.createElement('div');
+        consultDiv.className = 'mb-4 p-3 border rounded bg-light';
         
-        if (item.type === 'consultation') {
-            itemDiv.innerHTML = `
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-label">
-                        <i class="bi bi-calendar-check"></i> Consulta
-                    </div>
-                    <div class="timeline-date">${item.date}</div>
-                    <div class="timeline-text">
-                        <strong>${item.category}</strong> com Dr. ${item.doctor.name}
-                    </div>
+        // Header da consulta
+        consultDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h6 class="mb-1"><i class="bi bi-calendar-check"></i> <strong>${consultation.date}</strong></h6>
+                    <p class="mb-1"><small><strong>${consultation.category}</strong> com Dr. ${consultation.doctor_name}</small></p>
                 </div>
-            `;
-        } else {
-            itemDiv.innerHTML = `
-                <div class="timeline-dot"></div>
-                <div class="timeline-content">
-                    <div class="timeline-label">
-                        <i class="bi bi-arrow-right-circle"></i> Evolução
+                <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')">
+                    <i class="bi bi-plus"></i> Evolução
+                </button>
+            </div>
+        `;
+        
+        // Renderizar evoluções desta consulta
+        if (consultation.evolutions && consultation.evolutions.length > 0) {
+            const evolutionsList = document.createElement('div');
+            evolutionsList.className = 'ms-4 ps-3 border-start border-success';
+            
+            consultation.evolutions.forEach(evo => {
+                const evoDiv = document.createElement('div');
+                evoDiv.className = 'mb-3 p-2 bg-white border-left';
+                evoDiv.style.borderLeft = '4px solid #198754';
+                
+                evoDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
+                            <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
+                            <small class="text-muted">Dr. ${evo.doctor}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </div>
-                    <div class="timeline-date">${item.date}</div>
-                    <div class="timeline-text">${item.content}</div>
-                    <small class="text-muted">Dr. ${item.doctor}</small>
+                `;
+                
+                evolutionsList.appendChild(evoDiv);
+            });
+            
+            consultDiv.appendChild(evolutionsList);
+        } else {
+            const noEvoDiv = document.createElement('div');
+            noEvoDiv.className = 'ms-4 ps-3 text-muted small';
+            noEvoDiv.innerHTML = '<em>Nenhuma evolução registrada para esta consulta</em>';
+            consultDiv.appendChild(noEvoDiv);
+        }
+        
+        container.appendChild(consultDiv);
+    });
+}
+
+function openEvolutionFromConsultation(consultationId, consultationDate) {
+    const now = new Date();
+    document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
+    document.getElementById('evolutionContent').value = '';
+    document.getElementById('evolutionConsultation').value = consultationId;
+    document.querySelector('label[for="evolutionConsultation"]').textContent = `✓ Consulta: ${consultationDate}`;
+    new bootstrap.Modal(document.getElementById('evolutionModal')).show();
+}
                     <div class="timeline-actions">
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${item.id})">
                             <i class="bi bi-trash"></i> Deletar
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-        timeline.appendChild(itemDiv);
-    });
-    
-    container.appendChild(timeline);
-}
 
 function deleteEvolution(evoId) {
     if (!confirm('Tem certeza que deseja deletar esta evolução?')) return;

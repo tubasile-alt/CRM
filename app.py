@@ -1837,17 +1837,37 @@ def process_payment(payment_id):
 @app.route('/api/patient/<int:patient_id>/evolutions', methods=['GET'])
 @login_required
 def get_evolutions(patient_id):
-    """Listar todas as evoluções do paciente"""
-    evolutions = Evolution.query.filter_by(patient_id=patient_id).order_by(Evolution.evolution_date.asc()).all()
+    """Listar todas as evoluções agrupadas por consulta"""
+    from models import Appointment
+    
+    # Buscar todas as consultas do paciente
+    consultations = Appointment.query.filter_by(patient_id=patient_id).order_by(Appointment.start_time.desc()).all()
+    
     result = []
-    for evo in evolutions:
-        result.append({
-            'id': evo.id,
-            'date': evo.evolution_date.strftime('%d/%m/%Y %H:%M'),
-            'content': evo.content,
-            'doctor': evo.doctor.name,
-            'evolution_date': evo.evolution_date.isoformat()
-        })
+    for consultation in consultations:
+        # Buscar evoluções desta consulta
+        evolutions = Evolution.query.filter_by(consultation_id=consultation.id).order_by(Evolution.evolution_date.asc()).all()
+        
+        consultation_data = {
+            'id': consultation.id,
+            'date': consultation.start_time.strftime('%d/%m/%Y %H:%M'),
+            'category': consultation.notes or 'Consulta',
+            'doctor_name': consultation.doctor.name if consultation.doctor else 'N/A',
+            'evolutions': []
+        }
+        
+        # Adicionar evoluções desta consulta
+        for evo in evolutions:
+            consultation_data['evolutions'].append({
+                'id': evo.id,
+                'date': evo.evolution_date.strftime('%d/%m/%Y %H:%M'),
+                'content': evo.content,
+                'doctor': evo.doctor.name,
+                'evolution_date': evo.evolution_date.isoformat()
+            })
+        
+        result.append(consultation_data)
+    
     return jsonify(result)
 
 @app.route('/api/patient/<int:patient_id>/evolution', methods=['POST'])
