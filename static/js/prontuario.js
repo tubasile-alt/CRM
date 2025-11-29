@@ -1034,7 +1034,9 @@ function loadConsultationsDropdown() {
 function saveEvolution() {
     const content = document.getElementById('evolutionContent').value.trim();
     const date = document.getElementById('evolutionDate').value;
-    const consultationId = document.getElementById('evolutionConsultation').value;
+    let consultationId = document.getElementById('evolutionConsultation').value;
+    
+    console.log('saveEvolution - consultationId:', consultationId, 'content:', content, 'date:', date);
     
     if (!content) {
         showAlert('Descrição vazia!', 'warning');
@@ -1046,17 +1048,20 @@ function saveEvolution() {
         return;
     }
     
+    consultationId = parseInt(consultationId);
+    
     fetch(`/api/patient/${patientId}/evolution`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             content: content,
             evolution_date: date,
-            consultation_id: parseInt(consultationId)
+            consultation_id: consultationId
         })
     })
     .then(r => r.json())
     .then(result => {
+        console.log('Resultado saveEvolution:', result);
         if (result.success) {
             showAlert('Evolução salva com sucesso!', 'success');
             bootstrap.Modal.getInstance(document.getElementById('evolutionModal')).hide();
@@ -1066,8 +1071,8 @@ function saveEvolution() {
         }
     })
     .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro ao salvar evolução', 'danger');
+        console.error('Erro ao salvar evolução:', err);
+        showAlert('Erro ao salvar evolução: ' + err.message, 'danger');
     });
 }
 
