@@ -170,6 +170,36 @@ def dashboard():
         Appointment.start_time <= datetime.combine(last_day, datetime.max.time())
     ).all()
     
+    # Carregar procedimentos do médico
+    from models import Indication, CosmeticPlan, HairTransplant, Procedure
+    from collections import defaultdict
+    
+    # Buscar todas as indicações do médico
+    notes = Note.query.filter_by(doctor_id=current_user.id).all()
+    note_ids = [n.id for n in notes]
+    
+    procedures_completed = defaultdict(int)
+    procedures_pending = defaultdict(int)
+    
+    # Contar indicações feitas vs planejadas
+    if note_ids:
+        indications = Indication.query.filter(Indication.note_id.in_(note_ids)).all()
+        for ind in indications:
+            proc_name = ind.procedure.name if ind.procedure else 'Procedimento'
+            if ind.performed:
+                procedures_completed[proc_name] += 1
+            elif ind.indicated:
+                procedures_pending[proc_name] += 1
+    
+    # Contar planos cosméticos
+    cosmetic_plans = CosmeticPlan.query.filter(CosmeticPlan.note_id.in_(note_ids)).all() if note_ids else []
+    for plan in cosmetic_plans:
+        proc_name = plan.procedure_name or 'Cosmético'
+        if plan.was_performed:
+            procedures_completed[proc_name] += 1
+        else:
+            procedures_pending[proc_name] += 1
+    
     stats = {
         'agendados': sum(1 for a in today_appointments if a.status in ['agendado', 'confirmado']),
         'confirmados': sum(1 for a in today_appointments if a.status == 'confirmado'),
@@ -183,6 +213,9 @@ def dashboard():
         'unimed_month': sum(1 for a in month_appointments if a.appointment_type == 'UNIMED'),
         'particular_month': sum(1 for a in month_appointments if a.appointment_type == 'Particular'),
         'transplante_month': sum(1 for a in month_appointments if a.appointment_type == 'Transplante Capilar'),
+        # Procedimentos
+        'procedures_completed': dict(procedures_completed),
+        'procedures_pending': dict(procedures_pending),
     }
     
     return render_template('dashboard.html', stats=stats)

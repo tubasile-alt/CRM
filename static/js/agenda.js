@@ -236,13 +236,19 @@ function renderDayView() {
             block.style.opacity = '1';
         });
         
+        // Status icon
+        let statusIcon = '🕐';
+        if (status === 'confirmado') statusIcon = '✓';
+        if (status === 'faltou') statusIcon = '✗';
+        if (status === 'atendido') statusIcon = '✔';
+        
         block.innerHTML = `
             <div class="appointment-content">
                 <div class="appointment-info-line">
                     <span class="appointment-name">${patientName}</span>
                     <span class="appointment-code">cod:${patientCode}</span>
                     <span class="appointment-type-label">pac:${patientType}</span>
-                    <span class="appointment-consult-label">cons:${appointmentType}</span>
+                    <span class="appointment-consult-label">cons:${appointmentType} <span style="font-size: 0.8em;">${statusIcon}</span></span>
                 </div>
             </div>
         `;
