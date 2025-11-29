@@ -1153,9 +1153,6 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     document.querySelector('label[for="evolutionConsultation"]').textContent = `✓ Consulta: ${consultationDate}`;
     new bootstrap.Modal(document.getElementById('evolutionModal')).show();
 }
-                    <div class="timeline-actions">
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${item.id})">
-                            <i class="bi bi-trash"></i> Deletar
 
 function deleteEvolution(evoId) {
     if (!confirm('Tem certeza que deseja deletar esta evolução?')) return;
