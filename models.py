@@ -274,6 +274,17 @@ class TransplantImage(db.Model):
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
 
+class TransplantSurgery(db.Model):
+    __tablename__ = 'transplant_surgery'
+    id = db.Column(db.Integer, primary_key=True)
+    hair_transplant_id = db.Column(db.Integer, db.ForeignKey('hair_transplant.id'), nullable=False)
+    surgery_date = db.Column(db.DateTime, nullable=False)
+    surgical_planning = db.Column(db.Text)  # Planejamento cirúrgico detalhado
+    complications = db.Column(db.Text)  # Intercorrências
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    hair_transplant = db.relationship('HairTransplant', backref=db.backref('surgeries', cascade='all, delete-orphan'))
+
 # Modelo para lembretes automáticos do CRM
 class FollowUpReminder(db.Model):
     __tablename__ = 'follow_up_reminder'

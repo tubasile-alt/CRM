@@ -553,6 +553,54 @@ function saveAttentionNote() {
                                 placeholder="Descreva: linha frontal, número estimado de UF, estratégia de extração, distribuição de áreas receptoras, densidade planejada..." {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
                         </div>
 
+                        <!-- SUB-CATEGORIA: CIRURGIA -->
+                        <div class="card mt-4 border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0"><i class="bi bi-scissors"></i> Cirurgias Realizadas</h6>
+                                    {% if current_user.is_doctor() %}
+                                    <button class="btn btn-sm btn-light" onclick="openSurgeryModal()"><i class="bi bi-plus"></i> Adicionar Cirurgia</button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="surgeriesList" class="accordion">
+                                    <!-- Cirurgias serão carregadas aqui via JavaScript -->
+                                </div>
+                                <p class="text-muted text-center mt-3" id="noSurgeriesMsg">Nenhuma cirurgia registrada</p>
+                            </div>
+                        </div>
+
+                        <!-- MODAL CIRURGIA -->
+                        <div class="modal fade" id="surgeryModal" tabindex="-1">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title"><i class="bi bi-scissors"></i> Registrar Cirurgia</h5>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label class="form-label"><strong>Data da Cirurgia *</strong></label>
+                                            <input type="datetime-local" class="form-control" id="surgeryDate" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label"><strong>Planejamento Cirúrgico</strong></label>
+                                            <textarea class="form-control" id="surgerySurgicalPlanning" rows="5" placeholder="Descreva o planejamento detalhado da cirurgia..."></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label"><strong>Intercorrências</strong></label>
+                                            <textarea class="form-control" id="surgeryComplications" rows="4" placeholder="Relate qualquer complicação ou evento inusitado durante a cirurgia..."></textarea>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="button" class="btn btn-danger" onclick="saveSurgery()"><i class="bi bi-check"></i> Salvar Cirurgia</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="alert alert-info mt-3">
                             <small><i class="bi bi-info-circle"></i> O planejamento cirúrgico será salvo automaticamente ao clicar em "Finalizar Atendimento" na aba Conduta.</small>
                         </div>
@@ -740,6 +788,7 @@ function saveAttentionNote() {
                                             <div class="col-6">
                                                 <strong>Tipo de Caso:</strong><br>
                                                 {% if ht.case_type == 'primaria' %}
+                <script>const hairTransplantId = {{ consultation.all_notes[0].hair_transplants[0].id if consultation.all_notes and consultation.all_notes[0].hair_transplants else 'null' }};</script>
                                                 <span class="badge bg-primary">Cirurgia Primária</span>
                                                 {% elif ht.case_type == 'secundaria' %}
                                                 <span class="badge bg-warning">Cirurgia Secundária</span>
@@ -748,6 +797,7 @@ function saveAttentionNote() {
                                                 {% endif %}
                                             </div>
                                         </div>
+                <script src="/static/js/surgeries.js"></script>
                                         
                                         <div class="row mb-2">
                                             <div class="col-6">

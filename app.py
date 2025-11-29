@@ -1915,3 +1915,53 @@ def delete_evolution(evo_id):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+
+# APIs de Cirurgias de Transplante Capilar
+@app.route('/api/hair-transplant/<int:ht_id>/surgeries', methods=['GET'])
+@login_required
+def get_surgeries(ht_id):
+    from models import TransplantSurgery
+    surgeries = TransplantSurgery.query.filter_by(hair_transplant_id=ht_id).order_by(TransplantSurgery.surgery_date.desc()).all()
+    return jsonify([{
+        'id': s.id,
+        'surgery_date': s.surgery_date.isoformat(),
+        'surgical_planning': s.surgical_planning,
+        'complications': s.complications,
+    } for s in surgeries])
+
+@app.route('/api/hair-transplant/<int:ht_id>/surgeries', methods=['POST'])
+@login_required
+def create_surgery(ht_id):
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    from models import TransplantSurgery, HairTransplant
+    from datetime import datetime
+    
+    ht = HairTransplant.query.get_or_404(ht_id)
+    data = request.get_json()
+    
+    surgery = TransplantSurgery(
+        hair_transplant_id=ht_id,
+        surgery_date=datetime.fromisoformat(data.get('surgery_date')),
+        surgical_planning=data.get('surgical_planning', ''),
+        complications=data.get('complications', '')
+    )
+    db.session.add(surgery)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'id': surgery.id})
+
+@app.route('/api/surgery/<int:surgery_id>', methods=['DELETE'])
+@login_required
+def delete_surgery(surgery_id):
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    from models import TransplantSurgery
+    
+    surgery = TransplantSurgery.query.get_or_404(surgery_id)
+    db.session.delete(surgery)
+    db.session.commit()
+    
+    return jsonify({'success': True})
