@@ -1874,7 +1874,7 @@ def create_evolution(patient_id):
         patient_id=patient_id,
         doctor_id=current_user.id,
         evolution_date=evolution_date,
-        consultation_id=consultation_id,
+        consultation_id=data.get('consultation_id'),
         content=data['content']
     )
     db.session.add(evo)
@@ -1980,24 +1980,3 @@ def get_patient_consultations(patient_id):
     } for apt in appointments]
     return jsonify({'consultations': consultations})
 
-# Atualizar endpoint de evolução para aceitar consultation_id
-@app.route('/api/patient/<int:patient_id>/evolution', methods=['POST'])
-@login_required
-def create_evolution(patient_id):
-    if not current_user.is_doctor():
-        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
-    
-    from models import Evolution
-    from datetime import datetime
-    
-    data = request.get_json()
-    evo = Evolution(
-        patient_id=patient_id,
-        doctor_id=current_user.id,
-        consultation_id=data.get('consultation_id'),
-        evolution_date=datetime.fromisoformat(data.get('evolution_date')) if data.get('evolution_date') else get_brazil_time(),
-        content=data.get('content', '')
-    )
-    db.session.add(evo)
-    db.session.commit()
-    return jsonify({'success': True, 'id': evo.id})
