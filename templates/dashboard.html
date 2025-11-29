@@ -134,15 +134,28 @@
     </div>
 </div>
 
-<!-- GRÁFICO DE PROCEDIMENTOS POR MÊS -->
+<!-- GRÁFICOS DE PROCEDIMENTOS POR MÊS - SEPARADOS -->
 <div class="row g-3 mb-4">
     <div class="col-12">
+        <h4 class="mb-3"><i class="bi bi-graph-up"></i> Procedimentos por Mês</h4>
+    </div>
+    <div class="col-lg-6">
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Procedimentos por Mês</h5>
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-check-circle"></i> Realizados</h6>
             </div>
             <div class="card-body">
-                <canvas id="proceduresChart" height="80"></canvas>
+                <canvas id="completedChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="bi bi-clock-history"></i> Pendentes</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="pendingChart" height="80"></canvas>
             </div>
         </div>
     </div>
@@ -155,8 +168,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const completed = Object.values(procedureData).map(d => d.completed);
     const pending = Object.values(procedureData).map(d => d.pending);
     
-    const ctx = document.getElementById('proceduresChart').getContext('2d');
-    new Chart(ctx, {
+    // Gráfico de Realizados
+    const ctxCompleted = document.getElementById('completedChart').getContext('2d');
+    new Chart(ctxCompleted, {
         type: 'line',
         data: {
             labels: months,
@@ -165,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     label: 'Realizados',
                     data: completed,
                     borderColor: '#198754',
-                    backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                    backgroundColor: 'rgba(25, 135, 84, 0.15)',
                     tension: 0.4,
                     borderWidth: 3,
                     fill: true,
@@ -173,12 +187,44 @@ document.addEventListener('DOMContentLoaded', function() {
                     pointBackgroundColor: '#198754',
                     pointBorderColor: '#fff',
                     pointBorderWidth: 2,
-                },
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                    },
+                    title: {
+                        display: true,
+                        text: 'Quantidade'
+                    }
+                }
+            }
+        }
+    });
+    
+    // Gráfico de Pendentes
+    const ctxPending = document.getElementById('pendingChart').getContext('2d');
+    new Chart(ctxPending, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [
                 {
                     label: 'Pendentes',
                     data: pending,
                     borderColor: '#ffc107',
-                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    backgroundColor: 'rgba(255, 193, 7, 0.15)',
                     tension: 0.4,
                     borderWidth: 3,
                     fill: true,
@@ -194,13 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
             maintainAspectRatio: true,
             plugins: {
                 legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        font: { size: 12, weight: 'bold' },
-                        padding: 15,
-                        usePointStyle: true,
-                    }
+                    display: false
                 }
             },
             scales: {
@@ -211,13 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     },
                     title: {
                         display: true,
-                        text: 'Quantidade de Procedimentos'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Mês'
+                        text: 'Quantidade'
                     }
                 }
             }
