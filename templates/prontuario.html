@@ -1030,9 +1030,14 @@ function saveAttentionNote() {
             <div class="modal-body">
                 <div class="mb-3">
                     <label class="form-label"><strong>Consulta do Histórico *</strong></label>
+                    <!-- Dropdown para seleção (mostrado quando nenhuma consulta pré-selecionada) -->
                     <select id="evolutionConsultation" class="form-select" required>
                         <option value="">-- Selecione uma consulta --</option>
                     </select>
+                    <!-- Display da consulta selecionada (oculto por padrão) -->
+                    <div id="evolutionConsultationDisplay" style="display: none; padding: 8px 12px; background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; color: #155724;">
+                        <strong id="evolutionConsultationName"></strong>
+                    </div>
                 </div>
                 <div class="mb-3">
                     <label class="form-label"><strong>Data da Evolução</strong></label>

@@ -1151,13 +1151,29 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     document.getElementById('evolutionContent').value = '';
     document.getElementById('evolutionConsultation').value = consultationId;
     
-    // Atualizar label se existir
-    const label = document.querySelector('label[for="evolutionConsultation"]');
-    if (label) {
-        label.textContent = `✓ Consulta: ${consultationDate}`;
-    }
+    // Ocultar dropdown e mostrar consulta selecionada
+    document.getElementById('evolutionConsultation').style.display = 'none';
+    document.getElementById('evolutionConsultationDisplay').style.display = 'block';
+    document.getElementById('evolutionConsultationName').textContent = `✓ ${consultationDate}`;
+    
+    // Marcar que veio de uma consulta específica
+    document.getElementById('evolutionModal').dataset.fromConsultation = 'true';
     
     new bootstrap.Modal(document.getElementById('evolutionModal')).show();
+}
+
+function openEvolutionModal() {
+    // Limpar modal quando aberto sem consulta específica
+    const modal = document.getElementById('evolutionModal');
+    modal.dataset.fromConsultation = 'false';
+    
+    document.getElementById('evolutionConsultation').style.display = 'block';
+    document.getElementById('evolutionConsultationDisplay').style.display = 'none';
+    document.getElementById('evolutionConsultation').value = '';
+    document.getElementById('evolutionDate').value = new Date().toISOString().slice(0, 16);
+    document.getElementById('evolutionContent').value = '';
+    
+    new bootstrap.Modal(modal).show();
 }
 
 function deleteEvolution(evoId) {
