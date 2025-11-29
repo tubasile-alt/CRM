@@ -171,7 +171,7 @@ def dashboard():
     ).all()
     
     # Carregar procedimentos do médico
-    from models import Indication, CosmeticPlan, HairTransplant, Procedure
+    from models import Indication, CosmeticProcedurePlan, HairTransplant, Procedure
     from collections import defaultdict
     
     # Buscar todas as indicações do médico
@@ -192,7 +192,7 @@ def dashboard():
                 procedures_pending[proc_name] += 1
     
     # Contar planos cosméticos
-    cosmetic_plans = CosmeticPlan.query.filter(CosmeticPlan.note_id.in_(note_ids)).all() if note_ids else []
+    cosmetic_plans = CosmeticProcedurePlan.query.filter(CosmeticProcedurePlan.note_id.in_(note_ids)).all() if note_ids else []
     for plan in cosmetic_plans:
         proc_name = plan.procedure_name or 'Cosmético'
         if plan.was_performed:
