@@ -251,18 +251,6 @@ function saveAttentionNote() {
                         </div>
                         <textarea class="form-control" id="condutaText" rows="8" {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
                         
-                        <!-- Indicação de Transplante Capilar -->
-                        <div class="mt-4 mb-3">
-                            <label class="form-label"><strong>Indicação de Transplante Capilar</strong></label>
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="transplantIndication" id="transplantNo" value="nao" checked {% if not current_user.is_doctor() %}disabled{% endif %}>
-                                <label class="btn btn-outline-secondary" for="transplantNo">Não</label>
-                                
-                                <input type="radio" class="btn-check" name="transplantIndication" id="transplantYes" value="sim" {% if not current_user.is_doctor() %}disabled{% endif %}>
-                                <label class="btn btn-outline-info" for="transplantYes">Sim</label>
-                            </div>
-                        </div>
-                        
                         <!-- Seção para Cosmiatria: Procedimentos Planejados com Orçamento e Status -->
                         <div class="mt-4" id="cosmeticConductSection" style="display:none;">
                             <h6><i class="bi bi-check2-square"></i> Procedimentos Planejados - Execução</h6>
