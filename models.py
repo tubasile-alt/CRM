@@ -313,19 +313,6 @@ class Evolution(db.Model):
     doctor = db.relationship('User', backref='evolutions')
     consultation = db.relationship('Appointment', backref='evolutions')
 
-class Surgery(db.Model):
-    __tablename__ = 'surgery'
-    id = db.Column(db.Integer, primary_key=True)
-    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
-    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    surgery_date = db.Column(db.DateTime, nullable=False, index=True)
-    surgical_data = db.Column(db.Text)
-    observations = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
-    
-    patient = db.relationship('Patient', backref='surgeries')
-    doctor = db.relationship('User', backref='surgeries')
-
 class Payment(db.Model):
     __tablename__ = 'payment'
     id = db.Column(db.Integer, primary_key=True)
