@@ -1377,16 +1377,18 @@ function loadTimeline() {
         return;
     }
     
-    fetch(`/api/patient/${id}/surgeries`)
-        .then(r => r.json())
-        .then(surgeries => {
-            renderTimeline(window.consultations || [], surgeries);
-        })
-        .catch(err => console.error('Erro ao carregar cirurgias para timeline:', err));
+    // Carregar consultas E cirurgias da API
+    Promise.all([
+        fetch(`/api/patient/${id}/evolutions`).then(r => r.json()),
+        fetch(`/api/patient/${id}/surgeries`).then(r => r.json())
+    ])
+    .then(([consultations, surgeries]) => {
+        renderTimeline(consultations || [], surgeries || []);
+    })
+    .catch(err => console.error('Erro ao carregar timeline:', err));
 }
 
 // Carregar timeline ao abrir a página
 document.addEventListener('DOMContentLoaded', function() {
-    window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
     loadTimeline();
 });
