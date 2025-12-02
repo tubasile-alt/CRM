@@ -465,8 +465,11 @@
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="checkout-tab" data-bs-toggle="tab" data-bs-target="#checkout-content" type="button" role="tab">
+        <button class="nav-link position-relative" id="checkout-tab" data-bs-toggle="tab" data-bs-target="#checkout-content" type="button" role="tab">
             <i class="bi bi-credit-card"></i> Checkout
+            <span id="pendingCheckoutBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none; font-size: 0.65rem;">
+                0
+            </span>
         </button>
     </li>
 </ul>

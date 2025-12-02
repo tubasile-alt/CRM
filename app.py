@@ -1839,7 +1839,6 @@ def get_pending_checkouts():
     
     today = get_brazil_time().date()
     
-    # Buscar TODOS os checkouts do dia (pendentes E pagos)
     payments = Payment.query.filter(
         db.func.date(Payment.created_at) == today
     ).all()
@@ -1850,19 +1849,41 @@ def get_pending_checkouts():
     for payment in payments:
         patient = payment.patient
         apt_id = payment.appointment_id if payment.appointment_id else 'N/A'
+        
+        procedures = list(payment.procedures or [])
+        consultation_type = payment.consultation_type or 'Particular'
+        consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
+        
+        has_consultation_item = any(p.get('name', '').startswith('Consulta') for p in procedures)
+        
+        if payment.status == 'pendente' and not has_consultation_item and consultation_fee > 0:
+            procedures.insert(0, {
+                'name': f'Consulta {consultation_type}',
+                'value': consultation_fee
+            })
+            payment.procedures = procedures
+            db.session.commit()
+        
+        computed_total = sum(float(p.get('value', 0)) for p in procedures)
+        
+        if payment.status == 'pendente' and abs(float(payment.total_amount) - computed_total) > 0.01:
+            payment.total_amount = computed_total
+            db.session.commit()
+        
         data.append({
             'id': payment.id,
             'appointment_id': apt_id,
             'patient_name': patient.name if patient else 'Desconhecido',
-            'consultation_type': payment.consultation_type,
-            'total_amount': float(payment.total_amount),
-            'procedures': payment.procedures or [],
+            'consultation_type': consultation_type,
+            'total_amount': computed_total,
+            'procedures': procedures,
             'created_at': payment.created_at.strftime('%H:%M'),
             'status': payment.status,
             'paid_at': payment.paid_at.strftime('%H:%M') if payment.paid_at else None,
-            'payment_method': payment.payment_method
+            'payment_method': payment.payment_method,
+            'consultation_included': has_consultation_item or (consultation_fee > 0 and payment.status == 'pendente')
         })
-        print(f"  - Payment {payment.id}: {patient.name if patient else '?'} R${payment.total_amount} - {payment.status}")
+        print(f"  - Payment {payment.id}: {patient.name if patient else '?'} R${computed_total} - {payment.status}")
     
     return jsonify({'success': True, 'checkouts': data})
 
@@ -1918,6 +1939,79 @@ def process_payment(payment_id):
     
     db.session.commit()
     
+    return jsonify({'success': True, 'message': 'Pagamento registrado com sucesso'})
+
+@app.route('/api/checkout/pending/count', methods=['GET'])
+@login_required
+def get_pending_checkout_count():
+    """Retorna a contagem de checkouts pendentes do dia"""
+    today = get_brazil_time().date()
+    
+    count = Payment.query.filter(
+        db.func.date(Payment.created_at) == today,
+        Payment.status == 'pendente'
+    ).count()
+    
+    return jsonify({'success': True, 'count': count})
+
+@app.route('/api/checkout/<int:payment_id>/toggle-consultation', methods=['POST'])
+@login_required
+def toggle_consultation_charge(payment_id):
+    """Ativa ou desativa a cobrança da consulta no checkout"""
+    if not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Apenas secretárias'}), 403
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+    
+    payment = Payment.query.get(payment_id)
+    if not payment:
+        return jsonify({'success': False, 'error': 'Pagamento não encontrado'}), 404
+    
+    if payment.status != 'pendente':
+        return jsonify({'success': False, 'error': 'Não é possível alterar pagamento já processado'}), 400
+    
+    charge_consultation = data.get('charge_consultation', True)
+    consultation_type = payment.consultation_type or 'Particular'
+    consultation_fee = CONSULTATION_PRICES.get(consultation_type, 400.0)
+    
+    procedures = payment.procedures or []
+    
+    # Verificar se já tem item de consulta
+    consultation_item_index = None
+    for i, proc in enumerate(procedures):
+        if proc.get('name', '').startswith('Consulta'):
+            consultation_item_index = i
+            break
+    
+    if charge_consultation:
+        # Adicionar consulta se não existe
+        if consultation_item_index is None:
+            procedures.insert(0, {
+                'name': f'Consulta {consultation_type}',
+                'value': consultation_fee
+            })
+    else:
+        # Remover consulta se existe
+        if consultation_item_index is not None:
+            procedures.pop(consultation_item_index)
+    
+    # Recalcular total
+    new_total = sum(float(p.get('value', 0)) for p in procedures)
+    
+    payment.procedures = procedures
+    payment.total_amount = new_total
+    
+    db.session.commit()
+    
+    return jsonify({
+        'success': True, 
+        'new_total': new_total,
+        'procedures': procedures,
+        'message': 'Consulta ' + ('incluída' if charge_consultation else 'removida') + ' com sucesso'
+    })
+
 # ============ EVOLUTION ENDPOINTS ============
 @app.route('/api/patient/<int:patient_id>/evolutions', methods=['GET'])
 @login_required
