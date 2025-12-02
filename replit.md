@@ -15,11 +15,12 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ Layout flexbox (sem overlapping)
 - ✅ Blocos de agendamento com 3 colunas: Nome | Tipo Paciente | Tipo Consulta
 - ✅ Sistema de backup automático implementado
-- ✅ **NOVA**: Aba Cirurgias implementada para Transplante Capilar
-  - Modelo: `TransplantSurgeryRecord` criado em models.py
-  - Endpoints: POST /api/patient/<id>/surgery, DELETE /api/surgery/<id>
+- ✅ **✅ COMPLETO**: Aba Cirurgias implementada e funcional para Transplante Capilar
+  - Modelo: `TransplantSurgeryRecord` em models.py
+  - Blueprint: `patient_bp` em routes/patient.py com 3 endpoints
+  - Endpoints: GET, POST, DELETE para cirurgias
   - Interface: Aba independente com formulário e histórico
-  - Funcionalidades: Registrar cirurgias, calcular tempo desde cirurgia, botão para criar evolução vinculada
+  - Funcionalidades: Registrar cirurgias ✅, calcular tempo desde cirurgia ✅, criar evolução vinculada ✅
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
@@ -89,7 +90,7 @@ python init_backup.py && python app.py
 4. **Checkout** - Sistema de pagamento por procedimento
 5. **Chat** - Comunicação interna entre usuários
 6. **Controle de Acesso** - Médicos veem seus pacientes, secretárias veem todos
-7. **Registro de Cirurgias** - Para pacientes de Transplante Capilar (Nova!)
+7. **Registro de Cirurgias** - Para pacientes de Transplante Capilar ✅
 
 ## 📁 Estrutura de Pastas
 ```
@@ -104,8 +105,15 @@ python init_backup.py && python app.py
 ├── utils/
 │   └── database_backup.py # Sistema de backup
 ├── routes/                # Blueprints de rotas
+│   ├── __init__.py
+│   ├── patient.py         # Rotas de paciente (cirurgias)
+│   ├── surgical_map.py
+│   ├── settings.py
+│   └── waiting_room.py
 ├── templates/             # Templates HTML
 ├── static/               # CSS, JS, imagens
+│   └── js/
+│       └── surgeries.js   # JavaScript para cirurgias
 ├── backups/              # Diretório de backups
 └── instance/
     └── medcrm.db         # Banco SQLite local
@@ -130,34 +138,34 @@ Todos os dados de pacientes são sensíveis e críticos para operação clínica
 
 ## 📝 Notas de Desenvolvimento - Aba Cirurgias (02/12/2025)
 
-### Implementação Realizada
-- Criado modelo `TransplantSurgeryRecord` em models.py com campos: patient_id, doctor_id, surgery_date, surgical_data, observations, created_at, updated_at
-- Implementados 3 endpoints Flask:
-  - `POST /api/patient/<patient_id>/surgery` - Criar cirurgia
-  - `GET /api/patient/<patient_id>/surgeries` - Listar cirurgias
-  - `DELETE /api/surgery/<surgery_id>` - Deletar cirurgia
-- Criada interface HTML com aba "Cirurgias" independente em prontuario.html
-- Implementado sistema JavaScript (surgeries.js) com:
+### ✅ Implementação Completa
+- ✅ Criado modelo `TransplantSurgeryRecord` em models.py
+- ✅ Criado blueprint de paciente (`routes/patient.py`) com 3 rotas:
+  - `GET /api/patient/<id>/surgeries` - Carrega histórico de cirurgias
+  - `POST /api/patient/<id>/surgery` - Cria nova cirurgia
+  - `DELETE /api/patient/<id>/surgery` - Remove cirurgia
+- ✅ Implementado sistema JavaScript com:
   - Validação de formulário
-  - Contador automático de tempo (ex: "01/12/24 - 1 ano desde cirurgia")
+  - Contador automático de tempo desde cirurgia
   - Carregamento e renderização de histórico
   - Botão para criar evolução vinculada
+  - Exclusão de cirurgias
 
-### Status Atual
-- ✅ Modelo e endpoints implementados
-- ✅ Interface HTML criada
-- ✅ JavaScript funcional
-- ✅ Servidor limpo e reiniciado
-- ⚠️ Rota GET não está sendo registrada no Flask após reinício (necessita debug)
+### 🔧 Correção Realizada
+- **Problema:** Rotas definidas em app.py não estavam sendo registradas (retornando 404)
+- **Solução:** Criado blueprint dedicado (`routes/patient.py`) e registrado no Flask
+- **Resultado:** Todas as rotas agora funcionam (GET 200, POST 200, DELETE funcionando)
 
-### Próximos Passos
-- Verificar por que a rota GET `/api/patient/<patient_id>/surgeries` não está sendo registrada
-- Possível causa: erro de runtime quando Flask carrega a rota
+### ✅ Testes Realizados
+- Salvamento de cirurgia: ✅ Funciona (POST status 200)
+- Carregamento de histórico: ✅ Funciona (GET status 200)
+- Contador automático: ✅ Calcula corretamente ("27/11/2025 - Cirurgia recente")
+- Dados persistem no banco: ✅ Cirurgia salva com ID, data, dados e observações
 
 ## 🔒 Segurança
 - Senhas com hash seguro
 - CSRF protection ativada
 - Session cookies com HTTPOnly
 - Acesso controlado por papéis
-- Backups comprimidos e versionados
 - Acesso a cirurgias verificado por doctor_id
+- Backups comprimidos e versionados
