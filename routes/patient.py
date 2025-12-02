@@ -45,3 +45,19 @@ def create_patient_surgery(patient_id):
     
     return jsonify({'success': True, 'id': surgery.id})
 
+@patient_bp.route('/delete/<int:surgery_id>', methods=['DELETE'])
+@login_required
+def delete_patient_surgery(surgery_id):
+    """Deletar uma cirurgia"""
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
+    if surgery.doctor_id != current_user.id and not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    db.session.delete(surgery)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+

@@ -167,7 +167,7 @@ function renderSurgeries(surgeries) {
 function deleteSurgery(surgeryId) {
     if (!confirm('❌ Tem certeza que deseja deletar esta cirurgia? Esta ação é irreversível.')) return;
     
-    fetch(`/api/surgery/${surgeryId}`, {
+    fetch(`/api/patient/delete/${surgeryId}`, {
         method: 'DELETE',
         headers: {'Content-Type': 'application/json'}
     })
