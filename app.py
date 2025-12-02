@@ -1853,6 +1853,9 @@ def get_evolutions(patient_id):
     # Buscar todas as consultas do paciente
     consultations = Appointment.query.filter_by(patient_id=patient_id).order_by(Appointment.start_time.desc()).all()
     
+    # Rastrear consultation_ids com evoluções
+    consultation_ids_with_evolutions = set()
+    
     result = []
     for consultation in consultations:
         # Buscar evoluções desta consulta
@@ -1869,6 +1872,7 @@ def get_evolutions(patient_id):
         
         # Adicionar evoluções desta consulta
         for evo in evolutions:
+            consultation_ids_with_evolutions.add(consultation.id)
             consultation_data['evolutions'].append({
                 'id': evo.id,
                 'date': evo.evolution_date.strftime('%d/%m/%Y %H:%M'),
@@ -1878,6 +1882,29 @@ def get_evolutions(patient_id):
             })
         
         result.append(consultation_data)
+    
+    # Buscar evoluções sem consultation_id (orphaned) - estas precisam ser vinculadas a uma consulta real
+    orphaned_evolutions = Evolution.query.filter_by(patient_id=patient_id, consultation_id=None).order_by(Evolution.evolution_date.desc()).all()
+    
+    # Vincular evoluções órfãs à consulta mais recente
+    if orphaned_evolutions and consultations:
+        # Encontrar a consulta mais recente
+        most_recent_consultation = consultations[0]
+        
+        # Encontrar a entrada desta consulta no resultado
+        for consultation_entry in result:
+            if consultation_entry['id'] == most_recent_consultation.id:
+                for evo in orphaned_evolutions:
+                    consultation_entry['evolutions'].append({
+                        'id': evo.id,
+                        'date': evo.evolution_date.strftime('%d/%m/%Y %H:%M'),
+                        'content': evo.content,
+                        'doctor': evo.doctor.name,
+                        'evolution_date': evo.evolution_date.isoformat()
+                    })
+                # Ordenar evoluções por data
+                consultation_entry['evolutions'].sort(key=lambda x: x['evolution_date'])
+                break
     
     return jsonify(result)
 
