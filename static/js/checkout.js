@@ -99,33 +99,9 @@ function createCheckoutCard(checkout) {
     
     let itemsHtml = '<table class="table table-sm table-borderless mb-2" style="font-size: 0.85rem;">';
     
-    if (consultationItem) {
-        const checkboxId = `charge-consult-${checkout.id}`;
-        const consultValue = parseFloat(consultationItem.value || 0);
-        
-        if (isPaid) {
-            itemsHtml += `
-                <tr class="border-bottom">
-                    <td style="width: 30px;"><i class="bi bi-check text-success"></i></td>
-                    <td><strong>${consultationItem.name}</strong></td>
-                    <td class="text-end text-primary"><strong>R$ ${consultValue.toFixed(2)}</strong></td>
-                </tr>
-            `;
-        } else {
-            itemsHtml += `
-                <tr class="border-bottom">
-                    <td style="width: 30px;">
-                        <input type="checkbox" class="form-check-input" id="${checkboxId}" 
-                            onchange="toggleConsultationCharge(${checkout.id}, this.checked)" 
-                            checked>
-                    </td>
-                    <td><strong>${consultationItem.name}</strong></td>
-                    <td class="text-end text-primary"><strong>R$ ${consultValue.toFixed(2)}</strong></td>
-                </tr>
-            `;
-        }
-    } else if (!isPaid) {
+    if (!isPaid) {
         if (isConsultationFree) {
+            // Consulta gratuita - sem checkbox, apenas exibe como grátis
             itemsHtml += `
                 <tr class="border-bottom">
                     <td style="width: 30px;"><i class="bi bi-gift text-success"></i></td>
@@ -134,15 +110,34 @@ function createCheckoutCard(checkout) {
                 </tr>
             `;
         } else {
+            // Consulta paga - com checkbox para controlar se cobra ou não
             const checkboxId = `charge-consult-${checkout.id}`;
+            const isChecked = consultationItem ? 'checked' : '';
+            const consultValue = consultationItem ? parseFloat(consultationItem.value || 0).toFixed(2) : consultationPrice.toFixed(2);
+            const rowClass = consultationItem ? '' : 'text-muted';
+            const textDecoration = consultationItem ? '' : 'text-decoration-line-through';
+            
             itemsHtml += `
-                <tr class="border-bottom text-muted">
+                <tr class="border-bottom ${rowClass}">
                     <td style="width: 30px;">
                         <input type="checkbox" class="form-check-input" id="${checkboxId}" 
-                            onchange="toggleConsultationCharge(${checkout.id}, this.checked)">
+                            onchange="toggleConsultationCharge(${checkout.id}, this.checked)"
+                            ${isChecked}>
                     </td>
-                    <td><span class="text-decoration-line-through">Consulta ${consultationType}</span></td>
-                    <td class="text-end"><span class="text-decoration-line-through">R$ ${consultationPrice.toFixed(2)}</span></td>
+                    <td><strong><span class="${textDecoration}">Consulta ${consultationType}</span></strong></td>
+                    <td class="text-end text-primary"><strong><span class="${textDecoration}">R$ ${consultValue}</span></strong></td>
+                </tr>
+            `;
+        }
+    } else {
+        // Pagamento realizado - exibe consulta se foi cobrada
+        if (consultationItem) {
+            const consultValue = parseFloat(consultationItem.value || 0);
+            itemsHtml += `
+                <tr class="border-bottom">
+                    <td style="width: 30px;"><i class="bi bi-check text-success"></i></td>
+                    <td><strong>${consultationItem.name}</strong></td>
+                    <td class="text-end text-primary"><strong>R$ ${consultValue.toFixed(2)}</strong></td>
                 </tr>
             `;
         }
