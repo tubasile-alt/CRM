@@ -725,6 +725,14 @@ def prontuario(patient_id):
     if not current_user.is_doctor() and not current_user.is_secretary():
         return redirect(url_for('agenda'))
     
+    # Verificar acesso: Médicos veem apenas seus próprios pacientes, secretárias veem todos
+    if current_user.is_doctor():
+        from models import PatientDoctor
+        pd = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
+        if not pd:
+            from flask import abort
+            abort(403)
+    
     patient = Patient.query.get_or_404(patient_id)
     procedures = Procedure.query.all()
     tags = Tag.query.all()
