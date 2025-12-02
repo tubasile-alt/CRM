@@ -1494,3 +1494,71 @@ function loadTimeline() {
 document.addEventListener('DOMContentLoaded', function() {
     loadTimeline();
 });
+
+function openEditPatientModal() {
+    const modal = new bootstrap.Modal(document.getElementById('editPatientModal'));
+    modal.show();
+}
+
+function savePatientData() {
+    const data = {
+        name: document.getElementById('editPatientName').value,
+        email: document.getElementById('editPatientEmail').value,
+        phone: document.getElementById('editPatientPhone').value,
+        birth_date: document.getElementById('editPatientBirthDate').value,
+        cpf: document.getElementById('editPatientCpf').value,
+        address: document.getElementById('editPatientAddress').value,
+        city: document.getElementById('editPatientCity').value,
+        state: document.getElementById('editPatientState').value,
+        zip_code: document.getElementById('editPatientZip').value
+    };
+    
+    if (!data.name) {
+        showAlert('Nome é obrigatório', 'danger');
+        return;
+    }
+    
+    const id = window.patientId || patientId;
+    
+    fetch(`/api/patient/${id}/update`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Dados atualizados com sucesso!', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editPatientModal')).hide();
+            setTimeout(() => location.reload(), 500);
+        } else {
+            showAlert(result.error || 'Erro ao atualizar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao salvar dados', 'danger');
+    });
+}
+
+function saveTransplantIndication() {
+    const indication = document.querySelector('input[name="transplantIndication"]:checked')?.value;
+    if (!indication) return;
+    
+    const id = window.patientId || patientId;
+    
+    fetch(`/api/patient/${id}/transplant-indication`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({has_indication: indication === 'sim'})
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Indicação salva!', 'success');
+        } else {
+            showAlert(result.error || 'Erro ao salvar', 'danger');
+        }
+    })
+    .catch(err => console.error('Erro:', err));
+}

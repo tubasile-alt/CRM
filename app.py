@@ -721,6 +721,73 @@ def save_attention_note(patient_id):
     
     return jsonify({'success': True})
 
+@app.route('/api/patient/<int:patient_id>/update', methods=['POST'])
+@login_required
+def update_patient(patient_id):
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Sem permissão'}), 403
+    
+    # Verificar acesso: Médicos só podem editar seus próprios pacientes
+    if current_user.is_doctor():
+        from models import PatientDoctor
+        pd = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
+        if not pd:
+            return jsonify({'success': False, 'error': 'Sem acesso a este paciente'}), 403
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+    
+    patient = Patient.query.get_or_404(patient_id)
+    
+    if data.get('name'):
+        patient.name = data['name']
+    if 'email' in data:
+        patient.email = data['email'] or None
+    if 'phone' in data:
+        patient.phone = data['phone'] or None
+    if 'birth_date' in data:
+        if data['birth_date']:
+            from datetime import datetime
+            patient.birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
+        else:
+            patient.birth_date = None
+    if 'cpf' in data:
+        patient.cpf = data['cpf'] or None
+    if 'address' in data:
+        patient.address = data['address'] or None
+    if 'city' in data:
+        patient.city = data['city'] or None
+    if 'state' in data:
+        patient.state = data['state'] or None
+    if 'zip_code' in data:
+        patient.zip_code = data['zip_code'] or None
+    
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/patient/<int:patient_id>/transplant-indication', methods=['POST'])
+@login_required
+def save_transplant_indication(patient_id):
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    # Verificar acesso: Médicos só podem editar seus próprios pacientes
+    from models import PatientDoctor
+    pd = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
+    if not pd:
+        return jsonify({'success': False, 'error': 'Sem acesso a este paciente'}), 403
+    
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+    
+    patient = Patient.query.get_or_404(patient_id)
+    patient.has_transplant_indication = data.get('has_indication', False)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
 @app.route('/prontuario/<int:patient_id>')
 @login_required
 def prontuario(patient_id):
@@ -877,6 +944,13 @@ def prontuario(patient_id):
     # Pegar appointment_id da query string (opcional)
     appointment_id = request.args.get('appointment_id', type=int)
     
+    # Calcular idade do paciente
+    age = None
+    if patient.birth_date:
+        from datetime import date
+        today = date.today()
+        age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
+    
     return render_template('prontuario.html', 
                          patient=patient, 
                          procedures=procedures,
@@ -884,7 +958,8 @@ def prontuario(patient_id):
                          patient_tags=patient_tags,
                          notes=notes,
                          consultations=consultations,
-                         appointment_id=appointment_id)
+                         appointment_id=appointment_id,
+                         age=age)
 
 @app.route('/api/prontuario/<int:patient_id>', methods=['POST'])
 @login_required

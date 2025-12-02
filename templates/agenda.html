@@ -716,6 +716,53 @@
     </div>
 </div>
 
+<!-- Modal de Pagamento do Checkout -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-credit-card"></i> Registrar Pagamento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Paciente:</strong> <span id="patientNamePayment"></span></p>
+                <p><strong>Valor:</strong> <span id="paymentAmount" class="text-success fs-4"></span></p>
+                
+                <div class="mb-3">
+                    <label class="form-label">Forma de Pagamento *</label>
+                    <select class="form-select" id="paymentMethod" onchange="updateInstallments()">
+                        <option value="">Selecione...</option>
+                        <option value="dinheiro">Dinheiro</option>
+                        <option value="pix">PIX</option>
+                        <option value="cartao_debito">Cartão de Débito</option>
+                        <option value="cartao">Cartão de Crédito</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3" id="installmentsDiv" style="display: none;">
+                    <label class="form-label">Parcelas</label>
+                    <select class="form-select" id="installments">
+                        <option value="1">1x (à vista)</option>
+                        <option value="2">2x</option>
+                        <option value="3">3x</option>
+                        <option value="4">4x</option>
+                        <option value="5">5x</option>
+                        <option value="6">6x</option>
+                        <option value="10">10x</option>
+                        <option value="12">12x</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="completePayment()">
+                    <i class="bi bi-check-circle"></i> Confirmar Pagamento
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="eventDetailModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
