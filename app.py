@@ -2005,6 +2005,7 @@ def create_patient_surgery(patient_id):
         return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
     
     from models import Surgery
+    from datetime import datetime
     data = request.get_json()
     
     try:
