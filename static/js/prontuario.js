@@ -1038,19 +1038,20 @@ function loadConsultationsDropdown() {
 function saveEvolution() {
     const content = document.getElementById('evolutionContent').value.trim();
     const date = document.getElementById('evolutionDate').value;
-    const consultDisplay = document.getElementById('evolutionConsultationDisplay');
-    let consultationId = document.getElementById('evolutionConsultation').value;
     const modal = document.getElementById('evolutionModal');
     const surgeryId = modal.dataset.surgeryId;
     const type = modal.dataset.type;
+    const patId = window.patientId || patientId;
     
     if (!content) {
         showAlert('Descrição vazia!', 'warning');
         return;
     }
     
+    console.log('saveEvolution - type:', type, 'surgeryId:', surgeryId);
+    
     if (type === 'surgery' && surgeryId) {
-        const patId = window.patientId || patientId;
+        // Salvar evolução de cirurgia
         fetch(`/api/patient/${patId}/surgery/${surgeryId}/evolution`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -1058,6 +1059,7 @@ function saveEvolution() {
         })
         .then(r => r.json())
         .then(result => {
+            console.log('Resultado evolução cirurgia:', result);
             if (result.success) {
                 showAlert('✅ Evolução de cirurgia salva!', 'success');
                 bootstrap.Modal.getInstance(modal).hide();
@@ -1071,6 +1073,9 @@ function saveEvolution() {
             showAlert('Erro ao salvar evolução', 'danger');
         });
     } else {
+        // Salvar evolução de consulta
+        let consultationId = document.getElementById('evolutionConsultation').value;
+        
         if (!consultationId || consultationId === '') {
             showAlert('Selecione uma consulta!', 'warning');
             return;
@@ -1078,7 +1083,9 @@ function saveEvolution() {
         
         consultationId = parseInt(consultationId);
         
-        fetch(`/api/patient/${patientId}/evolution`, {
+        console.log('Salvando evolução consulta - consultationId:', consultationId);
+        
+        fetch(`/api/patient/${patId}/evolution`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -1089,6 +1096,7 @@ function saveEvolution() {
         })
         .then(r => r.json())
         .then(result => {
+            console.log('Resultado evolução consulta:', result);
             if (result.success) {
                 showAlert('Evolução salva com sucesso!', 'success');
                 bootstrap.Modal.getInstance(modal).hide();
@@ -1290,6 +1298,8 @@ function deleteSurgeryEvolution(evolutionId) {
 
 function openEvolutionFromConsultation(consultationId, consultationDate) {
     const now = new Date();
+    const modal = document.getElementById('evolutionModal');
+    
     document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
     document.getElementById('evolutionContent').value = '';
     document.getElementById('evolutionConsultation').value = consultationId;
@@ -1300,22 +1310,32 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     document.getElementById('evolutionConsultationName').textContent = `✓ ${consultationDate}`;
     
     // Marcar que veio de uma consulta específica
-    document.getElementById('evolutionModal').dataset.fromConsultation = 'true';
+    modal.dataset.fromConsultation = 'true';
+    modal.dataset.type = 'consultation';
+    modal.dataset.consultationId = consultationId;
+    delete modal.dataset.surgeryId;
     
-    new bootstrap.Modal(document.getElementById('evolutionModal')).show();
+    new bootstrap.Modal(modal).show();
 }
 
 function openEvolutionModal() {
     // Limpar modal quando aberto sem consulta específica
     const modal = document.getElementById('evolutionModal');
-    modal.dataset.fromConsultation = 'false';
+    const now = new Date();
+    
+    document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
+    document.getElementById('evolutionContent').value = '';
+    document.getElementById('evolutionConsultation').value = '';
     
     document.getElementById('evolutionConsultation').style.display = 'block';
     document.getElementById('evolutionConsultationDisplay').style.display = 'none';
-    document.getElementById('evolutionConsultation').value = '';
-    document.getElementById('evolutionDate').value = new Date().toISOString().slice(0, 16);
-    document.getElementById('evolutionContent').value = '';
     
+    modal.dataset.fromConsultation = 'false';
+    modal.dataset.type = 'consultation';
+    delete modal.dataset.surgeryId;
+    delete modal.dataset.consultationId;
+    
+    loadConsultationsDropdown();
     new bootstrap.Modal(modal).show();
 }
 
