@@ -1142,9 +1142,49 @@ function loadTimeline() {
         .catch(err => console.error('Erro ao carregar evoluções:', err));
 }
 
+function calculateDaysPassed(dateStr) {
+    // Parse data no formato DD/MM/YYYY
+    const [day, month, year] = dateStr.split('/').map(Number);
+    const surgeryDate = new Date(year, month - 1, day);
+    const today = new Date();
+    
+    const diffTime = today - surgeryDate;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Calcular anos, meses e dias
+    let years = Math.floor(diffDays / 365);
+    let months = Math.floor((diffDays % 365) / 30);
+    let days = diffDays % 30;
+    
+    // Formatar output
+    const parts = [];
+    if (years > 0) parts.push(`${years} ano${years !== 1 ? 's' : ''}`);
+    if (months > 0) parts.push(`${months} mês${months !== 1 ? 'es' : ''}`);
+    if (days > 0 || parts.length === 0) parts.push(`${days} dia${days !== 1 ? 's' : ''}`);
+    
+    return parts.slice(0, 2).join(' e '); // Mostrar no máximo 2 unidades
+}
+
+function groupSurgeriesByMonthYear(surgeries) {
+    const grouped = {};
+    
+    surgeries.forEach(surgery => {
+        const [day, month, year] = surgery.surgery_date.split('/');
+        const key = `${month}/${year}`;
+        const monthYear = new Date(year, month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        
+        if (!grouped[key]) {
+            grouped[key] = { monthYear, surgeries: [] };
+        }
+        grouped[key].surgeries.push(surgery);
+    });
+    
+    return grouped;
+}
+
 function renderSurgeries(surgeries = []) {
     const container = document.getElementById('surgeriesContainer');
-    if (!container) return; // Se não há container, pular
+    if (!container) return;
     
     container.innerHTML = '';
     
@@ -1153,56 +1193,74 @@ function renderSurgeries(surgeries = []) {
         return;
     }
     
-    surgeries.forEach(surgery => {
-        const surgeryDiv = document.createElement('div');
-        surgeryDiv.className = 'mb-4 p-3 border rounded';
-        surgeryDiv.style.backgroundColor = '#e3f2fd';
-        surgeryDiv.style.borderLeft = '5px solid #2196F3';
+    // Agrupar cirurgias por mês/ano
+    const grouped = groupSurgeriesByMonthYear(surgeries);
+    
+    // Renderizar grupos
+    Object.keys(grouped).sort().reverse().forEach(key => {
+        const group = grouped[key];
         
-        surgeryDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <div>
-                    <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${surgery.surgery_date}</strong></h6>
-                    <p class="mb-1"><small><strong>Cirurgia de Transplante</strong></small></p>
-                </div>
-                <button class="btn btn-sm btn-outline-success" onclick="openSurgeryEvolutionModal(${surgery.id}, '${surgery.surgery_date}')">
-                    <i class="bi bi-plus"></i> Evolução
-                </button>
-            </div>
-            <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${surgery.surgical_data}</p>
-            ${surgery.observations ? `<p><strong>Observações:</strong> ${surgery.observations}</p>` : ''}
-            <p class="mb-3"><small class="text-muted">Dr. ${surgery.doctor_name}</small></p>
-        `;
+        // Criar header do grupo
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'mb-3 mt-3 pt-2 border-top';
+        groupHeader.innerHTML = `<h6 class="text-secondary text-capitalize">${group.monthYear}</h6>`;
+        container.appendChild(groupHeader);
         
-        // Adicionar evoluções da cirurgia
-        if (surgery.evolutions && surgery.evolutions.length > 0) {
-            const evolutionsDiv = document.createElement('div');
-            evolutionsDiv.className = 'ms-4 ps-3 border-start border-primary';
+        // Renderizar cirurgias do grupo
+        group.surgeries.forEach(surgery => {
+            const daysPassed = calculateDaysPassed(surgery.surgery_date);
             
-            surgery.evolutions.forEach(evo => {
-                const evoDiv = document.createElement('div');
-                evoDiv.className = 'mb-2 p-2 bg-white border-left rounded';
-                evoDiv.style.borderLeft = '4px solid #2196F3';
-                
-                evoDiv.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
-                            <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
-                            <small class="text-muted">Dr. ${evo.doctor}</small>
-                        </div>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgeryEvolution(${evo.id})">
-                            <i class="bi bi-trash"></i>
-                        </button>
+            const surgeryDiv = document.createElement('div');
+            surgeryDiv.className = 'mb-4 p-3 border rounded';
+            surgeryDiv.style.backgroundColor = '#e3f2fd';
+            surgeryDiv.style.borderLeft = '5px solid #2196F3';
+            
+            surgeryDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${surgery.surgery_date}</strong></h6>
+                        <p class="mb-1"><small class="text-success"><i class="bi bi-hourglass-split"></i> ${daysPassed}</small></p>
+                        <p class="mb-1"><small><strong>Cirurgia de Transplante</strong></small></p>
                     </div>
-                `;
-                evolutionsDiv.appendChild(evoDiv);
-            });
+                    <button class="btn btn-sm btn-outline-success" onclick="openSurgeryEvolutionModal(${surgery.id}, '${surgery.surgery_date}')">
+                        <i class="bi bi-plus"></i> Evolução
+                    </button>
+                </div>
+                <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${surgery.surgical_data}</p>
+                ${surgery.observations ? `<p><strong>Observações:</strong> ${surgery.observations}</p>` : ''}
+                <p class="mb-3"><small class="text-muted">Dr. ${surgery.doctor_name}</small></p>
+            `;
             
-            surgeryDiv.appendChild(evolutionsDiv);
-        }
-        
-        container.appendChild(surgeryDiv);
+            // Adicionar evoluções da cirurgia
+            if (surgery.evolutions && surgery.evolutions.length > 0) {
+                const evolutionsDiv = document.createElement('div');
+                evolutionsDiv.className = 'ms-4 ps-3 border-start border-primary';
+                
+                surgery.evolutions.forEach(evo => {
+                    const evoDiv = document.createElement('div');
+                    evoDiv.className = 'mb-2 p-2 bg-white border-left rounded';
+                    evoDiv.style.borderLeft = '4px solid #2196F3';
+                    
+                    evoDiv.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
+                                <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
+                                <small class="text-muted">Dr. ${evo.doctor}</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgeryEvolution(${evo.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                    evolutionsDiv.appendChild(evoDiv);
+                });
+                
+                surgeryDiv.appendChild(evolutionsDiv);
+            }
+            
+            container.appendChild(surgeryDiv);
+        });
     });
 }
 
