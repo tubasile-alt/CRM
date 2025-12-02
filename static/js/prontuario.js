@@ -1114,33 +1114,6 @@ function saveEvolution() {
     }
 }
 
-function loadTimeline() {
-    const id = window.patientId || patientId;
-    
-    // Carregar cirurgias
-    fetch(`/api/patient/${id}/surgeries`)
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
-        })
-        .then(surgeries => {
-            console.log('Cirurgias carregadas:', surgeries);
-            renderSurgeries(surgeries || []);
-        })
-        .catch(err => console.error('Erro ao carregar cirurgias:', err));
-    
-    // Carregar evoluções
-    fetch(`/api/patient/${id}/evolutions`)
-        .then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            return r.json();
-        })
-        .then(consultations => {
-            console.log('Evoluções carregadas:', consultations);
-            renderEvolutionsInAccordion(consultations || []);
-        })
-        .catch(err => console.error('Erro ao carregar evoluções:', err));
-}
 
 function calculateDaysPassed(dateStr) {
     // Parse data no formato DD/MM/YYYY
