@@ -374,6 +374,42 @@ function saveAttentionNote() {
                         </div>
                     </div>
 
+                    <!-- ABA CIRURGIAS (TRANSPLANTE CAPILAR) -->
+                    <div class="tab-pane fade" id="surgery">
+                        <h6 class="mb-3"><i class="bi bi-heart-pulse"></i> Registro de Cirurgias</h6>
+                        
+                        {% if current_user.is_doctor() %}
+                        <div class="card mb-4 p-3 bg-light">
+                            <h6 class="mb-3">Registrar Nova Cirurgia</h6>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label class="form-label"><strong>Data da Cirurgia</strong></label>
+                                    <input type="date" id="surgeryDate" class="form-control">
+                                    <small class="text-muted">Data atual ou retroativa</small>
+                                </div>
+                            </div>
+                            <div class="row g-2 mt-2">
+                                <div class="col-md-6">
+                                    <label class="form-label"><strong>Dados Cirúrgicos</strong></label>
+                                    <textarea id="surgicalData" class="form-control" rows="3" placeholder="Técnica, número de enxertos, áreas operadas, detalhes do procedimento..."></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label"><strong>Observações</strong></label>
+                                    <textarea id="surgeryObservations" class="form-control" rows="3" placeholder="Intercorrências, pontos importantes, cuidados pós-operatórios..."></textarea>
+                                </div>
+                            </div>
+                            <button class="btn btn-success mt-3" onclick="saveSurgery()">
+                                <i class="bi bi-plus-circle"></i> Registrar Cirurgia
+                            </button>
+                        </div>
+                        {% endif %}
+                        
+                        <h6 class="mb-2"><strong>Histórico de Cirurgias</strong></h6>
+                        <div id="surgeriesList" class="mb-3">
+                            <p class="text-muted text-center">Carregando cirurgias...</p>
+                        </div>
+                    </div>
+
                     <!-- ABA PLANEJAMENTO CIRÚRGICO (TRANSPLANTE CAPILAR) -->
                     <div class="tab-pane fade" id="transplante">
                         <h6 class="mb-3"><i class="bi bi-scissors"></i> Planejamento Cirúrgico</h6>

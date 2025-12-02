@@ -1995,6 +1995,66 @@ def delete_surgery(surgery_id):
     
     return jsonify({'success': True})
 
+# API para gerenciar cirurgias por paciente
+@app.route('/api/patient/<int:patient_id>/surgeries', methods=['GET'])
+@login_required
+def get_patient_surgeries(patient_id):
+    """Listar todas as cirurgias de um paciente"""
+    from models import Surgery
+    surgeries = Surgery.query.filter_by(patient_id=patient_id).order_by(Surgery.surgery_date.desc()).all()
+    return jsonify([{
+        'id': s.id,
+        'surgery_date': s.surgery_date.strftime('%d/%m/%Y'),
+        'surgery_date_iso': s.surgery_date.isoformat(),
+        'surgical_data': s.surgical_data,
+        'observations': s.observations,
+        'doctor_name': s.doctor.name
+    } for s in surgeries])
+
+@app.route('/api/patient/<int:patient_id>/surgery', methods=['POST'])
+@login_required
+def create_patient_surgery(patient_id):
+    """Criar nova cirurgia para um paciente"""
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    from models import Surgery
+    data = request.get_json()
+    
+    try:
+        surgery_date = datetime.strptime(data.get('surgery_date'), '%Y-%m-%d')
+    except:
+        return jsonify({'success': False, 'error': 'Data inválida'}), 400
+    
+    surgery = Surgery(
+        patient_id=patient_id,
+        doctor_id=current_user.id,
+        surgery_date=surgery_date,
+        surgical_data=data.get('surgical_data', ''),
+        observations=data.get('observations', '')
+    )
+    db.session.add(surgery)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'id': surgery.id})
+
+@app.route('/api/surgery/<int:surgery_id>', methods=['DELETE'])
+@login_required
+def delete_patient_surgery(surgery_id):
+    """Deletar uma cirurgia"""
+    from models import Surgery
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    surgery = Surgery.query.get_or_404(surgery_id)
+    if surgery.doctor_id != current_user.id and not current_user.is_admin():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    db.session.delete(surgery)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
 # API para listar consultas (para dropdown de evolução)
 @app.route('/api/patient/<int:patient_id>/consultations', methods=['GET'])
 @login_required
