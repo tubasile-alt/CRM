@@ -1891,7 +1891,7 @@ def get_pending_checkouts():
             'status': payment.status,
             'paid_at': format_brazil_datetime(payment.paid_at),
             'payment_method': payment.payment_method,
-            'consultation_included': has_consultation_item or (consultation_fee > 0 and payment.status == 'pendente')
+            'consultation_included': has_consultation_item
         })
         print(f"  - Payment {payment.id}: {patient.name if patient else '?'} R${computed_total} - {payment.status}")
     
