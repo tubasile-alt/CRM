@@ -257,8 +257,6 @@ async function loadExistingPlans() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Passar consultações para a timeline
-    window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
     // Carregar planos existentes ao iniciar
     setTimeout(loadExistingPlans, 500);
     
@@ -877,8 +875,6 @@ function finalizarAtendimento() {
 
 // Auto-open attention modal if there's content when page loads
 document.addEventListener('DOMContentLoaded', function() {
-    // Passar consultações para a timeline
-    window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
     const attentionContent = document.getElementById('attentionContent');
     if (attentionContent && attentionContent.textContent.trim()) {
         // Delay slightly to ensure page is fully loaded
