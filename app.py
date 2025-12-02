@@ -76,6 +76,21 @@ def parse_datetime_with_tz(iso_string):
         dt = dt.astimezone(tz)
     return dt
 
+def format_brazil_datetime(dt):
+    """Converte datetime para timezone de São Paulo e formata"""
+    if not dt:
+        return None
+    tz = pytz.timezone('America/Sao_Paulo')
+    
+    # Se o datetime é naive (sem timezone), assume que já está em São Paulo
+    if dt.tzinfo is None:
+        dt = tz.localize(dt)
+    else:
+        # Se tem timezone, converte para São Paulo
+        dt = dt.astimezone(tz)
+    
+    return dt.strftime('%d/%m/%Y %H:%M')
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -1877,9 +1892,9 @@ def get_pending_checkouts():
             'consultation_type': consultation_type,
             'total_amount': computed_total,
             'procedures': procedures,
-            'created_at': payment.created_at.strftime('%d/%m/%Y %H:%M'),
+            'created_at': format_brazil_datetime(payment.created_at),
             'status': payment.status,
-            'paid_at': payment.paid_at.strftime('%d/%m/%Y %H:%M') if payment.paid_at else None,
+            'paid_at': format_brazil_datetime(payment.paid_at),
             'payment_method': payment.payment_method,
             'consultation_included': has_consultation_item or (consultation_fee > 0 and payment.status == 'pendente')
         })
