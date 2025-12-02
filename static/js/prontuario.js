@@ -1231,15 +1231,23 @@ function renderSurgeries(surgeries = []) {
                 <p class="mb-3"><small class="text-muted">Dr. ${surgery.doctor_name}</small></p>
             `;
             
-            // Adicionar evoluções da cirurgia
+            // Sempre adicionar seção de evoluções da cirurgia
+            const evolutionsDiv = document.createElement('div');
+            evolutionsDiv.className = 'mt-3 pt-3 border-top';
+            
+            const evoHeader = document.createElement('h6');
+            evoHeader.className = 'text-success mb-2';
+            evoHeader.innerHTML = '<i class="bi bi-stickies"></i> Evoluções';
+            evolutionsDiv.appendChild(evoHeader);
+            
             if (surgery.evolutions && surgery.evolutions.length > 0) {
-                const evolutionsDiv = document.createElement('div');
-                evolutionsDiv.className = 'ms-4 ps-3 border-start border-primary';
+                const evosContainer = document.createElement('div');
+                evosContainer.className = 'ms-2 ps-3 border-start border-success';
                 
                 surgery.evolutions.forEach(evo => {
                     const evoDiv = document.createElement('div');
-                    evoDiv.className = 'mb-2 p-2 bg-white border-left rounded';
-                    evoDiv.style.borderLeft = '4px solid #2196F3';
+                    evoDiv.className = 'mb-3 p-2 bg-light rounded';
+                    evoDiv.style.borderLeft = '4px solid #198754';
                     
                     evoDiv.innerHTML = `
                         <div class="d-flex justify-content-between align-items-start">
@@ -1253,11 +1261,18 @@ function renderSurgeries(surgeries = []) {
                             </button>
                         </div>
                     `;
-                    evolutionsDiv.appendChild(evoDiv);
+                    evosContainer.appendChild(evoDiv);
                 });
                 
-                surgeryDiv.appendChild(evolutionsDiv);
+                evolutionsDiv.appendChild(evosContainer);
+            } else {
+                const noEvo = document.createElement('p');
+                noEvo.className = 'text-muted small mb-0';
+                noEvo.innerHTML = '<em>Nenhuma evolução registrada</em>';
+                evolutionsDiv.appendChild(noEvo);
             }
+            
+            surgeryDiv.appendChild(evolutionsDiv);
             
             container.appendChild(surgeryDiv);
         });
