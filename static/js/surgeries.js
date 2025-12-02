@@ -2,30 +2,44 @@
 
 // Função para calcular tempo desde cirurgia
 function calculateSurgeryTime(surgeryDate) {
-    const surgery = new Date(surgeryDate + 'T00:00:00');
-    const today = new Date();
-    
-    let years = today.getFullYear() - surgery.getFullYear();
-    let months = today.getMonth() - surgery.getMonth();
-    let days = today.getDate() - surgery.getDate();
-    
-    if (days < 0) {
-        months--;
-        days += 30;
+    try {
+        // Se receber string dd/mm/yyyy, converter para YYYY-MM-DD
+        let dateStr = surgeryDate;
+        if (surgeryDate.includes('/')) {
+            const parts = surgeryDate.split('/');
+            dateStr = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        }
+        
+        // Parse em UTC para evitar problemas de timezone
+        const [year, month, day] = dateStr.split('-').map(Number);
+        const surgery = new Date(Date.UTC(year, month - 1, day));
+        const today = new Date();
+        
+        let years = today.getFullYear() - surgery.getFullYear();
+        let months = today.getMonth() - surgery.getMonth();
+        let days = today.getDate() - surgery.getDate();
+        
+        if (days < 0) {
+            months--;
+            days += 30;
+        }
+        if (months < 0) {
+            years--;
+            months += 12;
+        }
+        
+        let timeStr = `${day.toString().padStart(2, '0')}/${month.toString().padStart(2, '0')}/${year}`;
+        let timePassed = [];
+        
+        if (years > 0) timePassed.push(`${years} ano${years > 1 ? 's' : ''}`);
+        if (months > 0) timePassed.push(`${months} mês${months > 1 ? 'es' : ''}`);
+        if (days > 0 && years === 0 && months < 3) timePassed.push(`${days} dia${days > 1 ? 's' : ''}`);
+        
+        return `${timeStr} - ${timePassed.length > 0 ? timePassed.join(' e ') + ' desde cirurgia' : 'Cirurgia recente'}`;
+    } catch (e) {
+        console.error('Erro ao calcular data:', e, surgeryDate);
+        return 'Data inválida';
     }
-    if (months < 0) {
-        years--;
-        months += 12;
-    }
-    
-    let timeStr = surgery.toLocaleDateString('pt-BR');
-    let timePassed = [];
-    
-    if (years > 0) timePassed.push(`${years} ano${years > 1 ? 's' : ''}`);
-    if (months > 0) timePassed.push(`${months} mês${months > 1 ? 'es' : ''}`);
-    if (days > 0 && years === 0 && months < 3) timePassed.push(`${days} dia${days > 1 ? 's' : ''}`);
-    
-    return `${timeStr} - ${timePassed.length > 0 ? timePassed.join(' e ') + ' desde cirurgia' : 'Cirurgia recente'}`;
 }
 
 // Salvar nova cirurgia
