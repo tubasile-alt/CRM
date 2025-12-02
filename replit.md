@@ -9,12 +9,17 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - **Frontend:** Jinja2 + HTML/CSS/JavaScript
 - **Autenticação:** Flask-Login com roles (médico, secretária)
 
-## 📊 Status Atual (25/11/2025)
+## 📊 Status Atual (02/12/2025)
 - ✅ Migração de dados do SQLite para PostgreSQL completa
 - ✅ Interface de agenda diária com mini-calendário 3D
 - ✅ Layout flexbox (sem overlapping)
 - ✅ Blocos de agendamento com 3 colunas: Nome | Tipo Paciente | Tipo Consulta
 - ✅ Sistema de backup automático implementado
+- ✅ **NOVA**: Aba Cirurgias implementada para Transplante Capilar
+  - Modelo: `TransplantSurgeryRecord` criado em models.py
+  - Endpoints: POST /api/patient/<id>/surgery, DELETE /api/surgery/<id>
+  - Interface: Aba independente com formulário e histórico
+  - Funcionalidades: Registrar cirurgias, calcular tempo desde cirurgia, botão para criar evolução vinculada
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
@@ -79,11 +84,12 @@ python init_backup.py && python app.py
 
 ## 🔧 Funcionalidades Principais
 1. **Agenda Diária** - Visualização por horários
-2. **Prontuário** - Histórico completo do paciente
+2. **Prontuário** - Histórico completo do paciente com evoluções
 3. **Agendamento** - Criação e edição de consultas
 4. **Checkout** - Sistema de pagamento por procedimento
 5. **Chat** - Comunicação interna entre usuários
-6. **Controle de Acesso** - Médicos veem sua agenda, secretárias veem todas
+6. **Controle de Acesso** - Médicos veem seus pacientes, secretárias veem todos
+7. **Registro de Cirurgias** - Para pacientes de Transplante Capilar (Nova!)
 
 ## 📁 Estrutura de Pastas
 ```
@@ -122,11 +128,31 @@ python init_backup.py && python app.py
 
 Todos os dados de pacientes são sensíveis e críticos para operação clínica.
 
-## 📝 Notas de Desenvolvimento
-- Dados migrados com sucesso do SQLite original para PostgreSQL
-- 5 pacientes e agendamentos recuperados
-- Sistema de backup protege contra qualquer perda de dados
-- Mini-calendário com efeitos 3D melhora UX
+## 📝 Notas de Desenvolvimento - Aba Cirurgias (02/12/2025)
+
+### Implementação Realizada
+- Criado modelo `TransplantSurgeryRecord` em models.py com campos: patient_id, doctor_id, surgery_date, surgical_data, observations, created_at, updated_at
+- Implementados 3 endpoints Flask:
+  - `POST /api/patient/<patient_id>/surgery` - Criar cirurgia
+  - `GET /api/patient/<patient_id>/surgeries` - Listar cirurgias
+  - `DELETE /api/surgery/<surgery_id>` - Deletar cirurgia
+- Criada interface HTML com aba "Cirurgias" independente em prontuario.html
+- Implementado sistema JavaScript (surgeries.js) com:
+  - Validação de formulário
+  - Contador automático de tempo (ex: "01/12/24 - 1 ano desde cirurgia")
+  - Carregamento e renderização de histórico
+  - Botão para criar evolução vinculada
+
+### Status Atual
+- ✅ Modelo e endpoints implementados
+- ✅ Interface HTML criada
+- ✅ JavaScript funcional
+- ✅ Servidor limpo e reiniciado
+- ⚠️ Rota GET não está sendo registrada no Flask após reinício (necessita debug)
+
+### Próximos Passos
+- Verificar por que a rota GET `/api/patient/<patient_id>/surgeries` não está sendo registrada
+- Possível causa: erro de runtime quando Flask carrega a rota
 
 ## 🔒 Segurança
 - Senhas com hash seguro
@@ -134,3 +160,4 @@ Todos os dados de pacientes são sensíveis e críticos para operação clínica
 - Session cookies com HTTPOnly
 - Acesso controlado por papéis
 - Backups comprimidos e versionados
+- Acesso a cirurgias verificado por doctor_id
