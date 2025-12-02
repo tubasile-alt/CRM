@@ -15,12 +15,11 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ Layout flexbox (sem overlapping)
 - ✅ Blocos de agendamento com 3 colunas: Nome | Tipo Paciente | Tipo Consulta
 - ✅ Sistema de backup automático implementado
-- ✅ **✅ COMPLETO**: Aba Cirurgias implementada e funcional para Transplante Capilar
-  - Modelo: `TransplantSurgeryRecord` em models.py
-  - Blueprint: `patient_bp` em routes/patient.py com 3 endpoints
-  - Endpoints: GET, POST, DELETE para cirurgias
-  - Interface: Aba independente com formulário e histórico
-  - Funcionalidades: Registrar cirurgias ✅, calcular tempo desde cirurgia ✅, criar evolução vinculada ✅
+- ✅ **Aba Cirurgias** implementada e funcional para Transplante Capilar
+- ✅ **Idade do paciente** exibida ao lado do nome no prontuário
+- ✅ **Botão Editar Cadastro** - Permite edição de dados do paciente (médicos e secretárias)
+- ✅ **Checkout corrigido** - Modal de pagamento funcionando na aba Checkout
+- ✅ **Indicação de Transplante** - Campo "Sim/Não" como primeiro item na aba Transplante Capilar
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
