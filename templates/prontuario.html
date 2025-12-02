@@ -1152,6 +1152,7 @@ function saveAttentionNote() {
 {% block extra_js %}
 <script>
 const patientId = {{ patient.id }};
+window.patientId = {{ patient.id }};
 const appointmentId = {{ appointment_id | tojson }};
 </script>
 <script src="{{ url_for('static', filename='js/surgeries.js') }}"></script>

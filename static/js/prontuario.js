@@ -1242,22 +1242,22 @@ function deleteEvolution(evoId) {
 }
 
 function loadTimeline() {
-    const patientId = window.patientId || document.querySelector('[data-patient-id]')?.dataset.patientId;
-    if (!patientId) return;
+    const id = window.patientId || patientId;
+    if (!id) {
+        console.error('patientId não encontrado');
+        return;
+    }
     
-    // Carregar cirurgias
-    fetch(`/api/patient/${patientId}/surgeries`)
+    fetch(`/api/patient/${id}/surgeries`)
         .then(r => r.json())
         .then(surgeries => {
-            window.surgeries = surgeries;
             renderTimeline(window.consultations || [], surgeries);
         })
-        .catch(err => console.error('Erro ao carregar cirurgias:', err));
+        .catch(err => console.error('Erro ao carregar cirurgias para timeline:', err));
 }
 
 // Carregar timeline ao abrir a página
 document.addEventListener('DOMContentLoaded', function() {
-    // Passar consultações para a timeline
     window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
     loadTimeline();
 });
