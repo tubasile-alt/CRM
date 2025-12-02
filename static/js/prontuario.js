@@ -1096,68 +1096,95 @@ function loadTimeline() {
         .catch(err => console.error('Erro ao carregar timeline:', err));
 }
 
-function renderTimeline(consultations = []) {
+function renderTimeline(consultations = [], surgeries = []) {
     const container = document.getElementById('timelineContainer');
     container.innerHTML = '';
     
-    if (!consultations || consultations.length === 0) {
+    // Combinar consultas e cirurgias e ordenar por data (mais recente primeiro)
+    let allItems = [
+        ...consultations.map(c => ({ ...c, type: 'consultation' })),
+        ...(surgeries || []).map(s => ({ 
+            id: `surgery_${s.id}`,
+            date: s.surgery_date,
+            category: '🏥 Cirurgia de Transplante',
+            doctor_name: s.doctor_name,
+            surgeryData: s.surgical_data,
+            observations: s.observations,
+            type: 'surgery'
+        }))
+    ];
+    
+    if (allItems.length === 0) {
         container.innerHTML = '<p class="text-muted text-center">Nenhuma consulta ou evolução registrada.</p>';
         return;
     }
     
-    // Renderizar cada consulta com suas evoluções
-    consultations.forEach((consultation, idx) => {
-        const consultDiv = document.createElement('div');
-        consultDiv.className = 'mb-4 p-3 border rounded bg-light';
-        
-        // Header da consulta
-        consultDiv.innerHTML = `
-            <div class="d-flex justify-content-between align-items-start mb-3">
-                <div>
-                    <h6 class="mb-1"><i class="bi bi-calendar-check"></i> <strong>${consultation.date}</strong></h6>
-                    <p class="mb-1"><small><strong>${consultation.category}</strong> com Dr. ${consultation.doctor_name}</small></p>
-                </div>
-                <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')">
-                    <i class="bi bi-plus"></i> Evolução
-                </button>
-            </div>
-        `;
-        
-        // Renderizar evoluções desta consulta
-        if (consultation.evolutions && consultation.evolutions.length > 0) {
-            const evolutionsList = document.createElement('div');
-            evolutionsList.className = 'ms-4 ps-3 border-start border-success';
-            
-            consultation.evolutions.forEach(evo => {
-                const evoDiv = document.createElement('div');
-                evoDiv.className = 'mb-3 p-2 bg-white border-left';
-                evoDiv.style.borderLeft = '4px solid #198754';
-                
-                evoDiv.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
-                            <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
-                            <small class="text-muted">Dr. ${evo.doctor}</small>
-                        </div>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
-                            <i class="bi bi-trash"></i>
-                        </button>
+    allItems.forEach((item) => {
+        const itemDiv = document.createElement('div');
+        if (item.type === 'surgery') {
+            itemDiv.className = 'mb-4 p-3 border rounded';
+            itemDiv.style.backgroundColor = '#e3f2fd';
+            itemDiv.style.borderLeft = '5px solid #2196F3';
+            itemDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${item.date}</strong></h6>
+                        <p class="mb-1"><small><strong>${item.category}</strong></small></p>
+                        <p class="mb-2" style="white-space: pre-wrap;"><strong>Dados:</strong> ${item.surgeryData}</p>
+                        ${item.observations ? `<p class="mb-2"><strong>Observações:</strong> ${item.observations}</p>` : ''}
+                        <small class="text-muted">Dr. ${item.doctor_name}</small>
                     </div>
-                `;
-                
-                evolutionsList.appendChild(evoDiv);
-            });
-            
-            consultDiv.appendChild(evolutionsList);
+                </div>
+            `;
         } else {
-            const noEvoDiv = document.createElement('div');
-            noEvoDiv.className = 'ms-4 ps-3 text-muted small';
-            noEvoDiv.innerHTML = '<em>Nenhuma evolução registrada para esta consulta</em>';
-            consultDiv.appendChild(noEvoDiv);
+            itemDiv.className = 'mb-4 p-3 border rounded bg-light';
+            itemDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h6 class="mb-1"><i class="bi bi-calendar-check"></i> <strong>${item.date}</strong></h6>
+                        <p class="mb-1"><small><strong>${item.category}</strong> com Dr. ${item.doctor_name}</small></p>
+                    </div>
+                    <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation(${item.id}, '${item.date}')">
+                        <i class="bi bi-plus"></i> Evolução
+                    </button>
+                </div>
+            `;
+            
+            if (item.evolutions && item.evolutions.length > 0) {
+                const evolutionsList = document.createElement('div');
+                evolutionsList.className = 'ms-4 ps-3 border-start border-success';
+                
+                item.evolutions.forEach(evo => {
+                    const evoDiv = document.createElement('div');
+                    evoDiv.className = 'mb-3 p-2 bg-white border-left';
+                    evoDiv.style.borderLeft = '4px solid #198754';
+                    
+                    evoDiv.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
+                                <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
+                                <small class="text-muted">Dr. ${evo.doctor}</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                    
+                    evolutionsList.appendChild(evoDiv);
+                });
+                
+                itemDiv.appendChild(evolutionsList);
+            } else {
+                const noEvoDiv = document.createElement('div');
+                noEvoDiv.className = 'ms-4 ps-3 text-muted small';
+                noEvoDiv.innerHTML = '<em>Nenhuma evolução registrada para esta consulta</em>';
+                itemDiv.appendChild(noEvoDiv);
+            }
         }
         
-        container.appendChild(consultDiv);
+        container.appendChild(itemDiv);
     });
 }
 
@@ -1212,6 +1239,20 @@ function deleteEvolution(evoId) {
         console.error('Erro:', err);
         showAlert('Erro ao deletar evolução', 'danger');
     });
+}
+
+function loadTimeline() {
+    const patientId = window.patientId || document.querySelector('[data-patient-id]')?.dataset.patientId;
+    if (!patientId) return;
+    
+    // Carregar cirurgias
+    fetch(`/api/patient/${patientId}/surgeries`)
+        .then(r => r.json())
+        .then(surgeries => {
+            window.surgeries = surgeries;
+            renderTimeline(window.consultations || [], surgeries);
+        })
+        .catch(err => console.error('Erro ao carregar cirurgias:', err));
 }
 
 // Carregar timeline ao abrir a página
