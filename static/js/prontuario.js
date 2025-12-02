@@ -1257,11 +1257,30 @@ function renderEvolutionsInAccordion(consultations = []) {
     setTimeout(() => {
         consultations.forEach(consultation => {
             const containerId = `evolutionsContainer${consultation.id}`;
-            const container = document.getElementById(containerId);
+            let container = document.getElementById(containerId);
             
             if (!container) {
-                console.log(`Container não encontrado para consultaID ${consultation.id}`);
-                return;
+                // Tentar encontrar dentro do accordion body
+                const collapseDiv = document.getElementById(`collapse${consultation.id}`);
+                if (collapseDiv) {
+                    container = collapseDiv.querySelector(`#${containerId}`);
+                }
+            }
+            
+            if (!container) {
+                console.log(`Container não encontrado para consultaID ${consultation.id}, criando...`);
+                // Criar container se não existir
+                const collapseDiv = document.getElementById(`collapse${consultation.id}`);
+                if (collapseDiv) {
+                    const newContainer = document.createElement('div');
+                    newContainer.id = containerId;
+                    newContainer.className = 'mt-2';
+                    collapseDiv.appendChild(newContainer);
+                    container = newContainer;
+                } else {
+                    console.log(`Collapse div também não encontrada para ${consultation.id}`);
+                    return;
+                }
             }
             
             container.innerHTML = '';
