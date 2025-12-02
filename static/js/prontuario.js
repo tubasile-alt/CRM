@@ -1114,13 +1114,16 @@ function saveEvolution() {
 
 function loadTimeline() {
     const id = window.patientId || patientId;
-    fetch(`/api/patient/${id}/surgeries`)
-        .then(r => r.json())
-        .then(surgeries => {
-            window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
-            renderTimeline(window.consultations, surgeries);
-        })
-        .catch(err => console.error('Erro ao carregar timeline:', err));
+    
+    // Carregar cirurgias e consultas em paralelo
+    Promise.all([
+        fetch(`/api/patient/${id}/surgeries`).then(r => r.json()),
+        fetch(`/api/patient/${id}/evolutions`).then(r => r.json())
+    ])
+    .then(([surgeries, consultations]) => {
+        renderTimeline(consultations || [], surgeries || []);
+    })
+    .catch(err => console.error('Erro ao carregar timeline:', err));
 }
 
 function renderTimeline(consultations = [], surgeries = []) {
