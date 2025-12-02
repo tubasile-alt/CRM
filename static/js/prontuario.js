@@ -1424,6 +1424,12 @@ function deleteEvolution(evoId) {
     });
 }
 
+function renderTimeline(consultations = [], surgeries = []) {
+    console.log('renderTimeline - consultations:', consultations, 'surgeries:', surgeries);
+    renderEvolutionsInAccordion(consultations || []);
+    renderSurgeries(surgeries || []);
+}
+
 function loadTimeline() {
     const id = window.patientId || patientId;
     if (!id) {
