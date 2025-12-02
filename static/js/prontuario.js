@@ -1117,150 +1117,53 @@ function saveEvolution() {
 function loadTimeline() {
     const id = window.patientId || patientId;
     
-    // Carregar cirurgias e consultas em paralelo
-    Promise.all([
-        fetch(`/api/patient/${id}/surgeries`).then(r => r.json()),
-        fetch(`/api/patient/${id}/evolutions`).then(r => r.json())
-    ])
-    .then(([surgeries, consultations]) => {
-        renderTimeline(consultations || [], surgeries || []);
+    // Carregar evoluções
+    fetch(`/api/patient/${id}/evolutions`).then(r => r.json())
+    .then(evolutions => {
+        renderEvolutionsInAccordion(evolutions || []);
     })
-    .catch(err => console.error('Erro ao carregar timeline:', err));
+    .catch(err => console.error('Erro ao carregar evoluções:', err));
 }
 
-function renderTimeline(consultations = [], surgeries = []) {
-    const container = document.getElementById('timelineContainer');
-    container.innerHTML = '';
-    
-    let allItems = [
-        ...consultations.map(c => ({ ...c, type: 'consultation' })),
-        ...(surgeries || []).map(s => ({ 
-            id: s.id,
-            surgeryId: s.id,
-            date: s.surgery_date,
-            category: '🏥 Cirurgia de Transplante',
-            doctor_name: s.doctor_name,
-            surgeryData: s.surgical_data,
-            observations: s.observations,
-            evolutions: s.evolutions || [],
-            type: 'surgery'
-        }))
-    ];
-    
-    if (allItems.length === 0) {
-        container.innerHTML = '<p class="text-muted text-center">Nenhuma consulta ou evolução registrada.</p>';
-        return;
-    }
-    
-    allItems.forEach((item, idx) => {
-        const itemDiv = document.createElement('div');
-        if (item.type === 'surgery') {
-            const accordionId = `surgeryAccordion${item.surgeryId}`;
-            itemDiv.className = 'mb-4 p-3 border rounded';
-            itemDiv.style.backgroundColor = '#e3f2fd';
-            itemDiv.style.borderLeft = '5px solid #2196F3';
+function renderEvolutionsInAccordion(consultations = []) {
+    // Agrupar evoluções por consultation_id (appointment.id)
+    consultations.forEach(consultation => {
+        const containerId = `evolutionsContainer${consultation.id}`;
+        const container = document.getElementById(containerId);
+        
+        if (!container) {
+            console.warn(`Container não encontrado: ${containerId}`);
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        if (!consultation.evolutions || consultation.evolutions.length === 0) {
+            container.innerHTML = '<p class="text-muted small"><em>Nenhuma evolução registrada</em></p>';
+            return;
+        }
+        
+        // Renderizar cada evolução
+        consultation.evolutions.forEach(evo => {
+            const evoDiv = document.createElement('div');
+            evoDiv.className = 'mb-3 p-3 bg-light border-start rounded';
+            evoDiv.style.borderLeft = '4px solid #198754';
             
-            itemDiv.innerHTML = `
-                <div class="accordion" id="accordion${item.surgeryId}">
-                    <div class="accordion-item" style="background: transparent; border: none;">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
-                                    data-bs-target="#collapse${item.surgeryId}" style="background: transparent; box-shadow: none; padding: 0; color: #333;">
-                                <div class="flex-grow-1">
-                                    <h6 class="mb-0"><i class="bi bi-heart-pulse"></i> <strong>${item.date}</strong></h6>
-                                    <p class="mb-0 mt-2"><small><strong>${item.category}</strong></small></p>
-                                </div>
-                            </button>
-                        </h2>
-                        <div id="collapse${item.surgeryId}" class="accordion-collapse collapse" data-bs-parent="#accordion${item.surgeryId}">
-                            <div class="accordion-body" style="padding: 1rem 0;">
-                                <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${item.surgeryData}</p>
-                                ${item.observations ? `<p><strong>Observações:</strong> ${item.observations}</p>` : ''}
-                                <p class="mb-3"><small class="text-muted">Dr. ${item.doctor_name}</small></p>
-                                <button class="btn btn-sm btn-outline-success mb-3" onclick="openSurgeryEvolutionModal(${item.surgeryId}, '${item.date}')">
-                                    <i class="bi bi-plus-circle"></i> Evolução
-                                </button>
-                                <div id="surgeryEvolutions${item.surgeryId}"></div>
-                            </div>
-                        </div>
+            evoDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
+                        <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
+                        <small class="text-muted">Dr. ${evo.doctor}</small>
                     </div>
-                </div>
-            `;
-            
-            container.appendChild(itemDiv);
-            
-            // Renderizar evoluções da cirurgia
-            if (item.evolutions && item.evolutions.length > 0) {
-                const evolutionsDiv = document.getElementById(`surgeryEvolutions${item.surgeryId}`);
-                item.evolutions.forEach(evo => {
-                    const evoDiv = document.createElement('div');
-                    evoDiv.className = 'mb-2 p-2 bg-white border-left rounded';
-                    evoDiv.style.borderLeft = '4px solid #2196F3';
-                    
-                    evoDiv.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
-                                <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
-                                <small class="text-muted">Dr. ${evo.doctor}</small>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgeryEvolution(${evo.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    `;
-                    evolutionsDiv.appendChild(evoDiv);
-                });
-            }
-        } else {
-            itemDiv.className = 'mb-4 p-3 border rounded bg-light';
-            itemDiv.innerHTML = `
-                <div class="d-flex justify-content-between align-items-start mb-3">
-                    <div>
-                        <h6 class="mb-1"><i class="bi bi-calendar-check"></i> <strong>${item.date}</strong></h6>
-                        <p class="mb-1"><small><strong>${item.category}</strong> com Dr. ${item.doctor_name}</small></p>
-                    </div>
-                    <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation(${item.id}, '${item.date}')">
-                        <i class="bi bi-plus"></i> Evolução
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
+                        <i class="bi bi-trash"></i>
                     </button>
                 </div>
             `;
             
-            if (item.evolutions && item.evolutions.length > 0) {
-                const evolutionsList = document.createElement('div');
-                evolutionsList.className = 'ms-4 ps-3 border-start border-success';
-                
-                item.evolutions.forEach(evo => {
-                    const evoDiv = document.createElement('div');
-                    evoDiv.className = 'mb-3 p-2 bg-white border-left';
-                    evoDiv.style.borderLeft = '4px solid #198754';
-                    
-                    evoDiv.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
-                                <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
-                                <small class="text-muted">Dr. ${evo.doctor}</small>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    `;
-                    
-                    evolutionsList.appendChild(evoDiv);
-                });
-                
-                itemDiv.appendChild(evolutionsList);
-            } else {
-                const noEvoDiv = document.createElement('div');
-                noEvoDiv.className = 'ms-4 ps-3 text-muted small';
-                noEvoDiv.innerHTML = '<em>Nenhuma evolução registrada para esta consulta</em>';
-                itemDiv.appendChild(noEvoDiv);
-            }
-            
-            container.appendChild(itemDiv);
-        }
+            container.appendChild(evoDiv);
+        });
     });
 }
 
