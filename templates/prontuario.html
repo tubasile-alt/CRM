@@ -1058,40 +1058,60 @@ function saveAttentionNote() {
                                     {% if consultation.category == 'transplante_capilar' and conduta_note.surgical_planning %}
                                     <div class="mb-0">
                                         <h6 class="text-success">
-                                            <i class="bi bi-scissors"></i> Planejamento Cirúrgico (Aba Conduta)
+                                            <i class="bi bi-scissors"></i> Planejamento Cirúrgico
                                         </h6>
-                                        <div class="card card-body bg-light">
+                                        <div class="card card-body bg-light" id="surgicalPlanDisplay{{ consultation.id }}">
                                             <script>
                                                 (function() {
+                                                    const container = document.getElementById('surgicalPlanDisplay{{ consultation.id }}');
+                                                    const rawJsonString = {{ conduta_note.surgical_planning | tojson }};
+                                                    
+                                                    const labels = {
+                                                        'norwood': 'Escala Norwood',
+                                                        'previous_transplant': 'Transplante Anterior',
+                                                        'transplant_location': 'Local do Transplante',
+                                                        'case_type': 'Tipo de Caso',
+                                                        'body_hair': 'Pêlo Corporal',
+                                                        'eyebrow_transplant': 'Transplante Sobrancelha',
+                                                        'beard_transplant': 'Transplante Barba',
+                                                        'frontal': 'Frontal',
+                                                        'crown': 'Coroa',
+                                                        'complete': 'Completo',
+                                                        'complete_body_hair': 'Pêlo Corporal Completo',
+                                                        'surgical_planning_text': 'Observações'
+                                                    };
+                                                    
                                                     try {
-                                                        const planData = JSON.parse('{{ conduta_note.surgical_planning | safe }}');
-                                                        const labels = {
-                                                            'norwood': 'Escala Norwood',
-                                                            'previous_transplant': 'Transplante Anterior',
-                                                            'transplant_location': 'Local do Transplante',
-                                                            'case_type': 'Tipo de Caso',
-                                                            'body_hair': 'Pêlo Corporal',
-                                                            'eyebrow_transplant': 'Transplante Sobrancelha',
-                                                            'beard_transplant': 'Transplante Barba',
-                                                            'frontal': 'Frontal',
-                                                            'crown': 'Coroa',
-                                                            'complete': 'Completo',
-                                                            'complete_body_hair': 'Pêlo Corporal Completo',
-                                                            'surgical_planning_text': 'Observações'
-                                                        };
+                                                        let planData = JSON.parse(rawJsonString);
                                                         
-                                                        let html = '<dl class="row mb-0 small">';
-                                                        for (const [key, val] of Object.entries(planData)) {
-                                                            if (val !== null && val !== false && val !== '') {
-                                                                const label = labels[key] || key;
-                                                                const display = typeof val === 'boolean' ? (val ? 'Sim' : 'Não') : val;
-                                                                html += `<dt class="col-sm-5 text-muted">${label}:</dt><dd class="col-sm-7"><strong>${display}</strong></dd>`;
+                                                        if (planData && typeof planData === 'object') {
+                                                            let html = '<dl class="row mb-0 small">';
+                                                            let hasContent = false;
+                                                            for (const [key, val] of Object.entries(planData)) {
+                                                                if (val !== null && val !== false && val !== '' && val !== undefined) {
+                                                                    hasContent = true;
+                                                                    const label = labels[key] || key;
+                                                                    let display = val;
+                                                                    if (typeof val === 'boolean') {
+                                                                        display = val ? 'Sim' : 'Não';
+                                                                    } else if (typeof val === 'string') {
+                                                                        display = val.replace(/\n/g, '<br>');
+                                                                    }
+                                                                    html += '<dt class="col-sm-5 text-muted">' + label + ':</dt><dd class="col-sm-7"><strong>' + display + '</strong></dd>';
+                                                                }
                                                             }
+                                                            html += '</dl>';
+                                                            if (hasContent) {
+                                                                container.innerHTML = html;
+                                                            } else {
+                                                                container.innerHTML = '<p class="text-muted mb-0">Nenhum dado de planejamento registrado.</p>';
+                                                            }
+                                                        } else {
+                                                            container.innerHTML = '<p class="mb-0" style="white-space: pre-wrap;">' + rawJsonString + '</p>';
                                                         }
-                                                        html += '</dl>';
-                                                        document.currentScript.parentElement.innerHTML += html;
                                                     } catch (e) {
-                                                        console.error('Erro ao parsear planejamento:', e);
+                                                        console.error('Erro ao processar planejamento:', e);
+                                                        container.innerHTML = '<p class="mb-0" style="white-space: pre-wrap;">' + rawJsonString + '</p>';
                                                     }
                                                 })();
                                             </script>
