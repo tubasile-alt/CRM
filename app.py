@@ -1901,11 +1901,23 @@ def create_evolution(patient_id):
     else:
         evolution_date = get_brazil_time()
     
+    # Validar consultation_id se fornecido
+    consultation_id = data.get('consultation_id')
+    if consultation_id:
+        try:
+            consultation_id = int(consultation_id)
+            # Verificar se o appointment existe e pertence ao paciente
+            appointment = Appointment.query.filter_by(id=consultation_id, patient_id=patient_id).first()
+            if not appointment:
+                consultation_id = None  # Se não existe, deixar como NULL
+        except (ValueError, TypeError):
+            consultation_id = None
+    
     evo = Evolution(
         patient_id=patient_id,
         doctor_id=current_user.id,
         evolution_date=evolution_date,
-        consultation_id=data.get('consultation_id'),
+        consultation_id=consultation_id,
         content=data['content']
     )
     db.session.add(evo)
