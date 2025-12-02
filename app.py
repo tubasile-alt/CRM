@@ -1981,20 +1981,6 @@ def create_surgery(ht_id):
     
     return jsonify({'success': True, 'id': surgery.id})
 
-@app.route('/api/surgery/<int:surgery_id>', methods=['DELETE'])
-@login_required
-def delete_surgery(surgery_id):
-    if not current_user.is_doctor():
-        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
-    
-    from models import TransplantSurgery
-    
-    surgery = TransplantSurgery.query.get_or_404(surgery_id)
-    db.session.delete(surgery)
-    db.session.commit()
-    
-    return jsonify({'success': True})
-
 # API para gerenciar cirurgias por paciente
 @app.route('/api/patient/<int:patient_id>/surgeries', methods=['GET'])
 @login_required
