@@ -1117,18 +1117,29 @@ function saveEvolution() {
 function loadTimeline() {
     const id = window.patientId || patientId;
     
-    // Carregar cirurgias e evoluções em paralelo
-    Promise.all([
-        fetch(`/api/patient/${id}/surgeries`).then(r => r.json()),
-        fetch(`/api/patient/${id}/evolutions`).then(r => r.json())
-    ])
-    .then(([surgeries, consultations]) => {
-        // Renderizar cirurgias em um container separado
-        renderSurgeries(surgeries || []);
-        // Renderizar evoluções no accordion
-        renderEvolutionsInAccordion(consultations || []);
-    })
-    .catch(err => console.error('Erro ao carregar timeline:', err));
+    // Carregar cirurgias
+    fetch(`/api/patient/${id}/surgeries`)
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(surgeries => {
+            console.log('Cirurgias carregadas:', surgeries);
+            renderSurgeries(surgeries || []);
+        })
+        .catch(err => console.error('Erro ao carregar cirurgias:', err));
+    
+    // Carregar evoluções
+    fetch(`/api/patient/${id}/evolutions`)
+        .then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.json();
+        })
+        .then(consultations => {
+            console.log('Evoluções carregadas:', consultations);
+            renderEvolutionsInAccordion(consultations || []);
+        })
+        .catch(err => console.error('Erro ao carregar evoluções:', err));
 }
 
 function renderSurgeries(surgeries = []) {
@@ -1196,44 +1207,46 @@ function renderSurgeries(surgeries = []) {
 }
 
 function renderEvolutionsInAccordion(consultations = []) {
-    // Agrupar evoluções por consultation_id (appointment.id)
-    consultations.forEach(consultation => {
-        const containerId = `evolutionsContainer${consultation.id}`;
-        const container = document.getElementById(containerId);
-        
-        if (!container) {
-            return;
-        }
-        
-        container.innerHTML = '';
-        
-        if (!consultation.evolutions || consultation.evolutions.length === 0) {
-            container.innerHTML = '<p class="text-muted small"><em>Nenhuma evolução registrada</em></p>';
-            return;
-        }
-        
-        // Renderizar cada evolução
-        consultation.evolutions.forEach(evo => {
-            const evoDiv = document.createElement('div');
-            evoDiv.className = 'mb-3 p-3 bg-light border-start rounded';
-            evoDiv.style.borderLeft = '4px solid #198754';
+    // Aguardar um pouco para garantir que o DOM foi renderizado
+    setTimeout(() => {
+        consultations.forEach(consultation => {
+            const containerId = `evolutionsContainer${consultation.id}`;
+            const container = document.getElementById(containerId);
             
-            evoDiv.innerHTML = `
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="flex-grow-1">
-                        <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
-                        <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
-                        <small class="text-muted">Dr. ${evo.doctor}</small>
+            if (!container) {
+                console.log(`Container não encontrado para consultaID ${consultation.id}`);
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            if (!consultation.evolutions || consultation.evolutions.length === 0) {
+                container.innerHTML = '<p class="text-muted small"><em>Nenhuma evolução registrada</em></p>';
+                return;
+            }
+            
+            consultation.evolutions.forEach(evo => {
+                const evoDiv = document.createElement('div');
+                evoDiv.className = 'mb-3 p-3 bg-light border-start rounded';
+                evoDiv.style.borderLeft = '4px solid #198754';
+                
+                evoDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
+                            <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
+                            <small class="text-muted">Dr. ${evo.doctor}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </div>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </div>
-            `;
-            
-            container.appendChild(evoDiv);
+                `;
+                
+                container.appendChild(evoDiv);
+            });
         });
-    });
+    }, 100);
 }
 
 function openSurgeryEvolutionModal(surgeryId, surgeryDate) {
