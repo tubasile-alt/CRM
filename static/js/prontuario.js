@@ -1294,7 +1294,18 @@ function renderEvolutionsInAccordion(consultations = []) {
             container.innerHTML = '';
             
             if (!consultation.evolutions || consultation.evolutions.length === 0) {
-                container.innerHTML = '<p class="text-muted small"><em>Nenhuma evolução registrada</em></p>';
+                // Mostrar caixa de texto vazia para adicionar evolução
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'p-3 bg-light rounded border-start';
+                emptyDiv.style.borderLeft = '4px solid #ccc';
+                emptyDiv.innerHTML = `
+                    <div class="mb-2">
+                        <small class="text-muted"><i class="bi bi-plus-circle"></i> Adicionar evolução</small>
+                    </div>
+                    <textarea class="form-control form-control-sm" rows="4" placeholder="Descreva a evolução do paciente..." readonly style="background-color: #fff; cursor: pointer;" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')"></textarea>
+                    <small class="text-muted d-block mt-2"><em>Clique no campo para adicionar uma nova evolução</em></small>
+                `;
+                container.appendChild(emptyDiv);
                 return;
             }
             
@@ -1318,6 +1329,18 @@ function renderEvolutionsInAccordion(consultations = []) {
                 
                 container.appendChild(evoDiv);
             });
+            
+            // Adicionar botão para adicionar nova evolução após as existentes
+            if (consultation.evolutions && consultation.evolutions.length > 0) {
+                const addDiv = document.createElement('div');
+                addDiv.className = 'mt-3 p-2 border-top';
+                addDiv.innerHTML = `
+                    <button class="btn btn-sm btn-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')">
+                        <i class="bi bi-plus-circle"></i> Adicionar Evolução
+                    </button>
+                `;
+                container.appendChild(addDiv);
+            }
         });
     }, 100);
 }
