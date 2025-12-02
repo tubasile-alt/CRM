@@ -221,6 +221,18 @@ class TransplantSurgeryRecord(db.Model):
     
     patient = db.relationship('Patient', backref='transplant_surgeries')
     doctor = db.relationship('User', backref='transplant_surgeries')
+    evolutions = db.relationship('SurgeryEvolution', backref='surgery', lazy=True, cascade='all, delete-orphan')
+
+class SurgeryEvolution(db.Model):
+    __tablename__ = 'surgery_evolution'
+    id = db.Column(db.Integer, primary_key=True)
+    surgery_id = db.Column(db.Integer, db.ForeignKey('transplant_surgery_record.id'), nullable=False, index=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    evolution_date = db.Column(db.DateTime, default=get_brazil_time, nullable=False, index=True)
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
+    
+    doctor = db.relationship('User', backref='surgery_evolutions')
 
 class DoctorPreference(db.Model):
     __tablename__ = 'doctor_preference'

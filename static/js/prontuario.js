@@ -1040,58 +1040,77 @@ function saveEvolution() {
     const date = document.getElementById('evolutionDate').value;
     const consultDisplay = document.getElementById('evolutionConsultationDisplay');
     let consultationId = document.getElementById('evolutionConsultation').value;
-    
-    // Se consultationId está vazio, verifica se veio de uma consulta específica
-    if (!consultationId && consultDisplay && consultDisplay.style.display !== 'none') {
-        // Força recarregar do elemento
-        consultationId = document.getElementById('evolutionConsultation').value;
-    }
-    
-    console.log('saveEvolution - consultationId:', consultationId, 'consultDisplay visible:', consultDisplay.style.display, 'content:', content);
+    const modal = document.getElementById('evolutionModal');
+    const surgeryId = modal.dataset.surgeryId;
+    const type = modal.dataset.type;
     
     if (!content) {
         showAlert('Descrição vazia!', 'warning');
         return;
     }
     
-    if (!consultationId || consultationId === '') {
-        showAlert('Selecione uma consulta!', 'warning');
-        return;
-    }
-    
-    consultationId = parseInt(consultationId);
-    
-    fetch(`/api/patient/${patientId}/evolution`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            content: content,
-            evolution_date: date,
-            consultation_id: consultationId
+    if (type === 'surgery' && surgeryId) {
+        const patId = window.patientId || patientId;
+        fetch(`/api/patient/${patId}/surgery/${surgeryId}/evolution`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ content: content })
         })
-    })
-    .then(r => r.json())
-    .then(result => {
-        console.log('Resultado saveEvolution:', result);
-        if (result.success) {
-            showAlert('Evolução salva com sucesso!', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('evolutionModal')).hide();
-            loadTimeline();
-        } else {
-            showAlert(result.error || 'Erro ao salvar', 'danger');
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                showAlert('✅ Evolução de cirurgia salva!', 'success');
+                bootstrap.Modal.getInstance(modal).hide();
+                loadTimeline();
+            } else {
+                showAlert(result.error || 'Erro ao salvar', 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Erro:', err);
+            showAlert('Erro ao salvar evolução', 'danger');
+        });
+    } else {
+        if (!consultationId || consultationId === '') {
+            showAlert('Selecione uma consulta!', 'warning');
+            return;
         }
-    })
-    .catch(err => {
-        console.error('Erro ao salvar evolução:', err);
-        showAlert('Erro ao salvar evolução: ' + err.message, 'danger');
-    });
+        
+        consultationId = parseInt(consultationId);
+        
+        fetch(`/api/patient/${patientId}/evolution`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                content: content,
+                evolution_date: date,
+                consultation_id: consultationId
+            })
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                showAlert('Evolução salva com sucesso!', 'success');
+                bootstrap.Modal.getInstance(modal).hide();
+                loadTimeline();
+            } else {
+                showAlert(result.error || 'Erro ao salvar', 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Erro ao salvar evolução:', err);
+            showAlert('Erro ao salvar evolução: ' + err.message, 'danger');
+        });
+    }
 }
 
 function loadTimeline() {
-    fetch(`/api/patient/${patientId}/evolutions`)
+    const id = window.patientId || patientId;
+    fetch(`/api/patient/${id}/surgeries`)
         .then(r => r.json())
-        .then(consultations => {
-            renderTimeline(consultations);
+        .then(surgeries => {
+            window.consultations = window.consultations || JSON.parse(document.getElementById('consultationsData')?.textContent || '[]');
+            renderTimeline(window.consultations, surgeries);
         })
         .catch(err => console.error('Erro ao carregar timeline:', err));
 }
@@ -1100,16 +1119,17 @@ function renderTimeline(consultations = [], surgeries = []) {
     const container = document.getElementById('timelineContainer');
     container.innerHTML = '';
     
-    // Combinar consultas e cirurgias e ordenar por data (mais recente primeiro)
     let allItems = [
         ...consultations.map(c => ({ ...c, type: 'consultation' })),
         ...(surgeries || []).map(s => ({ 
-            id: `surgery_${s.id}`,
+            id: s.id,
+            surgeryId: s.id,
             date: s.surgery_date,
             category: '🏥 Cirurgia de Transplante',
             doctor_name: s.doctor_name,
             surgeryData: s.surgical_data,
             observations: s.observations,
+            evolutions: s.evolutions || [],
             type: 'surgery'
         }))
     ];
@@ -1119,23 +1139,66 @@ function renderTimeline(consultations = [], surgeries = []) {
         return;
     }
     
-    allItems.forEach((item) => {
+    allItems.forEach((item, idx) => {
         const itemDiv = document.createElement('div');
         if (item.type === 'surgery') {
+            const accordionId = `surgeryAccordion${item.surgeryId}`;
             itemDiv.className = 'mb-4 p-3 border rounded';
             itemDiv.style.backgroundColor = '#e3f2fd';
             itemDiv.style.borderLeft = '5px solid #2196F3';
+            
             itemDiv.innerHTML = `
-                <div class="d-flex justify-content-between align-items-start">
-                    <div class="flex-grow-1">
-                        <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${item.date}</strong></h6>
-                        <p class="mb-1"><small><strong>${item.category}</strong></small></p>
-                        <p class="mb-2" style="white-space: pre-wrap;"><strong>Dados:</strong> ${item.surgeryData}</p>
-                        ${item.observations ? `<p class="mb-2"><strong>Observações:</strong> ${item.observations}</p>` : ''}
-                        <small class="text-muted">Dr. ${item.doctor_name}</small>
+                <div class="accordion" id="accordion${item.surgeryId}">
+                    <div class="accordion-item" style="background: transparent; border: none;">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                    data-bs-target="#collapse${item.surgeryId}" style="background: transparent; box-shadow: none; padding: 0; color: #333;">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-0"><i class="bi bi-heart-pulse"></i> <strong>${item.date}</strong></h6>
+                                    <p class="mb-0 mt-2"><small><strong>${item.category}</strong></small></p>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse${item.surgeryId}" class="accordion-collapse collapse" data-bs-parent="#accordion${item.surgeryId}">
+                            <div class="accordion-body" style="padding: 1rem 0;">
+                                <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${item.surgeryData}</p>
+                                ${item.observations ? `<p><strong>Observações:</strong> ${item.observations}</p>` : ''}
+                                <p class="mb-3"><small class="text-muted">Dr. ${item.doctor_name}</small></p>
+                                <button class="btn btn-sm btn-outline-success mb-3" onclick="openSurgeryEvolutionModal(${item.surgeryId}, '${item.date}')">
+                                    <i class="bi bi-plus-circle"></i> Evolução
+                                </button>
+                                <div id="surgeryEvolutions${item.surgeryId}"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
+            
+            container.appendChild(itemDiv);
+            
+            // Renderizar evoluções da cirurgia
+            if (item.evolutions && item.evolutions.length > 0) {
+                const evolutionsDiv = document.getElementById(`surgeryEvolutions${item.surgeryId}`);
+                item.evolutions.forEach(evo => {
+                    const evoDiv = document.createElement('div');
+                    evoDiv.className = 'mb-2 p-2 bg-white border-left rounded';
+                    evoDiv.style.borderLeft = '4px solid #2196F3';
+                    
+                    evoDiv.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
+                                <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
+                                <small class="text-muted">Dr. ${evo.doctor}</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgeryEvolution(${evo.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                    evolutionsDiv.appendChild(evoDiv);
+                });
+            }
         } else {
             itemDiv.className = 'mb-4 p-3 border rounded bg-light';
             itemDiv.innerHTML = `
@@ -1182,9 +1245,46 @@ function renderTimeline(consultations = [], surgeries = []) {
                 noEvoDiv.innerHTML = '<em>Nenhuma evolução registrada para esta consulta</em>';
                 itemDiv.appendChild(noEvoDiv);
             }
+            
+            container.appendChild(itemDiv);
         }
-        
-        container.appendChild(itemDiv);
+    });
+}
+
+function openSurgeryEvolutionModal(surgeryId, surgeryDate) {
+    const modal = document.getElementById('evolutionModal');
+    document.getElementById('evolutionDate').value = new Date().toISOString().slice(0, 16);
+    document.getElementById('evolutionContent').value = '';
+    document.getElementById('evolutionConsultation').style.display = 'none';
+    document.getElementById('evolutionConsultationDisplay').style.display = 'block';
+    document.getElementById('evolutionConsultationName').textContent = `🏥 Cirurgia de ${surgeryDate}`;
+    
+    modal.dataset.surgeryId = surgeryId;
+    modal.dataset.fromConsultation = 'false';
+    modal.dataset.type = 'surgery';
+    
+    new bootstrap.Modal(modal).show();
+}
+
+function deleteSurgeryEvolution(evolutionId) {
+    if (!confirm('Tem certeza que deseja deletar esta evolução da cirurgia?')) return;
+    
+    fetch(`/api/patient/surgery-evolution/${evolutionId}`, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('✅ Evolução deletada!', 'success');
+            loadTimeline();
+        } else {
+            showAlert(result.error || 'Erro ao deletar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao deletar evolução', 'danger');
     });
 }
 
