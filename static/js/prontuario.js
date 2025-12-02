@@ -1220,7 +1220,7 @@ function renderTimeline(consultations = [], surgeries = []) {
                         <h6 class="mb-1"><i class="bi bi-calendar-check"></i> <strong>${item.date}</strong></h6>
                         <p class="mb-1"><small><strong>${item.category}</strong> com Dr. ${item.doctor_name}</small></p>
                     </div>
-                    <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation('${item.id}', '${item.date}')">
+                    <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation(${item.id}, '${item.date}')">
                         <i class="bi bi-plus"></i> Evolução
                     </button>
                 </div>
