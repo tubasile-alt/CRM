@@ -1871,16 +1871,11 @@ def get_pending_checkouts():
         
         has_consultation_item = any(p.get('name', '').startswith('Consulta') for p in procedures)
         
-        if payment.status == 'pendente' and not has_consultation_item and consultation_fee > 0:
-            procedures.insert(0, {
-                'name': f'Consulta {consultation_type}',
-                'value': consultation_fee
-            })
-            payment.procedures = procedures
-            db.session.commit()
-        
+        # Apenas calcula o total sem reinserer automaticamente a consulta
+        # A consulta é controlada manualmente pelo toggle do checkbox
         computed_total = sum(float(p.get('value', 0)) for p in procedures)
         
+        # Atualiza total_amount se diferente do computado
         if payment.status == 'pendente' and abs(float(payment.total_amount) - computed_total) > 0.01:
             payment.total_amount = computed_total
             db.session.commit()
