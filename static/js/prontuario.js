@@ -1271,13 +1271,36 @@ function renderEvolutionsInAccordion(consultations = []) {
                 const emptyDiv = document.createElement('div');
                 emptyDiv.className = 'p-3 bg-light rounded border-start';
                 emptyDiv.style.borderLeft = '4px solid #ccc';
-                emptyDiv.innerHTML = `
-                    <div class="mb-2">
-                        <small class="text-muted"><i class="bi bi-plus-circle"></i> Adicionar evolução</small>
-                    </div>
-                    <textarea class="form-control form-control-sm" rows="4" placeholder="Descreva a evolução do paciente..." readonly style="background-color: #fff; cursor: pointer;" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')"></textarea>
-                    <small class="text-muted d-block mt-2"><em>Clique no campo para adicionar uma nova evolução</em></small>
-                `;
+                
+                const button = document.createElement('button');
+                button.className = 'btn btn-sm btn-outline-primary w-100 mb-2';
+                button.innerHTML = '<i class="bi bi-plus-circle"></i> Adicionar Evolução';
+                button.type = 'button';
+                button.onclick = (e) => {
+                    e.preventDefault();
+                    openEvolutionFromConsultation(consultation.id, consultation.date);
+                };
+                
+                emptyDiv.appendChild(button);
+                
+                const textarea = document.createElement('textarea');
+                textarea.className = 'form-control form-control-sm';
+                textarea.rows = 4;
+                textarea.placeholder = 'Descreva a evolução do paciente...';
+                textarea.readOnly = true;
+                textarea.style.backgroundColor = '#fff';
+                textarea.style.cursor = 'pointer';
+                textarea.onclick = (e) => {
+                    e.preventDefault();
+                    openEvolutionFromConsultation(consultation.id, consultation.date);
+                };
+                emptyDiv.appendChild(textarea);
+                
+                const helpText = document.createElement('small');
+                helpText.className = 'text-muted d-block mt-2';
+                helpText.innerHTML = '<em>Clique no campo ou no botão para adicionar uma nova evolução</em>';
+                emptyDiv.appendChild(helpText);
+                
                 container.appendChild(emptyDiv);
                 return;
             }
