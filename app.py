@@ -1858,10 +1858,11 @@ def get_evolutions(patient_id):
         # Buscar evoluções desta consulta
         evolutions = Evolution.query.filter_by(consultation_id=consultation.id).order_by(Evolution.evolution_date.asc()).all()
         
+        # Se tem evoluções ou queremos mostrar todas as consultas
         consultation_data = {
-            'id': consultation.id,
+            'id': consultation.id,  # ID do appointment (consulta)
             'date': consultation.start_time.strftime('%d/%m/%Y %H:%M'),
-            'category': consultation.notes or 'Consulta',
+            'category': consultation.appointment_type or 'Consulta',
             'doctor_name': consultation.doctor.name if consultation.doctor else 'N/A',
             'evolutions': []
         }
