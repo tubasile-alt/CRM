@@ -1076,12 +1076,18 @@ function saveEvolution() {
         // Salvar evolução de consulta
         let consultationId = modal.dataset.consultationId || document.getElementById('evolutionConsultation').value;
         
-        if (!consultationId || consultationId === '') {
+        if (!consultationId || consultationId === '' || consultationId === undefined) {
             showAlert('Selecione uma consulta!', 'warning');
             return;
         }
         
-        consultationId = parseInt(consultationId);
+        // Garantir que é um número válido
+        consultationId = parseInt(String(consultationId).trim());
+        
+        if (isNaN(consultationId)) {
+            showAlert('ID de consulta inválido!', 'warning');
+            return;
+        }
         
         console.log('Salvando evolução consulta - consultationId:', consultationId, 'from dataset:', modal.dataset.consultationId);
         
@@ -1218,7 +1224,7 @@ function renderTimeline(consultations = [], surgeries = []) {
                         <h6 class="mb-1"><i class="bi bi-calendar-check"></i> <strong>${item.date}</strong></h6>
                         <p class="mb-1"><small><strong>${item.category}</strong> com Dr. ${item.doctor_name}</small></p>
                     </div>
-                    <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation(${item.id}, '${item.date}')">
+                    <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation('${item.id}', '${item.date}')">
                         <i class="bi bi-plus"></i> Evolução
                     </button>
                 </div>
@@ -1303,6 +1309,8 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     const now = new Date();
     const modal = document.getElementById('evolutionModal');
     
+    consultationId = String(consultationId).trim();
+    
     document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
     document.getElementById('evolutionContent').value = '';
     document.getElementById('evolutionConsultation').value = consultationId;
@@ -1317,6 +1325,8 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     modal.dataset.type = 'consultation';
     modal.dataset.consultationId = consultationId;
     delete modal.dataset.surgeryId;
+    
+    console.log('openEvolutionFromConsultation - consultationId:', consultationId, 'typeof:', typeof consultationId);
     
     new bootstrap.Modal(modal).show();
 }
