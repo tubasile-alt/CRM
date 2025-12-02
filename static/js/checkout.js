@@ -210,6 +210,8 @@ function getConsultationPrice(consultationType) {
 }
 
 function toggleConsultationCharge(paymentId, chargeConsultation) {
+    console.log(`Toggle consultation - Payment ${paymentId}, charge: ${chargeConsultation}`);
+    
     fetch(`/api/checkout/${paymentId}/toggle-consultation`, {
         method: 'POST',
         headers: {
@@ -219,14 +221,21 @@ function toggleConsultationCharge(paymentId, chargeConsultation) {
             charge_consultation: chargeConsultation
         })
     })
-    .then(r => r.json())
+    .then(r => {
+        console.log('Response status:', r.status);
+        return r.json();
+    })
     .then(result => {
+        console.log('Toggle result:', result);
+        
         if (result.success) {
             showAlert(result.message, 'success');
-            loadCheckouts();
+            // Pequeno delay para garantir que o estado está atualizado no servidor
+            setTimeout(() => loadCheckouts(), 100);
         } else {
             showAlert(result.error || 'Erro ao atualizar', 'danger');
-            loadCheckouts();
+            // Recarrega mesmo em caso de erro para reverter o estado do checkbox
+            setTimeout(() => loadCheckouts(), 100);
         }
     })
     .catch(err => {
