@@ -1877,9 +1877,9 @@ def get_pending_checkouts():
             'consultation_type': consultation_type,
             'total_amount': computed_total,
             'procedures': procedures,
-            'created_at': payment.created_at.strftime('%H:%M'),
+            'created_at': payment.created_at.strftime('%d/%m/%Y %H:%M'),
             'status': payment.status,
-            'paid_at': payment.paid_at.strftime('%H:%M') if payment.paid_at else None,
+            'paid_at': payment.paid_at.strftime('%d/%m/%Y %H:%M') if payment.paid_at else None,
             'payment_method': payment.payment_method,
             'consultation_included': has_consultation_item or (consultation_fee > 0 and payment.status == 'pendente')
         })
@@ -1975,6 +1975,10 @@ def toggle_consultation_charge(payment_id):
     charge_consultation = data.get('charge_consultation', True)
     consultation_type = payment.consultation_type or 'Particular'
     consultation_fee = CONSULTATION_PRICES.get(consultation_type, 400.0)
+    
+    # Validar: não permitir marcar como cobrada se a consulta é gratuita
+    if charge_consultation and consultation_fee == 0:
+        return jsonify({'success': False, 'error': 'Consulta gratuita não pode ser cobrada'}), 400
     
     procedures = payment.procedures or []
     
