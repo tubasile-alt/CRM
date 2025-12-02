@@ -330,6 +330,7 @@ function updateCategoryTexts() {
 function toggleCategoryTabs() {
     const tabPlanejamento = document.getElementById('tabPlanejamento');
     const tabTransplante = document.getElementById('tabTransplante');
+    const tabSurgery = document.getElementById('tabSurgery');
     const conductProcedures = document.getElementById('conductProceduresSection');
     const cosmeticConductSection = document.getElementById('cosmeticConductSection');
     const indicatedProcedures = document.getElementById('indicatedProceduresSection');
@@ -337,12 +338,14 @@ function toggleCategoryTabs() {
     if (currentCategory === 'cosmiatria') {
         tabPlanejamento.style.display = '';
         tabTransplante.style.display = 'none';
+        if (tabSurgery) tabSurgery.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = 'none';
         if (cosmeticConductSection) cosmeticConductSection.style.display = '';
         if (indicatedProcedures) indicatedProcedures.style.display = 'none';
     } else if (currentCategory === 'transplante_capilar') {
         tabPlanejamento.style.display = 'none';
         tabTransplante.style.display = '';
+        if (tabSurgery) tabSurgery.style.display = '';
         if (conductProcedures) conductProcedures.style.display = 'none';
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
         if (indicatedProcedures) indicatedProcedures.style.display = 'none';
@@ -350,6 +353,7 @@ function toggleCategoryTabs() {
         // Patologia - NÃO mostra checkboxes de procedimentos realizados
         tabPlanejamento.style.display = 'none';
         tabTransplante.style.display = 'none';
+        if (tabSurgery) tabSurgery.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = 'none';  // OCULTADO
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
         if (indicatedProcedures) indicatedProcedures.style.display = '';
