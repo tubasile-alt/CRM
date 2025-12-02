@@ -208,6 +208,20 @@ class Surgery(db.Model):
     creator = db.relationship('User', foreign_keys=[created_by], backref='created_surgeries')
     updater = db.relationship('User', foreign_keys=[updated_by], backref='updated_surgeries')
 
+class TransplantSurgeryRecord(db.Model):
+    __tablename__ = 'transplant_surgery_record'
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    surgery_date = db.Column(db.Date, nullable=False, index=True)
+    surgical_data = db.Column(db.Text, nullable=True)
+    observations = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time)
+    
+    patient = db.relationship('Patient', backref='transplant_surgeries')
+    doctor = db.relationship('User', backref='transplant_surgeries')
+
 class DoctorPreference(db.Model):
     __tablename__ = 'doctor_preference'
     id = db.Column(db.Integer, primary_key=True)

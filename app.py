@@ -1986,8 +1986,8 @@ def create_surgery(ht_id):
 @login_required
 def get_patient_surgeries(patient_id):
     """Listar todas as cirurgias de um paciente"""
-    from models import Surgery
-    surgeries = Surgery.query.filter_by(patient_id=patient_id).order_by(Surgery.surgery_date.desc()).all()
+    from models import TransplantSurgeryRecord
+    surgeries = TransplantSurgeryRecord.query.filter_by(patient_id=patient_id).order_by(TransplantSurgeryRecord.surgery_date.desc()).all()
     return jsonify([{
         'id': s.id,
         'surgery_date': s.surgery_date.strftime('%d/%m/%Y'),
@@ -2004,16 +2004,16 @@ def create_patient_surgery(patient_id):
     if not current_user.is_doctor():
         return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
     
-    from models import Surgery
+    from models import TransplantSurgeryRecord
     from datetime import datetime
     data = request.get_json()
     
     try:
-        surgery_date = datetime.strptime(data.get('surgery_date'), '%Y-%m-%d')
+        surgery_date = datetime.strptime(data.get('surgery_date'), '%Y-%m-%d').date()
     except:
         return jsonify({'success': False, 'error': 'Data inválida'}), 400
     
-    surgery = Surgery(
+    surgery = TransplantSurgeryRecord(
         patient_id=patient_id,
         doctor_id=current_user.id,
         surgery_date=surgery_date,
@@ -2029,11 +2029,11 @@ def create_patient_surgery(patient_id):
 @login_required
 def delete_patient_surgery(surgery_id):
     """Deletar uma cirurgia"""
-    from models import Surgery
+    from models import TransplantSurgeryRecord
     if not current_user.is_doctor():
         return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
     
-    surgery = Surgery.query.get_or_404(surgery_id)
+    surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
     if surgery.doctor_id != current_user.id and not current_user.is_admin():
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
