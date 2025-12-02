@@ -45,6 +45,7 @@ login_manager.login_message = 'Por favor, faça login para acessar esta página.
 from routes.surgical_map import surgical_map_bp
 from routes.waiting_room import waiting_room_bp
 from routes.settings import settings_bp
+from routes.patient import patient_bp
 
 app.register_blueprint(surgical_map_bp)
 app.register_blueprint(waiting_room_bp)
@@ -53,6 +54,7 @@ app.register_blueprint(settings_bp)
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
+app.register_blueprint(patient_bp)
 
 def get_brazil_time():
     tz = pytz.timezone('America/Sao_Paulo')
@@ -1946,7 +1948,6 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
 
 # APIs de Cirurgias de Transplante Capilar
-@app.route('/api/hair-transplant/<int:ht_id>/surgeries', methods=['GET'])
 @login_required
 def get_surgeries(ht_id):
     from models import TransplantSurgery
@@ -1958,7 +1959,6 @@ def get_surgeries(ht_id):
         'complications': s.complications,
     } for s in surgeries])
 
-@app.route('/api/hair-transplant/<int:ht_id>/surgeries', methods=['POST'])
 @login_required
 def create_surgery(ht_id):
     if not current_user.is_doctor():
@@ -1982,7 +1982,6 @@ def create_surgery(ht_id):
     return jsonify({'success': True, 'id': surgery.id})
 
 # API para gerenciar cirurgias por paciente
-@app.route('/api/patient/<int:patient_id>/surgeries', methods=['GET'])
 @login_required
 def get_patient_surgeries(patient_id):
     """Listar todas as cirurgias de um paciente"""
@@ -1997,7 +1996,6 @@ def get_patient_surgeries(patient_id):
         'doctor_name': s.doctor.name
     } for s in surgeries])
 
-@app.route('/api/patient/<int:patient_id>/surgery', methods=['POST'])
 @login_required
 def create_patient_surgery(patient_id):
     """Criar nova cirurgia para um paciente"""
