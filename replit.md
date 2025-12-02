@@ -20,6 +20,9 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **Botão Editar Cadastro** - Permite edição de dados do paciente (médicos e secretárias)
 - ✅ **Checkout corrigido** - Modal de pagamento funcionando na aba Checkout
 - ✅ **Indicação de Transplante** - Campo "Sim/Não" como primeiro item na aba Transplante Capilar
+- ✅ **Checkout melhorado** - Valores discriminados (consulta + procedimentos separados)
+- ✅ **Toggle de cobrança** - Checkbox para cobrar ou não cobrar consulta no checkout
+- ✅ **Badge de pendências** - Número de checkouts pendentes visível na aba Agenda
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
