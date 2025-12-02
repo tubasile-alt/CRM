@@ -1074,7 +1074,7 @@ function saveEvolution() {
         });
     } else {
         // Salvar evolução de consulta
-        let consultationId = document.getElementById('evolutionConsultation').value;
+        let consultationId = modal.dataset.consultationId || document.getElementById('evolutionConsultation').value;
         
         if (!consultationId || consultationId === '') {
             showAlert('Selecione uma consulta!', 'warning');
@@ -1083,7 +1083,7 @@ function saveEvolution() {
         
         consultationId = parseInt(consultationId);
         
-        console.log('Salvando evolução consulta - consultationId:', consultationId);
+        console.log('Salvando evolução consulta - consultationId:', consultationId, 'from dataset:', modal.dataset.consultationId);
         
         fetch(`/api/patient/${patId}/evolution`, {
             method: 'POST',
