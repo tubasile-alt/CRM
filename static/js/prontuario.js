@@ -1034,16 +1034,23 @@ function loadConsultationsDropdown() {
 function saveEvolution() {
     const content = document.getElementById('evolutionContent').value.trim();
     const date = document.getElementById('evolutionDate').value;
+    const consultDisplay = document.getElementById('evolutionConsultationDisplay');
     let consultationId = document.getElementById('evolutionConsultation').value;
     
-    console.log('saveEvolution - consultationId:', consultationId, 'content:', content, 'date:', date);
+    // Se consultationId está vazio, verifica se veio de uma consulta específica
+    if (!consultationId && consultDisplay && consultDisplay.style.display !== 'none') {
+        // Força recarregar do elemento
+        consultationId = document.getElementById('evolutionConsultation').value;
+    }
+    
+    console.log('saveEvolution - consultationId:', consultationId, 'consultDisplay visible:', consultDisplay.style.display, 'content:', content);
     
     if (!content) {
         showAlert('Descrição vazia!', 'warning');
         return;
     }
     
-    if (!consultationId) {
+    if (!consultationId || consultationId === '') {
         showAlert('Selecione uma consulta!', 'warning');
         return;
     }
