@@ -827,7 +827,6 @@ function saveAttentionNote() {
                                                 {% endif %}
                                             </div>
                                         </div>
-                <script src="/static/js/surgeries.js"></script>
                                         
                                         <div class="row mb-2">
                                             <div class="col-6">
@@ -1155,5 +1154,6 @@ function saveAttentionNote() {
 const patientId = {{ patient.id }};
 const appointmentId = {{ appointment_id | tojson }};
 </script>
+<script src="{{ url_for('static', filename='js/surgeries.js') }}"></script>
 <script src="{{ url_for('static', filename='js/prontuario.js') }}"></script>
 {% endblock %}
