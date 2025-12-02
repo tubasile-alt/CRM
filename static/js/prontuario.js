@@ -1117,12 +1117,82 @@ function saveEvolution() {
 function loadTimeline() {
     const id = window.patientId || patientId;
     
-    // Carregar evoluções
-    fetch(`/api/patient/${id}/evolutions`).then(r => r.json())
-    .then(evolutions => {
-        renderEvolutionsInAccordion(evolutions || []);
+    // Carregar cirurgias e evoluções em paralelo
+    Promise.all([
+        fetch(`/api/patient/${id}/surgeries`).then(r => r.json()),
+        fetch(`/api/patient/${id}/evolutions`).then(r => r.json())
+    ])
+    .then(([surgeries, consultations]) => {
+        // Renderizar cirurgias em um container separado
+        renderSurgeries(surgeries || []);
+        // Renderizar evoluções no accordion
+        renderEvolutionsInAccordion(consultations || []);
     })
-    .catch(err => console.error('Erro ao carregar evoluções:', err));
+    .catch(err => console.error('Erro ao carregar timeline:', err));
+}
+
+function renderSurgeries(surgeries = []) {
+    const container = document.getElementById('surgeriesContainer');
+    if (!container) return; // Se não há container, pular
+    
+    container.innerHTML = '';
+    
+    if (surgeries.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">Nenhuma cirurgia registrada.</p>';
+        return;
+    }
+    
+    surgeries.forEach(surgery => {
+        const surgeryDiv = document.createElement('div');
+        surgeryDiv.className = 'mb-4 p-3 border rounded';
+        surgeryDiv.style.backgroundColor = '#e3f2fd';
+        surgeryDiv.style.borderLeft = '5px solid #2196F3';
+        
+        surgeryDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${surgery.surgery_date}</strong></h6>
+                    <p class="mb-1"><small><strong>Cirurgia de Transplante</strong></small></p>
+                </div>
+                <button class="btn btn-sm btn-outline-success" onclick="openSurgeryEvolutionModal(${surgery.id}, '${surgery.surgery_date}')">
+                    <i class="bi bi-plus"></i> Evolução
+                </button>
+            </div>
+            <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${surgery.surgical_data}</p>
+            ${surgery.observations ? `<p><strong>Observações:</strong> ${surgery.observations}</p>` : ''}
+            <p class="mb-3"><small class="text-muted">Dr. ${surgery.doctor_name}</small></p>
+        `;
+        
+        // Adicionar evoluções da cirurgia
+        if (surgery.evolutions && surgery.evolutions.length > 0) {
+            const evolutionsDiv = document.createElement('div');
+            evolutionsDiv.className = 'ms-4 ps-3 border-start border-primary';
+            
+            surgery.evolutions.forEach(evo => {
+                const evoDiv = document.createElement('div');
+                evoDiv.className = 'mb-2 p-2 bg-white border-left rounded';
+                evoDiv.style.borderLeft = '4px solid #2196F3';
+                
+                evoDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
+                            <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
+                            <small class="text-muted">Dr. ${evo.doctor}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgeryEvolution(${evo.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `;
+                evolutionsDiv.appendChild(evoDiv);
+            });
+            
+            surgeryDiv.appendChild(evolutionsDiv);
+        }
+        
+        container.appendChild(surgeryDiv);
+    });
 }
 
 function renderEvolutionsInAccordion(consultations = []) {
@@ -1132,7 +1202,6 @@ function renderEvolutionsInAccordion(consultations = []) {
         const container = document.getElementById(containerId);
         
         if (!container) {
-            console.warn(`Container não encontrado: ${containerId}`);
             return;
         }
         
