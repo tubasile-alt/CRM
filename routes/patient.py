@@ -9,25 +9,31 @@ patient_bp = Blueprint('patient', __name__, url_prefix='/api/patient')
 @login_required
 def get_patient_surgeries(patient_id):
     """Listar todas as cirurgias de um paciente com suas evoluções"""
-    surgeries = TransplantSurgeryRecord.query.filter_by(patient_id=patient_id).order_by(TransplantSurgeryRecord.surgery_date.desc()).all()
-    result = []
-    for s in surgeries:
-        evolutions = SurgeryEvolution.query.filter_by(surgery_id=s.id).order_by(SurgeryEvolution.evolution_date.desc()).all()
-        result.append({
-            'id': s.id,
-            'surgery_date': s.surgery_date.strftime('%d/%m/%Y'),
-            'surgery_date_iso': s.surgery_date.isoformat(),
-            'surgical_data': s.surgical_data,
-            'observations': s.observations,
-            'doctor_name': s.doctor.name,
-            'evolutions': [{
-                'id': e.id,
-                'date': e.evolution_date.strftime('%d/%m/%Y %H:%M'),
-                'content': e.content,
-                'doctor': e.doctor.name
-            } for e in evolutions]
-        })
-    return jsonify(result)
+    try:
+        surgeries = TransplantSurgeryRecord.query.filter_by(patient_id=patient_id).order_by(TransplantSurgeryRecord.surgery_date.desc()).all()
+        result = []
+        for s in surgeries:
+            try:
+                evolutions = SurgeryEvolution.query.filter_by(surgery_id=s.id).order_by(SurgeryEvolution.evolution_date.desc()).all()
+            except:
+                evolutions = []
+            result.append({
+                'id': s.id,
+                'surgery_date': s.surgery_date.strftime('%d/%m/%Y'),
+                'surgery_date_iso': s.surgery_date.isoformat(),
+                'surgical_data': s.surgical_data,
+                'observations': s.observations,
+                'doctor_name': s.doctor.name,
+                'evolutions': [{
+                    'id': e.id,
+                    'date': e.evolution_date.strftime('%d/%m/%Y %H:%M'),
+                    'content': e.content,
+                    'doctor': e.doctor.name
+                } for e in evolutions]
+            })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @patient_bp.route('/<int:patient_id>/surgery', methods=['POST'])
 @login_required
