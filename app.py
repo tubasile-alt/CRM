@@ -2000,12 +2000,9 @@ def toggle_consultation_charge(payment_id):
             break
     
     if charge_consultation:
-        # Adicionar consulta se não existe
-        if consultation_item_index is None:
-            procedures.insert(0, {
-                'name': f'Consulta {consultation_type}',
-                'value': consultation_fee
-            })
+        # Apenas marca que quer cobrar - não reinserem automaticamente
+        # O frontend já adicionou se necessário
+        pass
     else:
         # Remover consulta se existe
         if consultation_item_index is not None:
