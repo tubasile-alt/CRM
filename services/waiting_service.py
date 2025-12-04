@@ -103,9 +103,15 @@ class WaitingService:
             wait_time = None
             checked_in_iso = None
             if apt.checked_in_time:
-                delta = datetime.now(self.tz) - apt.checked_in_time
+                # Converter para timezone-aware se for naive
+                checkin_time = apt.checked_in_time
+                if checkin_time.tzinfo is None:
+                    checkin_time = self.tz.localize(checkin_time)
+                
+                current_time = datetime.now(self.tz)
+                delta = current_time - checkin_time
                 wait_time = int(delta.total_seconds() / 60)
-                checked_in_iso = apt.checked_in_time.isoformat()
+                checked_in_iso = checkin_time.isoformat()
             
             waiting_list.append({
                 'id': apt.id,
