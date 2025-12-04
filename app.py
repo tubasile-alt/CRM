@@ -447,8 +447,6 @@ def create_appointment():
 def update_appointment(id):
     appointment = Appointment.query.get_or_404(id)
     data = request.get_json(silent=True)
-    print(f"[DEBUG] Update appointment {id}: data received = {data}")
-    print(f"[DEBUG] Current status before update: {appointment.status}")
     if data is None:
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
@@ -457,7 +455,6 @@ def update_appointment(id):
     if 'end' in data:
         appointment.end_time = parse_datetime_with_tz(data['end'])
     if 'status' in data:
-        print(f"[DEBUG] Setting status to: {data['status']}")
         appointment.status = data['status']
     if 'notes' in data:
         appointment.notes = data['notes']
@@ -480,7 +477,6 @@ def update_appointment(id):
             appointment.patient.name = data['patientName']
     
     db.session.commit()
-    print(f"[DEBUG] Status after commit: {appointment.status}")
     
     return jsonify({'success': True})
 
