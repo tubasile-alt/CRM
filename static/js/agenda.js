@@ -915,10 +915,14 @@ function doCheckin(appointmentId) {
     fetch(`/api/checkin/${appointmentId}`, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             showAlert('Check-in realizado! Paciente na sala de espera.');
@@ -935,8 +939,15 @@ function doCheckin(appointmentId) {
 }
 
 function loadWaitingRoom() {
-    fetch('/api/waiting-room')
-    .then(response => response.json())
+    fetch('/api/waiting-room', {
+        headers: {
+            'X-CSRFToken': getCSRFToken()
+        }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+    })
     .then(data => {
         renderWaitingRoom(data.waiting || []);
     })
