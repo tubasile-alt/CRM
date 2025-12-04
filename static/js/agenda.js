@@ -1,5 +1,14 @@
 let appointmentsList = [];
 
+// Parsear string ISO como hora local (São Paulo) sem conversão de timezone
+function parseLocalDateTime(isoString) {
+    if (!isoString) return null;
+    const [datePart, timePart] = isoString.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes, seconds] = (timePart.split(':').map(s => parseFloat(s)));
+    return new Date(year, month - 1, day, hours, Math.floor(minutes), Math.floor(seconds));
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Para médicos, inicializar o filtro com seu próprio ID (se fornecido)
     if (window.isDoctor && window.currentDoctorId) {
@@ -187,8 +196,8 @@ function renderDayView() {
     }
     
     dayAppointments.forEach(app => {
-        const start = new Date(app.start);
-        const end = new Date(app.end);
+        const start = parseLocalDateTime(app.start);
+        const end = parseLocalDateTime(app.end);
         const durationMinutes = (end - start) / (1000 * 60);
         const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 0.5;
         const height = durationMinutes * 0.5;
@@ -396,8 +405,8 @@ function selectAppointment(app) {
     currentEvent = {
         id: app.id,
         title: app.title,
-        start: new Date(app.start),
-        end: new Date(app.end),
+        start: parseLocalDateTime(app.start),
+        end: parseLocalDateTime(app.end),
         extendedProps: app
     };
     showEventDetails(currentEvent);
