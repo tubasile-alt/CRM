@@ -200,17 +200,9 @@ function renderDayView() {
     dayAppointments.forEach(app => {
         const start = parseLocalDateTime(app.start);
         const end = parseLocalDateTime(app.end);
-        
-        if (!start || !end) {
-            console.error('Erro ao parsear datas:', app.start, app.end);
-            return;
-        }
-        
         const durationMinutes = (end - start) / (1000 * 60);
         const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 0.5;
         const height = durationMinutes * 0.5;
-        
-        console.log(`Criando bloco: ${app.title} | Start: ${start} | Top: ${topPosition}px | Height: ${height}px`);
         
         // Extrair apenas o nome do paciente (sem nome do médico)
         const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
@@ -223,34 +215,10 @@ function renderDayView() {
         const statusClass = `status-${status}`;
         
         const block = document.createElement('div');
-        
-        // Forçar estilos inline para garantir visibilidade ABSOLUTA
-        const minHeight = Math.max(height, 80);
-        block.style.cssText = `
-            position: absolute !important;
-            top: ${topPosition}px !important;
-            left: 10px !important;
-            width: calc(100% - 20px) !important;
-            height: ${minHeight}px !important;
-            min-height: ${minHeight}px !important;
-            display: block !important;
-            visibility: visible !important;
-            overflow: hidden !important;
-            padding: 8px !important;
-            border-radius: 6px;
-            cursor: grab;
-            border-left: 4px solid #0d6efd !important;
-            background: #e7f0ff !important;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-            z-index: 10 !important;
-            font-size: 12px;
-            font-weight: 500;
-            color: #333;
-            opacity: 1 !important;
-        `;
-        
-        // IMPORTANTE: NÃO adicionar classes que podem sobrescrever CSS!
-        block.className = '';
+        block.className = `appointment-block ${typeClass} ${statusClass}`;
+        block.style.top = topPosition + 'px';
+        block.style.height = Math.max(height, 50) + 'px';
+        block.style.cursor = 'grab';
         block.draggable = true;
         block.dataset.appointmentId = app.id;
         block.dataset.duration = durationMinutes;
