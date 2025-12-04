@@ -244,6 +244,14 @@ function renderDayView() {
         if (status === 'faltou') statusIcon = '✗';
         if (status === 'atendido') statusIcon = '✔';
         
+        // Check if patient is waiting
+        const isWaiting = app.extendedProps?.waiting || app.waiting || false;
+        const checkinBtnHtml = status !== 'atendido' && !isWaiting 
+            ? `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`
+            : isWaiting 
+                ? `<span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>`
+                : '';
+        
         block.innerHTML = `
             <div class="appointment-content">
                 <div class="appointment-info-line">
@@ -251,6 +259,7 @@ function renderDayView() {
                     <span class="appointment-code">cod:${patientCode}</span>
                     <span class="appointment-type-label">pac:${patientType}</span>
                     <span class="appointment-consult-label">cons:${appointmentType} <span style="font-size: 0.8em;">${statusIcon}</span></span>
+                    ${checkinBtnHtml}
                 </div>
             </div>
         `;
@@ -897,3 +906,112 @@ function showAlert(message, type = 'success') {
 function getCSRFToken() {
     return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 }
+
+// ==================== SALA DE ESPERA / CHECK-IN ====================
+
+let waitingRoomInterval = null;
+
+function doCheckin(appointmentId) {
+    fetch(`/api/checkin/${appointmentId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Check-in realizado! Paciente na sala de espera.');
+            loadAppointments();
+            loadWaitingRoom();
+        } else {
+            showAlert(data.error || 'Erro ao fazer check-in', 'danger');
+        }
+    })
+    .catch(error => {
+        showAlert('Erro ao fazer check-in', 'danger');
+        console.error(error);
+    });
+}
+
+function loadWaitingRoom() {
+    fetch('/api/waiting-room')
+    .then(response => response.json())
+    .then(data => {
+        renderWaitingRoom(data.waiting || []);
+    })
+    .catch(error => {
+        console.error('Erro ao carregar sala de espera:', error);
+    });
+}
+
+function renderWaitingRoom(waitingList) {
+    const listDiv = document.getElementById('waitingRoomList');
+    const badge = document.getElementById('waitingCountBadge');
+    
+    if (!listDiv) return;
+    
+    badge.textContent = waitingList.length;
+    badge.style.display = waitingList.length > 0 ? 'inline-block' : 'none';
+    
+    if (waitingList.length === 0) {
+        listDiv.innerHTML = '<div class="waiting-empty">Nenhum paciente aguardando</div>';
+        return;
+    }
+    
+    listDiv.innerHTML = waitingList.map(patient => {
+        const waitingTime = calculateWaitingTime(patient.checked_in_time);
+        return `
+            <div class="waiting-patient-item" data-checkin="${patient.checked_in_time}" onclick="openPatientFromWaiting(${patient.patient_id}, ${patient.id})">
+                <div class="waiting-patient-info">
+                    <span class="waiting-patient-name">${patient.patient_name}</span>
+                    <span class="waiting-patient-type">${patient.appointment_type}</span>
+                </div>
+                <div class="waiting-timer" data-checkin="${patient.checked_in_time}">
+                    <i class="bi bi-stopwatch"></i> ${waitingTime}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function calculateWaitingTime(checkinTimeStr) {
+    if (!checkinTimeStr) return '0 min';
+    
+    const checkinTime = new Date(checkinTimeStr);
+    const now = new Date();
+    const diffMs = now - checkinTime;
+    const diffMinutes = Math.floor(diffMs / 60000);
+    
+    if (diffMinutes < 1) return '< 1 min';
+    if (diffMinutes < 60) return `${diffMinutes} min`;
+    
+    const hours = Math.floor(diffMinutes / 60);
+    const mins = diffMinutes % 60;
+    return `${hours}h ${mins}min`;
+}
+
+function updateWaitingTimers() {
+    const timers = document.querySelectorAll('.waiting-timer[data-checkin]');
+    timers.forEach(timer => {
+        const checkinTime = timer.dataset.checkin;
+        timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${calculateWaitingTime(checkinTime)}`;
+    });
+}
+
+function openPatientFromWaiting(patientId, appointmentId) {
+    window.location.href = `/prontuario/${patientId}?appointment_id=${appointmentId}`;
+}
+
+function startWaitingRoomUpdates() {
+    loadWaitingRoom();
+    if (waitingRoomInterval) clearInterval(waitingRoomInterval);
+    waitingRoomInterval = setInterval(() => {
+        updateWaitingTimers();
+    }, 30000);
+    setInterval(loadWaitingRoom, 60000);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    startWaitingRoomUpdates();
+});
