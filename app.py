@@ -317,9 +317,9 @@ def get_appointments():
         }.get(apt.status, '#6c757d')
         
         # TIMEZONE: Banco armazena horários naive em São Paulo (sem conversão)
-        # Retornar diretamente como ISO string
-        start_iso = apt.start_time.isoformat() if apt.start_time else None
-        end_iso = apt.end_time.isoformat() if apt.end_time else None
+        # Retornar com offset timezone correto (-03:00) para evitar conversão UTC
+        start_iso = apt.start_time.isoformat() + '-03:00' if apt.start_time else None
+        end_iso = apt.end_time.isoformat() + '-03:00' if apt.end_time else None
         
         # Buscar código do paciente para este médico
         from models import PatientDoctor
@@ -342,7 +342,7 @@ def get_appointments():
                 'doctorId': apt.doctor_id,
                 'doctorName': apt.doctor.name,
                 'waiting': apt.waiting,
-                'checkedInTime': apt.checked_in_time.isoformat() if apt.checked_in_time else None,
+                'checkedInTime': apt.checked_in_time.isoformat() + '-03:00' if apt.checked_in_time else None,
                 'phone': apt.patient.phone or '',
                 'notes': apt.notes or ''
             }
