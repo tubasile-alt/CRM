@@ -1262,6 +1262,7 @@ def finalizar_atendimento(patient_id):
             
             if appointment:
                 appointment.status = 'atendido'
+                appointment.waiting = False
                 if not appointment.checked_in_time:
                     appointment.checked_in_time = get_brazil_time()
             else:
@@ -2272,4 +2273,86 @@ def get_patient_consultations(patient_id):
         'category': apt.notes or 'Consulta'
     } for apt in appointments]
     return jsonify({'consultations': consultations})
+
+# ==================== SALA DE ESPERA / CHECK-IN ====================
+
+@app.route('/api/checkin/<int:appointment_id>', methods=['POST'])
+@login_required
+def checkin_patient(appointment_id):
+    """Fazer check-in do paciente - inicia cronômetro de espera"""
+    appointment = Appointment.query.get_or_404(appointment_id)
+    
+    if appointment.waiting:
+        return jsonify({'success': False, 'error': 'Paciente já está aguardando'}), 400
+    
+    if appointment.status == 'atendido':
+        return jsonify({'success': False, 'error': 'Paciente já foi atendido'}), 400
+    
+    appointment.waiting = True
+    appointment.checked_in_time = get_brazil_time()
+    db.session.commit()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Check-in realizado com sucesso',
+        'checked_in_time': appointment.checked_in_time.isoformat()
+    })
+
+@app.route('/api/waiting-room', methods=['GET'])
+@login_required
+def get_waiting_room():
+    """Listar pacientes na sala de espera (apenas do dia atual)"""
+    from datetime import datetime
+    import pytz
+    
+    tz = pytz.timezone('America/Sao_Paulo')
+    today = datetime.now(tz).date()
+    
+    query = Appointment.query.filter(
+        Appointment.waiting == True,
+        db.func.date(Appointment.start_time) == today
+    )
+    
+    if current_user.is_doctor():
+        query = query.filter(Appointment.doctor_id == current_user.id)
+    
+    waiting_appointments = query.order_by(Appointment.checked_in_time.asc()).all()
+    
+    waiting_list = []
+    for apt in waiting_appointments:
+        patient = Patient.query.get(apt.patient_id)
+        doctor = User.query.get(apt.doctor_id)
+        
+        patient_code = None
+        pd = PatientDoctor.query.filter_by(patient_id=apt.patient_id, doctor_id=apt.doctor_id).first()
+        if pd:
+            patient_code = pd.patient_code
+        
+        waiting_list.append({
+            'id': apt.id,
+            'patient_id': apt.patient_id,
+            'patient_name': patient.name if patient else 'Desconhecido',
+            'patient_code': patient_code,
+            'doctor_name': doctor.name if doctor else '',
+            'doctor_id': apt.doctor_id,
+            'appointment_type': apt.appointment_type,
+            'checked_in_time': apt.checked_in_time.isoformat() if apt.checked_in_time else None,
+            'scheduled_time': apt.start_time.strftime('%H:%M')
+        })
+    
+    return jsonify({'waiting': waiting_list})
+
+@app.route('/api/checkout-waiting/<int:appointment_id>', methods=['POST'])
+@login_required
+def checkout_waiting(appointment_id):
+    """Remover paciente da sala de espera (sem marcar como atendido)"""
+    appointment = Appointment.query.get_or_404(appointment_id)
+    
+    if not appointment.waiting:
+        return jsonify({'success': False, 'error': 'Paciente não está aguardando'}), 400
+    
+    appointment.waiting = False
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Paciente removido da sala de espera'})
 
