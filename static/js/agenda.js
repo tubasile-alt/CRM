@@ -20,11 +20,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     initializeDayView();
     initializeMonthCalendar();
-    loadAppointments();
+    loadAppointments(); // renderDayView() será chamado dentro desta função após dados serem carregados
     updateWaitingCounter();
     setInterval(updateWaitingCounter, 30000);
     renderMiniCalendar();
-    renderDayView();
     setupPatientAutocomplete();
 });
 
