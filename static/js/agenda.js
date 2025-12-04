@@ -709,6 +709,7 @@ function saveAppointmentEdits() {
 
 function updateEventStatus() {
     const newStatus = document.getElementById('eventStatusUpdate').value;
+    console.log('[updateEventStatus] Updating appointment', currentEvent.id, 'to status:', newStatus);
     
     fetch(`/api/appointments/${currentEvent.id}`, {
         method: 'PUT',
@@ -719,17 +720,27 @@ function updateEventStatus() {
             status: newStatus
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('[updateEventStatus] Response status:', response.status);
+        return response.json();
+    })
     .then(data => {
+        console.log('[updateEventStatus] Response data:', data);
         if (data.success) {
             showAlert('Status atualizado com sucesso!');
+            console.log('[updateEventStatus] Success! Reloading appointments...');
             loadAppointments();
-            bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('eventDetailModal')).hide();
+            }, 500);
+        } else {
+            showAlert(data.error || 'Erro ao atualizar status', 'danger');
+            console.error('[updateEventStatus] Server returned error:', data);
         }
     })
     .catch(error => {
         showAlert('Erro ao atualizar status.', 'danger');
-        console.error(error);
+        console.error('[updateEventStatus] Network error:', error);
     });
 }
 
