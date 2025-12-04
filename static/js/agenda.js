@@ -3,9 +3,9 @@ let appointmentsList = [];
 // Parsear string ISO como hora local (São Paulo) sem conversão de timezone
 function parseLocalDateTime(isoString) {
     if (!isoString) return null;
-    // Remove timezone designator (e.g., "-03:00") se existir
-    const withoutTz = isoString.split('-03:00')[0].split('+')[0];
-    const [datePart, timePart] = withoutTz.split('T');
+    // Remove timezone designator usando regex (e.g., "+03:00" ou "-03:00")
+    const cleanString = isoString.replace(/[+-]\d{2}:\d{2}$/, '').replace('Z', '');
+    const [datePart, timePart] = cleanString.split('T');
     const [year, month, day] = datePart.split('-').map(Number);
     const timeParts = timePart ? timePart.split(':') : ['00', '00', '00'];
     const [hours, minutes, seconds] = timeParts.map(s => parseFloat(s));
