@@ -101,12 +101,14 @@ function renderTimeColumn() {
     const timeColumn = document.getElementById('timeColumn');
     timeColumn.innerHTML = '';
     for (let hour = 7; hour <= 19; hour++) {
-        const slot = document.createElement('div');
-        slot.className = 'hour-slot';
-        slot.textContent = String(hour).padStart(2, '0') + ':00';
-        slot.style.cursor = 'pointer';
-        slot.onclick = () => openNewAppointmentAtTime(hour);
-        timeColumn.appendChild(slot);
+        for (let minutes = 0; minutes < 60; minutes += 30) {
+            const slot = document.createElement('div');
+            slot.className = 'hour-slot';
+            slot.textContent = String(hour).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+            slot.style.cursor = 'pointer';
+            slot.onclick = () => openNewAppointmentAtTime(hour, minutes);
+            timeColumn.appendChild(slot);
+        }
     }
 }
 
@@ -188,8 +190,8 @@ function renderDayView() {
         const start = new Date(app.start);
         const end = new Date(app.end);
         const durationMinutes = (end - start) / (1000 * 60);
-        const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 1;
-        const height = durationMinutes;
+        const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 0.5;
+        const height = durationMinutes * 0.5;
         
         // Extrair apenas o nome do paciente (sem nome do médico)
         const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
@@ -271,10 +273,13 @@ function renderDayView() {
         const grid = appointmentsGrid.getBoundingClientRect();
         const dropY = e.clientY - grid.top;
         
-        // Cada hora tem 60px de altura (7am-7pm = 12 horas = 720px)
-        const hourOffset = Math.round(dropY / 60);
-        const newHour = 7 + Math.max(0, Math.min(12, hourOffset));
-        const newMinutes = (dropY % 60 < 30) ? 0 : 30;
+        // Cada slot de 30min tem 30px de altura (7am-7pm = 24 slots = 720px)
+        const slotOffset = Math.round(dropY / 30);
+        const totalMinutes = 7 * 60 + slotOffset * 30;
+        const newHour = Math.floor(totalMinutes / 60);
+        const newMinutes = totalMinutes % 60;
+        
+        if (newHour < 7 || newHour > 19) return;
         
         // Criar nova data/hora
         const newStart = new Date(selectedDate);
@@ -350,15 +355,15 @@ function selectDate(date) {
     document.getElementById('scheduleDate').textContent = formatDateBR(selectedDate);
 }
 
-function openNewAppointmentAtTime(hour) {
+function openNewAppointmentAtTime(hour, minutes = 0) {
     clearAppointmentForm();
     
     const date = new Date(selectedDate);
-    date.setHours(hour, 0, 0, 0);
+    date.setHours(hour, minutes, 0, 0);
     
     // Separar data e hora
     const dateStr = date.toISOString().split('T')[0];
-    const timeStr = String(hour).padStart(2, '0') + ':00';
+    const timeStr = String(hour).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
     
     document.getElementById('appointmentDate').value = dateStr;
     document.getElementById('appointmentTime').value = timeStr;
