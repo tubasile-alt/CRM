@@ -2020,11 +2020,12 @@ def toggle_consultation_charge(payment_id):
     payment.total_amount = new_total
     
     db.session.commit()
+    db.session.refresh(payment)
     
     return jsonify({
         'success': True, 
         'new_total': new_total,
-        'procedures': procedures,
+        'procedures': list(payment.procedures or []),
         'message': 'Consulta ' + ('incluída' if charge_consultation else 'removida') + ' com sucesso'
     })
 

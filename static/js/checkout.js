@@ -230,12 +230,12 @@ function toggleConsultationCharge(paymentId, chargeConsultation) {
         
         if (result.success) {
             showAlert(result.message, 'success');
-            // Pequeno delay para garantir que o estado está atualizado no servidor
-            setTimeout(() => loadCheckouts(), 100);
+            // Delay maior para sincronização do banco de dados
+            setTimeout(() => loadCheckouts(), 500);
         } else {
             showAlert(result.error || 'Erro ao atualizar', 'danger');
             // Recarrega mesmo em caso de erro para reverter o estado do checkbox
-            setTimeout(() => loadCheckouts(), 100);
+            setTimeout(() => loadCheckouts(), 500);
         }
     })
     .catch(err => {
