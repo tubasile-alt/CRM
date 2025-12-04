@@ -101,16 +101,19 @@ class WaitingService:
         waiting_list = []
         for apt in appointments:
             wait_time = None
+            checked_in_iso = None
             if apt.checked_in_time:
                 delta = datetime.now(self.tz) - apt.checked_in_time
                 wait_time = int(delta.total_seconds() / 60)
+                checked_in_iso = apt.checked_in_time.isoformat()
             
             waiting_list.append({
                 'id': apt.id,
                 'patient_id': apt.patient_id,
                 'patient_name': apt.patient.name,
+                'appointment_type': apt.appointment_type or 'Consulta',
                 'scheduled_time': apt.start_time.strftime('%H:%M'),
-                'checked_in_time': apt.checked_in_time.strftime('%H:%M') if apt.checked_in_time else None,
+                'checked_in_time': checked_in_iso,
                 'wait_time_minutes': wait_time,
                 'room': apt.room
             })

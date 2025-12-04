@@ -912,7 +912,7 @@ function getCSRFToken() {
 let waitingRoomInterval = null;
 
 function doCheckin(appointmentId) {
-    fetch(`/api/checkin/${appointmentId}`, {
+    fetch(`/espera/api/checkin/${appointmentId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -939,7 +939,8 @@ function doCheckin(appointmentId) {
 }
 
 function loadWaitingRoom() {
-    fetch('/api/waiting-room', {
+    const today = new Date().toISOString().split('T')[0];
+    fetch(`/espera/api/list?date=${today}`, {
         headers: {
             'X-CSRFToken': getCSRFToken()
         }
@@ -949,10 +950,15 @@ function loadWaitingRoom() {
         return response.json();
     })
     .then(data => {
-        renderWaitingRoom(data.waiting || []);
+        const waitingList = data.waiting_list || [];
+        renderWaitingRoom(waitingList);
+        const badge = document.getElementById('waitingCountBadge');
+        if (badge) badge.textContent = waitingList.length;
     })
     .catch(error => {
         console.error('Erro ao carregar sala de espera:', error);
+        const listDiv = document.getElementById('waitingRoomList');
+        if (listDiv) listDiv.innerHTML = '<div class="waiting-empty">Erro ao carregar sala de espera</div>';
     });
 }
 
