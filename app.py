@@ -1969,6 +1969,8 @@ def get_pending_checkout_count():
 @login_required
 def toggle_consultation_charge(payment_id):
     """Ativa ou desativa a cobrança da consulta no checkout"""
+    from sqlalchemy.orm.attributes import flag_modified
+    
     if not current_user.is_secretary():
         return jsonify({'success': False, 'error': 'Apenas secretárias'}), 403
     
@@ -1991,41 +1993,38 @@ def toggle_consultation_charge(payment_id):
     if charge_consultation and consultation_fee == 0:
         return jsonify({'success': False, 'error': 'Consulta gratuita não pode ser cobrada'}), 400
     
-    procedures = payment.procedures or []
-    
-    # Verificar se já tem item de consulta
-    consultation_item_index = None
-    for i, proc in enumerate(procedures):
-        if proc.get('name', '').startswith('Consulta'):
-            consultation_item_index = i
-            break
+    # Criar CÓPIA da lista para forçar detecção de mudança pelo SQLAlchemy
+    procedures = list(payment.procedures or [])
     
     if charge_consultation:
         # Adicionar consulta se não existe
-        if consultation_item_index is None:
+        has_consultation = any(p.get('name', '').startswith('Consulta') for p in procedures)
+        if not has_consultation:
             consultation_item = {
                 'name': f'Consulta {consultation_type}',
                 'value': consultation_fee
             }
             procedures.insert(0, consultation_item)
     else:
-        # Remover consulta se existe
-        if consultation_item_index is not None:
-            procedures.pop(consultation_item_index)
+        # Remover consulta - criar nova lista sem itens de consulta
+        procedures = [p for p in procedures if not p.get('name', '').startswith('Consulta')]
     
     # Recalcular total
     new_total = sum(float(p.get('value', 0)) for p in procedures)
     
+    # Atribuir nova lista e marcar como modificado
     payment.procedures = procedures
     payment.total_amount = new_total
+    flag_modified(payment, 'procedures')
     
     db.session.commit()
-    db.session.refresh(payment)
+    
+    print(f"DEBUG toggle: Payment {payment_id} - new_total={new_total}, procedures={procedures}")
     
     return jsonify({
         'success': True, 
         'new_total': new_total,
-        'procedures': list(payment.procedures or []),
+        'procedures': procedures,
         'message': 'Consulta ' + ('incluída' if charge_consultation else 'removida') + ' com sucesso'
     })
 
