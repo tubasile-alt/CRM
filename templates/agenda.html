@@ -12,6 +12,14 @@
     align-items: flex-start;
 }
 
+.sidebar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 280px;
+    flex-shrink: 0;
+}
+
 .daily-agenda-divider {
     width: 2px;
     background: linear-gradient(to bottom, #d9d9d9, #f0f0f0);
@@ -21,7 +29,7 @@
 }
 
 .mini-calendar {
-    width: 280px;
+    width: 100%;
     flex-shrink: 0;
     background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
     border-radius: 12px;
@@ -406,7 +414,7 @@
         gap: 10px;
     }
     
-    .mini-calendar {
+    .sidebar-container {
         width: 260px;
     }
     
@@ -422,9 +430,19 @@
         gap: 20px;
     }
     
-    .mini-calendar {
+    .sidebar-container {
         width: 100%;
         order: 2;
+        flex-direction: row;
+        gap: 10px;
+    }
+    
+    .mini-calendar {
+        flex: 1;
+    }
+    
+    .waiting-room-panel {
+        flex: 1;
     }
     
     .daily-schedule {
@@ -513,17 +531,20 @@
 </div>
 
 <div class="daily-agenda-container">
-    <!-- MINI CALENDAR -->
-    <div class="mini-calendar" id="miniCalendar"></div>
-    
-    <!-- SALA DE ESPERA -->
-    <div class="waiting-room-panel" id="waitingRoomPanel">
-        <div class="waiting-room-header">
-            <i class="bi bi-hourglass-split"></i> Sala de Espera
-            <span class="waiting-count-badge" id="waitingCountBadge">0</span>
-        </div>
-        <div class="waiting-room-list" id="waitingRoomList">
-            <div class="waiting-empty">Nenhum paciente aguardando</div>
+    <!-- LEFT SIDEBAR: MINI CALENDAR + WAITING ROOM -->
+    <div class="sidebar-container">
+        <!-- MINI CALENDAR -->
+        <div class="mini-calendar" id="miniCalendar"></div>
+        
+        <!-- SALA DE ESPERA -->
+        <div class="waiting-room-panel" id="waitingRoomPanel">
+            <div class="waiting-room-header">
+                <i class="bi bi-hourglass-split"></i> Sala de Espera
+                <span class="waiting-count-badge" id="waitingCountBadge">0</span>
+            </div>
+            <div class="waiting-room-list" id="waitingRoomList">
+                <div class="waiting-empty">Nenhum paciente aguardando</div>
+            </div>
         </div>
     </div>
     
