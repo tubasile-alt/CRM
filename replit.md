@@ -9,7 +9,7 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - **Frontend:** Jinja2 + HTML/CSS/JavaScript
 - **Autenticação:** Flask-Login com roles (médico, secretária)
 
-## 📊 Status Atual (02/12/2025)
+## 📊 Status Atual (04/12/2025)
 - ✅ Migração de dados do SQLite para PostgreSQL completa
 - ✅ Interface de agenda diária com mini-calendário 3D
 - ✅ Layout flexbox (sem overlapping)
@@ -23,6 +23,9 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **Checkout melhorado** - Valores discriminados (consulta + procedimentos separados)
 - ✅ **Toggle de cobrança** - Checkbox para cobrar ou não cobrar consulta no checkout
 - ✅ **Badge de pendências** - Número de checkouts pendentes visível na aba Agenda
+- ✅ **Slots de 30 minutos** - Agenda mostra intervalos de 30 em 30 minutos
+- ✅ **Sala de Espera** - Lista de pacientes aguardando com cronômetro em tempo real
+- ✅ **Botão Check In** - Botão verde para fazer check-in do paciente na agenda
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
@@ -86,13 +89,35 @@ python init_backup.py && python app.py
   - Vermelho: Transplante Capilar
 
 ## 🔧 Funcionalidades Principais
-1. **Agenda Diária** - Visualização por horários
+1. **Agenda Diária** - Visualização por horários (slots de 30 minutos)
 2. **Prontuário** - Histórico completo do paciente com evoluções
 3. **Agendamento** - Criação e edição de consultas
 4. **Checkout** - Sistema de pagamento por procedimento
 5. **Chat** - Comunicação interna entre usuários
 6. **Controle de Acesso** - Médicos veem seus pacientes, secretárias veem todos
 7. **Registro de Cirurgias** - Para pacientes de Transplante Capilar ✅
+8. **Sala de Espera / Check-In** - Cronômetro de espera para pacientes ✅
+
+## 🕐 Sistema de Sala de Espera (04/12/2025)
+
+### Funcionalidades
+- **Botão Check In** (verde) ao lado do tipo de consulta nos blocos de agendamento
+- **Cronômetro automático** que conta o tempo de espera do paciente
+- **Lista de espera** visível abaixo do mini calendário
+- **Visível para médicos e secretárias**
+- **Auto-remoção** quando o atendimento é finalizado
+
+### API Endpoints
+- `POST /api/checkin/<appointment_id>` - Fazer check-in do paciente
+- `GET /api/waiting-room` - Listar pacientes aguardando
+- `POST /api/checkout-waiting/<appointment_id>` - Remover da sala de espera
+
+### Comportamento
+1. Secretária clica em "Check In" no bloco de agendamento
+2. Paciente aparece na lista de espera com cronômetro
+3. Cronômetro atualiza automaticamente (mostra minutos de espera)
+4. Clicar no paciente na lista abre o prontuário
+5. Ao finalizar atendimento, paciente sai automaticamente da lista
 
 ## 📁 Estrutura de Pastas
 ```
