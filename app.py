@@ -317,12 +317,22 @@ def get_appointments():
             'faltou': '#dc3545'
         }.get(apt.status, '#6c757d')
         
-        # Converter para São Paulo time e remover timezone do ISO string para evitar confusão no frontend
+        # Converter para São Paulo time se necessário
         tz_sp = pytz.timezone('America/Sao_Paulo')
-        start_sp = apt.start_time.astimezone(tz_sp)
-        end_sp = apt.end_time.astimezone(tz_sp)
         
-        # Remove timezone info para enviar como naive datetime (evita double conversion)
+        # Se o datetime é naive, assume que já está em São Paulo
+        if apt.start_time.tzinfo is None:
+            start_sp = tz_sp.localize(apt.start_time)
+        else:
+            # Se tem timezone, converte para São Paulo
+            start_sp = apt.start_time.astimezone(tz_sp)
+        
+        if apt.end_time.tzinfo is None:
+            end_sp = tz_sp.localize(apt.end_time)
+        else:
+            end_sp = apt.end_time.astimezone(tz_sp)
+        
+        # Remove timezone info para enviar como naive datetime (evita confusão no frontend)
         start_iso = start_sp.replace(tzinfo=None).isoformat()
         end_iso = end_sp.replace(tzinfo=None).isoformat()
         
