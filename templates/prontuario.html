@@ -47,6 +47,53 @@ function saveAttentionNote() {
         showAlert('Erro ao salvar anotação', 'danger');
     });
 }
+
+function openEditPatientModal() {
+    new bootstrap.Modal(document.getElementById('editPatientModal')).show();
+}
+
+function savePatientData() {
+    const data = {
+        name: document.getElementById('editPatientName').value,
+        email: document.getElementById('editPatientEmail').value,
+        phone: document.getElementById('editPatientPhone').value,
+        birth_date: document.getElementById('editPatientBirthDate').value,
+        cpf: document.getElementById('editPatientCpf').value,
+        address: document.getElementById('editPatientAddress').value,
+        city: document.getElementById('editPatientCity').value,
+        state: document.getElementById('editPatientState').value,
+        zip_code: document.getElementById('editPatientZip').value,
+        mother_name: document.getElementById('editPatientMotherName').value,
+        occupation: document.getElementById('editPatientOccupation').value,
+        indication_source: document.getElementById('editPatientIndication').value,
+        patient_type: document.getElementById('editPatientType').value
+    };
+    
+    if (!data.name) {
+        showAlert('Nome do paciente é obrigatório', 'warning');
+        return;
+    }
+    
+    fetch(`/api/patient/{{ patient.id }}/update`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('editPatientModal')).hide();
+            showAlert('Dados do paciente atualizados!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert(result.error || 'Erro ao atualizar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao salvar dados', 'danger');
+    });
+}
 </script>
 
 <div class="row">
@@ -150,6 +197,26 @@ function saveAttentionNote() {
                         <div class="col-md-4">
                             <label class="form-label">CEP</label>
                             <input type="text" class="form-control" id="editPatientZip" value="{{ patient.zip_code or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nome da Mãe</label>
+                            <input type="text" class="form-control" id="editPatientMotherName" value="{{ patient.mother_name or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ocupação</label>
+                            <input type="text" class="form-control" id="editPatientOccupation" value="{{ patient.occupation or '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Fonte de Indicação</label>
+                            <input type="text" class="form-control" id="editPatientIndication" value="{{ patient.indication_source or '' }}" placeholder="Ex: Google, Indicação de amigo...">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Paciente</label>
+                            <select class="form-select" id="editPatientType">
+                                <option value="particular" {% if patient.patient_type == 'particular' %}selected{% endif %}>Particular</option>
+                                <option value="UNIMED" {% if patient.patient_type == 'UNIMED' %}selected{% endif %}>UNIMED</option>
+                                <option value="convenio" {% if patient.patient_type == 'convenio' %}selected{% endif %}>Convênio</option>
+                            </select>
                         </div>
                     </div>
                 </form>

@@ -61,19 +61,18 @@ def get_brazil_time():
     return datetime.now(tz)
 
 def parse_datetime_with_tz(iso_string):
-    """Parse ISO datetime string and set Brazil timezone as default"""
-    tz = pytz.timezone('America/Sao_Paulo')
-    
+    """Parse ISO datetime string - retorna naive datetime para São Paulo.
+    NÃO usamos timezone para evitar conversões automáticas do SQLAlchemy."""
     # Remove 'Z' suffix if present and parse
     iso_string = iso_string.replace('Z', '')
     dt = datetime.fromisoformat(iso_string)
     
-    # If naive (no timezone), assume it's already in São Paulo time
-    if dt.tzinfo is None:
-        dt = tz.localize(dt)
-    else:
-        # If it has timezone info, convert to São Paulo timezone
-        dt = dt.astimezone(tz)
+    # Sempre retorna naive (sem timezone) - representa horário de São Paulo
+    if dt.tzinfo is not None:
+        # Se veio com timezone, converter para São Paulo e remover tzinfo
+        tz = pytz.timezone('America/Sao_Paulo')
+        dt = dt.astimezone(tz).replace(tzinfo=None)
+    
     return dt
 
 def format_brazil_datetime(dt):
@@ -317,24 +316,10 @@ def get_appointments():
             'faltou': '#dc3545'
         }.get(apt.status, '#6c757d')
         
-        # Converter para São Paulo time se necessário
-        tz_sp = pytz.timezone('America/Sao_Paulo')
-        
-        # Se o datetime é naive, assume que já está em São Paulo
-        if apt.start_time.tzinfo is None:
-            start_sp = tz_sp.localize(apt.start_time)
-        else:
-            # Se tem timezone, converte para São Paulo
-            start_sp = apt.start_time.astimezone(tz_sp)
-        
-        if apt.end_time.tzinfo is None:
-            end_sp = tz_sp.localize(apt.end_time)
-        else:
-            end_sp = apt.end_time.astimezone(tz_sp)
-        
-        # Remove timezone info para enviar como naive datetime (evita confusão no frontend)
-        start_iso = start_sp.replace(tzinfo=None).isoformat()
-        end_iso = end_sp.replace(tzinfo=None).isoformat()
+        # TIMEZONE: Banco armazena horários naive em São Paulo (sem conversão)
+        # Retornar diretamente como ISO string
+        start_iso = apt.start_time.isoformat() if apt.start_time else None
+        end_iso = apt.end_time.isoformat() if apt.end_time else None
         
         # Buscar código do paciente para este médico
         from models import PatientDoctor
@@ -787,6 +772,14 @@ def update_patient(patient_id):
         patient.state = data['state'] or None
     if 'zip_code' in data:
         patient.zip_code = data['zip_code'] or None
+    if 'mother_name' in data:
+        patient.mother_name = data['mother_name'] or None
+    if 'occupation' in data:
+        patient.occupation = data['occupation'] or None
+    if 'indication_source' in data:
+        patient.indication_source = data['indication_source'] or None
+    if 'patient_type' in data:
+        patient.patient_type = data['patient_type'] or 'particular'
     
     db.session.commit()
     return jsonify({'success': True})
