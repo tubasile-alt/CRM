@@ -112,7 +112,7 @@ function renderTimeColumn() {
     const timeColumn = document.getElementById('timeColumn');
     timeColumn.innerHTML = '';
     for (let hour = 7; hour <= 19; hour++) {
-        for (let minutes = 0; minutes < 60; minutes += 30) {
+        for (let minutes = 0; minutes < 60; minutes += 15) {
             const slot = document.createElement('div');
             slot.className = 'hour-slot';
             slot.textContent = String(hour).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
@@ -201,9 +201,9 @@ function renderDayView() {
         const start = parseLocalDateTime(app.start);
         const end = parseLocalDateTime(app.end);
         const durationMinutes = (end - start) / (1000 * 60);
-        // Cada slot de 15 min tem 120px de altura, então cada minuto = 8px
-        const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 4;
-        const height = durationMinutes * 4;
+        // Cada slot de 15 min tem 30px de altura, então cada minuto = 2px
+        const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 2;
+        const height = durationMinutes * 2;
         
         // Extrair apenas o nome do paciente (sem nome do médico)
         const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
