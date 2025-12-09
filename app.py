@@ -46,10 +46,12 @@ from routes.surgical_map import surgical_map_bp
 from routes.waiting_room import waiting_room_bp
 from routes.settings import settings_bp
 from routes.patient import patient_bp
+from routes.crm import crm_bp
 
 app.register_blueprint(surgical_map_bp)
 app.register_blueprint(waiting_room_bp)
 app.register_blueprint(settings_bp)
+app.register_blueprint(crm_bp)
 
 @login_manager.user_loader
 def load_user(user_id):

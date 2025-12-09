@@ -42,6 +42,11 @@
                             <i class="bi bi-clipboard2-pulse"></i> Mapa Cirúrgico
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'crm.crm_page' %}active{% endif %}" href="{{ url_for('crm.crm_page') }}">
+                            <i class="bi bi-graph-up"></i> CRM
+                        </a>
+                    </li>
                     {% if current_user.is_doctor() %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'settings.index' %}active{% endif %}" href="{{ url_for('settings.index') }}">

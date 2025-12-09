@@ -11,3 +11,4 @@ click
 Pillow
 reportlab
 psycopg2-binary
+python-dateutil

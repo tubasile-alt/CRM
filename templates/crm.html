@@ -1,0 +1,569 @@
+{% extends "base.html" %}
+
+{% block title %}CRM - Clínica Basile{% endblock %}
+
+{% block extra_css %}
+<style>
+.crm-container {
+    padding: 20px;
+}
+
+.crm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.crm-stats {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+    min-width: 150px;
+}
+
+.stat-card .number {
+    font-size: 28px;
+    font-weight: bold;
+    color: #0d6efd;
+}
+
+.stat-card .label {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.stat-card.danger .number {
+    color: #dc3545;
+}
+
+.stat-card.warning .number {
+    color: #ffc107;
+}
+
+.stat-card.success .number {
+    color: #198754;
+}
+
+.crm-panels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.crm-panel {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.panel-header {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+    padding: 15px 20px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-header.danger {
+    background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%);
+}
+
+.panel-header.warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #000;
+}
+
+.panel-header.success {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+}
+
+.panel-body {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.procedure-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 4px solid #0d6efd;
+}
+
+.procedure-item:hover {
+    background: #e9ecef;
+    transform: translateX(3px);
+}
+
+.procedure-item.overdue {
+    border-left-color: #dc3545;
+    background: #fff5f5;
+}
+
+.procedure-item.due-soon {
+    border-left-color: #ffc107;
+    background: #fffbeb;
+}
+
+.procedure-item .patient-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.procedure-item .procedure-name {
+    font-size: 13px;
+    color: #0d6efd;
+    margin-bottom: 4px;
+}
+
+.procedure-item .date-info {
+    font-size: 12px;
+    color: #666;
+}
+
+.procedure-item .phone-info {
+    font-size: 12px;
+    color: #198754;
+}
+
+.procedure-item .urgency-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.urgency-badge.overdue {
+    background: #dc3545;
+    color: white;
+}
+
+.urgency-badge.due-soon {
+    background: #ffc107;
+    color: #000;
+}
+
+.urgency-badge.future {
+    background: #6c757d;
+    color: white;
+}
+
+.empty-panel {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.action-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+}
+
+.action-btn.contacted {
+    background: #0d6efd;
+    color: white;
+}
+
+.action-btn.scheduled {
+    background: #198754;
+    color: white;
+}
+
+.action-btn.done {
+    background: #6c757d;
+    color: white;
+}
+
+@media (max-width: 1200px) {
+    .crm-panels {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crm-container">
+    <div class="crm-header">
+        <h2><i class="bi bi-graph-up"></i> CRM - Gestão de Procedimentos</h2>
+        <button class="btn btn-primary" onclick="openNewProcedureModal()">
+            <i class="bi bi-plus-lg"></i> Novo Registro
+        </button>
+    </div>
+    
+    <div class="crm-stats" id="crmStats">
+        <div class="stat-card success">
+            <div class="number" id="statPerformed">0</div>
+            <div class="label">Realizados</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="statPlanned">0</div>
+            <div class="label">Planejados</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="number" id="statOverdue">0</div>
+            <div class="label">Vencidos</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="number" id="statDueSoon">0</div>
+            <div class="label">Próximos 30 dias</div>
+        </div>
+    </div>
+    
+    <div class="crm-panels">
+        <div class="crm-panel">
+            <div class="panel-header danger">
+                <span><i class="bi bi-bell-fill"></i> Follow-ups Pendentes</span>
+                <span class="badge bg-light text-dark" id="followupCount">0</span>
+            </div>
+            <div class="panel-body" id="followupsPanel">
+                <div class="empty-panel">Carregando...</div>
+            </div>
+        </div>
+        
+        <div class="crm-panel">
+            <div class="panel-header warning">
+                <span><i class="bi bi-clipboard-check"></i> Planejados (Não Realizados)</span>
+                <span class="badge bg-light text-dark" id="plannedCount">0</span>
+            </div>
+            <div class="panel-body" id="plannedPanel">
+                <div class="empty-panel">Carregando...</div>
+            </div>
+        </div>
+        
+        <div class="crm-panel">
+            <div class="panel-header success">
+                <span><i class="bi bi-check-circle-fill"></i> Procedimentos Realizados</span>
+                <span class="badge bg-light text-dark" id="performedCount">0</span>
+            </div>
+            <div class="panel-body" id="performedPanel">
+                <div class="empty-panel">Carregando...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="newProcedureModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Registro de Procedimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="procedureForm">
+                    <div class="mb-3">
+                        <label class="form-label">Paciente</label>
+                        <input type="text" class="form-control" id="procedurePatientSearch" placeholder="Digite o nome do paciente..." autocomplete="off">
+                        <input type="hidden" id="procedurePatientId">
+                        <div id="patientSearchResults" class="list-group mt-1" style="position: absolute; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Procedimento</label>
+                        <select class="form-select" id="procedureName" required>
+                            <option value="">-- Selecione --</option>
+                            <option value="Botox">Botox</option>
+                            <option value="Preenchimento">Preenchimento</option>
+                            <option value="Laser">Laser</option>
+                            <option value="Ulthera">Ulthera</option>
+                            <option value="Infiltração Capilar">Infiltração Capilar</option>
+                            <option value="Soroterapia">Soroterapia</option>
+                            <option value="Pequena Cirurgia">Pequena Cirurgia</option>
+                            <option value="Nitrogênio Líquido">Nitrogênio Líquido</option>
+                            <option value="Transplante Capilar">Transplante Capilar</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" id="procedureStatus" required>
+                            <option value="planejado">Planejado</option>
+                            <option value="realizado">Realizado</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="performedDateGroup">
+                        <label class="form-label">Data da Realização</label>
+                        <input type="date" class="form-control" id="procedurePerformedDate">
+                    </div>
+                    <div class="mb-3" id="plannedDateGroup" style="display: none;">
+                        <label class="form-label">Data Planejada</label>
+                        <input type="date" class="form-control" id="procedurePlannedDate">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observações</label>
+                        <textarea class="form-control" id="procedureNotes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveProcedureRecord()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadCRMData();
+    setupPatientSearch();
+    
+    document.getElementById('procedureStatus').addEventListener('change', function() {
+        const isPerformed = this.value === 'realizado';
+        document.getElementById('performedDateGroup').style.display = isPerformed ? 'block' : 'none';
+        document.getElementById('plannedDateGroup').style.display = isPerformed ? 'none' : 'block';
+        if (isPerformed) {
+            document.getElementById('procedurePerformedDate').value = new Date().toISOString().split('T')[0];
+        }
+    });
+});
+
+function loadCRMData() {
+    loadStats();
+    loadFollowups();
+    loadPlanned();
+    loadPerformed();
+}
+
+function loadStats() {
+    fetch('/api/crm/stats')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('statPerformed').textContent = data.performed;
+            document.getElementById('statPlanned').textContent = data.planned;
+            document.getElementById('statOverdue').textContent = data.overdue;
+            document.getElementById('statDueSoon').textContent = data.due_soon;
+        });
+}
+
+function loadFollowups() {
+    fetch('/api/crm/followups')
+        .then(r => r.json())
+        .then(data => {
+            const panel = document.getElementById('followupsPanel');
+            document.getElementById('followupCount').textContent = data.length;
+            
+            if (data.length === 0) {
+                panel.innerHTML = '<div class="empty-panel"><i class="bi bi-check-circle"></i><br>Nenhum follow-up pendente</div>';
+                return;
+            }
+            
+            panel.innerHTML = data.map(item => `
+                <div class="procedure-item ${item.urgency === 'Vencido' ? 'overdue' : item.urgency === 'Próximo' ? 'due-soon' : ''}" onclick="openPatient(${item.patient_id})">
+                    <div class="patient-name">${item.patient_name}</div>
+                    <div class="procedure-name">${item.procedure_name}</div>
+                    <div class="date-info">
+                        Realizado: ${formatDate(item.performed_date)} | 
+                        Retorno: ${formatDate(item.follow_up_due_at)}
+                        <span class="urgency-badge ${item.urgency === 'Vencido' ? 'overdue' : item.urgency === 'Próximo' ? 'due-soon' : 'future'}">${item.urgency}</span>
+                    </div>
+                    ${item.patient_phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
+                    <div class="action-buttons" onclick="event.stopPropagation()">
+                        <button class="action-btn contacted" onclick="updateFollowupStatus(${item.id}, 'contacted')">Contatado</button>
+                        <button class="action-btn scheduled" onclick="updateFollowupStatus(${item.id}, 'scheduled')">Agendado</button>
+                        <button class="action-btn done" onclick="updateFollowupStatus(${item.id}, 'done')">Concluído</button>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function loadPlanned() {
+    fetch('/api/crm/planned')
+        .then(r => r.json())
+        .then(data => {
+            const panel = document.getElementById('plannedPanel');
+            document.getElementById('plannedCount').textContent = data.length;
+            
+            if (data.length === 0) {
+                panel.innerHTML = '<div class="empty-panel"><i class="bi bi-clipboard"></i><br>Nenhum procedimento planejado</div>';
+                return;
+            }
+            
+            panel.innerHTML = data.map(item => `
+                <div class="procedure-item" onclick="openPatient(${item.patient_id})">
+                    <div class="patient-name">${item.patient_name}</div>
+                    <div class="procedure-name">${item.procedure_name}</div>
+                    <div class="date-info">Planejado: ${item.planned_date ? formatDate(item.planned_date) : 'Sem data'}</div>
+                    ${item.patient_phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
+                    <div class="action-buttons" onclick="event.stopPropagation()">
+                        <button class="action-btn scheduled" onclick="markAsPerformed(${item.id})">Marcar como Realizado</button>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function loadPerformed() {
+    fetch('/api/crm/performed')
+        .then(r => r.json())
+        .then(data => {
+            const panel = document.getElementById('performedPanel');
+            document.getElementById('performedCount').textContent = data.length;
+            
+            if (data.length === 0) {
+                panel.innerHTML = '<div class="empty-panel"><i class="bi bi-check-circle"></i><br>Nenhum procedimento realizado</div>';
+                return;
+            }
+            
+            panel.innerHTML = data.map(item => `
+                <div class="procedure-item" onclick="openPatient(${item.patient_id})">
+                    <div class="patient-name">${item.patient_name}</div>
+                    <div class="procedure-name">${item.procedure_name}</div>
+                    <div class="date-info">Realizado: ${formatDate(item.performed_date)}</div>
+                    ${item.follow_up_due_at ? `<div class="date-info">Próximo retorno: ${formatDate(item.follow_up_due_at)}</div>` : ''}
+                </div>
+            `).join('');
+        });
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('pt-BR');
+}
+
+function openPatient(patientId) {
+    window.location.href = `/prontuario/${patientId}`;
+}
+
+function updateFollowupStatus(recordId, status) {
+    fetch(`/api/crm/records/${recordId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({follow_up_status: status})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadCRMData();
+        }
+    });
+}
+
+function markAsPerformed(recordId) {
+    fetch(`/api/crm/records/${recordId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: 'realizado'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadCRMData();
+        }
+    });
+}
+
+function openNewProcedureModal() {
+    document.getElementById('procedureForm').reset();
+    document.getElementById('procedurePatientId').value = '';
+    document.getElementById('procedurePerformedDate').value = new Date().toISOString().split('T')[0];
+    new bootstrap.Modal(document.getElementById('newProcedureModal')).show();
+}
+
+function setupPatientSearch() {
+    const searchInput = document.getElementById('procedurePatientSearch');
+    const resultsDiv = document.getElementById('patientSearchResults');
+    let timeout;
+    
+    searchInput.addEventListener('input', function() {
+        clearTimeout(timeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            resultsDiv.innerHTML = '';
+            return;
+        }
+        
+        timeout = setTimeout(() => {
+            fetch(`/api/patients/search?q=${encodeURIComponent(query)}`)
+                .then(r => r.json())
+                .then(patients => {
+                    resultsDiv.innerHTML = patients.slice(0, 10).map(p => `
+                        <button type="button" class="list-group-item list-group-item-action" onclick="selectPatient(${p.id}, '${p.name.replace(/'/g, "\\'")}')">
+                            ${p.name} ${p.phone ? '- ' + p.phone : ''}
+                        </button>
+                    `).join('');
+                });
+        }, 300);
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
+            resultsDiv.innerHTML = '';
+        }
+    });
+}
+
+function selectPatient(id, name) {
+    document.getElementById('procedurePatientId').value = id;
+    document.getElementById('procedurePatientSearch').value = name;
+    document.getElementById('patientSearchResults').innerHTML = '';
+}
+
+function saveProcedureRecord() {
+    const patientId = document.getElementById('procedurePatientId').value;
+    const procedureName = document.getElementById('procedureName').value;
+    const status = document.getElementById('procedureStatus').value;
+    const performedDate = document.getElementById('procedurePerformedDate').value;
+    const plannedDate = document.getElementById('procedurePlannedDate').value;
+    const notes = document.getElementById('procedureNotes').value;
+    
+    if (!patientId || !procedureName) {
+        alert('Selecione um paciente e um procedimento.');
+        return;
+    }
+    
+    fetch('/api/crm/records', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            patient_id: parseInt(patientId),
+            procedure_name: procedureName,
+            status: status,
+            performed_date: status === 'realizado' ? performedDate : null,
+            planned_date: status === 'planejado' ? plannedDate : null,
+            notes: notes
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('newProcedureModal')).hide();
+            loadCRMData();
+        } else {
+            alert(data.error || 'Erro ao salvar');
+        }
+    });
+}
+</script>
+{% endblock %}

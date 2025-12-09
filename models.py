@@ -358,3 +358,35 @@ class Payment(db.Model):
     
     appointment = db.relationship('Appointment', backref='payments')
     patient = db.relationship('Patient', backref='payments')
+
+class ProcedureFollowUpRule(db.Model):
+    __tablename__ = 'procedure_follow_up_rule'
+    id = db.Column(db.Integer, primary_key=True)
+    procedure_name = db.Column(db.String(100), unique=True, nullable=False)
+    follow_up_months = db.Column(db.Integer, nullable=False, default=6)
+    description = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+
+class ProcedureRecord(db.Model):
+    __tablename__ = 'procedure_record'
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    procedure_name = db.Column(db.String(100), nullable=False, index=True)
+    status = db.Column(db.String(20), default='planejado')  # 'planejado', 'realizado', 'cancelado'
+    planned_date = db.Column(db.Date)
+    performed_date = db.Column(db.Date, index=True)
+    follow_up_due_at = db.Column(db.Date, index=True)
+    follow_up_status = db.Column(db.String(20), default='pending')  # 'pending', 'contacted', 'scheduled', 'done'
+    notes = db.Column(db.Text)
+    evolution_id = db.Column(db.Integer, db.ForeignKey('evolution.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    __table_args__ = (
+        db.Index('idx_procedure_patient_status', 'patient_id', 'status'),
+        db.Index('idx_procedure_followup', 'follow_up_due_at', 'follow_up_status'),
+    )
+    
+    patient = db.relationship('Patient', backref='procedure_records')
+    doctor = db.relationship('User', backref='procedure_records')
+    evolution = db.relationship('Evolution', backref='procedure_records')
