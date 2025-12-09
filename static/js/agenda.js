@@ -201,9 +201,9 @@ function renderDayView() {
         const start = parseLocalDateTime(app.start);
         const end = parseLocalDateTime(app.end);
         const durationMinutes = (end - start) / (1000 * 60);
-        // Cada slot de 30 min tem 60px de altura, então cada minuto = 2px
-        const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 2;
-        const height = durationMinutes * 2;
+        // Cada slot de 15 min tem 120px de altura, então cada minuto = 8px
+        const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 4;
+        const height = durationMinutes * 4;
         
         // Extrair apenas o nome do paciente (sem nome do médico)
         const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
