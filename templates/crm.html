@@ -213,9 +213,6 @@
 <div class="crm-container">
     <div class="crm-header">
         <h2><i class="bi bi-graph-up"></i> CRM - Gestão de Procedimentos</h2>
-        <button class="btn btn-primary" onclick="openNewProcedureModal()">
-            <i class="bi bi-plus-lg"></i> Novo Registro
-        </button>
     </div>
     
     <div class="crm-stats" id="crmStats">
@@ -270,80 +267,12 @@
     </div>
 </div>
 
-<div class="modal fade" id="newProcedureModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Novo Registro de Procedimento</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="procedureForm">
-                    <div class="mb-3">
-                        <label class="form-label">Paciente</label>
-                        <input type="text" class="form-control" id="procedurePatientSearch" placeholder="Digite o nome do paciente..." autocomplete="off">
-                        <input type="hidden" id="procedurePatientId">
-                        <div id="patientSearchResults" class="list-group mt-1" style="position: absolute; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Procedimento</label>
-                        <select class="form-select" id="procedureName" required>
-                            <option value="">-- Selecione --</option>
-                            <option value="Botox">Botox</option>
-                            <option value="Preenchimento">Preenchimento</option>
-                            <option value="Laser">Laser</option>
-                            <option value="Ulthera">Ulthera</option>
-                            <option value="Infiltração Capilar">Infiltração Capilar</option>
-                            <option value="Soroterapia">Soroterapia</option>
-                            <option value="Pequena Cirurgia">Pequena Cirurgia</option>
-                            <option value="Nitrogênio Líquido">Nitrogênio Líquido</option>
-                            <option value="Transplante Capilar">Transplante Capilar</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Status</label>
-                        <select class="form-select" id="procedureStatus" required>
-                            <option value="planejado">Planejado</option>
-                            <option value="realizado">Realizado</option>
-                        </select>
-                    </div>
-                    <div class="mb-3" id="performedDateGroup">
-                        <label class="form-label">Data da Realização</label>
-                        <input type="date" class="form-control" id="procedurePerformedDate">
-                    </div>
-                    <div class="mb-3" id="plannedDateGroup" style="display: none;">
-                        <label class="form-label">Data Planejada</label>
-                        <input type="date" class="form-control" id="procedurePlannedDate">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Observações</label>
-                        <textarea class="form-control" id="procedureNotes" rows="2"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="saveProcedureRecord()">Salvar</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadCRMData();
-    setupPatientSearch();
-    
-    document.getElementById('procedureStatus').addEventListener('change', function() {
-        const isPerformed = this.value === 'realizado';
-        document.getElementById('performedDateGroup').style.display = isPerformed ? 'block' : 'none';
-        document.getElementById('plannedDateGroup').style.display = isPerformed ? 'none' : 'block';
-        if (isPerformed) {
-            document.getElementById('procedurePerformedDate').value = new Date().toISOString().split('T')[0];
-        }
-    });
 });
 
 function loadCRMData() {
@@ -387,9 +316,7 @@ function loadFollowups() {
                     </div>
                     ${item.patient_phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
                     <div class="action-buttons" onclick="event.stopPropagation()">
-                        <button class="action-btn contacted" onclick="updateFollowupStatus(${item.id}, 'contacted')">Contatado</button>
-                        <button class="action-btn scheduled" onclick="updateFollowupStatus(${item.id}, 'scheduled')">Agendado</button>
-                        <button class="action-btn done" onclick="updateFollowupStatus(${item.id}, 'done')">Concluído</button>
+                        <button class="action-btn contacted" onclick="markAsDone(${item.id})">Marcar Feito</button>
                     </div>
                 </div>
             `).join('');
@@ -415,7 +342,7 @@ function loadPlanned() {
                     <div class="date-info">Planejado: ${item.planned_date ? formatDate(item.planned_date) : 'Sem data'}</div>
                     ${item.patient_phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
                     <div class="action-buttons" onclick="event.stopPropagation()">
-                        <button class="action-btn scheduled" onclick="markAsPerformed(${item.id})">Marcar como Realizado</button>
+                        <button class="action-btn scheduled" onclick="markAsRealizado(${item.id})">Marcar Realizado</button>
                     </div>
                 </div>
             `).join('');
@@ -455,11 +382,11 @@ function openPatient(patientId) {
     window.location.href = `/prontuario/${patientId}`;
 }
 
-function updateFollowupStatus(recordId, status) {
-    fetch(`/api/crm/records/${recordId}`, {
+function markAsDone(planId) {
+    fetch(`/api/crm/records/${planId}`, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({follow_up_status: status})
+        body: JSON.stringify({was_performed: true})
     })
     .then(r => r.json())
     .then(data => {
@@ -469,99 +396,16 @@ function updateFollowupStatus(recordId, status) {
     });
 }
 
-function markAsPerformed(recordId) {
-    fetch(`/api/crm/records/${recordId}`, {
+function markAsRealizado(planId) {
+    fetch(`/api/crm/records/${planId}`, {
         method: 'PATCH',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({status: 'realizado'})
+        body: JSON.stringify({was_performed: true})
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
             loadCRMData();
-        }
-    });
-}
-
-function openNewProcedureModal() {
-    document.getElementById('procedureForm').reset();
-    document.getElementById('procedurePatientId').value = '';
-    document.getElementById('procedurePerformedDate').value = new Date().toISOString().split('T')[0];
-    new bootstrap.Modal(document.getElementById('newProcedureModal')).show();
-}
-
-function setupPatientSearch() {
-    const searchInput = document.getElementById('procedurePatientSearch');
-    const resultsDiv = document.getElementById('patientSearchResults');
-    let timeout;
-    
-    searchInput.addEventListener('input', function() {
-        clearTimeout(timeout);
-        const query = this.value.trim();
-        
-        if (query.length < 2) {
-            resultsDiv.innerHTML = '';
-            return;
-        }
-        
-        timeout = setTimeout(() => {
-            fetch(`/api/patients/search?q=${encodeURIComponent(query)}`)
-                .then(r => r.json())
-                .then(patients => {
-                    resultsDiv.innerHTML = patients.slice(0, 10).map(p => `
-                        <button type="button" class="list-group-item list-group-item-action" onclick="selectPatient(${p.id}, '${p.name.replace(/'/g, "\\'")}')">
-                            ${p.name} ${p.phone ? '- ' + p.phone : ''}
-                        </button>
-                    `).join('');
-                });
-        }, 300);
-    });
-    
-    document.addEventListener('click', function(e) {
-        if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {
-            resultsDiv.innerHTML = '';
-        }
-    });
-}
-
-function selectPatient(id, name) {
-    document.getElementById('procedurePatientId').value = id;
-    document.getElementById('procedurePatientSearch').value = name;
-    document.getElementById('patientSearchResults').innerHTML = '';
-}
-
-function saveProcedureRecord() {
-    const patientId = document.getElementById('procedurePatientId').value;
-    const procedureName = document.getElementById('procedureName').value;
-    const status = document.getElementById('procedureStatus').value;
-    const performedDate = document.getElementById('procedurePerformedDate').value;
-    const plannedDate = document.getElementById('procedurePlannedDate').value;
-    const notes = document.getElementById('procedureNotes').value;
-    
-    if (!patientId || !procedureName) {
-        alert('Selecione um paciente e um procedimento.');
-        return;
-    }
-    
-    fetch('/api/crm/records', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            patient_id: parseInt(patientId),
-            procedure_name: procedureName,
-            status: status,
-            performed_date: status === 'realizado' ? performedDate : null,
-            planned_date: status === 'planejado' ? plannedDate : null,
-            notes: notes
-        })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            bootstrap.Modal.getInstance(document.getElementById('newProcedureModal')).hide();
-            loadCRMData();
-        } else {
-            alert(data.error || 'Erro ao salvar');
         }
     });
 }

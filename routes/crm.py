@@ -1,28 +1,11 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
-from models import db, Patient, ProcedureRecord, ProcedureFollowUpRule, Evolution, User
+from models import db, Patient, CosmeticProcedurePlan, Note, User
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 import pytz
 
 crm_bp = Blueprint('crm', __name__)
-
-FOLLOW_UP_DEFAULTS = {
-    'Botox': 6,
-    'Preenchimento': 12,
-    'Laser': 3,
-    'Ulthera': 12,
-    'Infiltração Capilar': 1,
-    'Soroterapia': 1,
-    'Nitrogênio Líquido': 1,
-    'Retorno Botox': 6,
-}
-
-def get_follow_up_months(procedure_name):
-    rule = ProcedureFollowUpRule.query.filter_by(procedure_name=procedure_name).first()
-    if rule:
-        return rule.follow_up_months
-    return FOLLOW_UP_DEFAULTS.get(procedure_name, 6)
 
 @crm_bp.route('/crm')
 @login_required
@@ -32,27 +15,33 @@ def crm_page():
 @crm_bp.route('/api/crm/performed')
 @login_required
 def get_performed_procedures():
-    doctor_id = request.args.get('doctor_id', type=int)
+    # Pega procedimentos realizados do planejamento de cosmiatria
+    query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    ).join(
+        Patient, Note.patient_id == Patient.id
+    ).filter(CosmeticProcedurePlan.was_performed == True)
     
-    query = ProcedureRecord.query.filter_by(status='realizado')
-    if doctor_id:
-        query = query.filter_by(doctor_id=doctor_id)
-    elif current_user.is_doctor():
-        query = query.filter_by(doctor_id=current_user.id)
+    if current_user.is_doctor():
+        query = query.filter(Note.doctor_id == current_user.id)
     
-    records = query.order_by(ProcedureRecord.performed_date.desc()).limit(100).all()
+    plans = query.order_by(CosmeticProcedurePlan.performed_date.desc()).limit(100).all()
     
     result = []
-    for r in records:
+    for plan, note, patient in plans:
+        follow_up_due_at = None
+        if plan.performed_date and plan.follow_up_months:
+            follow_up_due_at = (plan.performed_date + relativedelta(months=plan.follow_up_months)).date()
+        
         result.append({
-            'id': r.id,
-            'patient_id': r.patient_id,
-            'patient_name': r.patient.name,
-            'procedure_name': r.procedure_name,
-            'performed_date': r.performed_date.isoformat() if r.performed_date else None,
-            'follow_up_due_at': r.follow_up_due_at.isoformat() if r.follow_up_due_at else None,
-            'follow_up_status': r.follow_up_status,
-            'notes': r.notes
+            'id': plan.id,
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'procedure_name': plan.procedure_name,
+            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
+            'follow_up_due_at': follow_up_due_at.isoformat() if follow_up_due_at else None,
+            'follow_up_months': plan.follow_up_months or 6,
+            'observations': plan.observations
         })
     
     return jsonify(result)
@@ -60,161 +49,122 @@ def get_performed_procedures():
 @crm_bp.route('/api/crm/followups')
 @login_required
 def get_followups():
-    doctor_id = request.args.get('doctor_id', type=int)
     today = date.today()
     
-    query = ProcedureRecord.query.filter(
-        ProcedureRecord.status == 'realizado',
-        ProcedureRecord.follow_up_due_at.isnot(None),
-        ProcedureRecord.follow_up_status.in_(['pending', 'contacted'])
-    )
+    # Pega procedimentos realizados que precisam de follow-up
+    query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    ).join(
+        Patient, Note.patient_id == Patient.id
+    ).filter(CosmeticProcedurePlan.was_performed == True)
     
-    if doctor_id:
-        query = query.filter_by(doctor_id=doctor_id)
-    elif current_user.is_doctor():
-        query = query.filter_by(doctor_id=current_user.id)
+    if current_user.is_doctor():
+        query = query.filter(Note.doctor_id == current_user.id)
     
-    records = query.order_by(ProcedureRecord.follow_up_due_at.asc()).limit(100).all()
+    plans = query.all()
     
     result = []
-    for r in records:
-        days_until = (r.follow_up_due_at - today).days if r.follow_up_due_at else 0
+    for plan, note, patient in plans:
+        if not plan.performed_date or not plan.follow_up_months:
+            continue
+        
+        follow_up_due_at = (plan.performed_date + relativedelta(months=plan.follow_up_months)).date()
+        days_until = (follow_up_due_at - today).days
+        
         status_label = 'Vencido' if days_until < 0 else ('Próximo' if days_until <= 30 else 'Futuro')
         
         result.append({
-            'id': r.id,
-            'patient_id': r.patient_id,
-            'patient_name': r.patient.name,
-            'patient_phone': r.patient.phone,
-            'procedure_name': r.procedure_name,
-            'performed_date': r.performed_date.isoformat() if r.performed_date else None,
-            'follow_up_due_at': r.follow_up_due_at.isoformat() if r.follow_up_due_at else None,
-            'follow_up_status': r.follow_up_status,
+            'id': plan.id,
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'patient_phone': patient.phone,
+            'procedure_name': plan.procedure_name,
+            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
+            'follow_up_due_at': follow_up_due_at.isoformat(),
             'days_until': days_until,
             'urgency': status_label
         })
     
-    return jsonify(result)
+    result.sort(key=lambda x: x['follow_up_due_at'])
+    return jsonify(result[:100])
 
 @crm_bp.route('/api/crm/planned')
 @login_required
 def get_planned_procedures():
-    doctor_id = request.args.get('doctor_id', type=int)
+    # Pega procedimentos planejados mas NÃO realizados
+    query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    ).join(
+        Patient, Note.patient_id == Patient.id
+    ).filter(CosmeticProcedurePlan.was_performed == False)
     
-    query = ProcedureRecord.query.filter_by(status='planejado')
+    if current_user.is_doctor():
+        query = query.filter(Note.doctor_id == current_user.id)
     
-    if doctor_id:
-        query = query.filter_by(doctor_id=doctor_id)
-    elif current_user.is_doctor():
-        query = query.filter_by(doctor_id=current_user.id)
-    
-    records = query.order_by(ProcedureRecord.created_at.desc()).limit(100).all()
+    plans = query.order_by(CosmeticProcedurePlan.created_at.desc()).limit(100).all()
     
     result = []
-    for r in records:
+    for plan, note, patient in plans:
         result.append({
-            'id': r.id,
-            'patient_id': r.patient_id,
-            'patient_name': r.patient.name,
-            'patient_phone': r.patient.phone,
-            'procedure_name': r.procedure_name,
-            'planned_date': r.planned_date.isoformat() if r.planned_date else None,
-            'notes': r.notes,
-            'created_at': r.created_at.isoformat() if r.created_at else None
+            'id': plan.id,
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'patient_phone': patient.phone,
+            'procedure_name': plan.procedure_name,
+            'planned_value': float(plan.planned_value) if plan.planned_value else None,
+            'observations': plan.observations,
+            'created_at': plan.created_at.isoformat() if plan.created_at else None
         })
     
     return jsonify(result)
 
-@crm_bp.route('/api/crm/records', methods=['POST'])
+@crm_bp.route('/api/crm/records/<int:plan_id>', methods=['PATCH'])
 @login_required
-def create_procedure_record():
+def update_cosmetic_plan(plan_id):
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
     data = request.get_json()
     
-    procedure_name = data.get('procedure_name')
-    patient_id = data.get('patient_id')
-    status = data.get('status', 'planejado')
-    performed_date_str = data.get('performed_date')
-    planned_date_str = data.get('planned_date')
-    notes = data.get('notes', '')
+    if 'was_performed' in data:
+        plan.was_performed = data['was_performed']
+        if data['was_performed'] and not plan.performed_date:
+            plan.performed_date = datetime.now()
     
-    performed_date = None
-    planned_date = None
-    follow_up_due_at = None
-    
-    if performed_date_str:
-        performed_date = datetime.strptime(performed_date_str, '%Y-%m-%d').date()
-        months = get_follow_up_months(procedure_name)
-        follow_up_due_at = performed_date + relativedelta(months=months)
-    
-    if planned_date_str:
-        planned_date = datetime.strptime(planned_date_str, '%Y-%m-%d').date()
-    
-    record = ProcedureRecord(
-        patient_id=patient_id,
-        doctor_id=current_user.id,
-        procedure_name=procedure_name,
-        status=status,
-        performed_date=performed_date,
-        planned_date=planned_date,
-        follow_up_due_at=follow_up_due_at,
-        notes=notes
-    )
-    
-    db.session.add(record)
-    db.session.commit()
-    
-    return jsonify({'success': True, 'id': record.id})
-
-@crm_bp.route('/api/crm/records/<int:record_id>', methods=['PATCH'])
-@login_required
-def update_procedure_record(record_id):
-    record = ProcedureRecord.query.get_or_404(record_id)
-    data = request.get_json()
-    
-    if 'status' in data:
-        record.status = data['status']
-        if data['status'] == 'realizado' and not record.performed_date:
-            record.performed_date = date.today()
-            months = get_follow_up_months(record.procedure_name)
-            record.follow_up_due_at = record.performed_date + relativedelta(months=months)
-    
-    if 'follow_up_status' in data:
-        record.follow_up_status = data['follow_up_status']
-    
-    if 'notes' in data:
-        record.notes = data['notes']
+    if 'observations' in data:
+        plan.observations = data['observations']
     
     db.session.commit()
-    
     return jsonify({'success': True})
 
 @crm_bp.route('/api/crm/stats')
 @login_required
 def get_crm_stats():
-    doctor_id = request.args.get('doctor_id', type=int)
     today = date.today()
     
-    base_query = ProcedureRecord.query
-    if doctor_id:
-        base_query = base_query.filter_by(doctor_id=doctor_id)
-    elif current_user.is_doctor():
-        base_query = base_query.filter_by(doctor_id=current_user.id)
+    # Conta procedimentos realizados e planejados
+    query = db.session.query(CosmeticProcedurePlan, Note).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    )
     
-    performed_count = base_query.filter_by(status='realizado').count()
-    planned_count = base_query.filter_by(status='planejado').count()
+    if current_user.is_doctor():
+        query = query.filter(Note.doctor_id == current_user.id)
     
-    overdue_count = base_query.filter(
-        ProcedureRecord.status == 'realizado',
-        ProcedureRecord.follow_up_due_at < today,
-        ProcedureRecord.follow_up_status.in_(['pending', 'contacted'])
-    ).count()
+    plans = query.all()
     
-    due_soon_count = base_query.filter(
-        ProcedureRecord.status == 'realizado',
-        ProcedureRecord.follow_up_due_at >= today,
-        ProcedureRecord.follow_up_due_at <= today + timedelta(days=30),
-        ProcedureRecord.follow_up_status.in_(['pending', 'contacted'])
-    ).count()
+    performed_count = sum(1 for plan, note in plans if plan.was_performed)
+    planned_count = sum(1 for plan, note in plans if not plan.was_performed)
+    
+    overdue_count = 0
+    due_soon_count = 0
+    
+    for plan, note in plans:
+        if plan.was_performed and plan.performed_date and plan.follow_up_months:
+            follow_up_due = (plan.performed_date + relativedelta(months=plan.follow_up_months)).date()
+            days_until = (follow_up_due - today).days
+            
+            if days_until < 0:
+                overdue_count += 1
+            elif days_until <= 30:
+                due_soon_count += 1
     
     return jsonify({
         'performed': performed_count,
