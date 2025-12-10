@@ -306,9 +306,11 @@ function loadFollowups() {
             }
             
             panel.innerHTML = data.map(item => `
-                <div class="procedure-item ${item.urgency === 'Vencido' ? 'overdue' : item.urgency === 'Próximo' ? 'due-soon' : ''}" onclick="openPatient(${item.patient_id})">
+                <div class="procedure-item ${item.urgency === 'Vencido' ? 'overdue' : item.urgency === 'Próximo' ? 'due-soon' : ''}" 
+                     style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
+                     onclick="openPatient(${item.patient_id})">
                     <div class="patient-name">${item.patient_name}</div>
-                    <div class="procedure-name">${item.procedure_name}</div>
+                    <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
                     <div class="date-info">
                         Realizado: ${formatDate(item.performed_date)} | 
                         Retorno: ${formatDate(item.follow_up_due_at)}
@@ -336,9 +338,11 @@ function loadPlanned() {
             }
             
             panel.innerHTML = data.map(item => `
-                <div class="procedure-item" onclick="openPatient(${item.patient_id})">
+                <div class="procedure-item" 
+                     style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
+                     onclick="openPatient(${item.patient_id})">
                     <div class="patient-name">${item.patient_name}</div>
-                    <div class="procedure-name">${item.procedure_name}</div>
+                    <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
                     <div class="date-info">Planejado: ${item.planned_date ? formatDate(item.planned_date) : 'Sem data'}</div>
                     ${item.patient_phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
                     <div class="action-buttons" onclick="event.stopPropagation()">
@@ -362,14 +366,36 @@ function loadPerformed() {
             }
             
             panel.innerHTML = data.map(item => `
-                <div class="procedure-item" onclick="openPatient(${item.patient_id})">
+                <div class="procedure-item" 
+                     style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
+                     onclick="openPatient(${item.patient_id})">
                     <div class="patient-name">${item.patient_name}</div>
-                    <div class="procedure-name">${item.procedure_name}</div>
+                    <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
                     <div class="date-info">Realizado: ${formatDate(item.performed_date)}</div>
                     ${item.follow_up_due_at ? `<div class="date-info">Próximo retorno: ${formatDate(item.follow_up_due_at)}</div>` : ''}
                 </div>
             `).join('');
         });
+}
+
+const PROCEDURE_COLORS = {
+    'Botox': '#0d6efd',
+    'Preenchimento': '#d946ef',
+    'Laser': '#ffc107',
+    'Ulthera': '#06b6d4',
+    'Infiltração Capilar': '#10b981',
+    'Sculptra': '#8b5cf6',
+    'Soroterapia': '#f97316',
+    'Pequeña Cirurgia': '#ec4899',
+    'Nitrogênio Líquido': '#6366f1',
+    'Transplante Capilar': '#14b8a6',
+    'Retorno': '#6366f1',
+    'Morpheus': '#84cc16',
+    'Profhilo': '#f43f5e'
+};
+
+function getProcedureColor(procedureName) {
+    return PROCEDURE_COLORS[procedureName] || '#6c757d';
 }
 
 function formatDate(dateStr) {
