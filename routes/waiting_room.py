@@ -75,6 +75,18 @@ def assign_room(appointment_id):
     except Exception as e:
         return jsonify({'error': 'Erro ao atribuir sala'}), 500
 
+@waiting_room_bp.route('/api/remove/<int:appointment_id>', methods=['POST'])
+@login_required
+def remove_from_waiting(appointment_id):
+    """Remove paciente da lista de espera (desfazer check-in)"""
+    try:
+        result = waiting_service.check_out(appointment_id)
+        return jsonify({'success': True, 'data': result})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': 'Erro ao remover da lista'}), 500
+
 @waiting_room_bp.route('/api/stats', methods=['GET'])
 @login_required
 def get_stats():

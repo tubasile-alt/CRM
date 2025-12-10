@@ -501,12 +501,42 @@ body {
     border-left: 4px solid #ffc107;
     box-shadow: 0 2px 6px rgba(0,0,0,0.12);
     transform: perspective(600px) rotateY(-2deg);
+    position: relative;
 }
 
 .waiting-patient-item:hover {
     transform: perspective(600px) rotateY(0deg) translateX(3px) translateY(-2px);
     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
     background: #fff8e1;
+}
+
+.btn-remove-waiting {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    background: #dc3545;
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.waiting-patient-item:hover .btn-remove-waiting {
+    opacity: 1;
+}
+
+.btn-remove-waiting:hover {
+    background: #a02834;
+    transform: scale(1.1);
 }
 
 .waiting-patient-info {

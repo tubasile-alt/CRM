@@ -985,6 +985,18 @@ function loadWaitingRoom() {
     });
 }
 
+function removeFromWaiting(appointmentId, event) {
+    event.stopPropagation();
+    if (!confirm('Remover paciente da lista de espera?')) return;
+    
+    fetch(`/espera/api/remove/${appointmentId}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) loadWaitingRoom();
+            else alert(data.error || 'Erro ao remover');
+        });
+}
+
 function renderWaitingRoom(waitingList) {
     const listDiv = document.getElementById('waitingRoomList');
     const badge = document.getElementById('waitingCountBadge');
@@ -1010,6 +1022,9 @@ function renderWaitingRoom(waitingList) {
                 <div class="waiting-timer" data-checkin="${patient.checked_in_time}">
                     <i class="bi bi-stopwatch"></i> ${waitingTime}
                 </div>
+                <button class="btn-remove-waiting" onclick="removeFromWaiting(${patient.id}, event)" title="Remover da lista de espera">
+                    <i class="bi bi-x-lg"></i>
+                </button>
             </div>
         `;
     }).join('');
