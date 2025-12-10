@@ -412,7 +412,88 @@ function selectAppointment(app) {
         end: parseLocalDateTime(app.end),
         extendedProps: app
     };
-    showEventDetails(currentEvent);
+    
+    // Secretária abre modal de edição, médico abre detalhes
+    if (window.isSecretary) {
+        openEditAppointmentModal(app);
+    } else {
+        showEventDetails(currentEvent);
+    }
+}
+
+function openEditAppointmentModal(app) {
+    document.getElementById('editAppointmentId').value = app.id;
+    document.getElementById('editPatientName').value = app.patientName || '';
+    document.getElementById('editPatientPhone').value = app.patientPhone || '';
+    document.getElementById('editPatientType').value = app.patientType || 'Particular';
+    document.getElementById('editAppointmentType').value = app.appointmentType || 'Particular';
+    
+    const start = parseLocalDateTime(app.start);
+    const dateStr = start.toISOString().split('T')[0];
+    const timeStr = String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0');
+    
+    document.getElementById('editAppointmentDate').value = dateStr;
+    document.getElementById('editAppointmentTime').value = timeStr;
+    document.getElementById('editAppointmentDuration').value = Math.round((parseLocalDateTime(app.end) - start) / 60000);
+    
+    const modal = new bootstrap.Modal(document.getElementById('editAppointmentModal'));
+    modal.show();
+}
+
+function deleteAppointment() {
+    if (!confirm('Tem certeza que deseja deletar este agendamento?')) return;
+    
+    const appointmentId = document.getElementById('editAppointmentId').value;
+    fetch(`/api/appointments/${appointmentId}`, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken': getCSRFToken()}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('editAppointmentModal')).hide();
+            loadAppointments();
+        } else {
+            alert(data.error || 'Erro ao deletar');
+        }
+    });
+}
+
+function updateAppointmentFromEdit() {
+    const appointmentId = document.getElementById('editAppointmentId').value;
+    const dateStr = document.getElementById('editAppointmentDate').value;
+    const timeStr = document.getElementById('editAppointmentTime').value;
+    const duration = parseInt(document.getElementById('editAppointmentDuration').value);
+    
+    const start = new Date(dateStr + 'T' + timeStr);
+    const end = new Date(start.getTime() + duration * 60000);
+    
+    const data = {
+        patient_name: document.getElementById('editPatientName').value,
+        patient_phone: document.getElementById('editPatientPhone').value,
+        patient_type: document.getElementById('editPatientType').value,
+        appointment_type: document.getElementById('editAppointmentType').value,
+        start: start.toISOString(),
+        end: end.toISOString()
+    };
+    
+    fetch(`/api/appointments/${appointmentId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('editAppointmentModal')).hide();
+            loadAppointments();
+        } else {
+            alert(data.error || 'Erro ao atualizar');
+        }
+    });
 }
 
 function previousDay() {

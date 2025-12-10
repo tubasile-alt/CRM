@@ -825,6 +825,86 @@
     </div>
 </div>
 
+<!-- MODAL DE EDIÇÃO PARA SECRETÁRIA -->
+<div class="modal fade" id="editAppointmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Agendamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editAppointmentId">
+                
+                <div class="mb-3">
+                    <label class="form-label">Nome do Paciente</label>
+                    <input type="text" class="form-control" id="editPatientName">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Telefone</label>
+                    <input type="text" class="form-control" id="editPatientPhone">
+                </div>
+                
+                <div class="row">
+                    <div class="col-6">
+                        <label class="form-label">Tipo Paciente</label>
+                        <select class="form-select" id="editPatientType">
+                            <option value="Particular">Particular</option>
+                            <option value="Retorno">Retorno</option>
+                            <option value="UNIMED">UNIMED</option>
+                            <option value="Cortesia">Cortesia</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Tipo Consulta</label>
+                        <select class="form-select" id="editAppointmentType">
+                            <option value="Particular">Particular</option>
+                            <option value="Botox">Botox</option>
+                            <option value="Retorno Botox">Retorno Botox</option>
+                            <option value="Laser">Laser</option>
+                            <option value="Preenchimento">Preenchimento</option>
+                            <option value="Ulthera">Ulthera</option>
+                            <option value="Infiltração Capilar">Infiltração Capilar</option>
+                            <option value="Soroterapia">Soroterapia</option>
+                            <option value="Pequena Cirurgia">Pequena Cirurgia</option>
+                            <option value="Retirada de Ponto">Retirada de Ponto</option>
+                            <option value="Nitrogênio Líquido">Nitrogênio Líquido</option>
+                            <option value="Transplante Capilar">Transplante Capilar</option>
+                            <option value="Retorno">Retorno</option>
+                            <option value="Retorno 1 semana TX">Retorno 1 semana TX</option>
+                            <option value="UNIMED">UNIMED</option>
+                            <option value="Cortesia">Cortesia</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-6">
+                        <label class="form-label">Data</label>
+                        <input type="date" class="form-control" id="editAppointmentDate">
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">Hora</label>
+                        <input type="time" class="form-control" id="editAppointmentTime">
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">Duração (min)</label>
+                        <input type="number" class="form-control" id="editAppointmentDuration" value="30">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" onclick="deleteAppointment()">
+                    <i class="bi bi-trash"></i> Deletar
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="updateAppointmentFromEdit()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
