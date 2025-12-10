@@ -374,7 +374,9 @@ function loadPerformed() {
 
 function formatDate(dateStr) {
     if (!dateStr) return '-';
-    const date = new Date(dateStr + 'T00:00:00');
+    // Remove timezone info if present (e.g., "2025-12-10T14:30:00-03:00" -> "2025-12-10")
+    const cleanDate = dateStr.split('T')[0];
+    const date = new Date(cleanDate + 'T00:00:00');
     return date.toLocaleDateString('pt-BR');
 }
 
