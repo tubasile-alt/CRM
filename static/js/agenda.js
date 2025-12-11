@@ -1,6 +1,4 @@
 let appointmentsList = [];
-let selectedDate = new Date(); // Inicializar com hoje
-let currentDoctorFilter = null;
 
 // Parsear string ISO como hora local (São Paulo) sem conversão de timezone
 function parseLocalDateTime(isoString) {
