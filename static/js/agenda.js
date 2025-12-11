@@ -1,4 +1,6 @@
 let appointmentsList = [];
+let selectedDate = new Date(); // Inicializar com hoje
+let currentDoctorFilter = null;
 
 // Parsear string ISO como hora local (São Paulo) sem conversão de timezone
 function parseLocalDateTime(isoString) {
@@ -183,14 +185,17 @@ function renderDayView() {
         const selectedDateStr = selectedDate.getFullYear() + '-' + 
                                String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
                                String(selectedDate.getDate()).padStart(2, '0');
-        const match = appDateStr === selectedDateStr && (!currentDoctorFilter || app.extendedProps?.doctorId == currentDoctorFilter);
+        const doctorMatch = !currentDoctorFilter || app.extendedProps?.doctorId == currentDoctorFilter;
+        const dateMatch = appDateStr === selectedDateStr;
+        const match = dateMatch && doctorMatch;
         if (!match) {
-            console.log(`  Filtrado fora: ${app.title} | ${appDateStr} vs ${selectedDateStr} | doctorId: ${app.extendedProps?.doctorId}`);
+            console.log(`  Filtrado fora: ${app.title} | ${appDateStr} vs ${selectedDateStr} | doctorId: ${app.extendedProps?.doctorId} | dateMatch: ${dateMatch} | doctorMatch: ${doctorMatch}`);
         }
         return match;
     });
     
     console.log('Agendamentos após filtro:', dayAppointments.length);
+    console.log('DEBUG - Primeiros 3 agendamentos:', dayAppointments.slice(0, 3).map(a => ({ title: a.title, start: a.start, id: a.id })));
     
     if (dayAppointments.length === 0) {
         appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
