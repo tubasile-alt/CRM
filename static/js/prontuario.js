@@ -372,36 +372,44 @@ function toggleCategoryTabs() {
 
 // ========== COSMIATRIA: PLANEJAMENTO CLÍNICO ==========
 function addCosmeticProcedure() {
-    const name = document.getElementById('newProcedureName').value;
-    const value = parseFloat(document.getElementById('newProcedureValue').value) || 0;
+    const nameInput = document.getElementById('newProcedureName');
+    const valueInput = document.getElementById('newProcedureValue');
+    const name = nameInput.value.trim();
+    const valueStr = valueInput.value.trim();
+    const value = valueStr ? parseFloat(valueStr) : 0;
     const months = parseInt(document.getElementById('newProcedureMonths').value) || 6;
     const observations = document.getElementById('newProcedureObservations').value || '';
     
-    if (!name) {
-        showAlert('Selecione um procedimento', 'warning');
+    // Validação: nome não pode estar vazio
+    if (!name || name === '') {
+        alert('Por favor, selecione um procedimento');
+        nameInput.focus();
         return;
     }
     
-    if (value <= 0) {
-        showAlert('Informe um valor válido', 'warning');
+    // Validação: valor deve ser maior que 0
+    if (isNaN(value) || value <= 0) {
+        alert('Por favor, informe um valor válido (maior que 0)');
+        valueInput.focus();
         return;
     }
     
+    // Adicionar procedimento
     cosmeticProcedures.push({ name, value, months, budget: value, performed: false, observations });
+    
+    // Atualizar a renderização
     renderCosmeticProcedures();
     renderCosmeticConduct();
     updateCosmeticTotal();
     
-    // Limpar campos após adicionar com sucesso
-    document.getElementById('newProcedureName').value = '';
-    document.getElementById('newProcedureValue').value = '';
+    // Limpar campos
+    nameInput.value = '';
+    valueInput.value = '';
     document.getElementById('newProcedureMonths').value = '6';
     document.getElementById('newProcedureObservations').value = '';
     
-    // Focar no SELECT para próximo procedimento
-    document.getElementById('newProcedureName').focus();
-    
-    showAlert('Procedimento adicionado com sucesso!', 'success');
+    // Focar no próximo procedimento
+    setTimeout(() => nameInput.focus(), 100);
 }
 
 function removeCosmeticProcedure(index) {
