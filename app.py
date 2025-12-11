@@ -1255,6 +1255,7 @@ def finalizar_atendimento(patient_id):
                     crown_transplant=surgical_planning.get('crown', False),
                     complete_transplant=surgical_planning.get('complete', False),
                     complete_with_body_hair=surgical_planning.get('complete_body_hair', False),
+                    dense_packing=surgical_planning.get('dense_packing', False),
                     surgical_planning=surgical_planning.get('surgical_planning_text', ''),
                     clinical_conduct=data.get('conduta', '')
                 )
@@ -1406,6 +1407,7 @@ def save_hair_transplant(patient_id):
         crown_transplant=request.form.get('crown') == 'true',
         complete_transplant=request.form.get('complete') == 'true',
         complete_with_body_hair=request.form.get('complete_body_hair') == 'true',
+        dense_packing=request.form.get('dense_packing') == 'true',
         surgical_planning=request.form.get('surgical_planning', ''),
         clinical_conduct=request.form.get('conduta', '')
     )

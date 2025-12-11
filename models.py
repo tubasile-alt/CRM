@@ -284,6 +284,7 @@ class HairTransplant(db.Model):
     crown_transplant = db.Column(db.Boolean, default=False)
     complete_transplant = db.Column(db.Boolean, default=False)
     complete_with_body_hair = db.Column(db.Boolean, default=False)
+    dense_packing = db.Column(db.Boolean, default=False)
     
     # Planejamento cirúrgico (texto livre)
     surgical_planning = db.Column(db.Text)

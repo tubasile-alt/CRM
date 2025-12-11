@@ -28,6 +28,7 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **Botão Check In** - Botão verde para fazer check-in do paciente na agenda
 - ✅ **Aba CRM** - Gestão de procedimentos com follow-up automático
 - ✅ **Checkbox "Transplante Capilar Feminino"** - Opção adicionada à seção de planejamento cirúrgico
+- ✅ **Checkbox "Dense Packing"** - Opção adicionada à seção de indicações cirúrgicas
 - ✅ **Performance otimizada** - Batch updates e índices de banco de dados implementados
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)

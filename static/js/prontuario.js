@@ -699,6 +699,7 @@ function saveHairTransplant() {
     formData.append('crown', document.getElementById('crownTransplant').checked);
     formData.append('complete', document.getElementById('completeTransplant').checked);
     formData.append('complete_body_hair', document.getElementById('completeBodyHair').checked);
+    formData.append('dense_packing', document.getElementById('densePacking').checked);
     formData.append('surgical_planning', document.getElementById('surgicalPlanning').value);
     formData.append('queixa', document.getElementById('queixaText').value);
     formData.append('conduta', document.getElementById('condutaText').value);
@@ -802,6 +803,7 @@ function finalizarAtendimento() {
             crown: document.getElementById('crownTransplant')?.checked || false,
             complete: document.getElementById('completeTransplant')?.checked || false,
             complete_body_hair: document.getElementById('completeBodyHair')?.checked || false,
+            dense_packing: document.getElementById('densePacking')?.checked || false,
             surgical_planning_text: document.getElementById('surgicalPlanning')?.value || ''
         };
     }
