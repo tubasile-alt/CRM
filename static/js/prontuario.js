@@ -392,11 +392,16 @@ function addCosmeticProcedure() {
     renderCosmeticConduct();
     updateCosmeticTotal();
     
-    // Limpar campos
+    // Limpar campos após adicionar com sucesso
     document.getElementById('newProcedureName').value = '';
     document.getElementById('newProcedureValue').value = '';
     document.getElementById('newProcedureMonths').value = '6';
     document.getElementById('newProcedureObservations').value = '';
+    
+    // Focar no SELECT para próximo procedimento
+    document.getElementById('newProcedureName').focus();
+    
+    showAlert('Procedimento adicionado com sucesso!', 'success');
 }
 
 function removeCosmeticProcedure(index) {
