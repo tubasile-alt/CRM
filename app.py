@@ -1135,7 +1135,29 @@ def finalizar_atendimento(patient_id):
             conduta_note_id = note_ids.get('conduta')
             
             if conduta_note_id and procedures:
-                # Sempre criar NOVOS registros para cada atendimento (mantém histórico)
+                # Batch update de lembretes ANTES do loop
+                performed_proc_names = [p['name'] for p in procedures if p.get('performed', False)]
+                non_performed_proc_names = [p['name'] for p in procedures if not p.get('performed', False)]
+                
+                # Cancelar lembretes para procedimentos realizados
+                if performed_proc_names:
+                    FollowUpReminder.query.filter(
+                        FollowUpReminder.patient_id == patient_id,
+                        FollowUpReminder.procedure_name.in_(performed_proc_names),
+                        FollowUpReminder.reminder_type == 'cosmetic_follow_up',
+                        FollowUpReminder.status == 'pending'
+                    ).update({'status': 'completed'}, synchronize_session=False)
+                
+                # Marcar como superados os lembretes para procedimentos não realizados
+                if non_performed_proc_names:
+                    FollowUpReminder.query.filter(
+                        FollowUpReminder.patient_id == patient_id,
+                        FollowUpReminder.procedure_name.in_(non_performed_proc_names),
+                        FollowUpReminder.reminder_type == 'cosmetic_follow_up',
+                        FollowUpReminder.status == 'pending'
+                    ).update({'status': 'superseded'}, synchronize_session=False)
+                
+                # Criar registros de plano e novos lembretes
                 for proc in procedures:
                     proc_name = proc['name']
                     
@@ -1162,26 +1184,8 @@ def finalizar_atendimento(patient_id):
                     )
                     db.session.add(plan)
                     
-                    # Gerenciar lembretes de follow-up
-                    if proc.get('performed', False):
-                        # Se foi realizado, cancelar lembretes pendentes anteriores
-                        FollowUpReminder.query.filter_by(
-                            patient_id=patient_id,
-                            procedure_name=proc_name,
-                            reminder_type='cosmetic_follow_up',
-                            status='pending'
-                        ).update({'status': 'completed'})
-                    else:
-                        # Se não foi realizado, criar novo lembrete e cancelar pendentes anteriores
-                        # Primeiro cancela lembretes antigos
-                        FollowUpReminder.query.filter_by(
-                            patient_id=patient_id,
-                            procedure_name=proc_name,
-                            reminder_type='cosmetic_follow_up',
-                            status='pending'
-                        ).update({'status': 'superseded'})
-                        
-                        # Criar novo lembrete
+                    # Criar novo lembrete APENAS para não realizados
+                    if not proc.get('performed', False):
                         follow_up_date = (get_brazil_time() + timedelta(days=30 * int(proc['months']))).date()
                         reminder = FollowUpReminder(
                             patient_id=patient_id,

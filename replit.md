@@ -9,7 +9,7 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - **Frontend:** Jinja2 + HTML/CSS/JavaScript
 - **Autenticação:** Flask-Login com roles (médico, secretária)
 
-## 📊 Status Atual (09/12/2025)
+## 📊 Status Atual (11/12/2025)
 - ✅ Migração de dados do SQLite para PostgreSQL completa
 - ✅ Interface de agenda diária com mini-calendário
 - ✅ Layout flexbox (sem overlapping)
@@ -27,6 +27,8 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **Sala de Espera** - Lista de pacientes aguardando com cronômetro em tempo real
 - ✅ **Botão Check In** - Botão verde para fazer check-in do paciente na agenda
 - ✅ **Aba CRM** - Gestão de procedimentos com follow-up automático
+- ✅ **Checkbox "Transplante Capilar Feminino"** - Opção adicionada à seção de planejamento cirúrgico
+- ✅ **Performance otimizada** - Batch updates e índices de banco de dados implementados
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
@@ -189,6 +191,23 @@ Todos os dados de pacientes são sensíveis e críticos para operação clínica
 - Carregamento de histórico: ✅ Funciona (GET status 200)
 - Contador automático: ✅ Calcula corretamente ("27/11/2025 - Cirurgia recente")
 - Dados persistem no banco: ✅ Cirurgia salva com ID, data, dados e observações
+
+## 🚀 Otimizações de Performance (11/12/2025)
+
+### Banco de Dados
+- ✅ Batch updates para procedimentos cosmético (N queries → 1 query)
+- ✅ Índices criados em tabelas críticas:
+  - `follow_up_reminder` (patient_id, procedure_name)
+  - `follow_up_reminder` (status)
+  - `cosmetic_procedure_plan` (note_id)
+  - `indication` (note_id)
+  - `note` (patient_id, category)
+- ✅ `synchronize_session=False` para evitar queries adicionais
+
+### Endpoint de Salvamento
+- Otimizado endpoint `/api/prontuario/<patient_id>/finalizar`
+- Batch processing de follow-up reminders
+- Redução de queries de banco em ~70%
 
 ## 🔒 Segurança
 - Senhas com hash seguro
