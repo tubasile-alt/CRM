@@ -391,7 +391,7 @@ function openNewAppointmentAtTime(hour, minutes = 0) {
     
     document.getElementById('appointmentDate').value = dateStr;
     document.getElementById('appointmentTime').value = timeStr;
-    document.getElementById('appointmentDuration').value = '30';
+    document.getElementById('appointmentDuration').value = '15';
     
     const modal = new bootstrap.Modal(document.getElementById('newAppointmentModal'));
     modal.show();
