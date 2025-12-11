@@ -277,6 +277,7 @@ class HairTransplant(db.Model):
     body_hair_needed = db.Column(db.Boolean, default=False)
     eyebrow_transplant = db.Column(db.Boolean, default=False)
     beard_transplant = db.Column(db.Boolean, default=False)
+    feminine_hair_transplant = db.Column(db.Boolean, default=False)
     
     # Indicações cirúrgicas (múltipla seleção via checkboxes separados)
     frontal_transplant = db.Column(db.Boolean, default=False)

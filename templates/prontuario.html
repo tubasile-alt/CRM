@@ -690,6 +690,10 @@ function savePatientData() {
                                         <input class="form-check-input" type="checkbox" id="beardTransplant" {% if not current_user.is_doctor() %}disabled{% endif %}>
                                         <label class="form-check-label" for="beardTransplant">Transplante de barba</label>
                                     </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="feminineHairTransplant" {% if not current_user.is_doctor() %}disabled{% endif %}>
+                                        <label class="form-check-label" for="feminineHairTransplant">Transplante capilar feminino</label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -992,6 +996,10 @@ function savePatientData() {
                                                 <li>
                                                     <i class="bi bi-{{ 'check-circle-fill text-success' if ht.beard_transplant else 'x-circle text-muted' }}"></i>
                                                     Transplante de barba: {{ 'Sim' if ht.beard_transplant else 'Não' }}
+                                                </li>
+                                                <li>
+                                                    <i class="bi bi-{{ 'check-circle-fill text-success' if ht.feminine_hair_transplant else 'x-circle text-muted' }}"></i>
+                                                    Transplante capilar feminino: {{ 'Sim' if ht.feminine_hair_transplant else 'Não' }}
                                                 </li>
                                             </ul>
                                         </div>

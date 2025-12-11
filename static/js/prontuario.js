@@ -694,6 +694,7 @@ function saveHairTransplant() {
     formData.append('body_hair', document.getElementById('bodyHair').checked);
     formData.append('eyebrow_transplant', document.getElementById('eyebrowTransplant').checked);
     formData.append('beard_transplant', document.getElementById('beardTransplant').checked);
+    formData.append('feminine_hair_transplant', document.getElementById('feminineHairTransplant').checked);
     formData.append('frontal', document.getElementById('frontalTransplant').checked);
     formData.append('crown', document.getElementById('crownTransplant').checked);
     formData.append('complete', document.getElementById('completeTransplant').checked);
@@ -796,6 +797,7 @@ function finalizarAtendimento() {
             body_hair: document.getElementById('bodyHair')?.checked || false,
             eyebrow_transplant: document.getElementById('eyebrowTransplant')?.checked || false,
             beard_transplant: document.getElementById('beardTransplant')?.checked || false,
+            feminine_hair_transplant: document.getElementById('feminineHairTransplant')?.checked || false,
             frontal: document.getElementById('frontalTransplant')?.checked || false,
             crown: document.getElementById('crownTransplant')?.checked || false,
             complete: document.getElementById('completeTransplant')?.checked || false,

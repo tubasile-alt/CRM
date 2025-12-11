@@ -1397,6 +1397,7 @@ def save_hair_transplant(patient_id):
         body_hair_needed=request.form.get('body_hair') == 'true',
         eyebrow_transplant=request.form.get('eyebrow_transplant') == 'true',
         beard_transplant=request.form.get('beard_transplant') == 'true',
+        feminine_hair_transplant=request.form.get('feminine_hair_transplant') == 'true',
         frontal_transplant=request.form.get('frontal') == 'true',
         crown_transplant=request.form.get('crown') == 'true',
         complete_transplant=request.form.get('complete') == 'true',
