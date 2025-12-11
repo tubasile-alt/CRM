@@ -578,19 +578,19 @@ function initializeMonthCalendar() {
 }
 
 function loadAppointments() {
-    let url = '/api/appointments';
+    // Formatar data atual para filtro no servidor (YYYY-MM-DD)
+    const dateStr = currentDate.toISOString().split('T')[0];
+    
+    let url = `/api/appointments?date=${dateStr}`;
     if (currentDoctorFilter) {
-        url += `?doctor_id=${currentDoctorFilter}`;
+        url += `&doctor_id=${currentDoctorFilter}`;
     }
     
     fetch(url)
         .then(r => r.json())
         .then(events => {
             appointmentsList = events;
-            console.log('=== Agendamentos carregados:', events.length, 'Total:', events);
-            events.forEach(e => {
-                console.log(`  ${e.title} | start: ${e.start} | doctor_id: ${e.extendedProps?.doctorId}`);
-            });
+            console.log('=== Agendamentos carregados:', events.length, 'para data:', dateStr);
             renderDayView();
             if (calendar) calendar.refetchEvents();
         });

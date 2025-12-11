@@ -287,6 +287,8 @@ def agenda():
 @app.route('/api/appointments')
 @login_required
 def get_appointments():
+    from datetime import timedelta
+    
     # Permitir filtrar por médico específico
     doctor_id = request.args.get('doctor_id', type=int)
     
@@ -294,14 +296,28 @@ def get_appointments():
     if not doctor_id and current_user.is_doctor():
         doctor_id = current_user.id
     
-    # Se especificou médico, filtra. Senão retorna todos (para secretária ver todos os médicos)
-    if doctor_id:
-        appointments = Appointment.query.filter_by(doctor_id=doctor_id).all()
-    else:
-        appointments = Appointment.query.all()
+    # Filtrar por data específica (opcional mas recomendado para performance)
+    date_str = request.args.get('date')
     
-    # Remover qualquer filtro de data - mostrar TODOS os eventos, incluindo antigos
-    # (FullCalendar pode enviar start/end, mas ignoramos para mostrar histórico completo)
+    # Base query
+    query = Appointment.query
+    
+    if doctor_id:
+        query = query.filter(Appointment.doctor_id == doctor_id)
+    
+    # Se data especificada, filtra apenas o dia selecionado (muito mais rápido)
+    if date_str:
+        try:
+            from datetime import datetime
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            # Filtrar agendamentos do dia específico
+            query = query.filter(
+                db.func.date(Appointment.start_time) == target_date
+            )
+        except ValueError:
+            pass  # Se data inválida, ignora o filtro
+    
+    appointments = query.all()
     
     events = []
     for apt in appointments:
