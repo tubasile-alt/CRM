@@ -362,6 +362,22 @@ class Payment(db.Model):
     appointment = db.relationship('Appointment', backref='payments')
     patient = db.relationship('Patient', backref='payments')
 
+class Prescription(db.Model):
+    __tablename__ = 'prescription'
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    appointment_id = db.Column(db.Integer, db.ForeignKey('appointment.id'), nullable=True)
+    medications_oral = db.Column(db.JSON)
+    medications_topical = db.Column(db.JSON)
+    summary = db.Column(db.Text)
+    prescription_type = db.Column(db.String(50), default='standard')
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    patient = db.relationship('Patient', backref='prescriptions')
+    doctor = db.relationship('User', backref='prescriptions')
+    appointment = db.relationship('Appointment', backref='prescriptions')
+
 class ProcedureFollowUpRule(db.Model):
     __tablename__ = 'procedure_follow_up_rule'
     id = db.Column(db.Integer, primary_key=True)

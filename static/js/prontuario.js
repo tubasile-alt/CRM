@@ -1579,3 +1579,92 @@ function saveTransplantIndication() {
     })
     .catch(err => console.error('Erro:', err));
 }
+
+function abrirDermaScribe() {
+    const patientName = document.getElementById('patientName')?.textContent?.trim() || 
+                        document.querySelector('.patient-name')?.textContent?.trim() || '';
+    const cleanName = patientName.replace(/\s*\(\d+\s*anos?\)/gi, '').trim();
+    const encodedName = encodeURIComponent(cleanName);
+    const dermaScribeUrl = `https://receitabasile.replit.app?patient=${encodedName}&callback=${encodeURIComponent(window.location.origin)}`;
+    
+    window.dermaScribeWindow = window.open(dermaScribeUrl, 'DermaScribe', 'width=1200,height=900,scrollbars=yes,resizable=yes');
+    
+    window.addEventListener('message', handleDermaScribeMessage, false);
+}
+
+function handleDermaScribeMessage(event) {
+    if (event.origin !== 'https://receitabasile.replit.app') return;
+    
+    const data = event.data;
+    if (data.type === 'prescription_saved') {
+        savePrescriptionToConduta(data.prescription);
+    }
+}
+
+function savePrescriptionToConduta(prescriptionData) {
+    const patientId = window.patientId || document.getElementById('patientId')?.value;
+    if (!patientId) {
+        console.error('Patient ID não encontrado');
+        return;
+    }
+    
+    fetch(`/api/patient/${patientId}/prescription`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(prescriptionData)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Receita salva na conduta!', 'success');
+            loadPrescriptionHistory();
+            const condutaText = document.getElementById('condutaText');
+            if (condutaText && prescriptionData.summary) {
+                const currentText = condutaText.value;
+                const separator = currentText ? '\n\n' : '';
+                condutaText.value = currentText + separator + '📋 RECEITA: ' + prescriptionData.summary;
+            }
+        } else {
+            showAlert(result.error || 'Erro ao salvar receita', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro ao salvar receita:', err);
+        showAlert('Erro ao salvar receita', 'danger');
+    });
+}
+
+function loadPrescriptionHistory() {
+    const patientId = window.patientId || document.getElementById('patientId')?.value;
+    if (!patientId) return;
+    
+    fetch(`/api/patient/${patientId}/prescriptions`)
+    .then(r => r.json())
+    .then(data => {
+        const container = document.getElementById('prescriptionHistoryList');
+        if (!container) return;
+        
+        if (!data.prescriptions || data.prescriptions.length === 0) {
+            container.innerHTML = '<small class="text-muted">Nenhuma receita emitida nesta consulta</small>';
+            return;
+        }
+        
+        let html = '<ul class="list-unstyled mb-0">';
+        data.prescriptions.forEach(p => {
+            html += `<li class="mb-2 p-2 bg-light rounded">
+                <small class="text-muted">${p.created_at}</small>
+                <div>${p.summary}</div>
+                <button class="btn btn-sm btn-outline-secondary mt-1" onclick="viewPrescription(${p.id})">
+                    <i class="bi bi-eye"></i> Ver
+                </button>
+            </li>`;
+        });
+        html += '</ul>';
+        container.innerHTML = html;
+    })
+    .catch(err => console.error('Erro ao carregar histórico:', err));
+}
+
+function viewPrescription(prescriptionId) {
+    window.open(`/prescription/${prescriptionId}/print`, '_blank');
+}

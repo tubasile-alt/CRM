@@ -377,12 +377,22 @@ function savePatientData() {
                         <div class="mb-3">
                             <label class="form-label">Conduta</label>
                             {% if current_user.is_doctor() %}
-                            <button class="btn btn-sm btn-outline-primary float-end" onclick="startDictation('condutaText')">
+                            <button class="btn btn-sm btn-outline-primary float-end ms-2" onclick="startDictation('condutaText')">
                                 <i class="bi bi-mic"></i> Ditado
+                            </button>
+                            <button class="btn btn-sm btn-primary float-end" onclick="abrirDermaScribe()">
+                                <i class="bi bi-prescription2"></i> Prescrever
                             </button>
                             {% endif %}
                         </div>
                         <textarea class="form-control" id="condutaText" rows="8" {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
+                        
+                        <div class="mt-3" id="prescriptionHistorySection">
+                            <h6><i class="bi bi-file-medical"></i> Receitas Emitidas</h6>
+                            <div id="prescriptionHistoryList">
+                                <small class="text-muted">Nenhuma receita emitida nesta consulta</small>
+                            </div>
+                        </div>
                         
                         <!-- Seção para Cosmiatria: Procedimentos Planejados com Orçamento e Status -->
                         <div class="mt-4" id="cosmeticConductSection" style="display:none;">

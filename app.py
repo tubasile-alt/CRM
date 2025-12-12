@@ -9,7 +9,7 @@ import click
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription
 from utils.database_backup import backup_manager
 
 app = Flask(__name__)
@@ -851,6 +851,48 @@ def save_transplant_indication(patient_id):
     db.session.commit()
     
     return jsonify({'success': True})
+
+@app.route('/api/patient/<int:patient_id>/prescription', methods=['POST'])
+@login_required
+def save_prescription(patient_id):
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+    
+    prescription = Prescription(
+        patient_id=patient_id,
+        doctor_id=current_user.id,
+        medications_oral=data.get('oral', []),
+        medications_topical=data.get('topical', []),
+        summary=data.get('summary', ''),
+        prescription_type=data.get('type', 'standard')
+    )
+    db.session.add(prescription)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'id': prescription.id})
+
+@app.route('/api/patient/<int:patient_id>/prescriptions', methods=['GET'])
+@login_required
+def get_prescriptions(patient_id):
+    prescriptions = Prescription.query.filter_by(patient_id=patient_id)\
+        .order_by(Prescription.created_at.desc()).limit(20).all()
+    
+    result = []
+    for p in prescriptions:
+        result.append({
+            'id': p.id,
+            'summary': p.summary or 'Receita sem resumo',
+            'type': p.prescription_type,
+            'created_at': p.created_at.strftime('%d/%m/%Y %H:%M') if p.created_at else '',
+            'oral': p.medications_oral or [],
+            'topical': p.medications_topical or []
+        })
+    
+    return jsonify({'prescriptions': result})
 
 @app.route('/prontuario/<int:patient_id>')
 @login_required
