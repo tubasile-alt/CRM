@@ -61,7 +61,7 @@ def get_waiting_list():
 @login_required
 def assign_room(appointment_id):
     """Atribui sala a um paciente"""
-    data = request.json
+    data = request.json or {}
     room_name = data.get('room')
     
     if not room_name:
