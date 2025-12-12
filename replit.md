@@ -31,7 +31,10 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **Checkbox "Dense Packing"** - Opção adicionada à seção de indicações cirúrgicas
 - ✅ **Performance otimizada** - Batch updates e índices de banco de dados implementados
 - ✅ **Cronômetro de Espera** - Timer em tempo real para sala de espera (atualiza a cada segundo)
-- ✅ **Agendamento de Cirurgias** - Opção "Cirurgia" no dropdown com campo de nome, cria automaticamente no Mapa Cirúrgico
+- ✅ **Agendamento de Cirurgias** - Opção "Cirurgia" no dropdown de tipo de paciente, cria automaticamente no Mapa Cirúrgico
+- ✅ **Integração DermaScribe** - Botão "Prescrever" na aba Conduta abre DermaScribe com nome do paciente
+- ✅ **Modelo Prescription** - Tabela para salvar receitas emitidas vinculadas ao paciente
+- ✅ **APIs de Receitas** - POST/GET para salvar e listar receitas do paciente
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
