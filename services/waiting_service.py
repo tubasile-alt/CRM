@@ -62,15 +62,27 @@ class WaitingService:
         # Calcular tempo de espera e registrar
         wait_time = None
         if appointment.checked_in_time:
-            delta = datetime.now(self.tz) - appointment.checked_in_time
-            wait_time = int(delta.total_seconds() / 60)  # minutos
-            appointment.total_waiting_minutes = wait_time
+            try:
+                # Garantir que ambos têm timezone para comparação
+                checked_in = appointment.checked_in_time
+                if checked_in.tzinfo is None:
+                    checked_in = self.tz.localize(checked_in)
+                
+                now = datetime.now(self.tz)
+                delta = now - checked_in
+                wait_time = int(delta.total_seconds() / 60)  # minutos
+                if wait_time >= 0:
+                    appointment.total_waiting_minutes = wait_time
+            except Exception as e:
+                import logging
+                logging.error(f"Erro ao calcular tempo de espera: {e}")
+                wait_time = None
         
         db.session.commit()
         
         return {
             'id': appointment.id,
-            'patient_name': appointment.patient.name,
+            'patient_name': appointment.patient.name if appointment.patient else "Desconhecido",
             'wait_time_minutes': wait_time,
             'waiting': False
         }
