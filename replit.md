@@ -38,6 +38,8 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **DermaScribe INTERNO** - Sistema de receituário integrado ao CRM (não mais externo)
 - ✅ **Modelos Medication/MedicationUsage** - Tabelas para banco de medicamentos e rastreamento de prescrições
 - ✅ **Link DermaScribe no menu** - Acesso direto ao receituário pelo menu principal (apenas médicos)
+- ✅ **Persistência de Prescrições** - Receitas salvas diretamente no prontuário do paciente
+- ✅ **Analytics de Medicamentos** - Rastreamento de uso para estatísticas de prescrição
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
