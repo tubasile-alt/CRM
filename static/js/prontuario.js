@@ -266,6 +266,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Carregar planos existentes ao iniciar
     setTimeout(loadExistingPlans, 500);
     
+    // Carregar histórico de receitas
+    setTimeout(loadPrescriptionHistory, 500);
+    
     // Listener para mudança de categoria
     const categoryInputs = document.querySelectorAll('input[name="category"]');
     categoryInputs.forEach(input => {
