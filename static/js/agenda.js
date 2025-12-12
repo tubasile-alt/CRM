@@ -1071,14 +1071,28 @@ function loadWaitingRoom() {
 
 function removeFromWaiting(appointmentId, event) {
     event.stopPropagation();
+    event.preventDefault();
     if (!confirm('Remover paciente da lista de espera?')) return;
     
-    fetch(`/espera/api/remove/${appointmentId}`, {method: 'POST'})
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) loadWaitingRoom();
-            else alert(data.error || 'Erro ao remover');
-        });
+    fetch(`/espera/api/remove/${appointmentId}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken(),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadWaitingRoom();
+        } else {
+            alert(data.error || 'Erro ao remover');
+        }
+    })
+    .catch(e => {
+        console.error('Erro ao remover da lista:', e);
+        alert('Erro ao remover paciente da lista de espera');
+    });
 }
 
 function renderWaitingRoom(waitingList) {
@@ -1117,17 +1131,27 @@ function renderWaitingRoom(waitingList) {
 function calculateWaitingTime(checkinTimeStr) {
     if (!checkinTimeStr) return '0 min';
     
-    const checkinTime = new Date(checkinTimeStr);
-    const now = new Date();
-    const diffMs = now - checkinTime;
-    const diffMinutes = Math.floor(diffMs / 60000);
-    
-    if (diffMinutes < 1) return '< 1 min';
-    if (diffMinutes < 60) return `${diffMinutes} min`;
-    
-    const hours = Math.floor(diffMinutes / 60);
-    const mins = diffMinutes % 60;
-    return `${hours}h ${mins}min`;
+    try {
+        // Parse ISO string handling timezone
+        const checkinTime = new Date(checkinTimeStr);
+        const now = new Date();
+        const diffMs = now - checkinTime;
+        
+        // Se a diferença for negativa (erro de timezone), retornar 0
+        if (diffMs < 0) return '< 1 min';
+        
+        const diffMinutes = Math.floor(diffMs / 60000);
+        
+        if (diffMinutes < 1) return '< 1 min';
+        if (diffMinutes < 60) return `${diffMinutes} min`;
+        
+        const hours = Math.floor(diffMinutes / 60);
+        const mins = diffMinutes % 60;
+        return `${hours}h ${mins}min`;
+    } catch (e) {
+        console.error('Erro ao calcular tempo de espera:', checkinTimeStr, e);
+        return '-- min';
+    }
 }
 
 function updateWaitingTimers() {
