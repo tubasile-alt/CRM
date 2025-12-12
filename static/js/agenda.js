@@ -1,4 +1,5 @@
 let appointmentsList = [];
+let waitingRoomData = [];  // Armazena dados da sala de espera para atualização do timer
 
 // Parsear string ISO como hora local (São Paulo) sem conversão de timezone
 function parseLocalDateTime(isoString) {
@@ -1058,7 +1059,11 @@ function loadWaitingRoom() {
     })
     .then(data => {
         const waitingList = data.waiting_list || [];
-        renderWaitingRoom(waitingList);
+        waitingRoomData = waitingList.map(patient => ({
+            ...patient,
+            checkinTimestamp: patient.checked_in_time ? new Date(patient.checked_in_time).getTime() : Date.now()
+        }));
+        renderWaitingRoom(waitingRoomData);
         const badge = document.getElementById('waitingCountBadge');
         if (badge) badge.textContent = waitingList.length;
     })
@@ -1110,15 +1115,15 @@ function renderWaitingRoom(waitingList) {
     }
     
     listDiv.innerHTML = waitingList.map(patient => {
-        const waitMinutes = patient.wait_time_minutes || 0;
+        const waitMinutes = calculateMinutesSinceCheckin(patient.checkinTimestamp);
         const waitingTime = formatWaitingMinutes(waitMinutes);
         return `
-            <div class="waiting-patient-item" data-checkin="${patient.checked_in_time}" data-wait-minutes="${waitMinutes}" onclick="openPatientFromWaiting(${patient.patient_id}, ${patient.id})">
+            <div class="waiting-patient-item" data-patient-id="${patient.id}" onclick="openPatientFromWaiting(${patient.patient_id}, ${patient.id})">
                 <div class="waiting-patient-info">
                     <span class="waiting-patient-name">${patient.patient_name}</span>
                     <span class="waiting-patient-type">${patient.appointment_type}</span>
                 </div>
-                <div class="waiting-timer" data-checkin="${patient.checked_in_time}" data-wait-minutes="${waitMinutes}">
+                <div class="waiting-timer" data-patient-id="${patient.id}">
                     <i class="bi bi-stopwatch"></i> ${waitingTime}
                 </div>
                 <button class="btn-remove-waiting" onclick="removeFromWaiting(${patient.id}, event)" title="Remover da lista de espera">
@@ -1137,35 +1142,22 @@ function formatWaitingMinutes(minutes) {
     return `${hours}h ${mins}min`;
 }
 
-function calculateWaitingTime(checkinTimeStr) {
-    if (!checkinTimeStr) return '0 min';
-    
-    try {
-        const checkinTime = new Date(checkinTimeStr);
-        const now = new Date();
-        const diffMs = now - checkinTime;
-        
-        if (diffMs < 0) return '< 1 min';
-        
-        const diffMinutes = Math.floor(diffMs / 60000);
-        return formatWaitingMinutes(diffMinutes);
-    } catch (e) {
-        console.error('Erro ao calcular tempo de espera:', checkinTimeStr, e);
-        return '-- min';
-    }
+function calculateMinutesSinceCheckin(checkinTimestamp) {
+    if (!checkinTimestamp) return 0;
+    const now = Date.now();
+    const diffMs = now - checkinTimestamp;
+    if (diffMs < 0) return 0;
+    return Math.floor(diffMs / 60000);
 }
 
 function updateWaitingTimers() {
-    const timers = document.querySelectorAll('.waiting-timer');
-    timers.forEach(timer => {
-        const waitMinutes = parseInt(timer.dataset.waitMinutes || '0', 10);
-        const checkinTime = timer.dataset.checkin;
-        
-        if (checkinTime) {
-            const displayTime = calculateWaitingTime(checkinTime);
-            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${displayTime}`;
-        } else if (waitMinutes >= 0) {
-            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${formatWaitingMinutes(waitMinutes)}`;
+    if (!waitingRoomData || waitingRoomData.length === 0) return;
+    
+    waitingRoomData.forEach(patient => {
+        const timer = document.querySelector(`.waiting-timer[data-patient-id="${patient.id}"]`);
+        if (timer) {
+            const minutes = calculateMinutesSinceCheckin(patient.checkinTimestamp);
+            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${formatWaitingMinutes(minutes)}`;
         }
     });
 }
