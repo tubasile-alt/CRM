@@ -59,11 +59,12 @@ class WaitingService:
         appointment.waiting = False
         appointment.status = 'atendido'
         
-        # Calcular tempo de espera
+        # Calcular tempo de espera e registrar
         wait_time = None
         if appointment.checked_in_time:
             delta = datetime.now(self.tz) - appointment.checked_in_time
             wait_time = int(delta.total_seconds() / 60)  # minutos
+            appointment.total_waiting_minutes = wait_time
         
         db.session.commit()
         
@@ -125,6 +126,53 @@ class WaitingService:
             })
         
         return waiting_list
+    
+    def get_average_wait_time(self, doctor_id=None, days=30):
+        """
+        Calcula tempo médio de espera
+        
+        Args:
+            doctor_id: ID do médico (opcional)
+            days: Número de dias a considerar
+            
+        Returns:
+            dict: Estatísticas de espera
+        """
+        from datetime import timedelta
+        
+        query = Appointment.query.filter(
+            Appointment.total_waiting_minutes.isnot(None),
+            Appointment.status == 'atendido'
+        )
+        
+        if doctor_id:
+            query = query.filter_by(doctor_id=doctor_id)
+        
+        # Últimos X dias
+        cutoff_date = datetime.now(self.tz) - timedelta(days=days)
+        query = query.filter(Appointment.created_at >= cutoff_date)
+        
+        appointments = query.all()
+        
+        if not appointments:
+            return {
+                'average': 0,
+                'total': 0,
+                'min': 0,
+                'max': 0,
+                'count': 0
+            }
+        
+        times = [apt.total_waiting_minutes for apt in appointments]
+        avg = sum(times) / len(times)
+        
+        return {
+            'average': round(avg, 1),
+            'total': sum(times),
+            'min': min(times),
+            'max': max(times),
+            'count': len(times)
+        }
     
     def get_wait_stats(self, doctor_id=None, date=None):
         """

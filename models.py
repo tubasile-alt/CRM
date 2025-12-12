@@ -88,6 +88,7 @@ class Appointment(db.Model):
     waiting = db.Column(db.Boolean, default=False)
     checked_in_time = db.Column(db.DateTime)
     room = db.Column(db.String(50))
+    total_waiting_minutes = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     doctor = db.relationship('User', backref='appointments')

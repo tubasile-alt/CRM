@@ -1131,10 +1131,12 @@ function calculateWaitingTime(checkinTimeStr) {
 }
 
 function updateWaitingTimers() {
-    const timers = document.querySelectorAll('.waiting-timer[data-checkin]');
+    const timers = document.querySelectorAll('.waiting-timer');
     timers.forEach(timer => {
         const checkinTime = timer.dataset.checkin;
-        timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${calculateWaitingTime(checkinTime)}`;
+        if (checkinTime) {
+            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${calculateWaitingTime(checkinTime)}`;
+        }
     });
 }
 
@@ -1145,8 +1147,13 @@ function openPatientFromWaiting(patientId, appointmentId) {
 function startWaitingRoomUpdates() {
     loadWaitingRoom();
     if (waitingRoomInterval) clearInterval(waitingRoomInterval);
-    waitingRoomInterval = setInterval(() => {
-        updateWaitingTimers();
-    }, 1000);
+    
+    // Atualizar timers a cada 1 segundo
+    waitingRoomInterval = setInterval(updateWaitingTimers, 1000);
+    
+    // Recarregar lista a cada 5 segundos
     setInterval(loadWaitingRoom, 5000);
+    
+    // Primeira atualização imediata
+    updateWaitingTimers();
 }

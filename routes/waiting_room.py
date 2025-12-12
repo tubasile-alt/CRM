@@ -104,3 +104,17 @@ def get_stats():
     stats = waiting_service.get_wait_stats(doctor_id, date)
     
     return jsonify(stats)
+
+@waiting_room_bp.route('/api/average-wait', methods=['GET'])
+@login_required
+def get_average_wait():
+    """Retorna tempo médio de espera"""
+    doctor_id = request.args.get('doctor_id', type=int)
+    days = request.args.get('days', default=30, type=int)
+    
+    if not doctor_id and current_user.is_doctor():
+        doctor_id = current_user.id
+    
+    stats = waiting_service.get_average_wait_time(doctor_id, days)
+    
+    return jsonify(stats)

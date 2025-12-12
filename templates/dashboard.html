@@ -44,9 +44,9 @@
     <div class="col-md-3">
         <div class="card text-center">
             <div class="card-body">
-                <i class="bi bi-x-circle text-danger" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ stats.faltaram }}</h3>
-                <p class="text-muted mb-0">Faltaram</p>
+                <i class="bi bi-stopwatch text-warning" style="font-size: 2rem;"></i>
+                <h3 class="mt-2" id="avgWaitingTime">--</h3>
+                <p class="text-muted mb-0">Tempo Médio de Espera (min)</p>
             </div>
         </div>
     </div>
@@ -163,6 +163,17 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Carregar tempo médio de espera
+    fetch('/espera/api/average-wait')
+        .then(r => r.json())
+        .then(data => {
+            const avgEl = document.getElementById('avgWaitingTime');
+            if (data.average > 0) {
+                avgEl.textContent = Math.round(data.average);
+            }
+        })
+        .catch(e => console.error('Erro ao carregar tempo médio:', e));
+    
     const procedureData = {{ stats.procedures_by_month_json | safe }};
     const months = Object.keys(procedureData);
     const completed = Object.values(procedureData).map(d => d.completed);
