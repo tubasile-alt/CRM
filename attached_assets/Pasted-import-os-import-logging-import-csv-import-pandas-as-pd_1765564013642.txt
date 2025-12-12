@@ -1,0 +1,441 @@
+import os
+import logging
+import csv
+import pandas as pd
+from datetime import datetime
+from io import BytesIO
+from flask import Flask, render_template, request, jsonify, send_file
+from sqlalchemy.orm import DeclarativeBase
+from flask_sqlalchemy import SQLAlchemy
+from services.openai_service import suggest_medications
+
+# Configure logging
+logging.basicConfig(level=logging.INFO if os.environ.get("REPLIT_DEPLOYMENT"
+                                                         ) else logging.DEBUG)
+
+
+# Database setup
+class Base(DeclarativeBase):
+    pass
+
+
+db = SQLAlchemy(model_class=Base)
+
+# Create the app
+app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET",
+                                "dev-secret-key-for-development")
+
+# Configure the database
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_recycle": 300,
+    "pool_pre_ping": True,
+}
+
+# Initialize the app with the extension
+db.init_app(app)
+
+# Import models after db is initialized to avoid circular imports
+with app.app_context():
+    from models import Medication, MedicationUsage
+
+    # Create tables
+    db.create_all()
+
+    # Check if we need to import initial data
+    if Medication.query.count() == 0:
+        try:
+            # Import CSV data
+            csv_path = 'attached_assets/Banco_Consolidado_Final_com_Todas_as_Marcas.csv'
+            if os.path.exists(csv_path):
+                with open(csv_path, 'r', encoding='utf-8') as file:
+                    csv_reader = csv.reader(file)
+                    # Skip header row
+                    next(csv_reader)
+
+                    for row in csv_reader:
+                        if len(row) >= 4:  # Make sure we have all columns
+                            name = row[0].strip()
+                            purpose = row[1].strip()
+                            med_type = 'topical' if row[2].lower().strip(
+                            ) == 'tópico' else 'oral'
+                            brand = row[3].strip()
+
+                            # Create and add medication
+                            medication = Medication()
+                            medication.name = name
+                            medication.purpose = purpose
+                            medication.type = med_type
+                            medication.brand = brand
+                            db.session.add(medication)
+
+                    db.session.commit()
+                    logging.info(
+                        f"Imported {Medication.query.count()} medications from CSV"
+                    )
+        except Exception as e:
+            logging.error(f"Error importing medications: {str(e)}")
+
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/api/suggest-medications', methods=['POST'])
+def medication_suggestions():
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        partial_input = data.get('partial_input', '')
+        if not partial_input:
+            return jsonify({"error": "No input provided"}), 400
+
+        logging.debug(f"Received partial input: {partial_input}")
+
+        # Primeiro buscar no banco de dados local
+        db_suggestions = []
+
+        # Query the database for medications matching the partial input by name OR brand
+        query = Medication.query.filter(
+            db.or_(
+                Medication.name.ilike(f'%{partial_input}%'),
+                Medication.brand.ilike(f'%{partial_input}%'))).limit(5).all()
+
+        for med in query:
+            db_suggestions.append(med.to_dict())
+
+        # Se tiver resultados no banco de dados, usar esses resultados
+        if db_suggestions:
+            logging.info(
+                f"Found {len(db_suggestions)} suggestions in database")
+            suggestions = db_suggestions
+        else:
+            # Se não tiver resultados no banco, tentar com OpenAI API
+            logging.info("No results from database, trying OpenAI API")
+            suggestions = suggest_medications(partial_input)
+
+            # Verificar se temos um erro na resposta da API
+            if not suggestions or (len(suggestions) == 1
+                                   and 'error' in suggestions[0]):
+                logging.warning("No results from OpenAI API")
+                suggestions = []
+
+        logging.debug(f"Returned suggestions: {suggestions}")
+        return jsonify({"suggestions": suggestions})
+    except Exception as e:
+        logging.error(f"Error while getting medication suggestions: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/save-medication', methods=['POST'])
+def save_medication():
+    try:
+        # Obter dados do medicamento
+        data = request.json
+        if not data or 'medication' not in data or 'type' not in data:
+            return jsonify({"error":
+                            "Dados incompletos para o medicamento"}), 400
+
+        # Verificar se o medicamento já existe no banco de dados
+        existing_med = Medication.query.filter(
+            Medication.name == data['medication']).first()
+        if existing_med:
+            # Se o medicamento já existe mas não tem instruções, atualizar as instruções
+            if data.get('instructions') and not existing_med.instructions:
+                existing_med.instructions = data.get('instructions')
+                db.session.commit()
+                logging.info(
+                    f"Updated instructions for existing medication '{data['medication']}'"
+                )
+                return jsonify({
+                    "message": "Instruções do medicamento atualizadas",
+                    "status": "updated"
+                })
+            else:
+                logging.info(
+                    f"Medication '{data['medication']}' already exists in database"
+                )
+                return jsonify({
+                    "message": "O medicamento já existe no banco de dados",
+                    "status": "exists"
+                })
+
+        # Criar um novo medicamento com instruções
+        new_medication = Medication()
+        new_medication.name = data['medication']
+        new_medication.purpose = data.get('purpose', '')
+        new_medication.type = data['type']
+        new_medication.brand = data.get('brand', '')
+        new_medication.instructions = data.get(
+            'instructions', '')  # Salvar as instruções específicas
+
+        # Salvar no banco de dados
+        db.session.add(new_medication)
+        db.session.commit()
+
+        logging.info(
+            f"Added new medication to database: {data['medication']} with instructions"
+        )
+        return jsonify({
+            "message": "Medicamento adicionado com sucesso",
+            "status": "success"
+        })
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error saving medication: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/export-medications-excel')
+def export_medications_excel():
+    """Exporta medicamentos para Excel com lista alfabética e ranking dos mais prescritos"""
+    try:
+        # Criar um buffer em memória para o arquivo Excel
+        from typing import cast
+        from pandas._typing import WriteExcelBuffer
+        output = BytesIO()
+
+        # Criar workbook com pandas Excel writer - cast to correct type for typing
+        with pd.ExcelWriter(cast(WriteExcelBuffer, output),
+                            engine='openpyxl') as writer:
+            # ABA 1: Lista Alfabética de Medicamentos
+            medications = Medication.query.order_by(Medication.name).all()
+            medications_data = []
+
+            for med in medications:
+                medications_data.append({
+                    'Nome':
+                    med.name,
+                    'Tipo':
+                    med.type.title(),
+                    'Posologia':
+                    med.instructions
+                    if med.instructions else med.get_default_instructions(),
+                    'Finalidade':
+                    med.purpose or '',
+                    'Marca':
+                    med.brand or '',
+                    'Vezes Prescrito':
+                    med.get_prescription_count()
+                })
+
+            medications_df = pd.DataFrame(medications_data)
+            medications_df.to_excel(writer,
+                                    sheet_name='Lista Alfabética',
+                                    index=False)
+
+            # ABA 2: Ranking dos 10 Mais Prescritos
+            top_medications = Medication.get_top_prescribed(limit=10)
+            ranking_data = []
+
+            for i, (med, count) in enumerate(top_medications, 1):
+                ranking_data.append({
+                    'Posição':
+                    i,
+                    'Nome':
+                    med.name,
+                    'Tipo':
+                    med.type.title(),
+                    'Posologia':
+                    med.instructions
+                    if med.instructions else med.get_default_instructions(),
+                    'Vezes Prescrito':
+                    count or 0,
+                    'Finalidade':
+                    med.purpose or '',
+                    'Marca':
+                    med.brand or ''
+                })
+
+            ranking_df = pd.DataFrame(ranking_data)
+            ranking_df.to_excel(writer,
+                                sheet_name='Top 10 Mais Prescritos',
+                                index=False)
+
+            # Ajustar largura das colunas
+            for sheet_name in writer.sheets:
+                worksheet = writer.sheets[sheet_name]
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    adjusted_width = min(max_length + 2, 50)
+                    worksheet.column_dimensions[
+                        column_letter].width = adjusted_width
+
+        output.seek(0)
+
+        # Gerar nome do arquivo com data/hora
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'medicamentos_relatorio_{timestamp}.xlsx'
+
+        return send_file(
+            output,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    except Exception as e:
+        logging.error(f"Erro ao exportar medicamentos para Excel: {str(e)}")
+        return jsonify({"error":
+                        f"Erro ao gerar arquivo Excel: {str(e)}"}), 500
+
+
+@app.route('/api/track-prescription', methods=['POST'])
+def track_prescription():
+    """Registra o uso de medicamentos para contagem de prescrições"""
+    try:
+        data = request.json
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        medications = data.get('medications', [])
+
+        for med_data in medications:
+            med_name = med_data.get('medication') or med_data.get('name')
+            if med_name:
+                # Buscar o medicamento no banco
+                medication = Medication.query.filter(
+                    Medication.name == med_name).first()
+                if medication:
+                    # Registrar o uso
+                    usage = MedicationUsage()
+                    usage.medication_id = medication.id
+                    db.session.add(usage)
+
+        db.session.commit()
+        return jsonify({"message": "Prescrição registrada com sucesso"})
+
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao registrar prescrição: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/top-medications')
+def get_top_medications():
+    """Retorna os 10 medicamentos mais prescritos - apenas se houver prescrições"""
+    try:
+        # Verificar se há prescrições registradas
+        total_prescriptions = MedicationUsage.query.count()
+        if total_prescriptions == 0:
+            return jsonify([])  # Retorna lista vazia se não há prescrições
+
+        top_meds = Medication.get_top_prescribed(limit=10)
+        result = []
+
+        for i, (med, count) in enumerate(top_meds, 1):
+            # Só incluir medicamentos que realmente foram prescritos
+            if count and count > 0:
+                result.append({
+                    'position':
+                    i,
+                    'name':
+                    med.name,
+                    'type':
+                    med.type.title(),
+                    'prescriptions':
+                    count,
+                    'instructions':
+                    med.instructions
+                    if med.instructions else med.get_default_instructions()
+                })
+
+        return jsonify(result)
+    except Exception as e:
+        logging.error(f"Erro ao buscar top medicamentos: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/general-stats')
+def get_general_stats():
+    """Retorna estatísticas gerais do sistema"""
+    try:
+        total_medications = Medication.query.count()
+        total_prescriptions = MedicationUsage.query.count()
+        oral_count = Medication.query.filter_by(type='oral').count()
+        topical_count = Medication.query.filter_by(type='topical').count()
+
+        # Medicamento mais prescrito - só mostrar se houver prescrições
+        most_prescribed = None
+        if total_prescriptions > 0:
+            top_med = Medication.get_top_prescribed(limit=1)
+            if top_med:
+                med, count = top_med[0]
+                if count and count > 0:
+                    most_prescribed = {'name': med.name, 'count': count}
+
+        return jsonify({
+            'total_medications': total_medications,
+            'total_prescriptions': total_prescriptions,
+            'oral_medications': oral_count,
+            'topical_medications': topical_count,
+            'most_prescribed': most_prescribed
+        })
+    except Exception as e:
+        logging.error(f"Erro ao buscar estatísticas gerais: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/analytics/recent-prescriptions')
+def get_recent_prescriptions():
+    """Retorna as prescrições mais recentes"""
+    try:
+        from sqlalchemy import desc
+
+        recent_usage = MedicationUsage.query.join(Medication)\
+            .order_by(desc(MedicationUsage.prescribed_at))\
+            .limit(10).all()
+
+        result = []
+        for usage in recent_usage:
+            result.append({
+                'medication_name':
+                usage.medication.name,
+                'type':
+                usage.medication.type.title(),
+                'prescribed_at':
+                usage.prescribed_at.strftime('%d/%m/%Y %H:%M')
+            })
+
+        return jsonify(result)
+    except Exception as e:
+        logging.error(f"Erro ao buscar prescrições recentes: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/clear-prescription-data', methods=['POST'])
+def clear_prescription_data():
+    """Limpa todos os dados de prescrições (MedicationUsage) mantendo os medicamentos"""
+    try:
+        # Contar quantos registros existem antes de apagar
+        count_before = MedicationUsage.query.count()
+
+        # Apagar todos os registros de prescrições (MedicationUsage)
+        MedicationUsage.query.delete()
+        db.session.commit()
+
+        logging.info(f"Cleared {count_before} prescription usage records")
+        return jsonify({
+            "message":
+            f"Dados de prescrições limpos com sucesso. {count_before} registros removidos.",
+            "cleared_count": count_before
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Erro ao limpar dados de prescrições: {str(e)}")
+        return jsonify({"error": f"Erro ao limpar dados: {str(e)}"}), 500
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
