@@ -1024,11 +1024,11 @@ function showAlert(message, type = 'success') {
 }
 
 function toggleSurgeryNameField() {
-    const appointmentType = document.getElementById('appointmentType').value;
+    const patientType = document.getElementById('patientType').value;
     const surgeryNameRow = document.getElementById('surgeryNameRow');
     const surgeryNameInput = document.getElementById('surgeryName');
     
-    if (appointmentType === 'Cirurgia') {
+    if (patientType === 'cirurgia') {
         surgeryNameRow.style.display = 'block';
         surgeryNameInput.required = true;
     } else {

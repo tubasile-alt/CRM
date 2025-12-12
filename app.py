@@ -456,9 +456,9 @@ def create_appointment():
         pd = PatientDoctor(patient_id=patient.id, doctor_id=doctor_id, patient_code=max_code + 1)
         db.session.add(pd)
     
-    # Se for tipo Cirurgia, criar automaticamente no mapa cirúrgico
+    # Se for tipo de paciente Cirurgia, criar automaticamente no mapa cirúrgico
     surgery_created = False
-    if data.get('appointmentType') == 'Cirurgia' and data.get('surgery_name'):
+    if data.get('patientType') == 'cirurgia' and data.get('surgery_name'):
         operating_room = OperatingRoom.query.first()
         if not operating_room:
             operating_room = OperatingRoom(name='Sala 1', capacity=1)

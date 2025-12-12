@@ -663,11 +663,12 @@
                         </div>
                         <div class="col-3">
                             <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Paciente</label>
-                            <select class="form-select form-select-sm" id="patientType">
+                            <select class="form-select form-select-sm" id="patientType" onchange="toggleSurgeryNameField()">
                                 <option value="particular" selected>Particular</option>
                                 <option value="retorno">Retorno</option>
                                 <option value="unimed">Unimed</option>
                                 <option value="cortesia">Cortesia</option>
+                                <option value="cirurgia">Cirurgia</option>
                             </select>
                         </div>
                     </div>
@@ -690,7 +691,7 @@
                     <div class="row mb-2">
                         <div class="col-6">
                             <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;"><strong>Tipo Consulta *</strong></label>
-                            <select class="form-select form-select-sm" id="appointmentType" required onchange="toggleSurgeryNameField()">
+                            <select class="form-select form-select-sm" id="appointmentType" required>
                                 <option value="">-- Selecione --</option>
                                 <option value="Particular" selected>Particular</option>
                                 <option value="Botox">Botox</option>
@@ -708,7 +709,6 @@
                                 <option value="Retorno 1 semana TX">Retorno 1 semana TX</option>
                                 <option value="UNIMED">UNIMED</option>
                                 <option value="Cortesia">Cortesia</option>
-                                <option value="Cirurgia">Cirurgia</option>
                             </select>
                         </div>
                         <div class="col-3">
