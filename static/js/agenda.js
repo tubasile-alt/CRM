@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(updateWaitingCounter, 30000);
     renderMiniCalendar();
     setupPatientAutocomplete();
+    
+    // Inicializar sala de espera
+    startWaitingRoomUpdates();
 });
 
 function setupPatientAutocomplete() {
@@ -1145,9 +1148,5 @@ function startWaitingRoomUpdates() {
     waitingRoomInterval = setInterval(() => {
         updateWaitingTimers();
     }, 1000);
-    setInterval(loadWaitingRoom, 60000);
+    setInterval(loadWaitingRoom, 5000);
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-    startWaitingRoomUpdates();
-});
