@@ -9,7 +9,7 @@ import click
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom
 from utils.database_backup import backup_manager
 
 app = Flask(__name__)
@@ -456,9 +456,37 @@ def create_appointment():
         pd = PatientDoctor(patient_id=patient.id, doctor_id=doctor_id, patient_code=max_code + 1)
         db.session.add(pd)
     
+    # Se for tipo Cirurgia, criar automaticamente no mapa cirúrgico
+    surgery_created = False
+    if data.get('appointmentType') == 'Cirurgia' and data.get('surgery_name'):
+        operating_room = OperatingRoom.query.first()
+        if not operating_room:
+            operating_room = OperatingRoom(name='Sala 1', capacity=1)
+            db.session.add(operating_room)
+            db.session.flush()
+        
+        start_dt = parse_datetime_with_tz(data['start'])
+        end_dt = parse_datetime_with_tz(data['end'])
+        
+        surgery = Surgery(
+            date=start_dt.date(),
+            start_time=start_dt.time(),
+            end_time=end_dt.time(),
+            patient_id=patient.id,
+            patient_name=patient.name,
+            procedure_name=data['surgery_name'],
+            doctor_id=doctor_id,
+            operating_room_id=operating_room.id,
+            status='agendada',
+            notes=data.get('notes', ''),
+            created_by=current_user.id
+        )
+        db.session.add(surgery)
+        surgery_created = True
+    
     db.session.commit()
     
-    return jsonify({'success': True, 'id': appointment.id})
+    return jsonify({'success': True, 'id': appointment.id, 'surgery_created': surgery_created})
 
 @app.route('/api/appointments/<int:id>', methods=['PUT'])
 @login_required

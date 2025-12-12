@@ -9,7 +9,7 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - **Frontend:** Jinja2 + HTML/CSS/JavaScript
 - **Autenticação:** Flask-Login com roles (médico, secretária)
 
-## 📊 Status Atual (11/12/2025)
+## 📊 Status Atual (12/12/2025)
 - ✅ Migração de dados do SQLite para PostgreSQL completa
 - ✅ Interface de agenda diária com mini-calendário
 - ✅ Layout flexbox (sem overlapping)
@@ -30,6 +30,8 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **Checkbox "Transplante Capilar Feminino"** - Opção adicionada à seção de planejamento cirúrgico
 - ✅ **Checkbox "Dense Packing"** - Opção adicionada à seção de indicações cirúrgicas
 - ✅ **Performance otimizada** - Batch updates e índices de banco de dados implementados
+- ✅ **Cronômetro de Espera** - Timer em tempo real para sala de espera (atualiza a cada segundo)
+- ✅ **Agendamento de Cirurgias** - Opção "Cirurgia" no dropdown com campo de nome, cria automaticamente no Mapa Cirúrgico
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 

@@ -897,9 +897,15 @@ function saveAppointment() {
     const status = document.getElementById('appointmentStatus').value;
     const appointmentType = document.getElementById('appointmentType').value;
     const notes = document.getElementById('appointmentNotes').value;
+    const surgeryName = document.getElementById('surgeryName')?.value?.trim() || '';
     
     if (!patientName) {
         showAlert('Por favor, preencha o nome do paciente', 'warning');
+        return;
+    }
+    
+    if (appointmentType === 'Cirurgia' && !surgeryName) {
+        showAlert('Por favor, preencha o nome da cirurgia', 'warning');
         return;
     }
     
@@ -953,7 +959,8 @@ function saveAppointment() {
         end: toLocalISOString(endDate),
         status: status,
         appointmentType: appointmentType,
-        notes: notes || null
+        notes: notes || null,
+        surgery_name: surgeryName || null
     };
     
     if (doctor_id) {
@@ -975,10 +982,15 @@ function saveAppointment() {
     })
     .then(data => {
         if (data.success) {
-            showAlert('Agendamento criado com sucesso!');
+            let msg = 'Agendamento criado com sucesso!';
+            if (data.surgery_created) {
+                msg += ' Cirurgia adicionada ao Mapa Cirúrgico.';
+            }
+            showAlert(msg);
             loadAppointments();
             bootstrap.Modal.getInstance(document.getElementById('newAppointmentModal')).hide();
             document.getElementById('appointmentForm').reset();
+            document.getElementById('surgeryNameRow').style.display = 'none';
         } else {
             showAlert(data.error || 'Erro ao criar agendamento', 'danger');
         }
@@ -1009,6 +1021,21 @@ function showAlert(message, type = 'success') {
     container.insertBefore(alertDiv, container.firstChild);
     
     setTimeout(() => alertDiv.remove(), 3000);
+}
+
+function toggleSurgeryNameField() {
+    const appointmentType = document.getElementById('appointmentType').value;
+    const surgeryNameRow = document.getElementById('surgeryNameRow');
+    const surgeryNameInput = document.getElementById('surgeryName');
+    
+    if (appointmentType === 'Cirurgia') {
+        surgeryNameRow.style.display = 'block';
+        surgeryNameInput.required = true;
+    } else {
+        surgeryNameRow.style.display = 'none';
+        surgeryNameInput.required = false;
+        surgeryNameInput.value = '';
+    }
 }
 
 function getCSRFToken() {
