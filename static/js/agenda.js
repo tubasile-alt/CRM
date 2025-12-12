@@ -1144,7 +1144,7 @@ function startWaitingRoomUpdates() {
     if (waitingRoomInterval) clearInterval(waitingRoomInterval);
     waitingRoomInterval = setInterval(() => {
         updateWaitingTimers();
-    }, 30000);
+    }, 1000);
     setInterval(loadWaitingRoom, 60000);
 }
 
