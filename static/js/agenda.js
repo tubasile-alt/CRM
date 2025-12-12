@@ -1110,14 +1110,15 @@ function renderWaitingRoom(waitingList) {
     }
     
     listDiv.innerHTML = waitingList.map(patient => {
-        const waitingTime = calculateWaitingTime(patient.checked_in_time);
+        const waitMinutes = patient.wait_time_minutes || 0;
+        const waitingTime = formatWaitingMinutes(waitMinutes);
         return `
-            <div class="waiting-patient-item" data-checkin="${patient.checked_in_time}" onclick="openPatientFromWaiting(${patient.patient_id}, ${patient.id})">
+            <div class="waiting-patient-item" data-checkin="${patient.checked_in_time}" data-wait-minutes="${waitMinutes}" onclick="openPatientFromWaiting(${patient.patient_id}, ${patient.id})">
                 <div class="waiting-patient-info">
                     <span class="waiting-patient-name">${patient.patient_name}</span>
                     <span class="waiting-patient-type">${patient.appointment_type}</span>
                 </div>
-                <div class="waiting-timer" data-checkin="${patient.checked_in_time}">
+                <div class="waiting-timer" data-checkin="${patient.checked_in_time}" data-wait-minutes="${waitMinutes}">
                     <i class="bi bi-stopwatch"></i> ${waitingTime}
                 </div>
                 <button class="btn-remove-waiting" onclick="removeFromWaiting(${patient.id}, event)" title="Remover da lista de espera">
@@ -1128,26 +1129,26 @@ function renderWaitingRoom(waitingList) {
     }).join('');
 }
 
+function formatWaitingMinutes(minutes) {
+    if (minutes < 1) return '< 1 min';
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}min`;
+}
+
 function calculateWaitingTime(checkinTimeStr) {
     if (!checkinTimeStr) return '0 min';
     
     try {
-        // Parse ISO string handling timezone
         const checkinTime = new Date(checkinTimeStr);
         const now = new Date();
         const diffMs = now - checkinTime;
         
-        // Se a diferença for negativa (erro de timezone), retornar 0
         if (diffMs < 0) return '< 1 min';
         
         const diffMinutes = Math.floor(diffMs / 60000);
-        
-        if (diffMinutes < 1) return '< 1 min';
-        if (diffMinutes < 60) return `${diffMinutes} min`;
-        
-        const hours = Math.floor(diffMinutes / 60);
-        const mins = diffMinutes % 60;
-        return `${hours}h ${mins}min`;
+        return formatWaitingMinutes(diffMinutes);
     } catch (e) {
         console.error('Erro ao calcular tempo de espera:', checkinTimeStr, e);
         return '-- min';
@@ -1157,9 +1158,14 @@ function calculateWaitingTime(checkinTimeStr) {
 function updateWaitingTimers() {
     const timers = document.querySelectorAll('.waiting-timer');
     timers.forEach(timer => {
+        const waitMinutes = parseInt(timer.dataset.waitMinutes || '0', 10);
         const checkinTime = timer.dataset.checkin;
+        
         if (checkinTime) {
-            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${calculateWaitingTime(checkinTime)}`;
+            const displayTime = calculateWaitingTime(checkinTime);
+            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${displayTime}`;
+        } else if (waitMinutes >= 0) {
+            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${formatWaitingMinutes(waitMinutes)}`;
         }
     });
 }
