@@ -1,0 +1,1085 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6">
+        <!-- Navigation tabs -->
+        <ul class="nav nav-tabs mb-3" id="prescriptionTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="custom-tab" data-bs-toggle="tab" data-bs-target="#custom-tab-content" type="button" role="tab" aria-controls="custom-tab-content" aria-selected="true">Personalizada</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates-tab-content" type="button" role="tab" aria-controls="templates-tab-content" aria-selected="false">Modelos Frequentes</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="antibiotic-tab" data-bs-toggle="tab" data-bs-target="#antibiotic-tab-content" type="button" role="tab" aria-controls="antibiotic-tab-content" aria-selected="false">Antibióticos</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="isotretinoin-tab" data-bs-toggle="tab" data-bs-target="#isotretinoin-tab-content" type="button" role="tab" aria-controls="isotretinoin-tab-content" aria-selected="false">
+                    <i class="fas fa-exclamation-triangle me-1"></i>Isotretinoína
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="drfilipe-tab" data-bs-toggle="tab" data-bs-target="#drfilipe-tab-content" type="button" role="tab" aria-controls="drfilipe-tab-content" aria-selected="false">
+                    <i class="fas fa-prescription me-1"></i>Receitas Dr Filipe
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics-tab-content" type="button" role="tab" aria-controls="analytics-tab-content" aria-selected="false">
+                    <i class="fas fa-chart-bar me-1"></i>Estatísticas
+                </button>
+            </li>
+        </ul>
+        
+        <!-- Tab content -->
+        <div class="tab-content" id="prescriptionTabsContent">
+            <!-- Aba de prescrição personalizada -->
+            <div class="tab-pane fade show active" id="custom-tab-content" role="tabpanel" aria-labelledby="custom-tab">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <form id="prescriptionForm">
+                            <div class="mb-3">
+                                <label for="patientName" class="form-label">Nome do Paciente</label>
+                                <input type="text" class="form-control" id="patientName" placeholder="Nome completo do paciente" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="medicationInput" class="form-label">Adicionar Medicamento</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="medicationInput" placeholder="Digite para buscar medicamentos..." autocomplete="off">
+                                    <button class="btn btn-outline-secondary" type="button" id="clearMedicationInput">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div id="suggestionsList" class="list-group mt-1 d-none"></div>
+                                <small class="form-text text-muted">Digite o nome parcial e aguarde sugestões da IA</small>
+                            </div>
+                            
+                            <!-- Adicionar Medicamento Manualmente -->
+                            <div class="mb-3">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0">Adicionar Medicamento Manualmente</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row g-2">
+                                            <div class="col-md-12 mb-2">
+                                                <input type="text" class="form-control" id="manualMedicationName" placeholder="Nome do medicamento">
+                                            </div>
+                                            <div class="col-md-6 mb-2">
+                                                <select class="form-select" id="manualMedicationType">
+                                                    <option value="">Selecione o tipo</option>
+                                                    <option value="topical">Uso tópico</option>
+                                                    <option value="oral">Uso oral</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6 mb-2">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="manualMedicationInstructions" 
+                                                       placeholder="Ex: Aplicar 1x ao dia / Tomar 1 comprimido por dia">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-12 mb-2">
+                                                <div class="d-grid">
+                                                    <button type="button" class="btn btn-primary" id="addManualMedication">
+                                                        <i class="fas fa-plus me-1"></i> Adicionar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <label class="form-label">Medicamentos Adicionados <small class="text-muted">(máximo 5)</small></label>
+                                    <span id="medicationCount" class="badge bg-primary">0/5</span>
+                                </div>
+                                
+                                <div class="card mb-2">
+                                    <div class="card-header bg-light py-1">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-pills text-primary me-2"></i> Medicamentos de Uso Oral
+                                        </h6>
+                                    </div>
+                                    <ul id="oralMedicationsList" class="list-group list-group-flush">
+                                        <li class="list-group-item text-muted empty-list">Nenhum medicamento oral adicionado</li>
+                                    </ul>
+                                </div>
+                                
+                                <div class="card">
+                                    <div class="card-header bg-light py-1">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-prescription-bottle text-success me-2"></i> Medicamentos de Uso Tópico
+                                        </h6>
+                                    </div>
+                                    <ul id="topicalMedicationsList" class="list-group list-group-flush">
+                                        <li class="list-group-item text-muted empty-list">Nenhum medicamento tópico adicionado</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Botão de Exportação Excel -->
+                            <div class="mb-3">
+                                <div class="card border-success">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-title text-success">
+                                            <i class="fas fa-file-excel me-2"></i>Exportar Base de Medicamentos
+                                        </h6>
+                                        <p class="card-text small text-muted">Baixe um arquivo Excel com todos os medicamentos organizados alfabeticamente e ranking dos mais prescritos</p>
+                                        <button type="button" class="btn btn-success" id="exportMedicationsExcel">
+                                            <i class="fas fa-download me-2"></i>Baixar Excel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-danger w-100" id="clearForm">
+                                    <i class="fas fa-trash-alt me-2"></i>Limpar Formulário
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aba de modelos de receituário -->
+            <div class="tab-pane fade" id="templates-tab-content" role="tabpanel" aria-labelledby="templates-tab">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="templatePatientName" class="form-label">Nome do Paciente</label>
+                            <input type="text" class="form-control" id="templatePatientName" placeholder="Nome completo do paciente" required>
+                        </div>
+                        
+                        <div class="card mb-4">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Pós-Transplante Capilar</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Este modelo contém a prescrição padrão para pacientes pós-transplante capilar.
+                                </div>
+                                
+                                <table class="table table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th width="5%"></th>
+                                            <th>USO TÓPICO</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>1.</td>
+                                            <td><strong>CAPPY</strong></td>
+                                            <td>APLICAR NO COURO CABELUDO 1X/DIA</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                
+                                <table class="table table-bordered mt-4">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th width="5%"></th>
+                                            <th>USO INTERNO</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>2.</td>
+                                            <td><strong>NEOSIL ATTACK</strong></td>
+                                            <td>TOMAR 01 CP VO POR DIA POR 3 MESES</td>
+                                        </tr>
+                                        <tr>
+                                            <td>3.</td>
+                                            <td><strong>MINOXIDIL 2,5MG</strong></td>
+                                            <td>TOMAR 01 CP VO POR DIA</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                
+                                <div class="d-grid gap-2 mt-4">
+                                    <button type="button" class="btn btn-success" id="useTransplantTemplate">
+                                        <i class="fas fa-check-circle me-2"></i>Usar Este Modelo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Aqui podem ser adicionados outros modelos no futuro -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aba de receituário de antibióticos (carbonado) -->
+            <div class="tab-pane fade" id="antibiotic-tab-content" role="tabpanel" aria-labelledby="antibiotic-tab">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Receituário Carbonado:</strong> Esta opção irá gerar uma receita em duas vias na mesma folha A4.
+                        </div>
+                        
+                        <form id="antibioticForm">
+                            <div class="mb-3">
+                                <label for="antibioticPatientName" class="form-label">Nome do Paciente</label>
+                                <input type="text" class="form-control" id="antibioticPatientName" placeholder="Nome completo do paciente" required>
+                            </div>
+                            
+                            <!-- Adicionar Medicamento Orais -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white py-2">
+                                    <h6 class="mb-0">Medicamentos de Uso Oral</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <div class="row g-2">
+                                            <div class="col-md-7 mb-2">
+                                                <input type="text" class="form-control" id="antibioticOralName" placeholder="Nome do medicamento">
+                                            </div>
+                                            <div class="col-md-5 mb-2">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="antibioticOralInstructions" 
+                                                        placeholder="Ex: Tomar 1cp vo de 12/12h por 10d">
+                                                </div>
+                                                <div class="mt-2">
+                                                    <div class="btn-group w-100">
+                                                        <button type="button" class="btn btn-sm btn-outline-primary quick-posology" data-posology="Tomar 1cp vo de 12/12h por 7 dias">12/12h</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary quick-posology" data-posology="Tomar 1cp vo de 8/8h por 7 dias">8/8h</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary quick-posology" data-posology="Tomar 1cp vo uma vez ao dia por 7 dias">1x/dia</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-12 mb-2">
+                                                <div class="d-grid">
+                                                    <button type="button" class="btn btn-primary" id="addAntibioticOral">
+                                                        <i class="fas fa-plus me-1"></i> Adicionar Medicamento Oral
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Lista de medicamentos orais adicionados -->
+                                    <div class="mb-3">
+                                        <div class="card">
+                                            <div class="card-header bg-light py-1">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-pills text-primary me-2"></i> Medicamentos Adicionados
+                                                </h6>
+                                            </div>
+                                            <ul id="antibioticOralList" class="list-group list-group-flush">
+                                                <li class="list-group-item text-muted empty-list">Nenhum medicamento oral adicionado</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Adicionar Medicamento Tópicos -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white py-2">
+                                    <h6 class="mb-0">Medicamentos de Uso Tópico</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <div class="row g-2">
+                                            <div class="col-md-7 mb-2">
+                                                <input type="text" class="form-control" id="antibioticTopicalName" placeholder="Nome do medicamento">
+                                            </div>
+                                            <div class="col-md-5 mb-2">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="antibioticTopicalInstructions" 
+                                                        placeholder="Ex: Aplicar 2x ao dia nas áreas afetadas">
+                                                </div>
+                                                <div class="mt-2">
+                                                    <div class="btn-group w-100">
+                                                        <button type="button" class="btn btn-sm btn-outline-success quick-posology" data-posology="Aplicar no rosto à noite e retirar pela manhã">Noite</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-success quick-posology" data-posology="Aplicar pela manhã antes do protetor solar">Manhã</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-success quick-posology" data-posology="Aplicar nas áreas dos olhos 1-2x/dia">Área dos olhos</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-12 mb-2">
+                                                <div class="d-grid">
+                                                    <button type="button" class="btn btn-success" id="addAntibioticTopical">
+                                                        <i class="fas fa-plus me-1"></i> Adicionar Medicamento Tópico
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Lista de medicamentos tópicos adicionados -->
+                                    <div class="mb-3">
+                                        <div class="card">
+                                            <div class="card-header bg-light py-1">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-prescription-bottle text-success me-2"></i> Medicamentos Adicionados
+                                                </h6>
+                                            </div>
+                                            <ul id="antibioticTopicalList" class="list-group list-group-flush">
+                                                <li class="list-group-item text-muted empty-list">Nenhum medicamento tópico adicionado</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-primary" id="generateAntibioticPrescription">
+                                    <i class="fas fa-file-medical me-2"></i>Gerar Receituário Carbonado
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aba de Isotretinoína -->
+            <div class="tab-pane fade" id="isotretinoin-tab-content" role="tabpanel" aria-labelledby="isotretinoin-tab">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Atenção:</strong> Receituário de controle especial para Isotretinoína (Medicamento de Alto Risco).
+                        </div>
+                        
+                        <form id="isotretinoinForm">
+                            <div class="mb-3">
+                                <label for="isotretinoinPatientName" class="form-label">Nome do Paciente</label>
+                                <input type="text" class="form-control" id="isotretinoinPatientName" placeholder="Nome completo do paciente" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="isotretinoinDosage" class="form-label">Dosagem</label>
+                                <select class="form-select" id="isotretinoinDosage">
+                                    <option value="10mg">10mg</option>
+                                    <option value="20mg" selected>20mg</option>
+                                    <option value="40mg">40mg</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="isotretinoinInstructions" class="form-label">Posologia</label>
+                                <input type="text" class="form-control" id="isotretinoinInstructions" 
+                                       value="tomar 02 cp vo por 30 dias na hora do almoço">
+                                <div class="mt-2">
+                                    <div class="btn-group w-100">
+                                        <button type="button" class="btn btn-sm btn-outline-danger quick-posology" 
+                                                data-posology="tomar 01 cp vo por 30 dias na hora do almoço">1 cp/dia</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger quick-posology" 
+                                                data-posology="tomar 02 cp vo por 30 dias na hora do almoço">2 cp/dia</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger quick-posology" 
+                                                data-posology="tomar 01 cp vo pela manhã e 01 cp vo à noite por 30 dias">2x/dia</button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-danger" id="generateIsotretinoinPrescription">
+                                    <i class="fas fa-file-medical me-2"></i>Gerar Receituário Isotretinoína
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aba de Receitas Dr Filipe -->
+            <div class="tab-pane fade" id="drfilipe-tab-content" role="tabpanel" aria-labelledby="drfilipe-tab">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Formato Especial:</strong> Receita dividida em duas partes idênticas para corte.
+                        </div>
+                        
+                        <form id="drFilipeForm">
+                            <div class="mb-3">
+                                <label for="drFilipePatientName" class="form-label">Nome do Paciente</label>
+                                <input type="text" class="form-control" id="drFilipePatientName" placeholder="Nome completo do paciente" required>
+                            </div>
+                            
+                            <!-- Medicamentos Orais -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white py-2">
+                                    <h6 class="mb-0">Medicamentos de Uso Oral</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <div class="row g-2">
+                                            <div class="col-md-7 mb-2">
+                                                <select class="form-select" id="drFilipeOralName">
+                                                    <option value="">Selecione um medicamento</option>
+                                                    <option value="Cefadroxil 500 mg">Cefadroxil 500 mg</option>
+                                                    <option value="Ciprofloxacina 500mg">Ciprofloxacina 500mg</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-5 mb-2">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="drFilipeOralInstructions" 
+                                                        placeholder="Ex: Tomar 1cp vo de 12/12h por 7 dias">
+                                                </div>
+                                                <div class="mt-2">
+                                                    <div class="btn-group w-100">
+                                                        <button type="button" class="btn btn-sm btn-outline-primary drfilipe-quick-posology-oral" data-med="Cefadroxil 500 mg" data-posology="Tomar 1 cp vo 12/12horas por 7 dias">Cefadroxil</button>
+                                                        <button type="button" class="btn btn-sm btn-outline-primary drfilipe-quick-posology-oral" data-med="Ciprofloxacina 500mg" data-posology="Tomar 1 cp vo 12/12 horas por 7 dias">Ciprofloxacina</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-12 mb-2">
+                                                <div class="d-grid">
+                                                    <button type="button" class="btn btn-primary" id="addDrFilipeOral">
+                                                        <i class="fas fa-plus me-1"></i> Adicionar Medicamento Oral
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Lista de medicamentos orais adicionados -->
+                                    <div class="mb-3">
+                                        <div class="card">
+                                            <div class="card-header bg-light py-1">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-pills text-primary me-2"></i> Medicamentos Adicionados
+                                                </h6>
+                                            </div>
+                                            <ul id="drFilipeOralList" class="list-group list-group-flush">
+                                                <li class="list-group-item text-muted empty-list">Nenhum medicamento oral adicionado</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Medicamentos Tópicos -->
+                            <div class="card mb-4">
+                                <div class="card-header bg-success text-white py-2">
+                                    <h6 class="mb-0">Medicamentos de Uso Tópico</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <div class="row g-2">
+                                            <div class="col-md-7 mb-2">
+                                                <select class="form-select" id="drFilipeTopicalName">
+                                                    <option value="">Selecione um medicamento</option>
+                                                    <option value="Rifocina spray">Rifocina spray</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-5 mb-2">
+                                                <div class="input-group">
+                                                    <input type="text" class="form-control" id="drFilipeTopicalInstructions" 
+                                                        placeholder="Ex: Aplicar 2x ao dia">
+                                                </div>
+                                                <div class="mt-2">
+                                                    <div class="btn-group w-100">
+                                                        <button type="button" class="btn btn-sm btn-outline-success drfilipe-quick-posology-topical" data-med="Rifocina spray" data-posology="Aplicar no local indicado 2x/dia por 7 dias">Rifocina</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-12 mb-2">
+                                                <div class="d-grid">
+                                                    <button type="button" class="btn btn-success" id="addDrFilipeTopical">
+                                                        <i class="fas fa-plus me-1"></i> Adicionar Medicamento Tópico
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Lista de medicamentos tópicos adicionados -->
+                                    <div class="mb-3">
+                                        <div class="card">
+                                            <div class="card-header bg-light py-1">
+                                                <h6 class="mb-0">
+                                                    <i class="fas fa-prescription-bottle text-success me-2"></i> Medicamentos Adicionados
+                                                </h6>
+                                            </div>
+                                            <ul id="drFilipeTopicalList" class="list-group list-group-flush">
+                                                <li class="list-group-item text-muted empty-list">Nenhum medicamento tópico adicionado</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-primary" id="generateDrFilipePrescription">
+                                    <i class="fas fa-file-medical me-2"></i>Gerar Receita Dr Filipe
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aba de Estatísticas -->
+            <div class="tab-pane fade" id="analytics-tab-content" role="tabpanel" aria-labelledby="analytics-tab">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-primary">
+                                    <div class="card-header bg-primary text-white">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-trophy me-2"></i>Top 10 Mais Prescritos
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="topMedicationsList" class="list-group list-group-flush">
+                                            <div class="list-group-item d-flex justify-content-center">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">Carregando...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="card border-info">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-chart-pie me-2"></i>Estatísticas Gerais
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="generalStats">
+                                            <div class="d-flex justify-content-center">
+                                                <div class="spinner-border text-info" role="status">
+                                                    <span class="visually-hidden">Carregando...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="card border-success mt-3">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-cogs me-2"></i>Gerenciar Dados
+                                        </h6>
+                                    </div>
+                                    <div class="card-body text-center">
+                                        <p class="card-text small">Exporte relatórios ou limpe dados de prescrições</p>
+                                        <div class="d-grid gap-2">
+                                            <button type="button" class="btn btn-success" id="exportMedicationsExcelFromStats">
+                                                <i class="fas fa-download me-2"></i>Baixar Excel
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger" id="clearPrescriptionData">
+                                                <i class="fas fa-trash-alt me-2"></i>Limpar Dados de Prescrições
+                                            </button>
+                                        </div>
+                                        <small class="text-muted d-block mt-2">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Limpar dados remove apenas o histórico de prescrições, mantendo os medicamentos
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card border-warning">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-history me-2"></i>Últimas Prescrições
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="recentPrescriptions">
+                                            <div class="d-flex justify-content-center">
+                                                <div class="spinner-border text-warning" role="status">
+                                                    <span class="visually-hidden">Carregando...</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm print-container">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h3 class="h5 mb-0">Visualização da Prescrição</h3>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-primary" id="generatePrescription">
+                        <i class="fas fa-file-medical me-2"></i>Gerar Prescrição
+                    </button>
+                    <button id="copyPrescription" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-copy me-1"></i>Copiar
+                    </button>
+                    <button id="printPrescription" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-print me-1"></i>Imprimir
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Container para prescrição padrão -->
+                <div id="prescriptionPreview" class="prescription-preview">
+                    <div class="prescription-content">
+                        <!-- Espaço extra para o cabeçalho da folha timbrada -->
+                        <div class="letterhead-space"></div>
+                        
+                        <!-- Espaço adicional para baixar o título "PRESCRIÇÃO" -->
+                        <div class="prescription-title-spacing">
+                            <br><br><br>
+                        </div>
+                        
+                        <h4 class="prescription-title text-center mb-3">🧾 PRESCRIÇÃO MÉDICA</h4>
+                        
+                        <div class="patient-info mb-4">
+                            <p><strong>Paciente:</strong> <span id="previewPatientName">______________________</span></p>
+                        </div>
+                        
+                        <div id="previewOralMedications" class="medication-section mb-4 d-none">
+                            <h5 class="medication-title">
+                                <i class="fas fa-pills text-primary me-2"></i>Uso Oral
+                            </h5>
+                            <ul class="medication-list"></ul>
+                        </div>
+                        
+                        <div id="previewTopicalMedications" class="medication-section mb-4 d-none">
+                            <h5 class="medication-title">
+                                <i class="fas fa-prescription-bottle text-success me-2"></i>Uso Tópico
+                            </h5>
+                            <ul class="medication-list"></ul>
+                        </div>
+                        
+                        <div class="prescription-footer">
+                            <div class="row mt-5 pt-5">
+                                <div class="col-6">
+                                    <div class="signature-with-logo">
+                                        <img src="{{ url_for('static', filename='images/sbd_logo_real.png') }}" alt="Logo SBD" class="doctor-logo">
+                                        <div class="doctor-info">
+                                            <p class="mb-0 fw-bold">Dr. Arthur Basile</p>
+                                            <p class="mb-0">CRM 125.217</p>
+                                            <p class="mb-0">Dermatologista</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="date-line text-end">
+                                        Data: ___/___/______
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="clinic-info text-center mt-4">
+                                <p class="mb-0">Clínica Basile – Av. Prof. João Fiúsa, 2300 – Ribeirão Preto – SP</p>
+                                <p class="mb-0">www.clinicabasile.com.br | Fone/Fax: (16) 3602-7785</p>
+                                <div class="instagram-container mt-2">
+                                    <img src="{{ url_for('static', filename='images/instagram-icon.svg') }}" alt="Instagram" class="instagram-icon">
+                                    <span class="instagram-handle">Siga-nos no Instagram: @clinicabasilemed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Container para receituário de isotretinoína -->
+                <div id="isotretinoinPreview" class="antibiotic-preview d-none">
+                    <!-- Primeira via do receituário -->
+                    <div class="antibiotic-prescription first-copy">
+                        <div class="basile-header">
+                            <div class="logo-container">
+                                <img src="{{ url_for('static', filename='images/basile_logo.png') }}" alt="Basile Logo" class="basile-logo-img">
+                            </div>
+                            <div class="dermatologia-text">DERMATOLOGIA</div>
+                        </div>
+                        
+                        <div class="antibiotic-content">
+                            <p class="mb-2"><strong>Nome:</strong> <span id="isotretinoinPatientNameDisplay">_____________________________</span></p>
+                            <p class="mb-2"><strong>Uso Interno</strong></p>
+                            <div class="antibiotic-item">
+                                <div class="antibiotic-number">1.</div>
+                                <div class="antibiotic-details">
+                                    <p class="antibiotic-name" id="isotretinoinNameDisplay">isotretinoína 20mg</p>
+                                    <p class="antibiotic-instructions" id="isotretinoinInstructionsDisplay">tomar 02 cp vo por 30 dias na hora do almoço</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="antibiotic-footer">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="signature-with-logo">
+                                        <img src="{{ url_for('static', filename='images/sbd_logo_real.png') }}" alt="Logo SBD" class="doctor-logo">
+                                        <div class="doctor-info">
+                                            <p class="mb-0 fw-bold">Dr. Arthur Basile</p>
+                                            <p class="mb-0">CRM 125.217</p>
+                                            <p class="mb-0">Dermatologista</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="date-line text-end">
+                                        Data: ___/___/______
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="clinic-info text-center mt-2">
+                                <p class="mb-0">Especialista em dermatologia SBD</p>
+                                <p class="mb-0">Av. Prof. João Fiúsa, 2300, Ribeirão Preto, SP, Brasil</p>
+                                <p class="mb-0">www.clinicabasile.com.br | Fone/Fax: (16) 3602-7785</p>
+                                <div class="instagram-container mt-1">
+                                    <img src="{{ url_for('static', filename='images/instagram-icon.svg') }}" alt="Instagram" class="instagram-icon">
+                                    <span class="instagram-handle">Siga-nos no Instagram: @clinicabasilemed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Linha de corte entre as duas vias -->
+                    <div class="cut-line">
+                        <div class="scissors-icon"><i class="fas fa-cut"></i></div>
+                        <div class="dashed-line"></div>
+                    </div>
+                    
+                    <!-- Segunda via do receituário (cópia) -->
+                    <div class="antibiotic-prescription second-copy">
+                        <div class="basile-header">
+                            <div class="logo-container">
+                                <img src="{{ url_for('static', filename='images/basile_logo.png') }}" alt="Basile Logo" class="basile-logo-img">
+                            </div>
+                            <div class="dermatologia-text">DERMATOLOGIA</div>
+                        </div>
+                        
+                        <div class="antibiotic-content">
+                            <p class="mb-2"><strong>Nome:</strong> <span id="isotretinoinPatientNameDisplay2">_____________________________</span></p>
+                            <p class="mb-2"><strong>Uso Interno</strong></p>
+                            <div class="antibiotic-item">
+                                <div class="antibiotic-number">1.</div>
+                                <div class="antibiotic-details">
+                                    <p class="antibiotic-name" id="isotretinoinNameDisplay2">isotretinoína 20mg</p>
+                                    <p class="antibiotic-instructions" id="isotretinoinInstructionsDisplay2">tomar 02 cp vo por 30 dias na hora do almoço</p>
+                                </div>
+                            </div>
+                            
+
+                        </div>
+                        
+                        <div class="antibiotic-footer">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="signature-with-logo">
+                                        <img src="{{ url_for('static', filename='images/sbd_logo_real.png') }}" alt="Logo SBD" class="doctor-logo">
+                                        <div class="doctor-info">
+                                            <p class="mb-0 fw-bold">Dr. Arthur Basile</p>
+                                            <p class="mb-0">CRM 125.217</p>
+                                            <p class="mb-0">Dermatologista</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="date-line text-end">
+                                        Data: ___/___/______
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="clinic-info text-center mt-2">
+                                <p class="mb-0">Especialista em dermatologia SBD</p>
+                                <p class="mb-0">Av. Prof. João Fiúsa, 2300, Ribeirão Preto, SP, Brasil</p>
+                                <p class="mb-0">www.clinicabasile.com.br | Fone/Fax: (16) 3602-7785</p>
+                                <div class="instagram-container mt-1">
+                                    <img src="{{ url_for('static', filename='images/instagram-icon.svg') }}" alt="Instagram" class="instagram-icon">
+                                    <span class="instagram-handle">Siga-nos no Instagram: @clinicabasilemed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Container para receituário de antibióticos (carbonado) -->
+                <div id="antibioticPreview" class="antibiotic-preview d-none">
+                    <!-- Primeira via do receituário -->
+                    <div class="antibiotic-prescription first-copy">
+                        <div class="basile-header">
+                            <div class="logo-container">
+                                <img src="{{ url_for('static', filename='images/basile_logo.png') }}" alt="Basile Logo" class="basile-logo-img">
+                            </div>
+                            <div class="dermatologia-text">DERMATOLOGIA</div>
+                        </div>
+                        
+                        <div class="antibiotic-content">
+                            <p class="mb-2"><strong>Nome:</strong> <span id="antibioticPatientNameDisplay">_____________________________</span></p>
+                            
+                            <!-- Medicamentos Orais -->
+                            <div id="antibioticPreviewOral" class="mb-4">
+                                <p class="mb-2"><strong>Uso Oral</strong></p>
+                                <div id="antibioticOralItemsPreview" class="antibiotic-items-list">
+                                    <!-- Lista gerada dinamicamente -->
+                                    <div class="antibiotic-item">
+                                        <div class="antibiotic-number">1.</div>
+                                        <div class="antibiotic-details">
+                                            <p class="antibiotic-name text-muted">Nenhum medicamento oral adicionado</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Medicamentos Tópicos -->
+                            <div id="antibioticPreviewTopical" class="mb-4">
+                                <p class="mb-2"><strong>Uso Tópico</strong></p>
+                                <div id="antibioticTopicalItemsPreview" class="antibiotic-items-list">
+                                    <!-- Lista gerada dinamicamente -->
+                                    <div class="antibiotic-item">
+                                        <div class="antibiotic-number">1.</div>
+                                        <div class="antibiotic-details">
+                                            <p class="antibiotic-name text-muted">Nenhum medicamento tópico adicionado</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="antibiotic-footer">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="signature-with-logo">
+                                        <img src="{{ url_for('static', filename='images/sbd_logo_real.png') }}" alt="Logo SBD" class="doctor-logo">
+                                        <div class="doctor-info">
+                                            <p class="mb-0 fw-bold">Dr. Arthur Basile</p>
+                                            <p class="mb-0">CRM 125.217</p>
+                                            <p class="mb-0">Dermatologista</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="date-line text-end">
+                                        Data: ___/___/______
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="clinic-info text-center mt-2">
+                                <p class="mb-0">Especialista em dermatologia SBD</p>
+                                <p class="mb-0">Av. Prof. João Fiúsa, 2300, Ribeirão Preto, SP, Brasil</p>
+                                <p class="mb-0">www.clinicabasile.com.br | Fone/Fax: (16) 3602-7785</p>
+                                <div class="instagram-container mt-1">
+                                    <img src="{{ url_for('static', filename='images/instagram-icon.svg') }}" alt="Instagram" class="instagram-icon">
+                                    <span class="instagram-handle">Siga-nos no Instagram: @clinicabasilemed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Linha de corte entre as duas vias -->
+                    <div class="cut-line">
+                        <div class="scissors-icon"><i class="fas fa-cut"></i></div>
+                        <div class="dashed-line"></div>
+                    </div>
+                    
+                    <!-- Segunda via do receituário (cópia) -->
+                    <div class="antibiotic-prescription second-copy">
+                        <div class="basile-header">
+                            <div class="logo-container">
+                                <img src="{{ url_for('static', filename='images/basile_logo.png') }}" alt="Basile Logo" class="basile-logo-img">
+                            </div>
+                            <div class="dermatologia-text">DERMATOLOGIA</div>
+                        </div>
+                        
+                        <div class="antibiotic-content">
+                            <p class="mb-2"><strong>Nome:</strong> <span id="antibioticPatientNameDisplay2">_____________________________</span></p>
+                            
+                            <!-- Medicamentos Orais (Cópia) -->
+                            <div id="antibioticPreviewOral2" class="mb-4">
+                                <p class="mb-2"><strong>Uso Oral</strong></p>
+                                <div id="antibioticOralItemsPreview2" class="antibiotic-items-list">
+                                    <!-- Lista gerada dinamicamente -->
+                                    <div class="antibiotic-item">
+                                        <div class="antibiotic-number">1.</div>
+                                        <div class="antibiotic-details">
+                                            <p class="antibiotic-name text-muted">Nenhum medicamento oral adicionado</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Medicamentos Tópicos (Cópia) -->
+                            <div id="antibioticPreviewTopical2" class="mb-4">
+                                <p class="mb-2"><strong>Uso Tópico</strong></p>
+                                <div id="antibioticTopicalItemsPreview2" class="antibiotic-items-list">
+                                    <!-- Lista gerada dinamicamente -->
+                                    <div class="antibiotic-item">
+                                        <div class="antibiotic-number">1.</div>
+                                        <div class="antibiotic-details">
+                                            <p class="antibiotic-name text-muted">Nenhum medicamento tópico adicionado</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="antibiotic-footer">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="signature-with-logo">
+                                        <img src="{{ url_for('static', filename='images/sbd_logo_real.png') }}" alt="Logo SBD" class="doctor-logo">
+                                        <div class="doctor-info">
+                                            <p class="mb-0 fw-bold">Dr. Arthur Basile</p>
+                                            <p class="mb-0">CRM 125.217</p>
+                                            <p class="mb-0">Dermatologista</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="date-line text-end">
+                                        Data: ___/___/______
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="clinic-info text-center mt-2">
+                                <p class="mb-0">Especialista em dermatologia SBD</p>
+                                <p class="mb-0">Av. Prof. João Fiúsa, 2300, Ribeirão Preto, SP, Brasil</p>
+                                <p class="mb-0">www.clinicabasile.com.br | Fone/Fax: (16) 3602-7785</p>
+                                <div class="instagram-container mt-1">
+                                    <img src="{{ url_for('static', filename='images/instagram-icon.svg') }}" alt="Instagram" class="instagram-icon">
+                                    <span class="instagram-handle">Siga-nos no Instagram: @clinicabasilemed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Container para receita Dr Filipe -->
+                <div id="drFilipePreview" class="drfilipe-preview d-none">
+                    <!-- Primeira metade -->
+                    <div class="drfilipe-half first-half">
+                        <div class="drfilipe-header">
+                            <div class="logo-container">
+                                <img src="{{ url_for('static', filename='images/basile_logo.png') }}" alt="Basile Logo" class="basile-logo-img">
+                            </div>
+                        </div>
+                        
+                        <h5 class="text-center mb-3">PRESCRIÇÃO MÉDICA</h5>
+                        
+                        <div class="drfilipe-content">
+                            <p class="mb-3"><strong>Paciente:</strong> <span id="drFilipePatientNameDisplay">_____________________________</span></p>
+                            
+                            <!-- Medicamentos Orais -->
+                            <div id="drFilipePreviewOral" class="mb-3">
+                                <p class="mb-2"><strong>Uso Oral</strong></p>
+                                <div id="drFilipeOralItemsPreview" class="drfilipe-items-list">
+                                </div>
+                            </div>
+                            
+                            <!-- Medicamentos Tópicos -->
+                            <div id="drFilipePreviewTopical" class="mb-3">
+                                <p class="mb-2"><strong>Uso Tópico</strong></p>
+                                <div id="drFilipeTopicalItemsPreview" class="drfilipe-items-list">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="drfilipe-footer">
+                            <div class="signature-section">
+                                <div class="signature-line"></div>
+                                <div class="doctor-signature">
+                                    <p class="mb-0">Dr. Filipe Basile</p>
+                                    <p class="mb-0">CRM: 108931</p>
+                                </div>
+                            </div>
+                            <div class="date-section">
+                                <p class="mb-0">Data: ___/___/______</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Linha de corte -->
+                    <div class="drfilipe-cut-line">
+                        <div class="scissors-icon"><i class="fas fa-cut"></i></div>
+                        <div class="dashed-line"></div>
+                    </div>
+                    
+                    <!-- Segunda metade (idêntica) -->
+                    <div class="drfilipe-half second-half">
+                        <div class="drfilipe-header">
+                            <div class="logo-container">
+                                <img src="{{ url_for('static', filename='images/basile_logo.png') }}" alt="Basile Logo" class="basile-logo-img">
+                            </div>
+                        </div>
+                        
+                        <h5 class="text-center mb-3">PRESCRIÇÃO MÉDICA</h5>
+                        
+                        <div class="drfilipe-content">
+                            <p class="mb-3"><strong>Paciente:</strong> <span id="drFilipePatientNameDisplay2">_____________________________</span></p>
+                            
+                            <!-- Medicamentos Orais (Cópia) -->
+                            <div id="drFilipePreviewOral2" class="mb-3">
+                                <p class="mb-2"><strong>Uso Oral</strong></p>
+                                <div id="drFilipeOralItemsPreview2" class="drfilipe-items-list">
+                                </div>
+                            </div>
+                            
+                            <!-- Medicamentos Tópicos (Cópia) -->
+                            <div id="drFilipePreviewTopical2" class="mb-3">
+                                <p class="mb-2"><strong>Uso Tópico</strong></p>
+                                <div id="drFilipeTopicalItemsPreview2" class="drfilipe-items-list">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="drfilipe-footer">
+                            <div class="signature-section">
+                                <div class="signature-line"></div>
+                                <div class="doctor-signature">
+                                    <p class="mb-0">Dr. Filipe Basile</p>
+                                    <p class="mb-0">CRM: 108931</p>
+                                </div>
+                            </div>
+                            <div class="date-section">
+                                <p class="mb-0">Data: ___/___/______</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Copy Confirmation Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="copyToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto">Notificação</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            Prescrição copiada para a área de transferência!
+        </div>
+    </div>
+</div>
+
+<!-- Save Medication Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11; margin-bottom: 70px;">
+    <div id="saveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header bg-success text-white">
+            <strong class="me-auto">Banco de Dados</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="saveToastMessage">
+            Medicamento adicionado ao banco de dados para uso futuro.
+        </div>
+    </div>
+</div>
+{% endblock %}

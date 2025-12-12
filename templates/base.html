@@ -49,6 +49,11 @@
                     </li>
                     {% if current_user.is_doctor() %}
                     <li class="nav-item">
+                        <a class="nav-link {% if 'dermascribe' in request.endpoint %}active{% endif %}" href="{{ url_for('dermascribe.index') }}">
+                            <i class="bi bi-prescription2"></i> DermaScribe
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'settings.index' %}active{% endif %}" href="{{ url_for('settings.index') }}">
                             <i class="bi bi-gear"></i> Configurações
                         </a>

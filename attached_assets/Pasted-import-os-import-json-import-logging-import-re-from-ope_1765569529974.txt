@@ -1,0 +1,187 @@
+import os
+import json
+import logging
+import re
+from openai import OpenAI
+
+# the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+# do not change this unless explicitly requested by the user
+MODEL = "gpt-4o"
+
+# Initialize OpenAI client
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+# Fallback database of common dermatological medications
+MEDICATIONS_DB = [
+    {
+        "medication": "Tretinoína 0,025% creme",
+        "type": "topical",
+        "instructions": "Aplicar uma fina camada à noite sobre a pele limpa e seca"
+    },
+    {
+        "medication": "Tretinoína 0,05% creme",
+        "type": "topical",
+        "instructions": "Aplicar uma fina camada à noite sobre a pele limpa e seca"
+    },
+    {
+        "medication": "Adapaleno 0,1% gel",
+        "type": "topical",
+        "instructions": "Aplicar uma fina camada à noite sobre a pele limpa e seca"
+    },
+    {
+        "medication": "Cetoconazol 2% creme",
+        "type": "topical",
+        "instructions": "Aplicar na área afetada 1 vez ao dia por 2-4 semanas"
+    },
+    {
+        "medication": "Dipropionato de Betametasona 0,05% pomada",
+        "type": "topical",
+        "instructions": "Aplicar uma fina camada 1-2 vezes ao dia nas áreas afetadas"
+    },
+    {
+        "medication": "Clindamicina 1% solução tópica",
+        "type": "topical",
+        "instructions": "Aplicar 2 vezes ao dia nas áreas afetadas"
+    },
+    {
+        "medication": "Metronidazol 0,75% gel",
+        "type": "topical",
+        "instructions": "Aplicar uma camada fina nas áreas afetadas 2 vezes ao dia"
+    },
+    {
+        "medication": "Peróxido de Benzoíla 5% gel",
+        "type": "topical",
+        "instructions": "Aplicar uma fina camada nas áreas afetadas 1 vez ao dia"
+    },
+    {
+        "medication": "Ácido Salicílico 2% loção",
+        "type": "topical",
+        "instructions": "Aplicar nas áreas afetadas 1-2 vezes ao dia"
+    },
+    {
+        "medication": "Isotretinoína 20mg cápsulas",
+        "type": "oral",
+        "instructions": "Tomar 1 cápsula por dia com alimento por 15-20 semanas"
+    },
+    {
+        "medication": "Isotretinoína 10mg cápsulas",
+        "type": "oral",
+        "instructions": "Tomar 1 cápsula por dia com alimento por 15-20 semanas"
+    },
+    {
+        "medication": "Doxiciclina 100mg comprimidos",
+        "type": "oral",
+        "instructions": "Tomar 1 comprimido a cada 12 horas por 14 dias"
+    },
+    {
+        "medication": "Fluconazol 150mg comprimidos",
+        "type": "oral",
+        "instructions": "Tomar 1 comprimido por semana por 2-4 semanas"
+    },
+    {
+        "medication": "Minoxidil 5% solução capilar",
+        "type": "topical",
+        "instructions": "Aplicar 1mL na área afetada do couro cabeludo 2 vezes ao dia"
+    },
+    {
+        "medication": "Tacrolimo 0,1% pomada",
+        "type": "topical",
+        "instructions": "Aplicar uma fina camada nas áreas afetadas 2 vezes ao dia"
+    },
+    {
+        "medication": "Hidroquinona 4% creme",
+        "type": "topical",
+        "instructions": "Aplicar uma fina camada nas manchas 2 vezes ao dia"
+    },
+    {
+        "medication": "Prednisolona 20mg comprimidos",
+        "type": "oral",
+        "instructions": "Tomar conforme prescrito, com redução gradual da dose"
+    },
+    {
+        "medication": "Azitromicina 500mg comprimidos",
+        "type": "oral",
+        "instructions": "Tomar 1 comprimido por dia durante 3 dias"
+    }
+]
+
+def suggest_medications(partial_input):
+    """
+    Get medication suggestions based on partial input using the OpenAI API
+    If the API fails, fall back to local database
+    
+    Args:
+        partial_input (str): The partial medication input from the user
+        
+    Returns:
+        list: A list of suggested medications with their classifications
+    """
+    logging.debug(f"Generating suggestions for: {partial_input}")
+    
+    try:
+        # Try using OpenAI API first
+        if OPENAI_API_KEY:
+            try:
+                # Create a prompt for the OpenAI API
+                prompt = f"""
+                I am a dermatologist creating a prescription. Based on the partial input "{partial_input}", 
+                suggest up to 5 potential dermatological medications or formulations.
+                
+                For each suggestion, classify it as either "topical" (creams, gels, ointments) or "oral" (pills, tablets, capsules).
+                
+                Return your response as a JSON array of objects with the following format:
+                [
+                    {{
+                        "medication": "Full medication name with strength and form",
+                        "type": "topical or oral",
+                        "instructions": "Brief usage instructions"
+                    }}
+                ]
+                
+                Only include dermatological medications that are commonly prescribed. Make sure the suggestions are complete and accurate.
+                """
+                
+                # Call the OpenAI API
+                response = client.chat.completions.create(
+                    model=MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    temperature=0.3,
+                    max_tokens=500
+                )
+                
+                # Parse the response
+                content = response.choices[0].message.content
+                logging.debug(f"OpenAI response: {content}")
+                
+                result = json.loads(content)
+                
+                # Return the suggestions
+                if "suggestions" in result:
+                    return result["suggestions"]
+                else:
+                    return result
+                    
+            except Exception as e:
+                logging.error(f"Error in OpenAI API call: {str(e)}")
+                # Continue to fallback if OpenAI fails
+        
+        # Fallback to local database
+        logging.info("Using fallback medication database for suggestions")
+        
+        # Convert to lowercase for case-insensitive matching
+        partial_lower = partial_input.lower()
+        
+        # Filter medications that match the partial input
+        suggestions = [
+            med for med in MEDICATIONS_DB 
+            if partial_lower in med["medication"].lower()
+        ]
+        
+        # Limit to 5 suggestions
+        return suggestions[:5]
+            
+    except Exception as e:
+        logging.error(f"Error while generating suggestions: {str(e)}")
+        return [{"error": f"Failed to get suggestions: {str(e)}"}]

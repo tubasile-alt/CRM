@@ -3,6 +3,12 @@ let timerStartTime = null;
 let recognition = null;
 let activeTextarea = null;
 
+window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'prescription_saved') {
+        showAlert('Receita salva com sucesso no prontuário!', 'success');
+    }
+});
+
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
@@ -1585,19 +1591,16 @@ function abrirDermaScribe() {
                         document.querySelector('.patient-name')?.textContent?.trim() || '';
     const cleanName = patientName.replace(/\s*\(\d+\s*anos?\)/gi, '').trim();
     const encodedName = encodeURIComponent(cleanName);
-    const dermaScribeUrl = `https://receitabasile.replit.app?patient=${encodedName}&callback=${encodeURIComponent(window.location.origin)}`;
+    const currentPatientId = window.patientId || patientId;
+    const dermaScribeUrl = `/dermascribe/?patient=${encodedName}&patient_id=${currentPatientId}`;
     
     window.dermaScribeWindow = window.open(dermaScribeUrl, 'DermaScribe', 'width=1200,height=900,scrollbars=yes,resizable=yes');
-    
-    window.addEventListener('message', handleDermaScribeMessage, false);
 }
 
 function handleDermaScribeMessage(event) {
-    if (event.origin !== 'https://receitabasile.replit.app') return;
-    
     const data = event.data;
-    if (data.type === 'prescription_saved') {
-        savePrescriptionToConduta(data.prescription);
+    if (data && data.type === 'prescription_saved') {
+        showAlert('Receita salva com sucesso no prontuário!', 'success');
     }
 }
 

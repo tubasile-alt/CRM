@@ -1,0 +1,79 @@
+from app import db
+from sqlalchemy.sql import func
+from datetime import datetime
+import pytz
+
+
+class MedicationUsage(db.Model):
+    """Modelo para rastrear quantas vezes cada medicamento foi prescrito"""
+    __tablename__ = 'medication_usage'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    medication_id = db.Column(db.Integer, db.ForeignKey('medications.id'), nullable=False)
+    prescribed_at = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('America/Sao_Paulo')))
+    
+    # Relacionamento com o medicamento
+    medication = db.relationship('Medication', backref='usage_records')
+
+
+class Medication(db.Model):
+    __tablename__ = 'medications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    purpose = db.Column(db.Text)
+    type = db.Column(db.String(50), nullable=False)  # 'topical' or 'oral'
+    brand = db.Column(db.String(100))
+    instructions = db.Column(db.Text)  # Armazenar a posologia personalizada
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('America/Sao_Paulo')))
+    
+    def __repr__(self):
+        return f'<Medication {self.name}>'
+    
+    def to_dict(self):
+        """
+        Converte o objeto para dicionário, ajustando para o formato
+        esperado pelo frontend.
+        """
+        return {
+            # Formato esperado pelo frontend: campo 'medication' em vez de 'name'
+            'medication': self.name,
+            'purpose': self.purpose,
+            'type': self.type.lower(),
+            'brand': self.brand,
+            'instructions': self.instructions if self.instructions else self.get_default_instructions()
+        }
+    
+    def get_default_instructions(self):
+        """
+        Gera instruções padrão com base no tipo e propósito do medicamento,
+        quando não existem instruções personalizadas salvas.
+        """
+        # Instruções personalizadas com base no tipo e propósito
+        if self.type.lower() == 'topical':
+            if self.purpose and 'acne' in self.purpose.lower():
+                return "Aplicar uma fina camada nas áreas afetadas 1-2 vezes ao dia"
+            elif self.purpose and ('proteção solar' in self.purpose.lower() or 'fps' in self.purpose.lower()):
+                return "Aplicar generosamente 20 minutos antes da exposição solar e reaplicar a cada 2 horas"
+            elif self.purpose and ('clareamento' in self.purpose.lower() or 'mancha' in self.purpose.lower()):
+                return "Aplicar uma fina camada nas áreas com manchas 1-2 vezes ao dia"
+            elif self.purpose and 'hidratação' in self.purpose.lower():
+                return "Aplicar sobre a pele limpa e seca 1-2 vezes ao dia"
+            else:
+                return "Aplicar uma fina camada na área afetada 1-2 vezes ao dia"
+        else:
+            return "Tomar conforme orientação médica"
+    
+    def get_prescription_count(self):
+        """Retorna o número de vezes que este medicamento foi prescrito"""
+        return len(self.usage_records)
+    
+    @classmethod
+    def get_top_prescribed(cls, limit=10):
+        """Retorna os medicamentos mais prescritos"""
+        from sqlalchemy import func
+        return db.session.query(cls, func.count(MedicationUsage.id).label('prescription_count'))\
+                .outerjoin(MedicationUsage)\
+                .group_by(cls.id)\
+                .order_by(func.count(MedicationUsage.id).desc())\
+                .limit(limit).all()

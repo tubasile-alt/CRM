@@ -1,0 +1,85 @@
+Produto,Finalidade,Tipo de Uso,Marca
+Anti-Pigment Dual Sérum,Clareamento de manchas e uniformização do tom da pele,Tópico,Eucerin
+Anti-Pigment Creme Facial Dia FPS 30,Redução de hiperpigmentação com proteção solar,Tópico,Eucerin
+Anti-Pigment Creme Facial Noite,Clareamento de manchas durante a noite,Tópico,Eucerin
+Anti-Pigment Creme para Mãos,Clareamento de manchas nas mãos,Tópico,Eucerin
+Anti-Pigment Creme Corporal para Áreas Específicas,Clareamento de manchas em áreas específicas do corpo,Tópico,Eucerin
+Anti-Pigment Creme Anti-Olheiras,Clareamento de olheiras,Tópico,Eucerin
+Hyaluron-Filler Creme Facial Dia FPS 30,Preenchimento de rugas e proteção solar,Tópico,Eucerin
+Hyaluron-Filler Creme Facial Noite,Preenchimento de rugas durante a noite,Tópico,Eucerin
+Hyaluron-Filler Creme para Contorno de Olhos FPS 15,Redução de rugas ao redor dos olhos,Tópico,Eucerin
+Hyaluron-Filler Elasticity Creme Facial Dia FPS 30,Melhora da elasticidade e preenchimento de rugas profundas,Tópico,Eucerin
+Hyaluron-Filler Elasticity Creme Facial Noite,Regeneração da pele e melhora da elasticidade,Tópico,Eucerin
+Hyaluron-Filler Elasticity 3D Sérum,"Redução de manchas senis, rugas profundas e melhora da elasticidade",Tópico,Eucerin
+Hyaluron-Filler Vitamin C Booster,Antioxidante para pele cansada e sem brilho,Tópico,Eucerin
+Sun Pigment Control FPS 60,Proteção solar e prevenção de manchas,Tópico,Eucerin
+Sun Oil Control Gel-Creme FPS 60,Proteção solar para pele oleosa com toque seco,Tópico,Eucerin
+Sun Oil Control Tinted Claro FPS 70,Proteção solar com cor para pele clara,Tópico,Eucerin
+Sun Oil Control Tinted Médio FPS 70,Proteção solar com cor para pele média,Tópico,Eucerin
+Sun Hydro Fluid FPS 60,Proteção solar ultraleve para todos os tipos de pele,Tópico,Eucerin
+Sun Photoaging Control FPS 50,Proteção solar com ação anti-idade,Tópico,Eucerin
+DermoPure Oil Control Gel de Limpeza,Limpeza profunda para pele oleosa e acneica,Tópico,Eucerin
+DermoPure Oil Control Sérum Efeito Triplo,"Redução de acne, oleosidade e marcas",Tópico,Eucerin
+DermoPure Oil Control Creme Corporal Efeito Triplo,Tratamento corporal para pele acneica,Tópico,Eucerin
+DermoPure Oil Control Ação Renovadora,Renovação celular e prevenção de acne,Tópico,Eucerin
+UreaRepair PLUS Loção Hidratante 10% Ureia,Hidratação intensa para pele extremamente seca,Tópico,Eucerin
+UreaRepair PLUS Creme para Pés 10% Ureia,Hidratação e reparação da pele dos pés,Tópico,Eucerin
+UreaRepair PLUS Creme para Mãos 5% Ureia,Hidratação e reparação da pele das mãos,Tópico,Eucerin
+pH5 Loção Hidratante,Hidratação e proteção da pele sensível,Tópico,Eucerin
+pH5 Gel de Limpeza,Limpeza suave para pele sensível,Tópico,Eucerin
+pH5 Óleo de Banho,Limpeza e hidratação durante o banho,Tópico,Eucerin
+Aquaphor Pomada Reparadora,"Reparação intensiva da pele muito seca, rachada ou irritada",Tópico,Eucerin
+Aquaphor Bálsamo Labial,Hidratação e reparação dos lábios secos e rachados,Tópico,Eucerin
+C E Ferulic,Antioxidante com vitamina C para prevenir envelhecimento e melhorar firmeza,Tópico,SkinCeuticals
+Phloretin CF,Antioxidante com vitamina C e ácido ferúlico para uniformizar o tom da pele,Tópico,SkinCeuticals
+Silymarin CF,Antioxidante para peles oleosas e acneicas,Tópico,SkinCeuticals
+Discoloration Defense,Sérum clareador para reduzir manchas e melasma,Tópico,SkinCeuticals
+Retinol 0.3 / 0.5 / 1.0,Tratamento anti-idade com retinol para rugas e textura irregular,Tópico,SkinCeuticals
+A.G.E. Interrupter,Creme anti-idade para rugas profundas e perda de firmeza,Tópico,SkinCeuticals
+Triple Lipid Restore 2:4:2,Creme restaurador para barreira cutânea e hidratação intensa,Tópico,SkinCeuticals
+Metacell Renewal B3,Hidratante com niacinamida para melhorar textura e uniformizar o tom,Tópico,SkinCeuticals
+Hydrating B5 Gel,Sérum hidratante com ácido hialurônico e vitamina B5,Tópico,SkinCeuticals
+Physical Fusion UV Defense SPF 50,Protetor solar com cor e alta proteção UVA/UVB,Tópico,SkinCeuticals
+Epidrat Corpo,Hidratação intensiva para pele seca,Tópico,Mantecorp
+Ivy C Gel,Clareamento e prevenção do envelhecimento,Tópico,Mantecorp
+Soapelle Sabonete,Higiene corporal e controle de oleosidade,Tópico,Mantecorp
+Ivy C AOX Gel,Antioxidante com vitamina C para prevenção de sinais de envelhecimento,Tópico,Mantecorp
+Ivy C10,Creme anti-idade com vitamina C nanoencapsulada para rugas e firmeza,Tópico,Mantecorp
+Reviline Retinol Sérum,Sérum com retinol para renovação celular e redução de linhas finas,Tópico,Mantecorp
+Glycare Sérum,Sérum anti-idade com ácido glicólico para textura e luminosidade da pele,Tópico,Mantecorp
+Epidrat Calm B5,Hidratante calmante para peles sensíveis e sensibilizadas,Tópico,Mantecorp
+Epidrat Mat FPS 30,Hidratante facial matificante com proteção solar para peles oleosas,Tópico,Mantecorp
+Episol Color FPS 70,Protetor solar com cor disponível em diversos tons,Tópico,Mantecorp
+Episol Sec Acqua FPS 60,Protetor solar facial com toque seco e alta proteção,Tópico,Mantecorp
+Episol Color Stick FPS 50,Protetor solar em bastão com cor para reaplicação prática,Tópico,Mantecorp
+Blancy TX,Clareador facial para tratamento de hiperpigmentações,Tópico,Mantecorp
+Toleriane Double Repair Moisturizer,Hidratação e reparação da barreira cutânea,Tópico,La Roche-Posay
+Cicaplast Baume B5,Reparação de pele irritada e ressecada,Tópico,La Roche-Posay
+Effaclar Duo (+),Tratamento de acne e imperfeições,Tópico,La Roche-Posay
+Anthelios Melt-in Milk SPF 100,Proteção solar de amplo espectro,Tópico,La Roche-Posay
+Lipikar AP+ Balm,Hidratação intensa para pele muito seca,Tópico,La Roche-Posay
+Hyalu B5 Serum,Preenchimento de rugas e hidratação,Tópico,La Roche-Posay
+Retinol B3 Serum,Redução de linhas finas e uniformização da pele,Tópico,La Roche-Posay
+Glycolic B5 Serum,Clareamento de manchas e renovação celular,Tópico,La Roche-Posay
+Effaclar Adapalene Gel 0.1%,Tratamento de acne com retinoide,Tópico,La Roche-Posay
+Mela B3 Serum,Clareamento de manchas escuras,Tópico,La Roche-Posay
+Minéral 89,Fortalecimento e hidratação da pele,Tópico,Vichy
+LiftActiv Supreme,Anti-idade e firmeza da pele,Tópico,Vichy
+Normaderm PhytoAction,Controle da acne e oleosidade,Tópico,Vichy
+LiftActiv Vitamin C Serum,Iluminação e uniformização do tom da pele,Tópico,Vichy
+Aqualia Thermal,Hidratação profunda e duradoura,Tópico,Vichy
+Neovadiol Compensating Complex,Cuidado para pele madura,Tópico,Vichy
+Capital Soleil SPF 50,Proteção solar facial,Tópico,Vichy
+Pureté Thermale 3-in-1,"Limpeza, tonificação e remoção de maquiagem",Tópico,Vichy
+Slow Âge Fluid,Prevenção de sinais de envelhecimento,Tópico,Vichy
+Dercos Energizing Shampoo,Fortalecimento capilar,Tópico,Vichy
+Intensive Hyaluronic Cream,Hidratação intensa e preenchimento de rugas e linhas finas com ácido hialurônico,Tópico,Institut Esthederm
+Intensive Retinol Cream,Correção de rugas profundas e renovação da pele com retinol,Tópico,Institut Esthederm
+Intensive Vitamine C² Dual Concentrate,Sérum antioxidante concentrado com 2x vitamina C para manchas e uniformização,Tópico,Institut Esthederm
+Intensive Propolis+ Ácido Salicílico,Sérum anti-imperfeições para pele oleosa e acneica,Tópico,Institut Esthederm
+Intensive Propolis+ Ácido Ferúlico,Antioxidante com efeito matte para peles oleosas e acneicas,Tópico,Institut Esthederm
+Intensive Retinol Balm Rejuvenecedor de Olhos,Contorno de olhos com retinol para reduzir rugas e linhas finas,Tópico,Institut Esthederm
+Intensive Pro-Collagen+ Cream,Creme firmador que estimula colágeno e redefine contornos faciais,Tópico,Institut Esthederm
+Intensive Hyaluronic Serum,Sérum hidratante com ácido hialurônico para pele desidratada,Tópico,Institut Esthederm
+Intensive Vitamine C Gel-Cream,Gel-creme com vitamina C para iluminar e uniformizar a pele,Tópico,Institut Esthederm
+Intensive Spirulina Cream,Creme revitalizante com spirulina para energizar a pele cansada,Tópico,Institut Esthederm

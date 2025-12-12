@@ -409,3 +409,64 @@ class ProcedureRecord(db.Model):
     patient = db.relationship('Patient', backref='procedure_records')
     doctor = db.relationship('User', backref='procedure_records')
     evolution = db.relationship('Evolution', backref='procedure_records')
+
+# Modelos para DermaScribe (Sistema de Receitas)
+class Medication(db.Model):
+    __tablename__ = 'medications'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), nullable=False)
+    purpose = db.Column(db.Text)
+    type = db.Column(db.String(50), nullable=False)  # 'topical' or 'oral'
+    brand = db.Column(db.String(100))
+    instructions = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    def __repr__(self):
+        return f'<Medication {self.name}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'medication': self.name,
+            'purpose': self.purpose,
+            'type': self.type.lower() if self.type else 'topical',
+            'brand': self.brand,
+            'instructions': self.instructions if self.instructions else self.get_default_instructions()
+        }
+    
+    def get_default_instructions(self):
+        if self.type and self.type.lower() == 'topical':
+            if self.purpose and 'acne' in self.purpose.lower():
+                return "Aplicar uma fina camada nas áreas afetadas 1-2 vezes ao dia"
+            elif self.purpose and ('proteção solar' in self.purpose.lower() or 'fps' in self.purpose.lower()):
+                return "Aplicar generosamente 20 minutos antes da exposição solar e reaplicar a cada 2 horas"
+            elif self.purpose and ('clareamento' in self.purpose.lower() or 'mancha' in self.purpose.lower()):
+                return "Aplicar uma fina camada nas áreas com manchas 1-2 vezes ao dia"
+            elif self.purpose and 'hidratação' in self.purpose.lower():
+                return "Aplicar sobre a pele limpa e seca 1-2 vezes ao dia"
+            else:
+                return "Aplicar uma fina camada na área afetada 1-2 vezes ao dia"
+        else:
+            return "Tomar conforme orientação médica"
+    
+    def get_prescription_count(self):
+        return len(self.usage_records)
+    
+    @classmethod
+    def get_top_prescribed(cls, limit=10):
+        from sqlalchemy import func
+        return db.session.query(cls, func.count(MedicationUsage.id).label('prescription_count'))\
+                .outerjoin(MedicationUsage)\
+                .group_by(cls.id)\
+                .order_by(func.count(MedicationUsage.id).desc())\
+                .limit(limit).all()
+
+class MedicationUsage(db.Model):
+    __tablename__ = 'medication_usage'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    medication_id = db.Column(db.Integer, db.ForeignKey('medications.id'), nullable=False)
+    prescribed_at = db.Column(db.DateTime, default=get_brazil_time)
+    
+    medication = db.relationship('Medication', backref='usage_records')

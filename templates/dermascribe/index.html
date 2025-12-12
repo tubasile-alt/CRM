@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+
+{% block title %}DermaScribe - Receituário Digital{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+    .suggestion-item { cursor: pointer; }
+    .suggestion-item:hover { background-color: #f8f9fa; }
+    .medication-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .medication-actions { display: flex; gap: 8px; }
+    .medication-actions i { cursor: pointer; color: #6c757d; }
+    .medication-actions i:hover { color: #dc3545; }
+    .medication-actions .fa-edit:hover { color: #0d6efd; }
+    .prescription-preview {
+        font-family: 'Times New Roman', Times, serif;
+        background: #fff;
+        padding: 30px;
+        border: 1px solid #ddd;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .prescription-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+    .prescription-header h4 { margin-bottom: 5px; }
+    .medication-section { margin: 20px 0; }
+    .medication-section h5 { border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
+    .medication-list { list-style-type: none; padding-left: 0; }
+    .medication-list li { margin-bottom: 10px; padding-left: 20px; position: relative; }
+    .medication-list li::before { content: "•"; position: absolute; left: 0; color: #333; }
+    @media print {
+        .no-print { display: none !important; }
+        .prescription-preview { border: none; box-shadow: none; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3 no-print">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Início</a></li>
+                    <li class="breadcrumb-item active">DermaScribe</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 no-print">
+            <ul class="nav nav-tabs mb-3" id="prescriptionTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="custom-tab" data-bs-toggle="tab" data-bs-target="#custom-tab-content" type="button">Personalizada</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates-tab-content" type="button">Modelos</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics-tab-content" type="button">
+                        <i class="fas fa-chart-bar me-1"></i>Estatísticas
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="prescriptionTabsContent">
+                <div class="tab-pane fade show active" id="custom-tab-content" role="tabpanel">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-body">
+                            <form id="prescriptionForm">
+                                <input type="hidden" id="patientId" value="{{ patient_id }}">
+                                <div class="mb-3">
+                                    <label for="patientName" class="form-label">Nome do Paciente</label>
+                                    <input type="text" class="form-control" id="patientName" placeholder="Nome completo do paciente" value="{{ patient_name }}" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="medicationInput" class="form-label">Buscar Medicamento</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="medicationInput" placeholder="Digite para buscar medicamentos..." autocomplete="off">
+                                        <button class="btn btn-outline-secondary" type="button" id="clearMedicationInput">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div id="suggestionsList" class="list-group mt-1 d-none"></div>
+                                    <small class="form-text text-muted">Digite o nome parcial e aguarde sugestões</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">Adicionar Medicamento Manualmente</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="row g-2">
+                                                <div class="col-md-12 mb-2">
+                                                    <input type="text" class="form-control" id="manualMedicationName" placeholder="Nome do medicamento">
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <select class="form-select" id="manualMedicationType">
+                                                        <option value="">Selecione o tipo</option>
+                                                        <option value="topical">Uso tópico</option>
+                                                        <option value="oral">Uso oral</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6 mb-2">
+                                                    <input type="text" class="form-control" id="manualMedicationInstructions" placeholder="Posologia">
+                                                </div>
+                                                <div class="col-md-12">
+                                                    <button type="button" class="btn btn-primary w-100" id="addManualMedication">
+                                                        <i class="fas fa-plus me-1"></i> Adicionar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between">
+                                        <label class="form-label">Medicamentos Adicionados</label>
+                                        <span id="medicationCount" class="badge bg-primary">0/5</span>
+                                    </div>
+
+                                    <div class="card mb-2">
+                                        <div class="card-header bg-light py-1">
+                                            <h6 class="mb-0"><i class="fas fa-pills text-primary me-2"></i>Uso Oral</h6>
+                                        </div>
+                                        <ul id="oralMedicationsList" class="list-group list-group-flush">
+                                            <li class="list-group-item text-muted empty-list">Nenhum medicamento oral</li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="card">
+                                        <div class="card-header bg-light py-1">
+                                            <h6 class="mb-0"><i class="fas fa-prescription-bottle text-success me-2"></i>Uso Tópico</h6>
+                                        </div>
+                                        <ul id="topicalMedicationsList" class="list-group list-group-flush">
+                                            <li class="list-group-item text-muted empty-list">Nenhum medicamento tópico</li>
+                                        </ul>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="card border-success">
+                                        <div class="card-body text-center">
+                                            <h6 class="card-title text-success"><i class="fas fa-file-excel me-2"></i>Exportar Medicamentos</h6>
+                                            <button type="button" class="btn btn-success btn-sm" id="exportMedicationsExcel">
+                                                <i class="fas fa-download me-2"></i>Baixar CSV
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-grid gap-2 mb-3" id="savePrescriptionSection" style="{{ 'display:block' if patient_id else 'display:none' }}">
+                                    <button type="button" class="btn btn-success w-100" id="savePrescription">
+                                        <i class="fas fa-save me-2"></i>Salvar Receita no Prontuário
+                                    </button>
+                                </div>
+                                <button type="button" class="btn btn-outline-danger w-100" id="clearForm">
+                                    <i class="fas fa-trash-alt me-2"></i>Limpar Formulário
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="templates-tab-content" role="tabpanel">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="templatePatientName" class="form-label">Nome do Paciente</label>
+                                <input type="text" class="form-control" id="templatePatientName" placeholder="Nome do paciente" value="{{ patient_name }}">
+                            </div>
+
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">Pós-Transplante Capilar</h5>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table table-bordered">
+                                        <thead class="table-light">
+                                            <tr><th></th><th>USO TÓPICO</th><th></th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td>1.</td><td><strong>CAPPY</strong></td><td>APLICAR NO COURO CABELUDO 1X/DIA</td></tr>
+                                        </tbody>
+                                    </table>
+                                    <table class="table table-bordered mt-3">
+                                        <thead class="table-light">
+                                            <tr><th></th><th>USO INTERNO</th><th></th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td>2.</td><td><strong>NEOSIL ATTACK</strong></td><td>TOMAR 01 CP VO POR DIA POR 3 MESES</td></tr>
+                                            <tr><td>3.</td><td><strong>MINOXIDIL 2,5MG</strong></td><td>TOMAR 01 CP VO POR DIA</td></tr>
+                                        </tbody>
+                                    </table>
+                                    <button type="button" class="btn btn-success w-100" id="useTransplantTemplate">
+                                        <i class="fas fa-check-circle me-2"></i>Usar Este Modelo
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="analytics-tab-content" role="tabpanel">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Top 10 Medicamentos Mais Prescritos</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="topMedicationsContainer">
+                                <div class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status"></div>
+                                    <p class="mt-2">Carregando estatísticas...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-file-prescription me-2"></i>Pré-visualização</h5>
+                    <div class="no-print">
+                        <button type="button" class="btn btn-light btn-sm me-2" id="copyPrescription">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                        <button type="button" class="btn btn-light btn-sm" id="printPrescription">
+                            <i class="fas fa-print"></i> Imprimir
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="prescription-preview" id="prescriptionPreview">
+                        <div class="prescription-header">
+                            <h4>RECEITUÁRIO</h4>
+                            <p class="mb-0">Paciente: <strong id="previewPatientName">______________________</strong></p>
+                        </div>
+
+                        <div id="previewOralMedications" class="medication-section d-none">
+                            <h5><i class="fas fa-pills me-2"></i>USO ORAL</h5>
+                            <ol class="medication-list"></ol>
+                        </div>
+
+                        <div id="previewTopicalMedications" class="medication-section d-none">
+                            <h5><i class="fas fa-prescription-bottle me-2"></i>USO TÓPICO</h5>
+                            <ol class="medication-list"></ol>
+                        </div>
+
+                        <div class="prescription-footer mt-4 pt-3 border-top">
+                            <p class="text-center text-muted mb-0">
+                                <small>Data: <span id="previewDate"></span></small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="copyToast" class="toast" role="alert">
+        <div class="toast-header">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <strong class="me-auto">Sucesso</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toastMessage">Receita copiada para a área de transferência!</div>
+    </div>
+    <div id="saveToast" class="toast" role="alert">
+        <div class="toast-header">
+            <i class="fas fa-check-circle text-success me-2"></i>
+            <strong class="me-auto">Salvo</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="saveToastMessage">Medicamento salvo no banco de dados.</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dermascribe.js') }}"></script>
+{% endblock %}
