@@ -323,50 +323,71 @@ def get_appointments():
     
     events = []
     for apt in appointments:
-        # Get doctor color from DoctorPreference
-        from models import DoctorPreference
-        pref = DoctorPreference.query.filter_by(user_id=apt.doctor_id).first()
-        doctor_color = pref.color if pref else '#0d6efd'
-        
-        # Use status color for border
-        border_color = {
-            'agendado': '#6c757d',
-            'confirmado': '#0d6efd',
-            'atendido': '#198754',
-            'faltou': '#dc3545'
-        }.get(apt.status, '#6c757d')
-        
-        # TIMEZONE: Banco armazena horários naive em São Paulo (sem conversão)
-        # Retornar com offset timezone correto (-03:00) para evitar conversão UTC
-        start_iso = apt.start_time.isoformat() + '-03:00' if apt.start_time else None
-        end_iso = apt.end_time.isoformat() + '-03:00' if apt.end_time else None
-        
-        # Buscar código do paciente para este médico
-        from models import PatientDoctor
-        pd = PatientDoctor.query.filter_by(patient_id=apt.patient_id, doctor_id=apt.doctor_id).first()
-        patient_code = pd.patient_code if pd else None
-        
-        events.append({
-            'id': apt.id,
-            'title': f"{apt.patient.name} - Dr. {apt.doctor.name}",
-            'start': start_iso,
-            'end': end_iso,
-            'backgroundColor': doctor_color,
-            'borderColor': border_color,
-            'extendedProps': {
-                'status': apt.status,
-                'appointmentType': apt.appointment_type or 'Particular',
-                'patientId': apt.patient_id,
-                'patientCode': patient_code,
-                'patientType': apt.patient.patient_type or 'Particular',
-                'doctorId': apt.doctor_id,
-                'doctorName': apt.doctor.name,
-                'waiting': apt.waiting,
-                'checkedInTime': apt.checked_in_time.isoformat() + '-03:00' if apt.checked_in_time else None,
-                'phone': apt.patient.phone or '',
-                'notes': apt.notes or ''
-            }
-        })
+        try:
+            # Get doctor color from DoctorPreference
+            from models import DoctorPreference
+            pref = DoctorPreference.query.filter_by(user_id=apt.doctor_id).first()
+            doctor_color = pref.color if pref else '#0d6efd'
+            
+            # Use status color for border
+            border_color = {
+                'agendado': '#6c757d',
+                'confirmado': '#0d6efd',
+                'atendido': '#198754',
+                'faltou': '#dc3545'
+            }.get(apt.status, '#6c757d')
+            
+            # TIMEZONE: Banco armazena horários naive em São Paulo (sem conversão)
+            # Retornar com offset timezone correto (-03:00) para evitar conversão UTC
+            start_iso = apt.start_time.isoformat() + '-03:00' if apt.start_time else None
+            end_iso = apt.end_time.isoformat() + '-03:00' if apt.end_time else None
+            
+            # Buscar código do paciente para este médico
+            from models import PatientDoctor
+            pd = PatientDoctor.query.filter_by(patient_id=apt.patient_id, doctor_id=apt.doctor_id).first()
+            patient_code = pd.patient_code if pd else None
+            
+            # Buscar dados do paciente e médico com fallback em caso de erro
+            patient_name = 'Paciente'
+            patient_type = 'Particular'
+            patient_phone = ''
+            try:
+                patient_name = apt.patient.name or 'Paciente'
+                patient_type = apt.patient.patient_type or 'Particular'
+                patient_phone = apt.patient.phone or ''
+            except Exception as e:
+                print(f"Erro ao carregar dados do paciente {apt.patient_id}: {e}")
+            
+            doctor_name = 'Dr. Desconhecido'
+            try:
+                doctor_name = f"Dr. {apt.doctor.name}" if apt.doctor else 'Dr. Desconhecido'
+            except Exception as e:
+                print(f"Erro ao carregar dados do médico {apt.doctor_id}: {e}")
+            
+            events.append({
+                'id': apt.id,
+                'title': f"{patient_name} - {doctor_name}",
+                'start': start_iso,
+                'end': end_iso,
+                'backgroundColor': doctor_color,
+                'borderColor': border_color,
+                'extendedProps': {
+                    'status': apt.status,
+                    'appointmentType': apt.appointment_type or 'Particular',
+                    'patientId': apt.patient_id,
+                    'patientCode': patient_code,
+                    'patientType': patient_type,
+                    'doctorId': apt.doctor_id,
+                    'doctorName': doctor_name,
+                    'waiting': apt.waiting,
+                    'checkedInTime': apt.checked_in_time.isoformat() + '-03:00' if apt.checked_in_time else None,
+                    'phone': patient_phone,
+                    'notes': apt.notes or ''
+                }
+            })
+        except Exception as e:
+            print(f"Erro ao processar agendamento {apt.id}: {e}")
+            continue
     
     return jsonify(events)
 
