@@ -23,18 +23,17 @@ args = "flask-app"
 name = "flask-app"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python /home/runner/workspace/app.py"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [deployment]
-deploymentTarget = "vm"
-run = ["python", "app.py"]
+deploymentTarget = "autoscale"
+run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=2", "--threads=4", "--worker-class=gthread", "--timeout=120"]

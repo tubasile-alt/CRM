@@ -95,6 +95,11 @@ def format_brazil_datetime(dt):
     
     return dt.strftime('%d/%m/%Y %H:%M')
 
+@app.route('/health')
+def health():
+    """Lightweight health check endpoint for deployment"""
+    return jsonify({'status': 'ok'}), 200
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -2291,8 +2296,12 @@ def delete_evolution(evo_id):
     db.session.commit()
     return jsonify({'success': True})
 
+# Note: When using Gunicorn for production, app.run() is not needed
+# Gunicorn handles the server execution
 if __name__ == '__main__':
     import os
+    # Development server - runs when executed as script
+    # Production uses Gunicorn (see deploy_config_tool settings)
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     app.run(host='0.0.0.0', port=5000, debug=debug_mode)
 
