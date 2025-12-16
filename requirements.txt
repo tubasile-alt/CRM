@@ -14,4 +14,3 @@ psycopg2-binary
 python-dateutil
 openai
 gunicorn
-gunicorn
