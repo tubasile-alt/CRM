@@ -15,22 +15,23 @@ from utils.database_backup import backup_manager
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Fazer backup automático ao iniciar a aplicação
-@app.before_request
-def auto_backup():
-    """Fazer backup automático a cada 30 minutos"""
-    import time
-    cache_key = 'last_backup_time'
-    now = time.time()
-    
-    # Verificar se já fez backup recentemente (a cada 30 min = 1800 seg)
-    last_backup = app.config.get(cache_key, 0)
-    if (now - last_backup) > 1800:
-        try:
-            backup_manager.backup_sqlite()
-            app.config[cache_key] = now
-        except:
-            pass  # Não interromper requisição se backup falhar
+# Fazer backup automático ao iniciar a aplicação (DESABILITADO EM PRODUÇÃO)
+# Este backup é executado apenas manualmente via init_backup.py
+# @app.before_request
+# def auto_backup():
+#     """Fazer backup automático a cada 30 minutos"""
+#     import time
+#     cache_key = 'last_backup_time'
+#     now = time.time()
+#     
+#     # Verificar se já fez backup recentemente (a cada 30 min = 1800 seg)
+#     last_backup = app.config.get(cache_key, 0)
+#     if (now - last_backup) > 1800:
+#         try:
+#             backup_manager.backup_sqlite()
+#             app.config[cache_key] = now
+#         except:
+#             pass  # Não interromper requisição se backup falhar
 
 db.init_app(app)
 csrf = CSRFProtect(app)
@@ -2291,7 +2292,9 @@ def delete_evolution(evo_id):
     return jsonify({'success': True})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    import os
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
 
 # APIs de Cirurgias de Transplante Capilar
 @login_required
