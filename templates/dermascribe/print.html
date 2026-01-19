@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receituário - {{ patient.name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 14pt;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            font-size: 24pt;
+            margin-bottom: 10px;
+        }
+        .patient-info {
+            margin-bottom: 30px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .patient-info p {
+            margin: 5px 0;
+        }
+        .medications-section {
+            margin: 25px 0;
+        }
+        .medications-section h2 {
+            font-size: 16pt;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        .medication-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        .medication-list li {
+            margin-bottom: 15px;
+            padding-left: 25px;
+            position: relative;
+        }
+        .medication-list li::before {
+            content: counter(item) ".";
+            counter-increment: item;
+            position: absolute;
+            left: 0;
+            font-weight: bold;
+        }
+        .medication-list {
+            counter-reset: item;
+        }
+        .medication-name {
+            font-weight: bold;
+            font-size: 14pt;
+        }
+        .medication-instructions {
+            display: block;
+            color: #555;
+            margin-top: 3px;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ccc;
+            text-align: center;
+        }
+        .signature-line {
+            margin-top: 60px;
+            text-align: center;
+        }
+        .signature-line hr {
+            width: 250px;
+            margin: 0 auto 10px;
+            border: none;
+            border-top: 1px solid #333;
+        }
+        @media print {
+            body {
+                padding: 20px;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .print-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">
+        Imprimir
+    </button>
+
+    <div class="header">
+        <h1>RECEITUÁRIO</h1>
+    </div>
+
+    <div class="patient-info">
+        <p><strong>Paciente:</strong> {{ patient.name }}</p>
+        <p><strong>Data:</strong> {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}</p>
+    </div>
+
+    {% if prescription.medications_oral and prescription.medications_oral|length > 0 %}
+    <div class="medications-section">
+        <h2>USO ORAL</h2>
+        <ol class="medication-list">
+            {% for med in prescription.medications_oral %}
+            <li>
+                <span class="medication-name">{{ med.medication if med is mapping else med }}</span>
+                {% if med is mapping and med.instructions %}
+                <span class="medication-instructions">{{ med.instructions }}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+    </div>
+    {% endif %}
+
+    {% if prescription.medications_topical and prescription.medications_topical|length > 0 %}
+    <div class="medications-section">
+        <h2>USO TÓPICO</h2>
+        <ol class="medication-list">
+            {% for med in prescription.medications_topical %}
+            <li>
+                <span class="medication-name">{{ med.medication if med is mapping else med }}</span>
+                {% if med is mapping and med.instructions %}
+                <span class="medication-instructions">{{ med.instructions }}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+    </div>
+    {% endif %}
+
+    <div class="signature-line">
+        <hr>
+        <p><strong>{{ doctor.name if doctor else 'Médico Responsável' }}</strong></p>
+        {% if doctor and doctor.specialty %}
+        <p>{{ doctor.specialty }}</p>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <small>Documento emitido eletronicamente pelo sistema CRM Médico</small>
+    </div>
+
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
+    </script>
+</body>
+</html>

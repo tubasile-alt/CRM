@@ -6,6 +6,27 @@ let activeTextarea = null;
 window.addEventListener('message', function(event) {
     if (event.data && event.data.type === 'prescription_saved') {
         showAlert('Receita salva com sucesso no prontuário!', 'success');
+        
+        loadPrescriptionHistory();
+        
+        const prescriptionData = event.data;
+        const condutaText = document.getElementById('condutaText');
+        if (condutaText) {
+            let receitaTexto = '\n\n📋 RECEITA EMITIDA:\n';
+            if (prescriptionData.oral && prescriptionData.oral.length > 0) {
+                receitaTexto += 'USO ORAL:\n';
+                prescriptionData.oral.forEach((med, i) => {
+                    receitaTexto += `  ${i+1}. ${med.medication} - ${med.instructions || ''}\n`;
+                });
+            }
+            if (prescriptionData.topical && prescriptionData.topical.length > 0) {
+                receitaTexto += 'USO TÓPICO:\n';
+                prescriptionData.topical.forEach((med, i) => {
+                    receitaTexto += `  ${i+1}. ${med.medication} - ${med.instructions || ''}\n`;
+                });
+            }
+            condutaText.value = condutaText.value + receitaTexto;
+        }
     }
 });
 
@@ -1590,9 +1611,20 @@ function saveTransplantIndication() {
 }
 
 function abrirDermaScribe() {
-    const patientName = document.getElementById('patientName')?.textContent?.trim() || 
-                        document.querySelector('.patient-name')?.textContent?.trim() || '';
-    const cleanName = patientName.replace(/\s*\(\d+\s*anos?\)/gi, '').trim();
+    let patientName = '';
+    
+    const h2Element = document.querySelector('h2');
+    if (h2Element) {
+        patientName = h2Element.textContent.replace('Prontuário:', '').trim();
+    }
+    
+    if (!patientName) {
+        patientName = document.getElementById('patientName')?.textContent?.trim() || 
+                      document.querySelector('.patient-name')?.textContent?.trim() || 
+                      window.patientName || '';
+    }
+    
+    const cleanName = patientName.replace(/\s*\(\d+\s*anos?\)/gi, '').replace(/Editar\s*Cadastro/gi, '').trim();
     const encodedName = encodeURIComponent(cleanName);
     const currentPatientId = window.patientId || patientId;
     const dermaScribeUrl = `/dermascribe/?patient=${encodedName}&patient_id=${currentPatientId}`;
@@ -1641,27 +1673,35 @@ function savePrescriptionToConduta(prescriptionData) {
 }
 
 function loadPrescriptionHistory() {
-    const patientId = window.patientId || document.getElementById('patientId')?.value;
-    if (!patientId) return;
+    const currentPatientId = window.patientId || patientId;
+    if (!currentPatientId) return;
     
-    fetch(`/api/patient/${patientId}/prescriptions`)
+    fetch(`/dermascribe/api/patient/${currentPatientId}/prescriptions`)
     .then(r => r.json())
     .then(data => {
         const container = document.getElementById('prescriptionHistoryList');
         if (!container) return;
         
         if (!data.prescriptions || data.prescriptions.length === 0) {
-            container.innerHTML = '<small class="text-muted">Nenhuma receita emitida nesta consulta</small>';
+            container.innerHTML = '<small class="text-muted">Nenhuma receita emitida</small>';
             return;
         }
         
         let html = '<ul class="list-unstyled mb-0">';
         data.prescriptions.forEach(p => {
+            let summary = '';
+            if (p.oral && p.oral.length > 0) {
+                summary += `Oral: ${p.oral.map(m => m.medication || m).join(', ')}. `;
+            }
+            if (p.topical && p.topical.length > 0) {
+                summary += `Tópico: ${p.topical.map(m => m.medication || m).join(', ')}`;
+            }
+            
             html += `<li class="mb-2 p-2 bg-light rounded">
-                <small class="text-muted">${p.created_at}</small>
-                <div>${p.summary}</div>
-                <button class="btn btn-sm btn-outline-secondary mt-1" onclick="viewPrescription(${p.id})">
-                    <i class="bi bi-eye"></i> Ver
+                <small class="text-muted">${p.created_at} - Dr(a). ${p.doctor}</small>
+                <div class="small">${summary || 'Receita'}</div>
+                <button class="btn btn-sm btn-outline-primary mt-1" onclick="printPrescription(${p.id})">
+                    <i class="bi bi-printer"></i> Imprimir
                 </button>
             </li>`;
         });
@@ -1669,6 +1709,10 @@ function loadPrescriptionHistory() {
         container.innerHTML = html;
     })
     .catch(err => console.error('Erro ao carregar histórico:', err));
+}
+
+function printPrescription(prescriptionId) {
+    window.open(`/dermascribe/prescription/${prescriptionId}/print`, '_blank');
 }
 
 function viewPrescription(prescriptionId) {

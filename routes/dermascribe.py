@@ -200,3 +200,14 @@ def api_patient_prescriptions(patient_id):
         })
     
     return jsonify({'prescriptions': result})
+
+@dermascribe_bp.route('/prescription/<int:prescription_id>/print')
+@login_required
+def print_prescription(prescription_id):
+    prescription = Prescription.query.get_or_404(prescription_id)
+    patient = Patient.query.get(prescription.patient_id)
+    
+    return render_template('dermascribe/print.html', 
+                         prescription=prescription, 
+                         patient=patient,
+                         doctor=prescription.doctor)

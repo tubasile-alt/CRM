@@ -1420,7 +1420,14 @@ function deletePatientPhoto() {
 <script>
 const patientId = {{ patient.id }};
 window.patientId = {{ patient.id }};
+window.patientName = "{{ patient.name }}";
 const appointmentId = {{ appointment_id | tojson }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof loadPrescriptionHistory === 'function') {
+        loadPrescriptionHistory();
+    }
+});
 </script>
 <script src="{{ url_for('static', filename='js/surgeries.js') }}"></script>
 <script src="{{ url_for('static', filename='js/prontuario.js') }}"></script>
