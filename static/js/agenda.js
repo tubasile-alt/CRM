@@ -270,11 +270,17 @@ function renderDayView() {
         
         // Check if patient is waiting
         const isWaiting = app.extendedProps?.waiting || app.waiting || false;
-        const checkinBtnHtml = status !== 'atendido' && !isWaiting 
-            ? `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`
-            : isWaiting 
-                ? `<span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>`
-                : '';
+        let actionBadgeHtml = '';
+        
+        if (status === 'atendido') {
+            actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
+        } else if (status === 'faltou') {
+            actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>`;
+        } else if (isWaiting) {
+            actionBadgeHtml = `<span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>`;
+        } else {
+            actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+        }
         
         block.innerHTML = `
             <div class="appointment-content">
@@ -283,8 +289,8 @@ function renderDayView() {
                     <span class="appointment-name">${patientName}</span>
                     <span class="appointment-code">cod:${patientCode}</span>
                     <span class="appointment-type-label">pac:${patientType}</span>
-                    <span class="appointment-consult-label">cons:${appointmentType} <span style="font-size: 0.8em;">${statusIcon}</span></span>
-                    ${checkinBtnHtml}
+                    <span class="appointment-consult-label">cons:${appointmentType}</span>
+                    ${actionBadgeHtml}
                 </div>
             </div>
         `;

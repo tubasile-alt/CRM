@@ -615,3 +615,82 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
+
+/* Estilos para pacientes atendidos - mais evidente */
+.appointment-block.status-atendido {
+    opacity: 0.6;
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%) !important;
+    border-left: 4px solid #28a745 !important;
+    position: relative;
+}
+
+.appointment-block.status-atendido::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(40, 167, 69, 0.05) 10px,
+        rgba(40, 167, 69, 0.05) 20px
+    );
+    pointer-events: none;
+}
+
+.appointment-block.status-atendido .appointment-name {
+    text-decoration: line-through;
+    color: #6c757d;
+}
+
+/* Badge de Atendido nos blocos */
+.atendido-badge {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.7em;
+    font-weight: 600;
+    margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Estilos para pacientes confirmados */
+.appointment-block.status-confirmado {
+    border-left: 4px solid #17a2b8 !important;
+}
+
+/* Estilos para pacientes que faltaram */
+.appointment-block.status-faltou {
+    opacity: 0.5;
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%) !important;
+    border-left: 4px solid #dc3545 !important;
+}
+
+.appointment-block.status-faltou .appointment-name {
+    text-decoration: line-through;
+    color: #721c24;
+}
+
+/* Badge de Faltou nos blocos */
+.faltou-badge {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.7em;
+    font-weight: 600;
+    margin-left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
