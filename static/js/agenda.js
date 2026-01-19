@@ -1092,10 +1092,19 @@ function loadWaitingRoom() {
     })
     .then(data => {
         const waitingList = data.waiting_list || [];
-        waitingRoomData = waitingList.map(patient => ({
-            ...patient,
-            checkinTimestamp: patient.checked_in_time ? new Date(patient.checked_in_time).getTime() : Date.now()
-        }));
+        waitingRoomData = waitingList.map(patient => {
+            let checkinTs = Date.now();
+            if (patient.checked_in_time) {
+                const parsed = new Date(patient.checked_in_time);
+                if (!isNaN(parsed.getTime())) {
+                    checkinTs = parsed.getTime();
+                }
+            }
+            return {
+                ...patient,
+                checkinTimestamp: checkinTs
+            };
+        });
         renderWaitingRoom(waitingRoomData);
         const badge = document.getElementById('waitingCountBadge');
         if (badge) badge.textContent = waitingList.length;
@@ -1221,9 +1230,9 @@ function startWaitingRoomUpdates() {
     // Atualizar timers a cada 1 segundo
     waitingRoomInterval = setInterval(updateWaitingTimers, 1000);
     
-    // Recarregar lista a cada 5 segundos
-    setInterval(loadWaitingRoom, 5000);
+    // Recarregar lista a cada 30 segundos (não a cada 5 para não interferir com o timer)
+    setInterval(loadWaitingRoom, 30000);
     
-    // Primeira atualização imediata
-    updateWaitingTimers();
+    // Primeira atualização imediata após 100ms
+    setTimeout(updateWaitingTimers, 100);
 }
