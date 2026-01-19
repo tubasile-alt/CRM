@@ -2296,6 +2296,62 @@ def delete_evolution(evo_id):
     db.session.commit()
     return jsonify({'success': True})
 
+# Upload de foto do paciente
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads', 'photos')
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+@app.route('/api/patient/<int:patient_id>/photo', methods=['POST'])
+@login_required
+def upload_patient_photo(patient_id):
+    """Upload de foto 3x4 do paciente"""
+    patient = Patient.query.get_or_404(patient_id)
+    
+    if 'photo' not in request.files:
+        return jsonify({'success': False, 'error': 'Nenhuma foto enviada'}), 400
+    
+    file = request.files['photo']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'Nenhum arquivo selecionado'}), 400
+    
+    if file and allowed_file(file.filename):
+        import uuid
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        filename = f"patient_{patient_id}_{uuid.uuid4().hex[:8]}.{ext}"
+        
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+        
+        photo_url = f"/static/uploads/photos/{filename}"
+        patient.photo_url = photo_url
+        db.session.commit()
+        
+        return jsonify({'success': True, 'photo_url': photo_url})
+    
+    return jsonify({'success': False, 'error': 'Tipo de arquivo não permitido'}), 400
+
+@app.route('/api/patient/<int:patient_id>/photo', methods=['DELETE'])
+@login_required
+def delete_patient_photo(patient_id):
+    """Remover foto do paciente"""
+    patient = Patient.query.get_or_404(patient_id)
+    
+    if patient.photo_url:
+        try:
+            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), patient.photo_url.lstrip('/'))
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        except:
+            pass
+        
+        patient.photo_url = None
+        db.session.commit()
+    
+    return jsonify({'success': True})
+
 # Note: When using Gunicorn for production, app.run() is not needed
 # Gunicorn handles the server execution
 if __name__ == '__main__':

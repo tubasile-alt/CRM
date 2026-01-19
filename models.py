@@ -50,6 +50,7 @@ class Patient(db.Model):
     patient_type = db.Column(db.String(50), default='particular')
     attention_note = db.Column(db.Text)
     has_transplant_indication = db.Column(db.Boolean, default=False)
+    photo_url = db.Column(db.String(255))  # Foto 3x4 do paciente
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')

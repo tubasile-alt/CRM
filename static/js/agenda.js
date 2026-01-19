@@ -1186,11 +1186,26 @@ function calculateMinutesSinceCheckin(checkinTimestamp) {
 function updateWaitingTimers() {
     if (!waitingRoomData || waitingRoomData.length === 0) return;
     
+    const now = Date.now();
     waitingRoomData.forEach(patient => {
         const timer = document.querySelector(`.waiting-timer[data-patient-id="${patient.id}"]`);
-        if (timer) {
-            const minutes = calculateMinutesSinceCheckin(patient.checkinTimestamp);
-            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${formatWaitingMinutes(minutes)}`;
+        if (timer && patient.checkinTimestamp) {
+            const diffMs = now - patient.checkinTimestamp;
+            const minutes = diffMs > 0 ? Math.floor(diffMs / 60000) : 0;
+            const seconds = diffMs > 0 ? Math.floor((diffMs % 60000) / 1000) : 0;
+            
+            // Mostrar minutos:segundos para precisão
+            let timeText;
+            if (minutes < 1) {
+                timeText = `${seconds}s`;
+            } else if (minutes < 60) {
+                timeText = `${minutes}m ${seconds}s`;
+            } else {
+                const hours = Math.floor(minutes / 60);
+                const mins = minutes % 60;
+                timeText = `${hours}h ${mins}m`;
+            }
+            timer.innerHTML = `<i class="bi bi-stopwatch"></i> ${timeText}`;
         }
     });
 }

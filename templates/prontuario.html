@@ -94,31 +94,108 @@ function savePatientData() {
         showAlert('Erro ao salvar dados', 'danger');
     });
 }
+
+// Funções de foto do paciente
+function uploadPatientPhoto(input) {
+    if (!input.files || !input.files[0]) return;
+    
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+        showAlert('Arquivo muito grande. Máximo 5MB.', 'warning');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('photo', file);
+    
+    fetch('/api/patient/{{ patient.id }}/photo', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Foto salva com sucesso!', 'success');
+            const wrapper = document.getElementById('patientPhotoWrapper');
+            wrapper.innerHTML = `<img src="${result.photo_url}?t=${Date.now()}" alt="Foto do paciente" style="width: 100%; height: 100%; object-fit: cover;" id="patientPhoto">`;
+            location.reload();
+        } else {
+            showAlert(result.error || 'Erro ao salvar foto', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao enviar foto', 'danger');
+    });
+}
+
+function deletePatientPhoto() {
+    if (!confirm('Remover foto do paciente?')) return;
+    
+    fetch('/api/patient/{{ patient.id }}/photo', {
+        method: 'DELETE'
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Foto removida!', 'success');
+            location.reload();
+        } else {
+            showAlert(result.error || 'Erro ao remover foto', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao remover foto', 'danger');
+    });
+}
 </script>
 
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2>
-                    Prontuário: {{ patient.name }}
-                    {% if age %}
-                    <small class="text-muted">({{ age }} anos)</small>
+            <div class="d-flex align-items-center gap-3">
+                <!-- Foto 3x4 do Paciente -->
+                <div class="patient-photo-container" style="position: relative;">
+                    <div id="patientPhotoWrapper" class="patient-photo" style="width: 80px; height: 100px; border: 2px dashed #ccc; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f8f9fa; cursor: pointer;" onclick="document.getElementById('photoInput').click()">
+                        {% if patient.photo_url %}
+                        <img src="{{ patient.photo_url }}" alt="Foto do paciente" style="width: 100%; height: 100%; object-fit: cover;" id="patientPhoto">
+                        {% else %}
+                        <div style="text-align: center; color: #999;" id="photoPlaceholder">
+                            <i class="bi bi-camera" style="font-size: 24px;"></i>
+                            <div style="font-size: 10px;">Foto 3x4</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="uploadPatientPhoto(this)">
+                    {% if patient.photo_url %}
+                    <button class="btn btn-sm btn-danger" style="position: absolute; top: -5px; right: -5px; padding: 2px 6px; border-radius: 50%;" onclick="event.stopPropagation(); deletePatientPhoto()">
+                        <i class="bi bi-x"></i>
+                    </button>
                     {% endif %}
-                    <button class="btn btn-sm btn-outline-primary ms-2" onclick="openEditPatientModal()">
-                        <i class="bi bi-pencil"></i> Editar Cadastro
-                    </button>
-                </h2>
-                <p class="text-muted mb-0">
-                    {% if patient.phone %}<i class="bi bi-telephone"></i> {{ patient.phone }} | {% endif %}
-                    {% if patient.email %}<i class="bi bi-envelope"></i> {{ patient.email }}{% endif %}
-                    <button class="btn btn-sm btn-warning ms-2" onclick="openAttentionModal()">
-                        <i class="bi bi-exclamation-circle"></i> Atenção
-                    </button>
-                    <span id="attentionBadge" class="badge bg-danger ms-2" style="display: {% if patient.attention_note %}inline{% else %}none{% endif %};">
-                        <i class="bi bi-exclamation-triangle"></i> Anotação
-                    </span>
-                </p>
+                </div>
+                
+                <div>
+                    <h2>
+                        Prontuário: {{ patient.name }}
+                        {% if age %}
+                        <small class="text-muted">({{ age }} anos)</small>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline-primary ms-2" onclick="openEditPatientModal()">
+                            <i class="bi bi-pencil"></i> Editar Cadastro
+                        </button>
+                    </h2>
+                    <p class="text-muted mb-0">
+                        {% if patient.phone %}<i class="bi bi-telephone"></i> {{ patient.phone }} | {% endif %}
+                        {% if patient.email %}<i class="bi bi-envelope"></i> {{ patient.email }}{% endif %}
+                        <button class="btn btn-sm btn-warning ms-2" onclick="openAttentionModal()">
+                            <i class="bi bi-exclamation-circle"></i> Atenção
+                        </button>
+                        <span id="attentionBadge" class="badge bg-danger ms-2" style="display: {% if patient.attention_note %}inline{% else %}none{% endif %};">
+                            <i class="bi bi-exclamation-triangle"></i> Anotação
+                        </span>
+                    </p>
+                </div>
             </div>
             <button class="btn btn-outline-secondary" onclick="history.back()">
                 <i class="bi bi-arrow-left"></i> Voltar
