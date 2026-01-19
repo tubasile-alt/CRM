@@ -204,13 +204,20 @@ function renderDayView() {
         return;
     }
     
+    // Ordenar por horário
+    dayAppointments.sort((a, b) => {
+        const startA = parseLocalDateTime(a.start);
+        const startB = parseLocalDateTime(b.start);
+        return startA - startB;
+    });
+    
     dayAppointments.forEach(app => {
         const start = parseLocalDateTime(app.start);
         const end = parseLocalDateTime(app.end);
         const durationMinutes = (end - start) / (1000 * 60);
-        // Cada slot de 15 min tem 30px de altura, então cada minuto = 2px
-        const topPosition = ((start.getHours() - 7) * 60 + start.getMinutes()) * 2;
-        const height = durationMinutes * 2;
+        
+        // Formatar horário para exibição
+        const timeStr = String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0');
         
         // Extrair apenas o nome do paciente (sem nome do médico)
         const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
@@ -224,9 +231,7 @@ function renderDayView() {
         
         const block = document.createElement('div');
         block.className = `appointment-block ${typeClass} ${statusClass}`;
-        block.style.top = topPosition + 'px';
-        block.style.height = Math.max(height, 50) + 'px';
-        block.style.cursor = 'grab';
+        block.style.cursor = 'pointer';
         block.draggable = true;
         block.dataset.appointmentId = app.id;
         block.dataset.duration = durationMinutes;
@@ -274,6 +279,7 @@ function renderDayView() {
         block.innerHTML = `
             <div class="appointment-content">
                 <div class="appointment-info-line">
+                    <span class="appointment-time-badge">${timeStr}</span>
                     <span class="appointment-name">${patientName}</span>
                     <span class="appointment-code">cod:${patientCode}</span>
                     <span class="appointment-type-label">pac:${patientType}</span>

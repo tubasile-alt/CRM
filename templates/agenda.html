@@ -194,21 +194,23 @@
 }
 
 .appointments-grid {
-    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     padding: 10px;
+    overflow-y: auto;
 }
 
 .appointment-block {
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    padding: 8px;
+    position: relative;
+    padding: 10px 12px;
     border-radius: 6px;
     cursor: pointer;
-    overflow: hidden;
     border-left: 4px solid;
     transition: all 0.2s;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    min-height: 40px;
+    flex-shrink: 0;
 }
 
 .appointment-block:hover {
@@ -230,11 +232,22 @@
 
 .appointment-info-line {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     font-size: 13px;
     font-weight: bold;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+.appointment-time-badge {
+    background: rgba(0,0,0,0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .appointment-name {
