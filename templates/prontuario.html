@@ -391,13 +391,16 @@ function deletePatientPhoto() {
                 </ul>
             </div>
             <div class="card-body">
-                <div class="mb-3">
+                <div class="mb-3 d-flex align-items-center">
                     {% if current_user.is_doctor() %}
                     <button class="btn btn-sm btn-success" id="startTimer" onclick="startConsultation()">
                         <i class="bi bi-play-circle"></i> Iniciar Atendimento
                     </button>
+                    <button class="btn btn-sm btn-primary ms-2" id="finishTimer" onclick="finishConsultation()">
+                        <i class="bi bi-check-all"></i> Finalizar Atendimento
+                    </button>
                     {% endif %}
-                    <span id="timerDisplay" class="ms-2 fw-bold"></span>
+                    <span id="timerDisplay" class="ms-3 fw-bold fs-5 text-primary">00:00</span>
                 </div>
 
                 <div class="tab-content">
