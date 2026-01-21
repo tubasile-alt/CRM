@@ -155,10 +155,66 @@ function getConsultationDuration() {
     return null;
 }
 
+function finishConsultation() {
+    if (!timerStartTime) {
+        showAlert('O atendimento ainda não foi iniciado.', 'warning');
+        return;
+    }
+
+    const duration = getConsultationDuration();
+    
+    if (confirm(`Deseja finalizar o atendimento? Duração total: ${duration} minutos.`)) {
+        fetch(`/api/prontuario/${patientId}/finalizar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ duration: duration })
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                // Parar cronômetro
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                timerStartTime = null;
+                
+                const button = document.getElementById('startTimer');
+                const display = document.getElementById('timerDisplay');
+                if (button) {
+                    button.innerHTML = '<i class="bi bi-play-circle"></i> Iniciar Atendimento';
+                    button.classList.remove('btn-danger');
+                    button.classList.add('btn-success');
+                }
+                if (display) {
+                    display.textContent = '00:00';
+                    display.classList.remove('timer-running');
+                }
+                
+                showAlert('Atendimento finalizado com sucesso!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/agenda';
+                }, 1500);
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao finalizar atendimento:', error);
+            showAlert('Erro ao finalizar atendimento.', 'danger');
+        });
+    }
+}
+
 function saveNote(noteType) {
     const textareaId = `${noteType}Text`;
     const content = document.getElementById(textareaId).value.trim();
     
+    // Auto-iniciar cronômetro se ainda não começou
+    if (!timerStartTime) {
+        startConsultation();
+    }
+
     if (!content) {
         showAlert('Por favor, adicione algum conteúdo antes de salvar.', 'warning');
         return;
