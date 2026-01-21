@@ -487,14 +487,17 @@ function updateAppointmentFromEdit() {
     const start = new Date(dateStr + 'T' + timeStr);
     const end = new Date(start.getTime() + duration * 60000);
     
+    // Usar os mesmos nomes de campos que o backend espera no update_appointment
     const data = {
-        patient_name: document.getElementById('editPatientName').value,
-        patient_phone: document.getElementById('editPatientPhone').value,
-        patient_type: document.getElementById('editPatientType').value,
-        appointment_type: document.getElementById('editAppointmentType').value,
+        patientName: document.getElementById('editPatientName').value,
+        phone: document.getElementById('editPatientPhone').value,
+        patientType: document.getElementById('editPatientType').value,
+        appointmentType: document.getElementById('editAppointmentType').value,
         start: start.toISOString(),
         end: end.toISOString()
     };
+    
+    console.log('[updateAppointmentFromEdit] Updating appointment:', appointmentId, data);
     
     fetch(`/api/appointments/${appointmentId}`, {
         method: 'PUT',
@@ -504,14 +507,22 @@ function updateAppointmentFromEdit() {
         },
         body: JSON.stringify(data)
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) throw new Error('Erro na rede');
+        return r.json();
+    })
     .then(data => {
         if (data.success) {
+            showAlert('Agendamento atualizado com sucesso!');
             bootstrap.Modal.getInstance(document.getElementById('editAppointmentModal')).hide();
             loadAppointments();
         } else {
-            alert(data.error || 'Erro ao atualizar');
+            showAlert(data.error || 'Erro ao atualizar', 'danger');
         }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao atualizar agendamento', 'danger');
     });
 }
 
@@ -775,6 +786,8 @@ function saveAppointmentEdits() {
         showAlert('Por favor, preencha os campos obrigatórios', 'danger');
         return;
     }
+    
+    console.log('[saveAppointmentEdits] Saving changes for app:', currentEvent.id, payload);
     
     fetch(`/api/appointments/${currentEvent.id}`, {
         method: 'PUT',

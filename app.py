@@ -534,8 +534,14 @@ def update_appointment(id):
         appointment.status = data['status']
     if 'notes' in data:
         appointment.notes = data['notes']
+    if 'appointment_type' in data:
+        appointment.appointment_type = data['appointment_type']
     if 'appointmentType' in data:
         appointment.appointment_type = data['appointmentType']
+    if 'patient_type' in data:
+        appointment.patient.patient_type = data['patient_type']
+    if 'patientType' in data:
+        appointment.patient.patient_type = data['patientType']
     
     # Update patient phone if provided
     if 'phone' in data:
