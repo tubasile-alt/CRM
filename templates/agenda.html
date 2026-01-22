@@ -540,6 +540,99 @@
             <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
                 <i class="bi bi-printer"></i> <span class="d-none d-md-inline">Imprimir</span>
             </button>
+            {% if not current_user.is_doctor() %}
+            <button class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#searchPatientModal">
+                <i class="bi bi-search"></i> Procurar Paciente
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Procurar Paciente -->
+<div class="modal fade" id="searchPatientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Procurar Paciente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" id="patientSearchInput" class="form-control" placeholder="Digite nome ou CPF do paciente...">
+                    <button class="btn btn-primary" onclick="searchPatientsDetailed()">Buscar</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Prontuário</th>
+                                <th>Última Consulta</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientSearchResults">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Digite algo para buscar</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalhes/Edição Paciente (Secretaria) -->
+<div class="modal fade" id="patientDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="patientDetailTitle">Ficha do Paciente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Coluna Edição Cadastro -->
+                    <div class="col-md-5 border-end">
+                        <h6 class="mb-3">Dados Cadastrais (Editável)</h6>
+                        <form id="patientEditForm">
+                            <input type="hidden" id="detailPatientId">
+                            <div class="mb-2">
+                                <label class="form-label small">Nome</label>
+                                <input type="text" id="detailPatientName" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">CPF</label>
+                                <input type="text" id="detailPatientCPF" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Telefone</label>
+                                <input type="tel" id="detailPatientPhone" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Nascimento</label>
+                                <input type="date" id="detailPatientBirth" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Endereço</label>
+                                <input type="text" id="detailPatientAddress" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-primary btn-sm w-100" onclick="savePatientChanges()">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                    <!-- Coluna Histórico (Somente Leitura) -->
+                    <div class="col-md-7">
+                        <h6 class="mb-3">Histórico de Consultas (Leitura)</h6>
+                        <div id="patientHistoryList" style="max-height: 500px; overflow-y: auto;">
+                            <!-- Histórico será carregado aqui -->
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

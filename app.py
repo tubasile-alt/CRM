@@ -398,7 +398,72 @@ def get_appointments():
     
     return jsonify(events)
 
-@app.route('/api/appointments', methods=['POST'])
+@app.route('/api/patients/search_detailed')
+@login_required
+def search_detailed_patients():
+    query_str = request.args.get('q', '').strip()
+    if not query_str:
+        return jsonify([])
+    
+    # Busca pacientes por nome ou CPF
+    patients = Patient.query.filter(
+        db.or_(
+            Patient.name.ilike(f'%{query_str}%'),
+            Patient.cpf.ilike(f'%{query_str}%')
+        )
+    ).all()
+    
+    results = []
+    for p in patients:
+        # Busca a última consulta (independente do médico para a secretária ver histórico geral)
+        last_appointment = Appointment.query.filter_by(patient_id=p.id)\
+            .order_by(Appointment.start_time.desc()).first()
+        
+        last_consult_date = last_appointment.start_time.strftime('%d/%m/%Y') if last_appointment else 'Nenhuma'
+        
+        # Prontuário/Código (para a secretária, podemos usar o ID ou um código global se existir)
+        # O CRM usa PatientDoctor para códigos específicos por médico.
+        # Vamos retornar o ID como número do prontuário geral.
+        
+        results.append({
+            'id': p.id,
+            'name': p.name,
+            'cpf': p.cpf or '',
+            'prontuario': p.id,
+            'last_consult': last_consult_date
+        })
+    
+    return jsonify(results)
+
+@app.route('/api/patient/<int:id>/history')
+@login_required
+def get_patient_history(id):
+    patient = Patient.query.get_or_404(id)
+    notes = Note.query.filter_by(patient_id=id).order_by(Note.created_at.desc()).all()
+    
+    history = []
+    for note in notes:
+        history.append({
+            'date': note.created_at.strftime('%d/%m/%Y %H:%M'),
+            'category': note.category,
+            'content': note.content,
+            'doctor': note.doctor.name if note.doctor else 'Desconhecido'
+        })
+    
+    return jsonify({
+        'patient': {
+            'id': patient.id,
+            'name': patient.name,
+            'phone': patient.phone,
+            'cpf': patient.cpf,
+            'birth_date': patient.birth_date,
+            'address': patient.address,
+            'city': patient.city,
+            'patient_type': patient.patient_type
+        },
+        'history': history
+    })
+
 @login_required
 def create_appointment():
     data = request.get_json(silent=True)

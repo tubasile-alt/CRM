@@ -31,7 +31,105 @@ document.addEventListener('DOMContentLoaded', function() {
     startWaitingRoomUpdates();
 });
 
-function setupPatientAutocomplete() {
+function searchPatientsDetailed() {
+    const query = document.getElementById('patientSearchInput').value.trim();
+    if (query.length < 2) return;
+    
+    const resultsTable = document.getElementById('patientSearchResults');
+    resultsTable.innerHTML = '<tr><td colspan="4" class="text-center"><div class="spinner-border spinner-border-sm"></div> Buscando...</td></tr>';
+    
+    fetch(`/api/patients/search_detailed?q=${encodeURIComponent(query)}`)
+        .then(r => r.json())
+        .then(patients => {
+            resultsTable.innerHTML = '';
+            if (patients.length === 0) {
+                resultsTable.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum paciente encontrado</td></tr>';
+                return;
+            }
+            
+            patients.forEach(p => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${p.name}</td>
+                    <td>${p.prontuario}</td>
+                    <td>${p.last_consult}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="openPatientDetail(${p.id})">Acessar Ficha</button>
+                    </td>
+                `;
+                resultsTable.appendChild(tr);
+            });
+        });
+}
+
+function openPatientDetail(patientId) {
+    fetch(`/api/patient/${patientId}/history`)
+        .then(r => r.json())
+        .then(data => {
+            const p = data.patient;
+            document.getElementById('detailPatientId').value = p.id;
+            document.getElementById('detailPatientName').value = p.name || '';
+            document.getElementById('detailPatientCPF').value = p.cpf || '';
+            document.getElementById('detailPatientPhone').value = p.phone || '';
+            document.getElementById('detailPatientBirth').value = p.birth_date || '';
+            document.getElementById('detailPatientAddress').value = p.address || '';
+            
+            const historyList = document.getElementById('patientHistoryList');
+            historyList.innerHTML = '';
+            
+            if (data.history.length === 0) {
+                historyList.innerHTML = '<div class="alert alert-light text-center">Nenhum histórico encontrado.</div>';
+            } else {
+                data.history.forEach(h => {
+                    const card = document.createElement('div');
+                    card.className = 'card mb-2 shadow-sm';
+                    card.innerHTML = `
+                        <div class="card-body p-2">
+                            <div class="d-flex justify-content-between mb-1">
+                                <strong class="small">${h.date} - ${h.category}</strong>
+                                <span class="badge bg-light text-dark small">Dr. ${h.doctor}</span>
+                            </div>
+                            <div class="p-2 bg-light rounded small" style="white-space: pre-wrap; font-family: monospace;">${h.content || '(Sem conteúdo)'}</div>
+                        </div>
+                    `;
+                    historyList.appendChild(card);
+                });
+            }
+            
+            // Fechar modal de busca e abrir ficha
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('searchPatientModal')).hide();
+            new bootstrap.Modal(document.getElementById('patientDetailModal')).show();
+        });
+}
+
+function savePatientChanges() {
+    const id = document.getElementById('detailPatientId').value;
+    const data = {
+        name: document.getElementById('detailPatientName').value,
+        cpf: document.getElementById('detailPatientCPF').value,
+        phone: document.getElementById('detailPatientPhone').value,
+        birth_date: document.getElementById('detailPatientBirth').value,
+        address: document.getElementById('detailPatientAddress').value
+    };
+    
+    fetch(`/api/patients/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showAlert('Dados do paciente atualizados com sucesso!');
+        } else {
+            showAlert(res.error || 'Erro ao salvar alterações', 'danger');
+        }
+    });
+}
+
     const patientInput = document.getElementById('patientName');
     const suggestionsDiv = document.getElementById('patientSuggestions');
     
