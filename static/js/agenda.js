@@ -1,5 +1,6 @@
 (function() {
     let appointmentsList = [];
+    let waitingRoomData = [];
     let calendar = null;
     let selectedDate = new Date();
     let currentDoctorFilter = null;
@@ -229,27 +230,113 @@
         miniCalendar.innerHTML = html;
     };
 
+    function getAppointmentTypeClass(type) {
+        const typeMap = {
+            'Particular': 'appointment-particular',
+            'Retorno': 'appointment-retorno',
+            'UNIMED': 'appointment-unimed',
+            'Cortesia': 'appointment-cortesia',
+            'Transplante Capilar': 'appointment-transplante',
+            'Botox': 'appointment-botox',
+            'Laser': 'appointment-laser',
+            'Preenchimento': 'appointment-preenchimento'
+        };
+        return typeMap[type] || 'appointment-particular';
+    }
+
     window.renderDayView = function() {
-        const grid = document.getElementById('appointmentsGrid');
-        if (!grid) return;
-        grid.innerHTML = '';
-        const dateStr = selectedDate.toISOString().split('T')[0];
-        const filtered = appointmentsList.filter(a => a.start.startsWith(dateStr) && (!currentDoctorFilter || a.extendedProps?.doctorId == currentDoctorFilter));
+        const appointmentsGrid = document.getElementById('appointmentsGrid');
+        if (!appointmentsGrid) return;
+        appointmentsGrid.innerHTML = '';
         
-        if (filtered.length === 0) {
-            grid.innerHTML = '<div class="empty-schedule">Nenhum agendamento</div>';
+        const dayAppointments = appointmentsList.filter(app => {
+            const appDateStr = app.start.split('T')[0];
+            const selectedDateStr = selectedDate.getFullYear() + '-' + 
+                                   String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                                   String(selectedDate.getDate()).padStart(2, '0');
+            const doctorMatch = !currentDoctorFilter || app.extendedProps?.doctorId == currentDoctorFilter;
+            return appDateStr === selectedDateStr && doctorMatch;
+        });
+        
+        if (dayAppointments.length === 0) {
+            appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
             return;
         }
 
-        filtered.sort((a, b) => a.start.localeCompare(b.start)).forEach(app => {
+        dayAppointments.sort((a, b) => {
+            const startA = parseLocalDateTime(a.start);
+            const startB = parseLocalDateTime(b.start);
+            return startA - startB;
+        });
+
+        dayAppointments.forEach(app => {
             const start = parseLocalDateTime(app.start);
-            const timeStr = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
-            const patientName = app.title.split(' - ')[0];
+            const timeStr = String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0');
+            const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
+            const appointmentType = app.extendedProps?.appointmentType || app.appointmentType || 'Particular';
+            const patientType = app.extendedProps?.patientType || app.patientType || 'Particular';
+            const patientCode = app.extendedProps?.patientCode || '-';
+            const status = app.extendedProps?.status || app.status || 'agendado';
+            const typeClass = getAppointmentTypeClass(appointmentType);
+            const statusClass = `status-${status}`;
+            const patientId = app.extendedProps?.patientId || app.patientId;
+
             const block = document.createElement('div');
-            block.className = `appointment-block appointment-${(app.extendedProps?.appointmentType || 'particular').toLowerCase().replace(/\s+/g, '-')}`;
-            block.innerHTML = `<div class="appointment-info-line"><b>${timeStr}</b> ${patientName}</div>`;
+            block.className = `appointment-block ${typeClass} ${statusClass}`;
+            block.style.cursor = 'pointer';
+            block.dataset.appointmentId = app.id;
+
+            const isWaiting = app.extendedProps?.waiting || app.waiting || false;
+            let actionBadgeHtml = '';
+            
+            if (status === 'atendido') {
+                actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
+            } else if (status === 'faltou') {
+                actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>`;
+            } else if (isWaiting) {
+                actionBadgeHtml = `<span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>`;
+            } else {
+                actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+            }
+
+            block.innerHTML = `
+                <div class="appointment-content">
+                    <div class="appointment-info-line">
+                        <span class="appointment-time-badge">${timeStr}</span>
+                        <span class="appointment-name" onclick="event.stopPropagation(); goToPatientChart(${patientId}, ${app.id})" style="cursor:pointer; text-decoration:underline;">${patientName}</span>
+                        <span class="appointment-code">cod:${patientCode}</span>
+                        <span class="appointment-type-label">pac:${patientType}</span>
+                        <span class="appointment-consult-label">cons:${appointmentType}</span>
+                        ${actionBadgeHtml}
+                    </div>
+                </div>
+            `;
+
             block.onclick = () => selectAppointment(app);
-            grid.appendChild(block);
+            appointmentsGrid.appendChild(block);
+        });
+    };
+
+    window.goToPatientChart = function(patientId, appointmentId) {
+        if (patientId) {
+            window.location.href = `/prontuario/${patientId}?appointment_id=${appointmentId}`;
+        }
+    };
+
+    window.doCheckin = function(appointmentId) {
+        fetch(`/espera/api/checkin/${appointmentId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Check-in realizado!');
+                loadAppointments();
+                loadWaitingRoom();
+            } else {
+                showAlert(data.error || 'Erro no check-in', 'danger');
+            }
         });
     };
 
@@ -278,13 +365,19 @@
 
     function selectAppointment(app) {
         currentEvent = app;
-        if (window.isSecretary) openEditAppointmentModal(app);
-        else showEventDetails(app);
+        if (window.isSecretary) {
+            openEditAppointmentModal(app);
+        } else {
+            showEventDetails(app);
+        }
     }
 
     function openEditAppointmentModal(app) {
         const modalEl = document.getElementById('editAppointmentModal');
-        if (!modalEl) return;
+        if (!modalEl) {
+            showEventDetails(app);
+            return;
+        }
         document.getElementById('editAppointmentId').value = app.id;
         document.getElementById('editPatientName').value = app.title.split(' - ')[0];
         const start = parseLocalDateTime(app.start);
@@ -365,15 +458,19 @@
             const list = document.getElementById('waitingRoomList');
             if (!list) return;
             const items = d.waiting_list || [];
-            list.innerHTML = items.length ? items.map(p => `<div class="waiting-patient-item">${p.patient_name}</div>`).join('') : '<div class="waiting-empty">Vazio</div>';
+            waitingRoomData = items;
+            list.innerHTML = items.length ? items.map(p => `<div class="waiting-patient-item">${p.patient_name} <small class="text-muted">(${p.wait_time || '0 min'})</small></div>`).join('') : '<div class="waiting-empty">Sala de espera vazia</div>';
         });
     }
 
     function openNewAppointmentAtTime(h, m) {
         const date = selectedDate.toISOString().split('T')[0];
-        document.getElementById('appointmentDate').value = date;
-        document.getElementById('appointmentTime').value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        new bootstrap.Modal(document.getElementById('newAppointmentModal')).show();
+        const dateInput = document.getElementById('appointmentDate');
+        const timeInput = document.getElementById('appointmentTime');
+        if (dateInput) dateInput.value = date;
+        if (timeInput) timeInput.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        const modal = document.getElementById('newAppointmentModal');
+        if (modal) new bootstrap.Modal(modal).show();
     }
 
     function formatDateBR(date) {
@@ -383,8 +480,22 @@
     }
 
     window.showEventDetails = function(event) {
-        const props = event.extendedProps;
-        const patientName = event.title.split(' - ')[0];
+        let props, patientName, startDate, endDate;
+        
+        if (event.extendedProps) {
+            props = event.extendedProps;
+            patientName = event.title ? event.title.split(' - ')[0] : 'Paciente';
+            startDate = typeof event.start === 'string' ? parseLocalDateTime(event.start) : event.start;
+            endDate = typeof event.end === 'string' ? parseLocalDateTime(event.end) : event.end;
+        } else {
+            props = event;
+            patientName = event.title ? event.title.split(' - ')[0] : 'Paciente';
+            startDate = parseLocalDateTime(event.start);
+            endDate = parseLocalDateTime(event.end);
+        }
+        
+        if (!startDate) startDate = new Date();
+        if (!endDate) endDate = new Date(startDate.getTime() + 30*60*1000);
         
         function formatToLocalDateTime(date) {
             const year = date.getFullYear();
@@ -395,8 +506,8 @@
             return `${year}-${month}-${day}T${hours}:${minutes}`;
         }
         
-        const startDateTime = formatToLocalDateTime(event.start);
-        const endDateTime = formatToLocalDateTime(event.end);
+        const startDateTime = formatToLocalDateTime(startDate);
+        const endDateTime = formatToLocalDateTime(endDate);
         
         const statusLabels = {
             'agendado': 'Agendado',
@@ -414,29 +525,29 @@
             detailsHtml = `
                 <div class="mb-3">
                     <label class="form-label"><strong>Paciente</strong></label>
-                    <input type="text" class="form-control" id="editPatientName" value="${patientName}">
+                    <input type="text" class="form-control" id="modalEditPatientName" value="${patientName}">
                 </div>
                 <div class="mb-3">
                     <label class="form-label"><strong>Data/Hora Início</strong></label>
-                    <input type="datetime-local" class="form-control" id="editStartTime" value="${startDateTime}">
+                    <input type="datetime-local" class="form-control" id="modalEditStartTime" value="${startDateTime}">
                 </div>
                 <div class="mb-3">
                     <label class="form-label"><strong>Data/Hora Fim</strong></label>
-                    <input type="datetime-local" class="form-control" id="editEndTime" value="${endDateTime}">
+                    <input type="datetime-local" class="form-control" id="modalEditEndTime" value="${endDateTime}">
                 </div>
                 <div class="mb-3">
                     <label class="form-label"><strong>Telefone</strong></label>
-                    <input type="tel" class="form-control" id="editPhone" value="${props.phone || ''}">
+                    <input type="tel" class="form-control" id="modalEditPhone" value="${props.phone || ''}">
                 </div>
                 <div class="mb-3">
                     <label class="form-label"><strong>Tipo de Consulta</strong></label>
-                    <select class="form-select" id="editAppointmentType">
+                    <select class="form-select" id="modalEditAppointmentType">
                         ${appointmentTypes.map(type => `<option value="${type}" ${props.appointmentType === type ? 'selected' : ''}>${type}</option>`).join('')}
                     </select>
                 </div>
                 <div class="mb-3">
                     <label class="form-label"><strong>Status</strong></label>
-                    <select class="form-select" id="editStatus">
+                    <select class="form-select" id="modalEditStatus">
                         <option value="agendado" ${props.status === 'agendado' ? 'selected' : ''}>Agendado</option>
                         <option value="confirmado" ${props.status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
                         <option value="atendido" ${props.status === 'atendido' ? 'selected' : ''}>Atendido</option>
@@ -445,15 +556,16 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label"><strong>Observações</strong></label>
-                    <textarea class="form-control" id="editNotes" rows="3">${props.notes || ''}</textarea>
+                    <textarea class="form-control" id="modalEditNotes" rows="3">${props.notes || ''}</textarea>
                 </div>
             `;
         } else {
             const appointmentType = props.appointmentType || 'Particular';
             const status = props.status || 'agendado';
+            const patientId = props.patientId;
             detailsHtml = `
-                <p><strong>Paciente:</strong> ${patientName}</p>
-                <p><strong>Data/Hora:</strong> ${formatDateTime(event.start)}</p>
+                <p><strong>Paciente:</strong> <a href="#" onclick="goToPatientChart(${patientId}, ${currentEvent?.id || event.id}); return false;">${patientName}</a></p>
+                <p><strong>Data/Hora:</strong> ${startDate.toLocaleDateString('pt-BR')} ${String(startDate.getHours()).padStart(2,'0')}:${String(startDate.getMinutes()).padStart(2,'0')}</p>
                 <p><strong>Tipo:</strong> ${appointmentType}</p>
                 <p><strong>Status:</strong> <span class="badge bg-secondary">${statusLabels[status]}</span></p>
                 ${props.phone ? `<p><strong>Telefone:</strong> ${props.phone}</p>` : ''}
@@ -497,16 +609,16 @@
     };
 
     window.saveAppointmentEdits = function() {
-        const startStr = document.getElementById('editStartTime').value;
-        const endStr = document.getElementById('editEndTime').value;
+        const startStr = document.getElementById('modalEditStartTime').value;
+        const endStr = document.getElementById('modalEditEndTime').value;
         const payload = {
-            patientName: document.getElementById('editPatientName').value,
+            patientName: document.getElementById('modalEditPatientName').value,
             start: startStr + ':00',
             end: endStr + ':00',
-            phone: document.getElementById('editPhone').value,
-            appointmentType: document.getElementById('editAppointmentType').value,
-            status: document.getElementById('editStatus').value,
-            notes: document.getElementById('editNotes').value
+            phone: document.getElementById('modalEditPhone').value,
+            appointmentType: document.getElementById('modalEditAppointmentType').value,
+            status: document.getElementById('modalEditStatus').value,
+            notes: document.getElementById('modalEditNotes').value
         };
         fetch(`/api/appointments/${currentEvent.id}`, {
             method: 'PUT',
@@ -541,16 +653,11 @@
     };
 
     window.openPatientChart = function() {
-        let patientId = currentEvent.extendedProps?.patientId || currentEvent.extendedProps?.extendedProps?.patientId;
+        let patientId = currentEvent?.extendedProps?.patientId || currentEvent?.patientId;
         if (patientId) {
             window.location.href = `/prontuario/${patientId}?appointment_id=${currentEvent.id}`;
         }
     };
-
-    function formatDateTime(date) {
-        const d = new Date(date);
-        return d.toLocaleDateString('pt-BR') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    }
 
     window.filterByDoctor = function(doctorId) {
         currentDoctorFilter = doctorId === 'all' ? null : doctorId;
@@ -566,15 +673,15 @@
         const monthBtn = document.getElementById('monthViewBtn');
         
         if (view === 'day') {
-            dayContent.style.display = 'grid';
-            monthContent.style.display = 'none';
-            dayBtn.classList.add('active');
-            monthBtn.classList.remove('active');
+            if (dayContent) dayContent.style.display = 'grid';
+            if (monthContent) monthContent.style.display = 'none';
+            if (dayBtn) dayBtn.classList.add('active');
+            if (monthBtn) monthBtn.classList.remove('active');
         } else {
-            dayContent.style.display = 'none';
-            monthContent.style.display = 'block';
-            dayBtn.classList.remove('active');
-            monthBtn.classList.add('active');
+            if (dayContent) dayContent.style.display = 'none';
+            if (monthContent) monthContent.style.display = 'block';
+            if (dayBtn) dayBtn.classList.remove('active');
+            if (monthBtn) monthBtn.classList.add('active');
             if (!calendar) initializeMonthCalendar();
         }
     };
