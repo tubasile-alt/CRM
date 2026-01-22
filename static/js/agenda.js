@@ -1,13 +1,10 @@
-let appointmentsList = [];
-let waitingRoomData = [];
-let calendar = null;
-let selectedDate = new Date();
-let currentDoctorFilter = null;
-let currentView = 'day';
-let currentEvent = null;
-
-// Use a self-executing function to avoid global namespace pollution
 (function() {
+    let appointmentsList = [];
+    let calendar = null;
+    let selectedDate = new Date();
+    let currentDoctorFilter = null;
+    let currentView = 'day';
+    let currentEvent = null;
     let webcamStream = null;
 
     window.parseLocalDateTime = function(isoString) {
@@ -386,9 +383,174 @@ let currentEvent = null;
     }
 
     window.showEventDetails = function(event) {
-        // Implementation for showEventDetails
-        console.log('Showing event details:', event);
+        const props = event.extendedProps;
+        const patientName = event.title.split(' - ')[0];
+        
+        function formatToLocalDateTime(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+        
+        const startDateTime = formatToLocalDateTime(event.start);
+        const endDateTime = formatToLocalDateTime(event.end);
+        
+        const statusLabels = {
+            'agendado': 'Agendado',
+            'confirmado': 'Confirmado',
+            'atendido': 'Atendido',
+            'faltou': 'Faltou'
+        };
+        
+        const appointmentTypes = ['Particular', 'Botox', 'Retorno Botox', 'Laser', 'Preenchimento', 'Ulthera', 'Infiltração Capilar', 'Soroterapia', 'Pequena Cirurgia', 'Retirada de Ponto', 'Nitrogênio Líquido', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
+        const isSecretary = window.isSecretary === true;
+        
+        let detailsHtml = '';
+        
+        if (isSecretary) {
+            detailsHtml = `
+                <div class="mb-3">
+                    <label class="form-label"><strong>Paciente</strong></label>
+                    <input type="text" class="form-control" id="editPatientName" value="${patientName}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Data/Hora Início</strong></label>
+                    <input type="datetime-local" class="form-control" id="editStartTime" value="${startDateTime}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Data/Hora Fim</strong></label>
+                    <input type="datetime-local" class="form-control" id="editEndTime" value="${endDateTime}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Telefone</strong></label>
+                    <input type="tel" class="form-control" id="editPhone" value="${props.phone || ''}">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Tipo de Consulta</strong></label>
+                    <select class="form-select" id="editAppointmentType">
+                        ${appointmentTypes.map(type => `<option value="${type}" ${props.appointmentType === type ? 'selected' : ''}>${type}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Status</strong></label>
+                    <select class="form-select" id="editStatus">
+                        <option value="agendado" ${props.status === 'agendado' ? 'selected' : ''}>Agendado</option>
+                        <option value="confirmado" ${props.status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
+                        <option value="atendido" ${props.status === 'atendido' ? 'selected' : ''}>Atendido</option>
+                        <option value="faltou" ${props.status === 'faltou' ? 'selected' : ''}>Faltou</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Observações</strong></label>
+                    <textarea class="form-control" id="editNotes" rows="3">${props.notes || ''}</textarea>
+                </div>
+            `;
+        } else {
+            const appointmentType = props.appointmentType || 'Particular';
+            const status = props.status || 'agendado';
+            detailsHtml = `
+                <p><strong>Paciente:</strong> ${patientName}</p>
+                <p><strong>Data/Hora:</strong> ${formatDateTime(event.start)}</p>
+                <p><strong>Tipo:</strong> ${appointmentType}</p>
+                <p><strong>Status:</strong> <span class="badge bg-secondary">${statusLabels[status]}</span></p>
+                ${props.phone ? `<p><strong>Telefone:</strong> ${props.phone}</p>` : ''}
+                ${props.notes ? `<p><strong>Observações:</strong> ${props.notes}</p>` : ''}
+                <div class="mt-3">
+                    <label class="form-label">Alterar Status:</label>
+                    <select class="form-select" id="eventStatusUpdate">
+                        <option value="agendado" ${status === 'agendado' ? 'selected' : ''}>Agendado</option>
+                        <option value="confirmado" ${status === 'confirmado' ? 'selected' : ''}>Confirmado</option>
+                        <option value="atendido" ${status === 'atendido' ? 'selected' : ''}>Atendido</option>
+                        <option value="faltou" ${status === 'faltou' ? 'selected' : ''}>Faltou</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary mt-2" onclick="updateEventStatus()">Atualizar Status</button>
+                </div>
+            `;
+        }
+        
+        const detailsEl = document.getElementById('eventDetails');
+        if (detailsEl) detailsEl.innerHTML = detailsHtml;
+        
+        const footer = document.querySelector('#eventDetailModal .modal-footer');
+        if (footer) {
+            let saveBtn = document.getElementById('saveEditBtn');
+            if (isSecretary) {
+                if (!saveBtn) {
+                    saveBtn = document.createElement('button');
+                    saveBtn.id = 'saveEditBtn';
+                    saveBtn.type = 'button';
+                    saveBtn.className = 'btn btn-success';
+                    saveBtn.innerHTML = '<i class="bi bi-save"></i> Salvar Alterações';
+                    saveBtn.onclick = window.saveAppointmentEdits;
+                    footer.insertBefore(saveBtn, footer.firstChild);
+                }
+            } else {
+                if (saveBtn) saveBtn.remove();
+            }
+        }
+        
+        const modalEl = document.getElementById('eventDetailModal');
+        if (modalEl) new bootstrap.Modal(modalEl).show();
     };
+
+    window.saveAppointmentEdits = function() {
+        const startStr = document.getElementById('editStartTime').value;
+        const endStr = document.getElementById('editEndTime').value;
+        const payload = {
+            patientName: document.getElementById('editPatientName').value,
+            start: startStr + ':00',
+            end: endStr + ':00',
+            phone: document.getElementById('editPhone').value,
+            appointmentType: document.getElementById('editAppointmentType').value,
+            status: document.getElementById('editStatus').value,
+            notes: document.getElementById('editNotes').value
+        };
+        fetch(`/api/appointments/${currentEvent.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify(payload)
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                showAlert('Atualizado!');
+                loadAppointments();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('eventDetailModal'));
+                if (modal) modal.hide();
+            } else {
+                showAlert(data.error || 'Erro', 'danger');
+            }
+        });
+    };
+
+    window.updateEventStatus = function() {
+        const newStatus = document.getElementById('eventStatusUpdate').value;
+        fetch(`/api/appointments/${currentEvent.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify({ status: newStatus })
+        }).then(r => r.json()).then(data => {
+            if (data.success) {
+                showAlert('Status atualizado!');
+                loadAppointments();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('eventDetailModal'));
+                if (modal) modal.hide();
+            }
+        });
+    };
+
+    window.openPatientChart = function() {
+        let patientId = currentEvent.extendedProps?.patientId || currentEvent.extendedProps?.extendedProps?.patientId;
+        if (patientId) {
+            window.location.href = `/prontuario/${patientId}?appointment_id=${currentEvent.id}`;
+        }
+    };
+
+    function formatDateTime(date) {
+        const d = new Date(date);
+        return d.toLocaleDateString('pt-BR') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
 
     window.filterByDoctor = function(doctorId) {
         currentDoctorFilter = doctorId === 'all' ? null : doctorId;
