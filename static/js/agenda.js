@@ -42,7 +42,7 @@ function searchPatientsDetailed() {
         .then(r => r.json())
         .then(patients => {
             resultsTable.innerHTML = '';
-            if (patients.length === 0) {
+            if (!Array.isArray(patients) || patients.length === 0) {
                 resultsTable.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum paciente encontrado</td></tr>';
                 return;
             }
@@ -59,6 +59,10 @@ function searchPatientsDetailed() {
                 `;
                 resultsTable.appendChild(tr);
             });
+        })
+        .catch(err => {
+            console.error('Erro na busca detalhada:', err);
+            resultsTable.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Erro ao buscar pacientes</td></tr>';
         });
 }
 
@@ -130,8 +134,11 @@ function savePatientChanges() {
     });
 }
 
+function setupPatientAutocomplete() {
     const patientInput = document.getElementById('patientName');
     const suggestionsDiv = document.getElementById('patientSuggestions');
+    
+    if (!patientInput || !suggestionsDiv) return;
     
     patientInput.addEventListener('input', function() {
         const query = this.value.trim();
@@ -145,7 +152,6 @@ function savePatientChanges() {
             doctorId = document.getElementById('appointmentDoctor').value || '';
         }
         
-        // Build URL - only include doctor_id if it has a value
         const url = doctorId 
             ? `/api/patients/search?q=${encodeURIComponent(query)}&doctor_id=${doctorId}`
             : `/api/patients/search?q=${encodeURIComponent(query)}`;
@@ -188,6 +194,95 @@ function savePatientChanges() {
         }
     });
 }
+
+let webcamStream = null;
+function startWebcam(videoId, placeholderId) {
+    const video = document.getElementById(videoId);
+    const placeholder = document.getElementById(placeholderId);
+    
+    if (!video) return;
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function(stream) {
+                webcamStream = stream;
+                video.srcObject = stream;
+                video.style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+                
+                const startBtn = document.getElementById('start-webcam-btn');
+                const captureBtn = document.getElementById('capture-photo-btn');
+                if (startBtn) startBtn.style.display = 'none';
+                if (captureBtn) captureBtn.style.display = 'inline-block';
+            })
+            .catch(function(error) {
+                console.error("Erro ao acessar a webcam:", error);
+                alert("Não foi possível acessar a câmera. Verifique as permissões.");
+            });
+    }
+}
+
+function stopWebcam() {
+    if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+        webcamStream = null;
+    }
+    const video = document.getElementById('webcam-video');
+    const placeholder = document.getElementById('webcam-placeholder');
+    if (video) {
+        video.srcObject = null;
+        video.style.display = 'none';
+    }
+    if (placeholder) placeholder.style.display = 'flex';
+    
+    const startBtn = document.getElementById('start-webcam-btn');
+    const captureBtn = document.getElementById('capture-photo-btn');
+    const retakeBtn = document.getElementById('retake-photo-btn');
+    if (startBtn) startBtn.style.display = 'inline-block';
+    if (captureBtn) captureBtn.style.display = 'none';
+    if (retakeBtn) retakeBtn.style.display = 'none';
+}
+
+function capturePhoto() {
+    const video = document.getElementById('webcam-video');
+    const canvas = document.getElementById('photo-canvas');
+    const preview = document.getElementById('patient-photo-preview');
+    const photoDataInput = document.getElementById('patientPhotoData');
+    
+    if (!video || !canvas || !preview) return;
+    
+    const context = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    const dataURL = canvas.toDataURL('image/jpeg');
+    preview.src = dataURL;
+    preview.style.display = 'block';
+    video.style.display = 'none';
+    if (photoDataInput) photoDataInput.value = dataURL;
+    
+    document.getElementById('capture-photo-btn').style.display = 'none';
+    document.getElementById('retake-photo-btn').style.display = 'inline-block';
+    
+    stopWebcam();
+}
+
+// Global initialization for webcam buttons
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'start-webcam-btn' || e.target.closest('#start-webcam-btn')) {
+        startWebcam('webcam-video', 'webcam-placeholder');
+    }
+    if (e.target && e.target.id === 'capture-photo-btn' || e.target.closest('#capture-photo-btn')) {
+        capturePhoto();
+    }
+    if (e.target && e.target.id === 'retake-photo-btn' || e.target.closest('#retake-photo-btn')) {
+        const preview = document.getElementById('patient-photo-preview');
+        if (preview) preview.style.display = 'none';
+        startWebcam('webcam-video', 'webcam-placeholder');
+    }
+});
+
 
 function selectPatient(patient) {
     document.getElementById('selectedPatientId').value = patient.id;

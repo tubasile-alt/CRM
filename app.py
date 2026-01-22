@@ -464,6 +464,7 @@ def get_patient_history(id):
         'history': history
     })
 
+@app.route('/api/appointments', methods=['POST'])
 @login_required
 def create_appointment():
     data = request.get_json(silent=True)
