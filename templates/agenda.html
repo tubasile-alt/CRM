@@ -620,6 +620,34 @@
             </div>
             <div class="modal-body" style="padding: 15px;">
                 <form id="appointmentForm">
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label d-block text-center"><strong>Foto do Paciente</strong></label>
+                            <div class="d-flex flex-column align-items-center">
+                                <div id="webcam-container" style="width: 240px; height: 180px; background: #eee; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; position: relative; margin-bottom: 10px;">
+                                    <video id="webcam-video" width="240" height="180" autoplay playsinline style="display: none; object-fit: cover;"></video>
+                                    <canvas id="photo-canvas" width="240" height="180" style="display: none;"></canvas>
+                                    <img id="patient-photo-preview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                                    <div id="webcam-placeholder" class="d-flex align-items-center justify-content-center h-100">
+                                        <i class="bi bi-person-bounding-box" style="font-size: 3rem; color: #ccc;"></i>
+                                    </div>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary" id="start-webcam-btn">
+                                        <i class="bi bi-camera"></i> Iniciar Câmera
+                                    </button>
+                                    <button type="button" class="btn btn-primary" id="capture-photo-btn" style="display: none;">
+                                        <i class="bi bi-camera-fill"></i> Tirar Foto
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="retake-photo-btn" style="display: none;">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Nova Foto
+                                    </button>
+                                </div>
+                                <input type="hidden" id="patientPhotoData">
+                            </div>
+                        </div>
+                    </div>
+                    
                     {% if not current_user.is_doctor() %}
                     <div class="row mb-2">
                         <div class="col-12">
@@ -857,6 +885,58 @@
             </div>
             <div class="modal-body">
                 <input type="hidden" id="editAppointmentId">
+                
+                <div class="mb-3 text-center">
+                    <label class="form-label d-block"><strong>Foto do Paciente</strong></label>
+                    <div class="d-flex flex-column align-items-center">
+                        <div id="edit-webcam-container" style="width: 200px; height: 150px; background: #eee; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; position: relative; margin-bottom: 10px;">
+                            <video id="edit-webcam-video" width="200" height="150" autoplay playsinline style="display: none; object-fit: cover;"></video>
+                            <canvas id="edit-photo-canvas" width="200" height="150" style="display: none;"></canvas>
+                            <img id="edit-patient-photo-preview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                            <div id="edit-webcam-placeholder" class="d-flex align-items-center justify-content-center h-100">
+                                <i class="bi bi-person-bounding-box" style="font-size: 2.5rem; color: #ccc;"></i>
+                            </div>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-primary" id="edit-start-webcam-btn">
+                                <i class="bi bi-camera"></i> Câmera
+                            </button>
+                            <button type="button" class="btn btn-primary" id="edit-capture-photo-btn" style="display: none;">
+                                <i class="bi bi-camera-fill"></i> Tirar
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="edit-retake-photo-btn" style="display: none;">
+                                <i class="bi bi-arrow-counterclockwise"></i> Nova
+                            </button>
+                        </div>
+                        <input type="hidden" id="editPatientPhotoData">
+                    </div>
+                </div>
+                
+                <div class="mb-3 text-center">
+                    <label class="form-label d-block"><strong>Foto do Paciente</strong></label>
+                    <div class="d-flex flex-column align-items-center">
+                        <div id="edit-webcam-container" style="width: 200px; height: 150px; background: #eee; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; position: relative; margin-bottom: 10px;">
+                            <video id="edit-webcam-video" width="200" height="150" autoplay playsinline style="display: none; object-fit: cover;"></video>
+                            <canvas id="edit-photo-canvas" width="200" height="150" style="display: none;"></canvas>
+                            <img id="edit-patient-photo-preview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                            <div id="edit-webcam-placeholder" class="d-flex align-items-center justify-content-center h-100">
+                                <i class="bi bi-person-bounding-box" style="font-size: 2.5rem; color: #ccc;"></i>
+                            </div>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-primary" id="edit-start-webcam-btn">
+                                <i class="bi bi-camera"></i> Câmera
+                            </button>
+                            <button type="button" class="btn btn-primary" id="edit-capture-photo-btn" style="display: none;">
+                                <i class="bi bi-camera-fill"></i> Tirar
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="edit-retake-photo-btn" style="display: none;">
+                                <i class="bi bi-arrow-counterclockwise"></i> Nova
+                            </button>
+                        </div>
+                        <input type="hidden" id="editPatientPhotoData">
+                    </div>
+                </div>
                 
                 <div class="mb-3">
                     <label class="form-label">Nome do Paciente</label>

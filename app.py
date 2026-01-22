@@ -445,6 +445,27 @@ def create_appointment():
         )
         db.session.add(patient)
         db.session.flush()
+        
+        # Handle photo for new patient
+        if 'photo_data' in data and data['photo_data']:
+            import base64
+            import os
+            from uuid import uuid4
+            
+            photo_data = data['photo_data']
+            if photo_data.startswith('data:image'):
+                header, encoded = photo_data.split(",", 1)
+                file_ext = header.split(";")[0].split("/")[1]
+                if file_ext == 'jpeg': file_ext = 'jpg'
+                
+                filename = f"patient_{patient.id}_{uuid4().hex}.{file_ext}"
+                filepath = os.path.join('static/uploads/photos', filename)
+                
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                with open(filepath, "wb") as f:
+                    f.write(base64.b64decode(encoded))
+                
+                patient.photo_url = f"/{filepath}"
     else:
         # Atualizar dados do paciente se fornecidos
         if 'patientType' in data:
@@ -547,6 +568,27 @@ def update_appointment(id):
     if 'phone' in data:
         appointment.patient.phone = data['phone']
     
+    # Update patient photo if provided
+    if 'photo_data' in data and data['photo_data']:
+        import base64
+        import os
+        from uuid import uuid4
+        
+        photo_data = data['photo_data']
+        if photo_data.startswith('data:image'):
+            header, encoded = photo_data.split(",", 1)
+            file_ext = header.split(";")[0].split("/")[1]
+            if file_ext == 'jpeg': file_ext = 'jpg'
+            
+            filename = f"patient_{appointment.patient.id}_{uuid4().hex}.{file_ext}"
+            filepath = os.path.join('static/uploads/photos', filename)
+            
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, "wb") as f:
+                f.write(base64.b64decode(encoded))
+            
+            appointment.patient.photo_url = f"/{filepath}"
+
     # Update patient name if provided (find or update existing)
     if 'patientName' in data and data['patientName'] != appointment.patient.name:
         # Check if patient with new name already exists

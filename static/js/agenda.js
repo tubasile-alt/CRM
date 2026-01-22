@@ -501,6 +501,7 @@ function updateAppointmentFromEdit() {
         appointmentType: document.getElementById('editAppointmentType').value,
         start: start.toISOString(),
         end: end.toISOString(),
+        photo_data: document.getElementById('editPatientPhotoData').value,
         // Incluir também versões com underscore para garantir
         patient_name: document.getElementById('editPatientName').value,
         patient_phone: document.getElementById('editPatientPhone').value,
@@ -619,6 +620,75 @@ function initializeMonthCalendar() {
     
     calendar.render();
 }
+
+// Photo handling
+let webcamStream = null;
+
+function setupWebcam(containerId, videoId, canvasId, previewId, placeholderId, startBtnId, captureBtnId, retakeBtnId, photoDataId) {
+    const startBtn = document.getElementById(startBtnId);
+    const captureBtn = document.getElementById(captureBtnId);
+    const retakeBtn = document.getElementById(retakeBtnId);
+    const video = document.getElementById(videoId);
+    const canvas = document.getElementById(canvasId);
+    const preview = document.getElementById(previewId);
+    const placeholder = document.getElementById(placeholderId);
+    const photoData = document.getElementById(photoDataId);
+
+    startBtn.onclick = async () => {
+        try {
+            webcamStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            video.srcObject = webcamStream;
+            video.style.display = 'block';
+            placeholder.style.display = 'none';
+            preview.style.display = 'none';
+            startBtn.style.display = 'none';
+            captureBtn.style.display = 'inline-block';
+            retakeBtn.style.display = 'none';
+        } catch (err) {
+            console.error("Erro ao acessar webcam:", err);
+            showAlert("Não foi possível acessar a webcam.", "danger");
+        }
+    };
+
+    captureBtn.onclick = () => {
+        const context = canvas.getContext('2d');
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const data = canvas.toDataURL('image/jpeg');
+        photoData.value = data;
+        
+        preview.src = data;
+        preview.style.display = 'block';
+        video.style.display = 'none';
+        captureBtn.style.display = 'none';
+        retakeBtn.style.display = 'inline-block';
+        
+        if (webcamStream) {
+            webcamStream.getTracks().forEach(track => track.stop());
+        }
+    };
+
+    retakeBtn.onclick = () => {
+        photoData.value = '';
+        preview.style.display = 'none';
+        placeholder.style.display = 'flex';
+        startBtn.style.display = 'inline-block';
+        retakeBtn.style.display = 'none';
+    };
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // New Appointment Webcam
+    setupWebcam(
+        'webcam-container', 'webcam-video', 'photo-canvas', 'patient-photo-preview', 'webcam-placeholder',
+        'start-webcam-btn', 'capture-photo-btn', 'retake-photo-btn', 'patientPhotoData'
+    );
+    
+    // Edit Appointment Webcam
+    setupWebcam(
+        'edit-webcam-container', 'edit-webcam-video', 'edit-photo-canvas', 'edit-patient-photo-preview', 'edit-webcam-placeholder',
+        'edit-start-webcam-btn', 'edit-capture-photo-btn', 'edit-retake-photo-btn', 'edit-patientPhotoData'
+    );
+});
 
 function loadAppointments() {
     let url = '/api/appointments';
