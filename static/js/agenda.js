@@ -501,7 +501,7 @@ function updateAppointmentFromEdit() {
         appointmentType: document.getElementById('editAppointmentType').value,
         start: start.toISOString(),
         end: end.toISOString(),
-        photo_data: document.getElementById('editPatientPhotoData').value,
+        photo_data: document.getElementById('edit-patientPhotoData')?.value || '',
         // Incluir também versões com underscore para garantir
         patient_name: document.getElementById('editPatientName').value,
         patient_phone: document.getElementById('editPatientPhone').value,
@@ -688,6 +688,58 @@ document.addEventListener('DOMContentLoaded', function() {
         'edit-webcam-container', 'edit-webcam-video', 'edit-photo-canvas', 'edit-patient-photo-preview', 'edit-webcam-placeholder',
         'edit-start-webcam-btn', 'edit-capture-photo-btn', 'edit-retake-photo-btn', 'edit-patientPhotoData'
     );
+    
+    // Clean up webcam when modals close
+    const newModal = document.getElementById('newAppointmentModal');
+    const editModal = document.getElementById('editAppointmentModal');
+    
+    if (newModal) {
+        newModal.addEventListener('hidden.bs.modal', function() {
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+            const video = document.getElementById('webcam-video');
+            const placeholder = document.getElementById('webcam-placeholder');
+            const preview = document.getElementById('patient-photo-preview');
+            const startBtn = document.getElementById('start-webcam-btn');
+            const captureBtn = document.getElementById('capture-photo-btn');
+            const retakeBtn = document.getElementById('retake-photo-btn');
+            const photoData = document.getElementById('patientPhotoData');
+            
+            if (video) video.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'flex';
+            if (preview) preview.style.display = 'none';
+            if (startBtn) startBtn.style.display = 'inline-block';
+            if (captureBtn) captureBtn.style.display = 'none';
+            if (retakeBtn) retakeBtn.style.display = 'none';
+            if (photoData) photoData.value = '';
+        });
+    }
+    
+    if (editModal) {
+        editModal.addEventListener('hidden.bs.modal', function() {
+            if (webcamStream) {
+                webcamStream.getTracks().forEach(track => track.stop());
+                webcamStream = null;
+            }
+            const video = document.getElementById('edit-webcam-video');
+            const placeholder = document.getElementById('edit-webcam-placeholder');
+            const preview = document.getElementById('edit-patient-photo-preview');
+            const startBtn = document.getElementById('edit-start-webcam-btn');
+            const captureBtn = document.getElementById('edit-capture-photo-btn');
+            const retakeBtn = document.getElementById('edit-retake-photo-btn');
+            const photoData = document.getElementById('edit-patientPhotoData');
+            
+            if (video) video.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'flex';
+            if (preview) preview.style.display = 'none';
+            if (startBtn) startBtn.style.display = 'inline-block';
+            if (captureBtn) captureBtn.style.display = 'none';
+            if (retakeBtn) retakeBtn.style.display = 'none';
+            if (photoData) photoData.value = '';
+        });
+    }
 });
 
 function loadAppointments() {
@@ -1053,6 +1105,9 @@ function saveAppointment() {
         return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
     }
     
+    const photoDataEl = document.getElementById('patientPhotoData');
+    const photoData = photoDataEl ? photoDataEl.value : null;
+    
     const payload = {
         patientName: patientName,
         phone: phone || null,
@@ -1068,7 +1123,8 @@ function saveAppointment() {
         status: status,
         appointmentType: appointmentType,
         notes: notes || null,
-        surgery_name: surgeryName || null
+        surgery_name: surgeryName || null,
+        photo_data: photoData || null
     };
     
     if (doctor_id) {
@@ -1099,6 +1155,18 @@ function saveAppointment() {
             bootstrap.Modal.getInstance(document.getElementById('newAppointmentModal')).hide();
             document.getElementById('appointmentForm').reset();
             document.getElementById('surgeryNameRow').style.display = 'none';
+            
+            // Limpar dados da foto após salvar
+            if (document.getElementById('patientPhotoData')) {
+                document.getElementById('patientPhotoData').value = '';
+            }
+            if (document.getElementById('patient-photo-preview')) {
+                document.getElementById('patient-photo-preview').style.display = 'none';
+            }
+            if (document.getElementById('webcam-placeholder')) {
+                document.getElementById('webcam-placeholder').style.display = 'flex';
+            }
+            stopWebcam();
         } else {
             showAlert(data.error || 'Erro ao criar agendamento', 'danger');
         }
@@ -1338,3 +1406,10 @@ function startWaitingRoomUpdates() {
     // Primeira atualização imediata após 100ms
     setTimeout(updateWaitingTimers, 100);
 }
+
+// Page unload cleanup for webcam streams
+window.addEventListener('beforeunload', function() {
+    if (webcamStream) {
+        webcamStream.getTracks().forEach(track => track.stop());
+    }
+});

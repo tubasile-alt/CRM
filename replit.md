@@ -40,6 +40,7 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **Link DermaScribe no menu** - Acesso direto ao receituário pelo menu principal (apenas médicos)
 - ✅ **Persistência de Prescrições** - Receitas salvas diretamente no prontuário do paciente
 - ✅ **Analytics de Medicamentos** - Rastreamento de uso para estatísticas de prescrição
+- ✅ **Webcam Foto Paciente** - Captura de foto via webcam no agendamento (novo e edição)
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 
