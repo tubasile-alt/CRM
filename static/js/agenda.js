@@ -484,6 +484,12 @@ function updateAppointmentFromEdit() {
     const timeStr = document.getElementById('editAppointmentTime').value;
     const duration = parseInt(document.getElementById('editAppointmentDuration').value);
     
+    // Validar se temos data e hora
+    if (!dateStr || !timeStr) {
+        showAlert('Data e hora são obrigatórias', 'danger');
+        return;
+    }
+
     const start = new Date(dateStr + 'T' + timeStr);
     const end = new Date(start.getTime() + duration * 60000);
     
@@ -494,7 +500,12 @@ function updateAppointmentFromEdit() {
         patientType: document.getElementById('editPatientType').value,
         appointmentType: document.getElementById('editAppointmentType').value,
         start: start.toISOString(),
-        end: end.toISOString()
+        end: end.toISOString(),
+        // Incluir também versões com underscore para garantir
+        patient_name: document.getElementById('editPatientName').value,
+        patient_phone: document.getElementById('editPatientPhone').value,
+        patient_type: document.getElementById('editPatientType').value,
+        appointment_type: document.getElementById('editAppointmentType').value
     };
     
     console.log('[updateAppointmentFromEdit] Updating appointment:', appointmentId, data);
@@ -514,7 +525,9 @@ function updateAppointmentFromEdit() {
     .then(data => {
         if (data.success) {
             showAlert('Agendamento atualizado com sucesso!');
-            bootstrap.Modal.getInstance(document.getElementById('editAppointmentModal')).hide();
+            const modalEl = document.getElementById('editAppointmentModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
             loadAppointments();
         } else {
             showAlert(data.error || 'Erro ao atualizar', 'danger');
