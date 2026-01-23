@@ -717,7 +717,7 @@
 
         const payload = {
             patient_id: patientId || null,
-            patient_name: patientName,
+            patientName: patientName,
             patient_code: patientCode,
             cpf: patientCPF,
             birth_date: patientBirthDate,
@@ -727,11 +727,14 @@
             mother_name: patientMotherName,
             indication_source: patientIndicationSource,
             occupation: patientOccupation,
-            patient_type: patientType,
-            appointment_type: appointmentType,
-            date: appointmentDate,
-            time: appointmentTime,
-            duration: parseInt(appointmentDuration),
+            patientType: patientType,
+            appointmentType: appointmentType,
+            start: `${appointmentDate}T${appointmentTime}:00`,
+            end: (function() {
+                const startDate = new Date(`${appointmentDate}T${appointmentTime}`);
+                const endDate = new Date(startDate.getTime() + parseInt(appointmentDuration) * 60000);
+                return `${appointmentDate}T${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}:00`;
+            })(),
             doctor_id: appointmentDoctor || null,
             photo_data: photoData
         };
