@@ -686,4 +686,197 @@
         }
     };
 
+    window.saveAppointment = function() {
+        const patientId = document.getElementById('selectedPatientId')?.value || '';
+        const patientName = document.getElementById('patientName')?.value || '';
+        const patientCode = document.getElementById('patientCode')?.value || '';
+        const patientCPF = document.getElementById('patientCPF')?.value || '';
+        const patientBirthDate = document.getElementById('patientBirthDate')?.value || '';
+        const patientPhone = document.getElementById('patientPhone')?.value || '';
+        const patientAddress = document.getElementById('patientAddress')?.value || '';
+        const patientCity = document.getElementById('patientCity')?.value || '';
+        const patientMotherName = document.getElementById('patientMotherName')?.value || '';
+        const patientIndicationSource = document.getElementById('patientIndicationSource')?.value || '';
+        const patientOccupation = document.getElementById('patientOccupation')?.value || '';
+        const patientType = document.getElementById('patientType')?.value || 'Particular';
+        const appointmentType = document.getElementById('appointmentType')?.value || 'Particular';
+        const appointmentDate = document.getElementById('appointmentDate')?.value || '';
+        const appointmentTime = document.getElementById('appointmentTime')?.value || '';
+        const appointmentDuration = document.getElementById('appointmentDuration')?.value || 15;
+        const appointmentDoctor = document.getElementById('appointmentDoctor')?.value || '';
+        const photoData = document.getElementById('patientPhotoData')?.value || '';
+
+        if (!patientName) {
+            showAlert('Nome do paciente é obrigatório', 'danger');
+            return;
+        }
+        if (!appointmentDate || !appointmentTime) {
+            showAlert('Data e hora são obrigatórios', 'danger');
+            return;
+        }
+
+        const payload = {
+            patient_id: patientId || null,
+            patient_name: patientName,
+            patient_code: patientCode,
+            cpf: patientCPF,
+            birth_date: patientBirthDate,
+            phone: patientPhone,
+            address: patientAddress,
+            city: patientCity,
+            mother_name: patientMotherName,
+            indication_source: patientIndicationSource,
+            occupation: patientOccupation,
+            patient_type: patientType,
+            appointment_type: appointmentType,
+            date: appointmentDate,
+            time: appointmentTime,
+            duration: parseInt(appointmentDuration),
+            doctor_id: appointmentDoctor || null,
+            photo_data: photoData
+        };
+
+        fetch('/api/appointments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Agendamento salvo com sucesso!');
+                loadAppointments();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newAppointmentModal'));
+                if (modal) modal.hide();
+                document.getElementById('patientName').value = '';
+                document.getElementById('selectedPatientId').value = '';
+                if (document.getElementById('patientPhotoData')) document.getElementById('patientPhotoData').value = '';
+            } else {
+                showAlert(data.error || 'Erro ao salvar', 'danger');
+            }
+        })
+        .catch(err => {
+            console.error('Erro:', err);
+            showAlert('Erro ao salvar agendamento', 'danger');
+        });
+    };
+
+    window.deleteAppointment = function() {
+        if (!currentEvent) {
+            showAlert('Nenhum agendamento selecionado', 'danger');
+            return;
+        }
+        if (!confirm('Tem certeza que deseja excluir este agendamento?')) {
+            return;
+        }
+        fetch(`/api/appointments/${currentEvent.id}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCSRFToken() }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Agendamento excluído!');
+                loadAppointments();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editAppointmentModal'));
+                if (modal) modal.hide();
+            } else {
+                showAlert(data.error || 'Erro ao excluir', 'danger');
+            }
+        });
+    };
+
+    window.updateAppointmentFromEdit = function() {
+        const appointmentId = document.getElementById('editAppointmentId')?.value;
+        if (!appointmentId) {
+            showAlert('Agendamento não encontrado', 'danger');
+            return;
+        }
+
+        const patientName = document.getElementById('editPatientName')?.value || '';
+        const patientPhone = document.getElementById('editPatientPhone')?.value || '';
+        const patientType = document.getElementById('editPatientType')?.value || 'Particular';
+        const appointmentType = document.getElementById('editAppointmentType')?.value || 'Particular';
+        const appointmentDate = document.getElementById('editAppointmentDate')?.value || '';
+        const appointmentTime = document.getElementById('editAppointmentTime')?.value || '';
+        const appointmentDuration = parseInt(document.getElementById('editAppointmentDuration')?.value || 15);
+        const photoData = document.getElementById('edit-patientPhotoData')?.value || '';
+
+        let startDateTime = null;
+        let endDateTime = null;
+        if (appointmentDate && appointmentTime) {
+            startDateTime = `${appointmentDate}T${appointmentTime}:00`;
+            const startDate = new Date(`${appointmentDate}T${appointmentTime}`);
+            const endDate = new Date(startDate.getTime() + appointmentDuration * 60000);
+            const endTimeStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}:00`;
+            endDateTime = `${appointmentDate}T${endTimeStr}`;
+        }
+
+        const payload = {
+            patientName: patientName,
+            phone: patientPhone,
+            patientType: patientType,
+            appointmentType: appointmentType,
+            photo_data: photoData
+        };
+        if (startDateTime) payload.start = startDateTime;
+        if (endDateTime) payload.end = endDateTime;
+
+        fetch(`/api/appointments/${appointmentId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify(payload)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Agendamento atualizado!');
+                loadAppointments();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('editAppointmentModal'));
+                if (modal) modal.hide();
+            } else {
+                showAlert(data.error || 'Erro ao atualizar', 'danger');
+            }
+        });
+    };
+
+    window.deleteEvent = function() {
+        if (!currentEvent) {
+            showAlert('Nenhum evento selecionado', 'danger');
+            return;
+        }
+        if (!confirm('Tem certeza que deseja excluir este agendamento?')) {
+            return;
+        }
+        fetch(`/api/appointments/${currentEvent.id}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCSRFToken() }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Agendamento excluído!');
+                loadAppointments();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('eventDetailModal'));
+                if (modal) modal.hide();
+            } else {
+                showAlert(data.error || 'Erro ao excluir', 'danger');
+            }
+        });
+    };
+
+    window.exportAgenda = function(format) {
+        const dateStr = selectedDate.toISOString().split('T')[0];
+        let url = '';
+        if (format === 'pdf') {
+            url = `/agenda/export/pdf?date=${dateStr}`;
+        } else if (format === 'excel') {
+            url = `/agenda/export/excel?date=${dateStr}`;
+        }
+        if (currentDoctorFilter) {
+            url += `&doctor_id=${currentDoctorFilter}`;
+        }
+        window.open(url, '_blank');
+    };
+
 })();
