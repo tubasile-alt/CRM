@@ -1972,12 +1972,12 @@ def get_cosmetic_plans(patient_id):
     
     from models import CosmeticProcedurePlan, Note
     
-    plans = db.session.query(CosmeticProcedurePlan).join(Note).filter(
+    plans = db.session.query(CosmeticProcedurePlan, Note).join(Note).filter(
         Note.patient_id == patient_id
     ).order_by(CosmeticProcedurePlan.id.desc()).all()
     
     plans_data = []
-    for plan in plans:
+    for plan, note in plans:
         plans_data.append({
             'id': plan.id,
             'procedure_name': plan.procedure_name,
@@ -1986,7 +1986,7 @@ def get_cosmetic_plans(patient_id):
             'was_performed': plan.was_performed,
             'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_months': plan.follow_up_months,
-            'created_at': plan.note.created_at.isoformat() if plan.note else None
+            'created_at': note.created_at.isoformat() if note else None
         })
     
     return jsonify({'success': True, 'plans': plans_data})
@@ -2428,7 +2428,7 @@ def upload_patient_photo(patient_id):
         return jsonify({'success': False, 'error': 'Nenhuma foto enviada'}), 400
     
     file = request.files['photo']
-    if file.filename == '':
+    if not file.filename:
         return jsonify({'success': False, 'error': 'Nenhum arquivo selecionado'}), 400
     
     if file and allowed_file(file.filename):
