@@ -240,7 +240,7 @@ def dashboard():
         # Contar indicações por mês
         indications = Indication.query.filter(Indication.note_id.in_(note_ids)).all()
         for ind in indications:
-            note = Note.query.get(ind.note_id)
+            note = db.session.get(Note, ind.note_id)
             if note:
                 month_key = note.created_at.strftime('%b %Y')
                 if month_key in procedures_by_month:
@@ -251,7 +251,7 @@ def dashboard():
         
         # Contar planos cosméticos por mês
         for plan in cosmetic_plans:
-            note = Note.query.get(plan.note_id)
+            note = db.session.get(Note, plan.note_id)
             if note:
                 month_key = note.created_at.strftime('%b %Y')
                 if month_key in procedures_by_month:
@@ -783,7 +783,7 @@ def export_agenda_pdf():
         if not doctor_id:
             return jsonify({'error': 'Especifique o médico'}), 400
     
-    doctor = User.query.get(doctor_id)
+    doctor = db.session.get(User, doctor_id)
     if not doctor:
         return jsonify({'error': 'Médico não encontrado'}), 404
     
@@ -822,7 +822,7 @@ def export_agenda_excel():
         if not doctor_id:
             return jsonify({'error': 'Especifique o médico'}), 400
     
-    doctor = User.query.get(doctor_id)
+    doctor = db.session.get(User, doctor_id)
     if not doctor:
         return jsonify({'error': 'Médico não encontrado'}), 404
     
@@ -870,7 +870,7 @@ def send_agenda_email():
         if not doctor_id:
             return jsonify({'error': 'Especifique o médico'}), 400
     
-    doctor = User.query.get(doctor_id)
+    doctor = db.session.get(User, doctor_id)
     if not doctor:
         return jsonify({'error': 'Médico não encontrado'}), 404
     
@@ -1118,7 +1118,7 @@ def prontuario(patient_id):
         first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
         
         # Obter appointment para pegar a data correta
-        appointment = Appointment.query.get(appt_id)
+        appointment = db.session.get(Appointment, appt_id)
         consultation_date = appointment.start_time if appointment else (finalized_note.created_at if finalized_note else first_note.created_at)
         
         consultations.append({
@@ -1471,7 +1471,7 @@ def finalizar_atendimento(patient_id):
             
             # Atualizar nota com planejamento cirúrgico
             if conduta_note_id:
-                conduta_note = Note.query.get(conduta_note_id)
+                conduta_note = db.session.get(Note, conduta_note_id)
                 if conduta_note:
                     conduta_note.surgical_planning = json.dumps(surgical_planning) if surgical_planning else None
             
@@ -1763,7 +1763,7 @@ def send_message():
     if not recipient_id:
         return jsonify({'error': 'recipient_id é obrigatório'}), 400
     
-    recipient = User.query.get(int(recipient_id))
+    recipient = db.session.get(User, int(recipient_id))
     if not recipient:
         return jsonify({'error': 'Destinatário não encontrado'}), 404
     
@@ -2016,7 +2016,7 @@ def get_cosmetic_plans_grouped(patient_id):
         if consultation_key not in consultation_info:
             appointment = None
             if note.appointment_id:
-                appointment = Appointment.query.get(note.appointment_id)
+                appointment = db.session.get(Appointment, note.appointment_id)
             
             consultation_info[consultation_key] = {
                 'date': note.created_at.isoformat(),
@@ -2150,7 +2150,7 @@ def create_checkout():
     if not data or 'appointment_id' not in data:
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
-    appointment = Appointment.query.get(data['appointment_id'])
+    appointment = db.session.get(Appointment, data['appointment_id'])
     if not appointment:
         return jsonify({'success': False, 'error': 'Consulta não encontrada'}), 404
     
@@ -2181,7 +2181,7 @@ def process_payment(payment_id):
     if not data or 'payment_method' not in data:
         return jsonify({'success': False, 'error': 'Método de pagamento obrigatório'}), 400
     
-    payment = Payment.query.get(payment_id)
+    payment = db.session.get(Payment, payment_id)
     if not payment:
         return jsonify({'success': False, 'error': 'Pagamento não encontrado'}), 404
     
@@ -2220,7 +2220,7 @@ def toggle_consultation_charge(payment_id):
     if not data:
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
-    payment = Payment.query.get(payment_id)
+    payment = db.session.get(Payment, payment_id)
     if not payment:
         return jsonify({'success': False, 'error': 'Pagamento não encontrado'}), 404
     
