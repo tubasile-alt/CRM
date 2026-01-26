@@ -333,17 +333,17 @@ function getEvolutionFormHtml(type) {
                 <label class="form-label fw-bold">Resultado:</label>
                 <div class="btn-group w-100" role="group">
                     <input type="radio" class="btn-check" name="result_rating" id="result_otimo" value="otimo">
-                    <label class="btn btn-outline-success" for="result_otimo">Ótimo</label>
+                    <label class="btn btn-outline-success" for="result_otimo">Otimo</label>
                     <input type="radio" class="btn-check" name="result_rating" id="result_bom" value="bom">
                     <label class="btn btn-outline-primary" for="result_bom">Bom</label>
                     <input type="radio" class="btn-check" name="result_rating" id="result_medio" value="medio">
-                    <label class="btn btn-outline-warning" for="result_medio">Médio</label>
+                    <label class="btn btn-outline-warning" for="result_medio">Medio</label>
                     <input type="radio" class="btn-check" name="result_rating" id="result_ruim" value="ruim">
                     <label class="btn btn-outline-danger" for="result_ruim">Ruim</label>
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label fw-bold">Indicação de nova cirurgia:</label>
+                <label class="form-label fw-bold">Indicacao de nova cirurgia:</label>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="needs_another_surgery">
                     <label class="form-check-label" for="needs_another_surgery">Sim, paciente precisa de nova cirurgia</label>
@@ -351,8 +351,8 @@ function getEvolutionFormHtml(type) {
                 <small class="text-muted">Se marcado, o paciente será adicionado à lista de CRM para contato</small>
             </div>
             <div class="mb-3">
-                <label for="evolution_content" class="form-label fw-bold">Observações:</label>
-                <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a avaliação do resultado..."></textarea>
+                <label for="evolution_content" class="form-label fw-bold">Observacoes:</label>
+                <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a evolucao..."></textarea>
             </div>
         `;
     } else if (type === '7_days') {
@@ -380,7 +380,7 @@ function getEvolutionFormHtml(type) {
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="has_infection">
                         <label class="form-check-label" for="has_infection">
-                            <i class="bi bi-bug text-danger"></i> Infecção
+                            <i class="bi bi-bug text-danger"></i> Infeccao
                         </label>
                     </div>
                 </div>
@@ -388,21 +388,21 @@ function getEvolutionFormHtml(type) {
                     <div class="form-check">
                         <input class="form-check-input" type="checkbox" id="has_follicle_loss">
                         <label class="form-check-label" for="has_follicle_loss">
-                            <i class="bi bi-droplet text-secondary"></i> Perda de Folículos
+                            <i class="bi bi-droplet text-secondary"></i> Perda de Foliculos
                         </label>
                     </div>
                 </div>
             </div>
             <div class="mb-3">
-                <label for="evolution_content" class="form-label fw-bold">Observações:</label>
-                <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a evolução do paciente..."></textarea>
+                <label for="evolution_content" class="form-label fw-bold">Observacoes:</label>
+                <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a evolucao do paciente..."></textarea>
             </div>
         `;
     } else {
         return `
             <div class="mb-3">
-                <label for="evolution_content" class="form-label fw-bold">Descrição:</label>
-                <textarea class="form-control" id="evolution_content" rows="6" placeholder="Descreva a evolução do paciente..."></textarea>
+                <label for="evolution_content" class="form-label fw-bold">Descricao:</label>
+                <textarea class="form-control" id="evolution_content" rows="6" placeholder="Descreva a evolucao do paciente..."></textarea>
             </div>
         `;
     }
