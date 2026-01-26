@@ -237,6 +237,16 @@ class SurgeryEvolution(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
     
+    evolution_type = db.Column(db.String(20), default='general')
+    
+    has_necrosis = db.Column(db.Boolean, default=False)
+    has_scabs = db.Column(db.Boolean, default=False)
+    has_infection = db.Column(db.Boolean, default=False)
+    has_follicle_loss = db.Column(db.Boolean, default=False)
+    
+    result_rating = db.Column(db.String(20), nullable=True)
+    needs_another_surgery = db.Column(db.Boolean, default=False)
+    
     doctor = db.relationship('User', backref='surgery_evolutions')
 
 class DoctorPreference(db.Model):

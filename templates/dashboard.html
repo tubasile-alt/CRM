@@ -303,4 +303,85 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+
+<div class="row g-3 mt-4 mb-4">
+    <div class="col-12">
+        <h4 class="mb-3"><i class="bi bi-clipboard-pulse"></i> Estatísticas de Cirurgias</h4>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="bi bi-calendar-week"></i> Avaliação 7 Dias</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center" id="stats-7days">
+                    <div class="col-3">
+                        <h4 class="text-danger" id="stat-necrosis">-</h4>
+                        <small>Necrose</small>
+                    </div>
+                    <div class="col-3">
+                        <h4 class="text-warning" id="stat-scabs">-</h4>
+                        <small>Crostas</small>
+                    </div>
+                    <div class="col-3">
+                        <h4 class="text-danger" id="stat-infection">-</h4>
+                        <small>Infecção</small>
+                    </div>
+                    <div class="col-3">
+                        <h4 class="text-secondary" id="stat-follicle">-</h4>
+                        <small>Perda Folículos</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0"><i class="bi bi-star"></i> Resultado 1 Ano</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center" id="stats-1year">
+                    <div class="col">
+                        <h4 class="text-success" id="stat-otimo">-</h4>
+                        <small>Ótimo</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-primary" id="stat-bom">-</h4>
+                        <small>Bom</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-warning" id="stat-medio">-</h4>
+                        <small>Médio</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-danger" id="stat-ruim">-</h4>
+                        <small>Ruim</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-info" id="stat-nova-cirurgia">-</h4>
+                        <small>Nova Cirurgia</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+fetch('/api/dashboard/surgery-stats')
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('stat-necrosis').textContent = data.seven_day_stats?.necrosis || 0;
+        document.getElementById('stat-scabs').textContent = data.seven_day_stats?.scabs || 0;
+        document.getElementById('stat-infection').textContent = data.seven_day_stats?.infections || 0;
+        document.getElementById('stat-follicle').textContent = data.seven_day_stats?.follicle_loss || 0;
+        document.getElementById('stat-otimo').textContent = data.one_year_stats?.results?.otimo || 0;
+        document.getElementById('stat-bom').textContent = data.one_year_stats?.results?.bom || 0;
+        document.getElementById('stat-medio').textContent = data.one_year_stats?.results?.medio || 0;
+        document.getElementById('stat-ruim').textContent = data.one_year_stats?.results?.ruim || 0;
+        document.getElementById('stat-nova-cirurgia').textContent = data.one_year_stats?.needs_another_surgery || 0;
+    })
+    .catch(e => console.error('Erro ao carregar estatísticas de cirurgia:', e));
+</script>
 {% endblock %}

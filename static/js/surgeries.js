@@ -109,7 +109,6 @@ function loadSurgeries() {
         .catch(err => console.error('Erro ao carregar cirurgias:', err));
 }
 
-// Renderizar lista de cirurgias com opção de evolução
 function renderSurgeries(surgeries) {
     const container = document.getElementById('surgeriesList');
     
@@ -118,10 +117,22 @@ function renderSurgeries(surgeries) {
         return;
     }
     
-    // Ordenar por data (mais recentes primeiro)
     const sorted = [...surgeries].sort((a, b) => new Date(b.surgery_date) - new Date(a.surgery_date));
     
-    container.innerHTML = sorted.map((surgery, idx) => `
+    container.innerHTML = sorted.map((surgery, idx) => {
+        const daysSince = calculateDaysSince(surgery.surgery_date);
+        let evolutionBtnClass = 'btn-success';
+        let evolutionBtnText = '<i class="bi bi-plus-circle"></i> Evolução';
+        
+        if (daysSince >= 365) {
+            evolutionBtnClass = 'btn-info';
+            evolutionBtnText = '<i class="bi bi-star"></i> Resultado 1 Ano';
+        } else if (daysSince >= 7) {
+            evolutionBtnClass = 'btn-warning';
+            evolutionBtnText = '<i class="bi bi-clipboard-pulse"></i> Evolução 7 Dias';
+        }
+        
+        return `
         <div class="card mb-3 border-left border-success" style="border-left: 5px solid #198754;">
             <div class="card-body">
                 <div class="row">
@@ -132,7 +143,7 @@ function renderSurgeries(surgeries) {
                         </h6>
                         
                         <div class="mb-2">
-                            <strong>📋 Dados Cirúrgicos:</strong>
+                            <strong>Dados Cirúrgicos:</strong>
                             <p class="mb-0 p-2 bg-light rounded" style="white-space: pre-wrap; font-size: 0.9rem;">
                                 ${surgery.surgical_data}
                             </p>
@@ -140,7 +151,7 @@ function renderSurgeries(surgeries) {
                         
                         ${surgery.observations ? `
                         <div class="mb-2">
-                            <strong>📝 Observações:</strong>
+                            <strong>Observações:</strong>
                             <p class="mb-0 p-2 bg-light rounded" style="white-space: pre-wrap; font-size: 0.9rem;">
                                 ${surgery.observations}
                             </p>
@@ -148,10 +159,15 @@ function renderSurgeries(surgeries) {
                         ` : ''}
                         
                         <small class="text-muted"><i class="bi bi-person-fill"></i> Dr. ${surgery.doctor_name}</small>
+                        
+                        <div id="evolutions-${surgery.id}" class="mt-2"></div>
                     </div>
                     <div class="col-md-4">
-                        <button class="btn btn-sm btn-success w-100 mb-2" onclick="createEvolutionForSurgery(${surgery.id}, '${surgery.surgery_date}')">
-                            <i class="bi bi-plus-circle"></i> Criar Evolução
+                        <button class="btn btn-sm ${evolutionBtnClass} w-100 mb-2" onclick="createEvolutionForSurgery(${surgery.id}, '${surgery.surgery_date}')">
+                            ${evolutionBtnText}
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary w-100 mb-2" onclick="viewEvolutions(${surgery.id})">
+                            <i class="bi bi-list-check"></i> Ver Evoluções
                         </button>
                         <button class="btn btn-sm btn-outline-danger w-100" onclick="deleteSurgery(${surgery.id})">
                             <i class="bi bi-trash"></i> Deletar
@@ -160,14 +176,55 @@ function renderSurgeries(surgeries) {
                 </div>
             </div>
         </div>
-    `).join('');
+    `}).join('');
+}
+
+function viewEvolutions(surgeryId) {
+    fetch(`/api/surgery/${surgeryId}/evolutions`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById(`evolutions-${surgeryId}`);
+            if (!data.evolutions || data.evolutions.length === 0) {
+                container.innerHTML = '<div class="alert alert-secondary py-1 px-2 mb-0"><small>Nenhuma evolução registrada</small></div>';
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="border rounded p-2 bg-light">
+                    <strong class="d-block mb-2"><i class="bi bi-clipboard-data"></i> Evoluções (${data.evolutions.length})</strong>
+                    ${data.evolutions.map(e => {
+                        let badges = '';
+                        if (e.evolution_type === '7_days') {
+                            if (e.has_necrosis) badges += '<span class="badge bg-danger me-1">Necrose</span>';
+                            if (e.has_infection) badges += '<span class="badge bg-danger me-1">Infecção</span>';
+                            if (e.has_scabs) badges += '<span class="badge bg-warning text-dark me-1">Crostas</span>';
+                            if (e.has_follicle_loss) badges += '<span class="badge bg-secondary me-1">Perda Folículos</span>';
+                        } else if (e.evolution_type === '1_year') {
+                            const resultColors = {otimo: 'success', bom: 'primary', medio: 'warning', ruim: 'danger'};
+                            if (e.result_rating) badges += \`<span class="badge bg-\${resultColors[e.result_rating] || 'secondary'} me-1">\${e.result_rating.charAt(0).toUpperCase() + e.result_rating.slice(1)}</span>\`;
+                            if (e.needs_another_surgery) badges += '<span class="badge bg-info me-1">Nova Cirurgia</span>';
+                        }
+                        
+                        const date = new Date(e.evolution_date).toLocaleDateString('pt-BR');
+                        return \`
+                            <div class="border-bottom pb-2 mb-2">
+                                <small class="text-muted">\${date} - Dr. \${e.doctor_name}</small>
+                                <div>\${badges || ''}</div>
+                                \${e.content ? \`<p class="mb-0 small">\${e.content}</p>\` : ''}
+                            </div>
+                        \`;
+                    }).join('')}
+                </div>
+            `;
+        })
+        .catch(err => console.error('Erro ao carregar evoluções:', err));
 }
 
 // Deletar cirurgia
 function deleteSurgery(surgeryId) {
     if (!confirm('❌ Tem certeza que deseja deletar esta cirurgia? Esta ação é irreversível.')) return;
     
-    fetch(`/api/patient/delete/${surgeryId}`, {
+    fetch(`/api/surgery/${surgeryId}`, {
         method: 'DELETE',
         headers: {'Content-Type': 'application/json'}
     })
@@ -186,25 +243,180 @@ function deleteSurgery(surgeryId) {
     });
 }
 
-// Criar evolução vinculada à cirurgia
+function calculateDaysSince(surgeryDate) {
+    let dateStr = surgeryDate;
+    if (surgeryDate.includes('/')) {
+        const parts = surgeryDate.split('/');
+        dateStr = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const surgery = new Date(Date.UTC(year, month - 1, day));
+    const today = new Date();
+    return Math.floor((today - surgery) / (1000 * 60 * 60 * 24));
+}
+
 function createEvolutionForSurgery(surgeryId, surgeryDate) {
     console.log('Criar evolução para cirurgia:', surgeryId, surgeryDate);
     
-    // Navegar para aba de evoluções
-    const evolutionTab = document.querySelector('[href="#evolucoes"]');
-    if (evolutionTab) {
-        new bootstrap.Tab(evolutionTab).show();
+    const daysSince = calculateDaysSince(surgeryDate);
+    console.log('Dias desde cirurgia:', daysSince);
+    
+    let modalTitle = 'Nova Evolução Pós-Cirúrgica';
+    let formContent = '';
+    
+    if (daysSince >= 365) {
+        modalTitle = 'Evolução de 1 Ano - Resultado Final';
+        formContent = `
+            <div class="alert alert-info mb-3">
+                <i class="bi bi-info-circle"></i> <strong>Avaliação de resultado final</strong> - ${daysSince} dias desde a cirurgia
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Resultado:</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="result_rating" id="result_otimo" value="otimo">
+                    <label class="btn btn-outline-success" for="result_otimo">Ótimo</label>
+                    <input type="radio" class="btn-check" name="result_rating" id="result_bom" value="bom">
+                    <label class="btn btn-outline-primary" for="result_bom">Bom</label>
+                    <input type="radio" class="btn-check" name="result_rating" id="result_medio" value="medio">
+                    <label class="btn btn-outline-warning" for="result_medio">Médio</label>
+                    <input type="radio" class="btn-check" name="result_rating" id="result_ruim" value="ruim">
+                    <label class="btn btn-outline-danger" for="result_ruim">Ruim</label>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Indicação de nova cirurgia:</label>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="needs_another_surgery">
+                    <label class="form-check-label" for="needs_another_surgery">Sim, paciente precisa de nova cirurgia</label>
+                </div>
+                <small class="text-muted">Se marcado, o paciente será adicionado à lista de CRM para contato</small>
+            </div>
+            <div class="mb-3">
+                <label for="evolution_content" class="form-label fw-bold">Observações:</label>
+                <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a avaliação do resultado..."></textarea>
+            </div>
+        `;
+    } else if (daysSince >= 7) {
+        modalTitle = 'Evolução de 7 Dias - Avaliação Inicial';
+        formContent = `
+            <div class="alert alert-warning mb-3">
+                <i class="bi bi-exclamation-triangle"></i> <strong>Avaliação de 7 dias</strong> - ${daysSince} dias desde a cirurgia
+            </div>
+            <div class="row mb-3">
+                <div class="col-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="has_necrosis">
+                        <label class="form-check-label" for="has_necrosis">
+                            <i class="bi bi-x-circle text-danger"></i> Necrose
+                        </label>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="has_scabs">
+                        <label class="form-check-label" for="has_scabs">
+                            <i class="bi bi-bandaid text-warning"></i> Crostas
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="has_infection">
+                        <label class="form-check-label" for="has_infection">
+                            <i class="bi bi-bug text-danger"></i> Infecção
+                        </label>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="has_follicle_loss">
+                        <label class="form-check-label" for="has_follicle_loss">
+                            <i class="bi bi-droplet text-secondary"></i> Perda de Folículos
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="evolution_content" class="form-label fw-bold">Observações:</label>
+                <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a evolução do paciente..."></textarea>
+            </div>
+        `;
+    } else {
+        formContent = `
+            <div class="alert alert-secondary mb-3">
+                <i class="bi bi-clock"></i> <strong>Evolução geral</strong> - ${daysSince} dias desde a cirurgia
+            </div>
+            <div class="mb-3">
+                <label for="evolution_content" class="form-label fw-bold">Observações:</label>
+                <textarea class="form-control" id="evolution_content" rows="6" placeholder="Descreva a evolução do paciente..."></textarea>
+            </div>
+        `;
     }
     
-    // Pré-preencher observação com referência à cirurgia
-    const dateFormatted = new Date(surgeryDate).toLocaleDateString('pt-BR');
-    const evolutionObservations = document.getElementById('newEvolutionObservations');
-    if (evolutionObservations) {
-        evolutionObservations.value = `[EVOLUÇÃO PÓS-CIRURGIA - ${dateFormatted}]\n\n`;
-        evolutionObservations.focus();
-    }
+    const modalHtml = `
+        <div class="modal fade" id="surgeryEvolutionModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="bi bi-clipboard-pulse"></i> ${modalTitle}</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${formContent}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-success" onclick="saveSurgeryEvolution(${surgeryId})">
+                            <i class="bi bi-check-lg"></i> Salvar Evolução
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
     
-    showAlert('✏️ Aba de Evoluções aberta - Preencha os dados da evolução pós-cirurgia', 'info');
+    const existingModal = document.getElementById('surgeryEvolutionModal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = new bootstrap.Modal(document.getElementById('surgeryEvolutionModal'));
+    modal.show();
+}
+
+function saveSurgeryEvolution(surgeryId) {
+    const content = document.getElementById('evolution_content')?.value || '';
+    
+    const data = {
+        content: content,
+        has_necrosis: document.getElementById('has_necrosis')?.checked || false,
+        has_scabs: document.getElementById('has_scabs')?.checked || false,
+        has_infection: document.getElementById('has_infection')?.checked || false,
+        has_follicle_loss: document.getElementById('has_follicle_loss')?.checked || false,
+        result_rating: document.querySelector('input[name="result_rating"]:checked')?.value || null,
+        needs_another_surgery: document.getElementById('needs_another_surgery')?.checked || false
+    };
+    
+    fetch(`/api/surgery/${surgeryId}/evolution`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('surgeryEvolutionModal')).hide();
+            showAlert('Evolução salva com sucesso!', 'success');
+            loadSurgeries();
+        } else {
+            showAlert(result.error || 'Erro ao salvar evolução', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao salvar evolução', 'danger');
+    });
 }
 
 // Chamar ao carregar página se o elemento existir

@@ -2569,6 +2569,131 @@ def delete_patient_surgery(surgery_id):
     
     return jsonify({'success': True})
 
+@app.route('/api/surgery/<int:surgery_id>/evolutions', methods=['GET'])
+@login_required
+def get_surgery_evolutions(surgery_id):
+    """Listar evoluções de uma cirurgia"""
+    from models import TransplantSurgeryRecord, SurgeryEvolution
+    surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
+    
+    evolutions = SurgeryEvolution.query.filter_by(surgery_id=surgery_id).order_by(SurgeryEvolution.evolution_date.desc()).all()
+    
+    days_since = (get_brazil_time().date() - surgery.surgery_date).days
+    
+    return jsonify({
+        'surgery_id': surgery_id,
+        'surgery_date': surgery.surgery_date.isoformat(),
+        'days_since_surgery': days_since,
+        'evolutions': [{
+            'id': e.id,
+            'evolution_type': e.evolution_type,
+            'evolution_date': e.evolution_date.isoformat(),
+            'content': e.content,
+            'has_necrosis': e.has_necrosis,
+            'has_scabs': e.has_scabs,
+            'has_infection': e.has_infection,
+            'has_follicle_loss': e.has_follicle_loss,
+            'result_rating': e.result_rating,
+            'needs_another_surgery': e.needs_another_surgery,
+            'doctor_name': e.doctor.name if e.doctor else 'Desconhecido'
+        } for e in evolutions]
+    })
+
+@app.route('/api/surgery/<int:surgery_id>/evolution', methods=['POST'])
+@login_required
+def create_surgery_evolution(surgery_id):
+    """Criar evolução pós-cirúrgica"""
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    from models import TransplantSurgeryRecord, SurgeryEvolution, FollowUpReminder
+    surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
+    data = request.get_json()
+    
+    days_since = (get_brazil_time().date() - surgery.surgery_date).days
+    
+    if days_since >= 365:
+        evolution_type = '1_year'
+    elif days_since >= 7:
+        evolution_type = '7_days'
+    else:
+        evolution_type = 'general'
+    
+    evolution = SurgeryEvolution(
+        surgery_id=surgery_id,
+        doctor_id=current_user.id,
+        content=data.get('content', ''),
+        evolution_type=evolution_type,
+        has_necrosis=data.get('has_necrosis', False),
+        has_scabs=data.get('has_scabs', False),
+        has_infection=data.get('has_infection', False),
+        has_follicle_loss=data.get('has_follicle_loss', False),
+        result_rating=data.get('result_rating'),
+        needs_another_surgery=data.get('needs_another_surgery', False)
+    )
+    
+    db.session.add(evolution)
+    
+    if data.get('needs_another_surgery'):
+        reminder = FollowUpReminder(
+            patient_id=surgery.patient_id,
+            procedure_name='Nova Cirurgia de Transplante Capilar',
+            scheduled_date=get_brazil_time().date(),
+            reminder_type='transplant_revision',
+            status='pending',
+            notes=f'Paciente indicado para nova cirurgia na evolução de 1 ano. Observações: {data.get("content", "")}'
+        )
+        db.session.add(reminder)
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'id': evolution.id, 'evolution_type': evolution_type})
+
+@app.route('/api/surgery/evolution/<int:evolution_id>', methods=['DELETE'])
+@login_required
+def delete_surgery_evolution(evolution_id):
+    """Deletar uma evolução"""
+    from models import SurgeryEvolution
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    
+    evolution = SurgeryEvolution.query.get_or_404(evolution_id)
+    db.session.delete(evolution)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/api/dashboard/surgery-stats', methods=['GET'])
+@login_required
+def get_surgery_stats():
+    """Estatísticas de evoluções cirúrgicas para o dashboard"""
+    from models import SurgeryEvolution
+    
+    evolutions_7days = SurgeryEvolution.query.filter_by(evolution_type='7_days').all()
+    evolutions_1year = SurgeryEvolution.query.filter_by(evolution_type='1_year').all()
+    
+    stats = {
+        'seven_day_stats': {
+            'total': len(evolutions_7days),
+            'necrosis': sum(1 for e in evolutions_7days if e.has_necrosis),
+            'scabs': sum(1 for e in evolutions_7days if e.has_scabs),
+            'infections': sum(1 for e in evolutions_7days if e.has_infection),
+            'follicle_loss': sum(1 for e in evolutions_7days if e.has_follicle_loss)
+        },
+        'one_year_stats': {
+            'total': len(evolutions_1year),
+            'results': {
+                'otimo': sum(1 for e in evolutions_1year if e.result_rating == 'otimo'),
+                'bom': sum(1 for e in evolutions_1year if e.result_rating == 'bom'),
+                'medio': sum(1 for e in evolutions_1year if e.result_rating == 'medio'),
+                'ruim': sum(1 for e in evolutions_1year if e.result_rating == 'ruim')
+            },
+            'needs_another_surgery': sum(1 for e in evolutions_1year if e.needs_another_surgery)
+        }
+    }
+    
+    return jsonify(stats)
+
 # API para listar consultas (para dropdown de evolução)
 @app.route('/api/patient/<int:patient_id>/consultations', methods=['GET'])
 @login_required
