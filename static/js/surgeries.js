@@ -292,14 +292,12 @@ function createEvolutionForSurgery(surgeryId, surgeryDate) {
                             </div>
                         </div>
                         
-                        <div id="evolutionFormContainer">
-                            ${getEvolutionFormHtml('general')}
-                        </div>
+                        <div id="evolutionFormContainer"></div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-success" onclick="saveSurgeryEvolution(${surgeryId})">
-                            <i class="bi bi-check-lg"></i> Salvar Evolução
+                        <button type="button" class="btn btn-success" id="btnSaveEvolution">
+                            <i class="bi bi-check-lg"></i> Salvar Evolucao
                         </button>
                     </div>
                 </div>
@@ -311,6 +309,12 @@ function createEvolutionForSurgery(surgeryId, surgeryDate) {
     if (existingModal) existingModal.remove();
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    document.getElementById('evolutionFormContainer').innerHTML = getEvolutionFormHtml('general');
+    
+    document.getElementById('btnSaveEvolution').addEventListener('click', function() {
+        saveSurgeryEvolution(surgeryId);
+    });
     
     document.querySelectorAll('input[name="evolution_type"]').forEach(radio => {
         radio.addEventListener('change', function() {
