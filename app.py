@@ -545,24 +545,42 @@ def create_appointment():
         
         # Handle photo for new patient
         if 'photo_data' in data and data['photo_data']:
-            import base64
-            import os
-            from uuid import uuid4
-            
-            photo_data = data['photo_data']
-            if photo_data.startswith('data:image'):
-                header, encoded = photo_data.split(",", 1)
-                file_ext = header.split(";")[0].split("/")[1]
-                if file_ext == 'jpeg': file_ext = 'jpg'
+            try:
+                import base64
+                import os
+                from uuid import uuid4
+                from PIL import Image
+                from io import BytesIO
                 
-                filename = f"patient_{patient.id}_{uuid4().hex}.{file_ext}"
-                filepath = os.path.join('static/uploads/photos', filename)
-                
-                os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                with open(filepath, "wb") as f:
-                    f.write(base64.b64decode(encoded))
-                
-                patient.photo_url = f"/{filepath}"
+                photo_data = data['photo_data']
+                if photo_data.startswith('data:image'):
+                    header, encoded = photo_data.split(",", 1)
+                    file_ext = header.split(";")[0].split("/")[1]
+                    if file_ext == 'jpeg': file_ext = 'jpg'
+                    
+                    # Decodificar imagem
+                    image_bytes = base64.b64decode(encoded)
+                    img = Image.open(BytesIO(image_bytes))
+                    
+                    # Converter para RGB se necessário (remover transparência)
+                    if img.mode in ("RGBA", "P"):
+                        img = img.convert("RGB")
+                    
+                    # Redimensionar para tamanho 3x4 (proporcional)
+                    # Exemplo: 300x400 pixels é suficiente para ficha
+                    img.thumbnail((300, 400), Image.LANCZOS)
+                    
+                    filename = f"patient_{patient.id}_{uuid4().hex}.jpg"
+                    filepath = os.path.join('static/uploads/photos', filename)
+                    
+                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                    
+                    # Salvar com compressão máxima
+                    img.save(filepath, "JPEG", quality=60, optimize=True)
+                    
+                    patient.photo_url = f"/{filepath}"
+            except Exception as e:
+                print(f"Erro ao processar foto: {e}")
     else:
         # Atualizar dados do paciente se fornecidos
         if 'patientType' in data:
@@ -667,24 +685,37 @@ def update_appointment(id):
     
     # Update patient photo if provided
     if 'photo_data' in data and data['photo_data']:
-        import base64
-        import os
-        from uuid import uuid4
-        
-        photo_data = data['photo_data']
-        if photo_data.startswith('data:image'):
-            header, encoded = photo_data.split(",", 1)
-            file_ext = header.split(";")[0].split("/")[1]
-            if file_ext == 'jpeg': file_ext = 'jpg'
+        try:
+            import base64
+            import os
+            from uuid import uuid4
+            from PIL import Image
+            from io import BytesIO
             
-            filename = f"patient_{appointment.patient.id}_{uuid4().hex}.{file_ext}"
-            filepath = os.path.join('static/uploads/photos', filename)
-            
-            os.makedirs(os.path.dirname(filepath), exist_ok=True)
-            with open(filepath, "wb") as f:
-                f.write(base64.b64decode(encoded))
-            
-            appointment.patient.photo_url = f"/{filepath}"
+            photo_data = data['photo_data']
+            if photo_data.startswith('data:image'):
+                header, encoded = photo_data.split(",", 1)
+                image_bytes = base64.b64decode(encoded)
+                img = Image.open(BytesIO(image_bytes))
+                
+                # Converter para RGB se necessário (remover transparência)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                
+                # Redimensionar para tamanho 3x4 (proporcional)
+                img.thumbnail((300, 400), Image.LANCZOS)
+                
+                filename = f"patient_{appointment.patient.id}_{uuid4().hex}.jpg"
+                filepath = os.path.join('static/uploads/photos', filename)
+                
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                
+                # Salvar com compressão máxima
+                img.save(filepath, "JPEG", quality=60, optimize=True)
+                
+                appointment.patient.photo_url = f"/{filepath}"
+        except Exception as e:
+            print(f"Erro ao processar foto na edicao: {e}")
 
     # Update patient name if provided (find or update existing)
     if 'patientName' in data and data['patientName'] != appointment.patient.name:
@@ -700,6 +731,71 @@ def update_appointment(id):
     db.session.commit()
     
     return jsonify({'success': True})
+
+@app.route('/api/patient/<int:id>/photo', methods=['POST'])
+@login_required
+def update_patient_photo(id):
+    patient = Patient.query.get_or_404(id)
+    
+    if 'photo' in request.files:
+        # Upload via form-data
+        file = request.files['photo']
+        if file:
+            try:
+                from PIL import Image
+                from uuid import uuid4
+                import os
+                
+                img = Image.open(file.stream)
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                
+                img.thumbnail((300, 400), Image.LANCZOS)
+                
+                filename = f"patient_{patient.id}_{uuid4().hex}.jpg"
+                filepath = os.path.join('static/uploads/photos', filename)
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                
+                img.save(filepath, "JPEG", quality=60, optimize=True)
+                patient.photo_url = f"/{filepath}"
+                db.session.commit()
+                return jsonify({'success': True, 'photo_url': patient.photo_url})
+            except Exception as e:
+                return jsonify({'success': False, 'error': str(e)}), 500
+    
+    data = request.get_json(silent=True)
+    if data and 'photo_data' in data:
+        # Upload via base64 (webcam)
+        try:
+            import base64
+            from PIL import Image
+            from io import BytesIO
+            from uuid import uuid4
+            import os
+            
+            photo_data = data['photo_data']
+            if photo_data.startswith('data:image'):
+                header, encoded = photo_data.split(",", 1)
+                image_bytes = base64.b64decode(encoded)
+                img = Image.open(BytesIO(image_bytes))
+                
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                
+                img.thumbnail((300, 400), Image.LANCZOS)
+                
+                filename = f"patient_{patient.id}_{uuid4().hex}.jpg"
+                filepath = os.path.join('static/uploads/photos', filename)
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+                
+                img.save(filepath, "JPEG", quality=60, optimize=True)
+                patient.photo_url = f"/{filepath}"
+                db.session.commit()
+                return jsonify({'success': True, 'photo_url': patient.photo_url})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+            
+    return jsonify({'success': False, 'error': 'Nenhuma foto fornecida'}), 400
 
 @app.route('/api/patients/search')
 @login_required

@@ -471,15 +471,60 @@
         });
     }
 
-    function openNewAppointmentAtTime(h, m) {
-        const date = selectedDate.toISOString().split('T')[0];
-        const dateInput = document.getElementById('appointmentDate');
-        const timeInput = document.getElementById('appointmentTime');
-        if (dateInput) dateInput.value = date;
-        if (timeInput) timeInput.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        const modal = document.getElementById('newAppointmentModal');
-        if (modal) new bootstrap.Modal(modal).show();
+    function saveAppointment() {
+        const form = document.getElementById('appointmentForm');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+        
+        // Adicionar foto se capturada
+        const photoData = document.getElementById('patientPhotoData').value;
+        if (photoData) data.photo_data = photoData;
+
+        // Formatar data/hora
+        const startDateTime = data.appointmentDate + 'T' + data.appointmentTime;
+        data.start = startDateTime;
+        
+        // Calcular end_time (30 min depois)
+        const start = new Date(startDateTime);
+        const end = new Date(start.getTime() + 30 * 60 * 1000);
+        data.end = end.toISOString();
+
+        fetch('/api/appointments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                showAlert('Agendamento salvo!');
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newAppointmentModal'));
+                if (modal) modal.hide();
+                loadAppointments();
+                
+                // Limpar campos de foto
+                document.getElementById('patientPhotoData').value = '';
+                const preview = document.getElementById('patient-photo-preview');
+                if (preview) preview.style.display = 'none';
+                const placeholder = document.getElementById('webcam-placeholder');
+                if (placeholder) placeholder.style.display = 'flex';
+            } else {
+                showAlert(res.error || 'Erro ao salvar', 'danger');
+            }
+        });
     }
+
+    // Garantir que o botão de salvar chama a função correta
+    document.addEventListener('DOMContentLoaded', function() {
+        const saveBtn = document.querySelector('#appointmentForm button[type="submit"]') || 
+                        document.querySelector('#newAppointmentModal .btn-primary:last-child');
+        if (saveBtn) {
+            saveBtn.onclick = (e) => {
+                e.preventDefault();
+                saveAppointment();
+            };
+        }
+    });
 
     function formatDateBR(date) {
         const days = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
