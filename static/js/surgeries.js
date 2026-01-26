@@ -261,15 +261,70 @@ function createEvolutionForSurgery(surgeryId, surgeryDate) {
     const daysSince = calculateDaysSince(surgeryDate);
     console.log('Dias desde cirurgia:', daysSince);
     
-    let modalTitle = 'Nova Evolução Pós-Cirúrgica';
-    let formContent = '';
-    
-    if (daysSince >= 365) {
-        modalTitle = 'Evolução de 1 Ano - Resultado Final';
-        formContent = `
-            <div class="alert alert-info mb-3">
-                <i class="bi bi-info-circle"></i> <strong>Avaliação de resultado final</strong> - ${daysSince} dias desde a cirurgia
+    const modalHtml = `
+        <div class="modal fade" id="surgeryEvolutionModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title"><i class="bi bi-clipboard-pulse"></i> Nova Evolução Pós-Cirúrgica</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-secondary mb-3">
+                            <i class="bi bi-clock"></i> <strong>${daysSince} dias</strong> desde a cirurgia
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Tipo de Evolução:</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="evolution_type" id="evo_rotina" value="general" checked>
+                                <label class="btn btn-outline-secondary" for="evo_rotina">
+                                    <i class="bi bi-journal-text"></i> Rotina
+                                </label>
+                                <input type="radio" class="btn-check" name="evolution_type" id="evo_7dias" value="7_days">
+                                <label class="btn btn-outline-warning" for="evo_7dias">
+                                    <i class="bi bi-calendar-week"></i> 7 Dias
+                                </label>
+                                <input type="radio" class="btn-check" name="evolution_type" id="evo_1ano" value="1_year">
+                                <label class="btn btn-outline-info" for="evo_1ano">
+                                    <i class="bi bi-calendar-check"></i> 1 Ano
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="evolutionFormContainer">
+                            ${getEvolutionFormHtml('general')}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-success" onclick="saveSurgeryEvolution(${surgeryId})">
+                            <i class="bi bi-check-lg"></i> Salvar Evolução
+                        </button>
+                    </div>
+                </div>
             </div>
+        </div>
+    `;
+    
+    const existingModal = document.getElementById('surgeryEvolutionModal');
+    if (existingModal) existingModal.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    document.querySelectorAll('input[name="evolution_type"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('evolutionFormContainer').innerHTML = getEvolutionFormHtml(this.value);
+        });
+    });
+    
+    const modal = new bootstrap.Modal(document.getElementById('surgeryEvolutionModal'));
+    modal.show();
+}
+
+function getEvolutionFormHtml(type) {
+    if (type === '1_year') {
+        return `
             <div class="mb-3">
                 <label class="form-label fw-bold">Resultado:</label>
                 <div class="btn-group w-100" role="group">
@@ -296,12 +351,8 @@ function createEvolutionForSurgery(surgeryId, surgeryDate) {
                 <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a avaliação do resultado..."></textarea>
             </div>
         `;
-    } else if (daysSince >= 7) {
-        modalTitle = 'Evolução de 7 Dias - Avaliação Inicial';
-        formContent = `
-            <div class="alert alert-warning mb-3">
-                <i class="bi bi-exclamation-triangle"></i> <strong>Avaliação de 7 dias</strong> - ${daysSince} dias desde a cirurgia
-            </div>
+    } else if (type === '7_days') {
+        return `
             <div class="row mb-3">
                 <div class="col-6">
                     <div class="form-check">
@@ -344,52 +395,22 @@ function createEvolutionForSurgery(surgeryId, surgeryDate) {
             </div>
         `;
     } else {
-        formContent = `
-            <div class="alert alert-secondary mb-3">
-                <i class="bi bi-clock"></i> <strong>Evolução geral</strong> - ${daysSince} dias desde a cirurgia
-            </div>
+        return `
             <div class="mb-3">
-                <label for="evolution_content" class="form-label fw-bold">Observações:</label>
+                <label for="evolution_content" class="form-label fw-bold">Descrição:</label>
                 <textarea class="form-control" id="evolution_content" rows="6" placeholder="Descreva a evolução do paciente..."></textarea>
             </div>
         `;
     }
-    
-    const modalHtml = `
-        <div class="modal fade" id="surgeryEvolutionModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title"><i class="bi bi-clipboard-pulse"></i> ${modalTitle}</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        ${formContent}
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-success" onclick="saveSurgeryEvolution(${surgeryId})">
-                            <i class="bi bi-check-lg"></i> Salvar Evolução
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    const existingModal = document.getElementById('surgeryEvolutionModal');
-    if (existingModal) existingModal.remove();
-    
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-    const modal = new bootstrap.Modal(document.getElementById('surgeryEvolutionModal'));
-    modal.show();
 }
 
 function saveSurgeryEvolution(surgeryId) {
     const content = document.getElementById('evolution_content')?.value || '';
+    const evolutionType = document.querySelector('input[name="evolution_type"]:checked')?.value || 'general';
     
     const data = {
         content: content,
+        evolution_type: evolutionType,
         has_necrosis: document.getElementById('has_necrosis')?.checked || false,
         has_scabs: document.getElementById('has_scabs')?.checked || false,
         has_infection: document.getElementById('has_infection')?.checked || false,

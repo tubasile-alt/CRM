@@ -2641,13 +2641,10 @@ def create_surgery_evolution(surgery_id):
     surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
     data = request.get_json()
     
-    days_since = (get_brazil_time().date() - surgery.surgery_date).days
-    
-    if days_since >= 365:
-        evolution_type = '1_year'
-    elif days_since >= 7:
-        evolution_type = '7_days'
-    else:
+    evolution_type = data.get('evolution_type', 'general')
+    if evolution_type == 'rotina':
+        evolution_type = 'general'
+    if evolution_type not in ['general', '7_days', '1_year']:
         evolution_type = 'general'
     
     evolution = SurgeryEvolution(
