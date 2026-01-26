@@ -459,7 +459,15 @@
             if (!list) return;
             const items = d.waiting_list || [];
             waitingRoomData = items;
-            list.innerHTML = items.length ? items.map(p => `<div class="waiting-patient-item">${p.patient_name} <small class="text-muted">(${p.wait_time || '0 min'})</small></div>`).join('') : '<div class="waiting-empty">Sala de espera vazia</div>';
+            list.innerHTML = items.length ? items.map(p => `
+                <div class="waiting-patient-item" onclick="goToPatientChart(${p.patient_id}, ${p.appointment_id})" style="cursor:pointer; padding: 8px; border-bottom: 1px solid #eee; transition: background 0.2s;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span style="font-weight: 500;">${p.patient_name}</span>
+                        <small class="text-muted">(${p.wait_time || '0 min'})</small>
+                    </div>
+                </div>`).join('') : '<div class="waiting-empty">Sala de espera vazia</div>';
+            
+            // Adicionar hover effect via JS se necessário, mas CSS é melhor
         });
     }
 
