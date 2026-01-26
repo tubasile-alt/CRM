@@ -101,6 +101,37 @@ def health():
     """Lightweight health check endpoint for deployment"""
     return jsonify({'status': 'ok'}), 200
 
+@app.route('/api/dashboard/surgery-stats', methods=['GET'])
+@login_required  
+def get_surgery_stats():
+    """Estatisticas de evolucoes cirurgicas para o dashboard"""
+    from models import SurgeryEvolution
+    
+    evolutions_7days = SurgeryEvolution.query.filter_by(evolution_type='7_days').all()
+    evolutions_1year = SurgeryEvolution.query.filter_by(evolution_type='1_year').all()
+    
+    stats = {
+        'seven_day_stats': {
+            'total': len(evolutions_7days),
+            'necrosis': sum(1 for e in evolutions_7days if e.has_necrosis),
+            'scabs': sum(1 for e in evolutions_7days if e.has_scabs),
+            'infections': sum(1 for e in evolutions_7days if e.has_infection),
+            'follicle_loss': sum(1 for e in evolutions_7days if e.has_follicle_loss)
+        },
+        'one_year_stats': {
+            'total': len(evolutions_1year),
+            'results': {
+                'otimo': sum(1 for e in evolutions_1year if e.result_rating == 'otimo'),
+                'bom': sum(1 for e in evolutions_1year if e.result_rating == 'bom'),
+                'medio': sum(1 for e in evolutions_1year if e.result_rating == 'medio'),
+                'ruim': sum(1 for e in evolutions_1year if e.result_rating == 'ruim')
+            },
+            'needs_another_surgery': sum(1 for e in evolutions_1year if e.needs_another_surgery)
+        }
+    }
+    
+    return jsonify(stats)
+
 @app.route('/')
 def index():
     if current_user.is_authenticated:
@@ -2662,37 +2693,6 @@ def delete_surgery_evolution(evolution_id):
     db.session.commit()
     
     return jsonify({'success': True})
-
-@app.route('/api/dashboard/surgery-stats', methods=['GET'])
-@login_required
-def get_surgery_stats():
-    """Estatísticas de evoluções cirúrgicas para o dashboard"""
-    from models import SurgeryEvolution
-    
-    evolutions_7days = SurgeryEvolution.query.filter_by(evolution_type='7_days').all()
-    evolutions_1year = SurgeryEvolution.query.filter_by(evolution_type='1_year').all()
-    
-    stats = {
-        'seven_day_stats': {
-            'total': len(evolutions_7days),
-            'necrosis': sum(1 for e in evolutions_7days if e.has_necrosis),
-            'scabs': sum(1 for e in evolutions_7days if e.has_scabs),
-            'infections': sum(1 for e in evolutions_7days if e.has_infection),
-            'follicle_loss': sum(1 for e in evolutions_7days if e.has_follicle_loss)
-        },
-        'one_year_stats': {
-            'total': len(evolutions_1year),
-            'results': {
-                'otimo': sum(1 for e in evolutions_1year if e.result_rating == 'otimo'),
-                'bom': sum(1 for e in evolutions_1year if e.result_rating == 'bom'),
-                'medio': sum(1 for e in evolutions_1year if e.result_rating == 'medio'),
-                'ruim': sum(1 for e in evolutions_1year if e.result_rating == 'ruim')
-            },
-            'needs_another_surgery': sum(1 for e in evolutions_1year if e.needs_another_surgery)
-        }
-    }
-    
-    return jsonify(stats)
 
 # API para listar consultas (para dropdown de evolução)
 @app.route('/api/patient/<int:patient_id>/consultations', methods=['GET'])

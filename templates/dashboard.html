@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
-fetch('/api/dashboard/surgery-stats')
+fetch('/api/dashboard/surgery-stats', {credentials: 'same-origin'})
     .then(r => r.json())
     .then(data => {
         document.getElementById('stat-necrosis').textContent = data.seven_day_stats?.necrosis || 0;
