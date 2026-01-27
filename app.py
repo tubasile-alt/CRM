@@ -1577,7 +1577,7 @@ def finalizar_atendimento(patient_id):
                     total_amount += consultation_fee
                 
                 payment = Payment(
-                    appointment_id=appointment_id,  # Pode ser None
+                    appointment_id=appointment_id if appointment_id else None,
                     patient_id=patient_id,
                     total_amount=float(total_amount),
                     consultation_type=consultation_type,
