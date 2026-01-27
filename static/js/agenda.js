@@ -921,18 +921,63 @@
         });
     };
 
-    window.exportAgenda = function(format) {
-        const dateStr = selectedDate.toISOString().split('T')[0];
-        let url = '';
-        if (format === 'pdf') {
-            url = `/agenda/export/pdf?date=${dateStr}`;
-        } else if (format === 'excel') {
-            url = `/agenda/export/excel?date=${dateStr}`;
-        }
-        if (currentDoctorFilter) {
-            url += `&doctor_id=${currentDoctorFilter}`;
-        }
-        window.open(url, '_blank');
-    };
+    // Webcam functionality
+    let stream = null;
+    const video = document.getElementById('webcam-video');
+    const canvas = document.getElementById('photo-canvas');
+    const preview = document.getElementById('patient-photo-preview');
+    const placeholder = document.getElementById('webcam-placeholder');
+    const startBtn = document.getElementById('start-webcam-btn');
+    const captureBtn = document.getElementById('capture-photo-btn');
+    const retakeBtn = document.getElementById('retake-photo-btn');
+    const photoDataInput = document.getElementById('patientPhotoData');
+
+    if (startBtn) {
+        startBtn.onclick = async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: false });
+                video.srcObject = stream;
+                video.style.display = 'block';
+                placeholder.style.display = 'none';
+                preview.style.display = 'none';
+                startBtn.style.display = 'none';
+                captureBtn.style.display = 'inline-block';
+            } catch (err) {
+                console.error("Erro ao acessar webcam:", err);
+                showAlert("Não foi possível acessar a câmera. Verifique as permissões.", "danger");
+            }
+        };
+    }
+
+    if (captureBtn) {
+        captureBtn.onclick = () => {
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+            photoDataInput.value = dataURL;
+            
+            preview.src = dataURL;
+            preview.style.display = 'block';
+            video.style.display = 'none';
+            captureBtn.style.display = 'none';
+            retakeBtn.style.display = 'inline-block';
+            
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }
+
+    if (retakeBtn) {
+        retakeBtn.onclick = () => {
+            photoDataInput.value = '';
+            preview.style.display = 'none';
+            retakeBtn.style.display = 'none';
+            startBtn.click();
+        };
+    }
 
 })();
