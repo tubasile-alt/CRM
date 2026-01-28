@@ -476,17 +476,31 @@
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
         
+        // Se for secretária, pegar o médico selecionado
+        if (window.isSecretary && document.getElementById('appointmentDoctor')) {
+            data.doctor_id = document.getElementById('appointmentDoctor').value;
+        }
+
         // Adicionar foto se capturada
         const photoData = document.getElementById('patientPhotoData').value;
         if (photoData) data.photo_data = photoData;
 
         // Formatar data/hora
-        const startDateTime = data.appointmentDate + 'T' + data.appointmentTime;
+        const dateVal = data.appointmentDate;
+        const timeVal = data.appointmentTime;
+        
+        if (!dateVal || !timeVal) {
+            showAlert('Data e hora são obrigatórias', 'warning');
+            return;
+        }
+
+        const startDateTime = dateVal + 'T' + timeVal;
         data.start = startDateTime;
         
-        // Calcular end_time (30 min depois)
+        // Calcular end_time (15 min depois - padrão da clínica)
+        const duration = parseInt(data.appointmentDuration || 15);
         const start = new Date(startDateTime);
-        const end = new Date(start.getTime() + 30 * 60 * 1000);
+        const end = new Date(start.getTime() + duration * 60 * 1000);
         data.end = end.toISOString();
 
         fetch('/api/appointments', {
@@ -502,15 +516,29 @@
                 if (modal) modal.hide();
                 loadAppointments();
                 
-                // Limpar campos de foto
+                // Limpar campos
+                form.reset();
+                document.getElementById('selectedPatientId').value = '';
                 document.getElementById('patientPhotoData').value = '';
                 const preview = document.getElementById('patient-photo-preview');
                 if (preview) preview.style.display = 'none';
                 const placeholder = document.getElementById('webcam-placeholder');
                 if (placeholder) placeholder.style.display = 'flex';
+                const video = document.getElementById('webcam-video');
+                if (video) video.style.display = 'none';
+                const startBtn = document.getElementById('start-webcam-btn');
+                if (startBtn) startBtn.style.display = 'inline-block';
+                const captureBtn = document.getElementById('capture-photo-btn');
+                if (captureBtn) captureBtn.style.display = 'none';
+                const retakeBtn = document.getElementById('retake-photo-btn');
+                if (retakeBtn) retakeBtn.style.display = 'none';
             } else {
                 showAlert(res.error || 'Erro ao salvar', 'danger');
             }
+        })
+        .catch(err => {
+            console.error('Erro ao salvar:', err);
+            showAlert('Erro de conexão ao salvar agendamento', 'danger');
         });
     }
 
