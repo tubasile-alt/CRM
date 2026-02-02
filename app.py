@@ -1414,6 +1414,17 @@ def finalizar_atendimento(patient_id):
         # Salvar cada seção como nota separada
         sections = ['queixa', 'anamnese', 'diagnostico']
         note_ids = {}
+
+        # Atualizar status do agendamento para "atendido" e remover da sala de espera
+        if appointment_id:
+            appointment = db.session.get(Appointment, int(appointment_id))
+            if appointment and appointment.patient_id == patient_id:
+                appointment.status = 'atendido'
+                appointment.waiting = False
+                if not appointment.checked_in_time:
+                    appointment.checked_in_time = get_brazil_time()
+                db.session.add(appointment)
+                print(f"DEBUG: Appointment {appointment_id} updated to atendido and waiting=False")
         
         for section in sections:
             content = data.get(section, '').strip()
