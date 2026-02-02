@@ -204,11 +204,18 @@
                 startWebcam('webcam-video', 'webcam-placeholder', 'start-webcam-btn', 'capture-photo-btn');
             }
             
-            // Handlers para o modal de edição (secretária)
-            if (id === 'edit-start-webcam-btn') {
+            // Handlers para o modal de edicao (secretaria)
+            if (id === 'edit-start-webcam-btn' || btn.classList.contains('start-webcam-edit')) {
                 e.preventDefault();
                 e.stopPropagation();
-                startWebcam('edit-webcam-video', 'edit-webcam-placeholder', 'edit-start-webcam-btn', 'edit-capture-photo-btn');
+                // Tenta detectar se estamos no modal de edicao de cadastro ou agendamento
+                const editVideo = document.getElementById('edit-webcam-video');
+                if (editVideo) {
+                    startWebcam('edit-webcam-video', 'edit-webcam-placeholder', id, 'edit-capture-photo-btn');
+                } else {
+                    // Fallback para o modal de novo agendamento
+                    startWebcam('webcam-video', 'webcam-placeholder', 'start-webcam-btn', 'capture-photo-btn');
+                }
             }
             if (id === 'edit-capture-photo-btn') {
                 e.preventDefault();
