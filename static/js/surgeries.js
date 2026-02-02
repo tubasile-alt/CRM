@@ -1,5 +1,119 @@
 // ========== GERENCIAR CIRURGIAS ==========
 
+// Tornar as funções globais anexando ao objeto window explicitamente
+window.saveSurgery = function() {
+    console.log('saveSurgery chamada');
+    
+    // Tentar pegar patientId de várias fontes
+    const pId = typeof patientId !== 'undefined' ? patientId : (document.getElementById('detailPatientId')?.value || null);
+    
+    if (!pId) {
+        console.error('patientId não encontrado!');
+        if (typeof showAlert === 'function') {
+            showAlert('❌ Erro: ID do paciente não encontrado.', 'danger');
+        } else {
+            alert('Erro: ID do paciente não encontrado.');
+        }
+        return;
+    }
+
+    // IDs dos campos podem variar entre a aba "Cirurgias" e o modal de "Planejamento"
+    const surgeryDate = document.getElementById('surgeryDate')?.value || document.getElementById('surgeryModalDate')?.value;
+    const surgicalData = (document.getElementById('surgicalData')?.value || document.getElementById('surgeryModalSurgicalPlanning')?.value || '').trim();
+    const observations = (document.getElementById('surgeryObservations')?.value || document.getElementById('surgeryModalComplications')?.value || '').trim();
+    
+    if (!surgeryDate) {
+        if (typeof showAlert === 'function') showAlert('⚠️ Selecione a data da cirurgia!', 'warning');
+        return;
+    }
+    
+    if (!surgicalData) {
+        if (typeof showAlert === 'function') showAlert('⚠️ Preencha os dados cirúrgicos!', 'warning');
+        return;
+    }
+    
+    fetch(`/api/patient/${pId}/surgery`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json', 
+            'X-CSRFToken': typeof getCSRFToken === 'function' ? getCSRFToken() : ''
+        },
+        body: JSON.stringify({
+            surgery_date: surgeryDate.split('T')[0], // Garantir apenas data YYYY-MM-DD
+            surgical_data: surgicalData,
+            observations: observations
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            if (typeof showAlert === 'function') showAlert('✅ Cirurgia registrada com sucesso!', 'success');
+            // Limpar campos de ambos os formulários
+            ['surgeryDate', 'surgicalData', 'surgeryObservations', 'surgeryModalDate', 'surgeryModalSurgicalPlanning', 'surgeryModalComplications'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            
+            // Fechar modal se aberto
+            const modalEl = document.getElementById('surgeryModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+            
+            if (typeof loadSurgeries === 'function') loadSurgeries();
+        } else {
+            if (typeof showAlert === 'function') showAlert('❌ ' + (result.error || 'Erro ao salvar'), 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        if (typeof showAlert === 'function') showAlert('❌ Erro ao salvar cirurgia', 'danger');
+    });
+};
+
+window.loadSurgeries = function() {
+    console.log('loadSurgeries chamada');
+    const pId = typeof patientId !== 'undefined' ? patientId : (document.getElementById('detailPatientId')?.value || null);
+    if (!pId) return;
+    
+    fetch(`/api/patient/${pId}/surgeries`)
+        .then(r => r.json())
+        .then(surgeries => {
+            console.log('Cirurgias carregadas:', surgeries);
+            renderSurgeries(surgeries);
+        })
+        .catch(err => console.error('Erro ao carregar cirurgias:', err));
+};
+
+window.deleteSurgery = function(surgeryId) {
+    if (!confirm('❌ Tem certeza que deseja deletar esta cirurgia? Esta ação é irreversível.')) return;
+    
+    fetch(`/api/surgery/${surgeryId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': typeof getCSRFToken === 'function' ? getCSRFToken() : ''
+        }
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            if (typeof showAlert === 'function') showAlert('✅ Cirurgia deletada!', 'success');
+            window.loadSurgeries();
+        } else {
+            if (typeof showAlert === 'function') showAlert('❌ ' + (result.error || 'Erro ao deletar'), 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        if (typeof showAlert === 'function') showAlert('❌ Erro ao deletar cirurgia', 'danger');
+    });
+};
+
+window.createEvolutionForSurgery = createEvolutionForSurgery;
+window.viewEvolutions = viewEvolutions;
+
 // Função para calcular tempo desde cirurgia
 function calculateSurgeryTime(surgeryDate) {
     try {
@@ -42,88 +156,9 @@ function calculateSurgeryTime(surgeryDate) {
     }
 }
 
-function saveSurgery() {
-    console.log('saveSurgery chamada');
-    
-    // Tentar pegar patientId de várias fontes
-    const pId = typeof patientId !== 'undefined' ? patientId : (document.getElementById('detailPatientId')?.value || null);
-    
-    if (!pId) {
-        console.error('patientId não encontrado!');
-        showAlert('❌ Erro: ID do paciente não encontrado.', 'danger');
-        return;
-    }
-
-    // IDs dos campos podem variar entre a aba "Cirurgias" e o modal de "Planejamento"
-    const surgeryDate = document.getElementById('surgeryDate')?.value || document.getElementById('surgeryModalDate')?.value;
-    const surgicalData = (document.getElementById('surgicalData')?.value || document.getElementById('surgeryModalSurgicalPlanning')?.value || '').trim();
-    const observations = (document.getElementById('surgeryObservations')?.value || document.getElementById('surgeryModalComplications')?.value || '').trim();
-    
-    if (!surgeryDate) {
-        showAlert('⚠️ Selecione a data da cirurgia!', 'warning');
-        return;
-    }
-    
-    if (!surgicalData) {
-        showAlert('⚠️ Preencha os dados cirúrgicos!', 'warning');
-        return;
-    }
-    
-    fetch(`/api/patient/${pId}/surgery`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': typeof getCSRFToken === 'function' ? getCSRFToken() : ''},
-        body: JSON.stringify({
-            surgery_date: surgeryDate.split('T')[0], // Garantir apenas data YYYY-MM-DD
-            surgical_data: surgicalData,
-            observations: observations
-        })
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('✅ Cirurgia registrada com sucesso!', 'success');
-            // Limpar campos de ambos os formulários
-            ['surgeryDate', 'surgicalData', 'surgeryObservations', 'surgeryModalDate', 'surgeryModalSurgicalPlanning', 'surgeryModalComplications'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = '';
-            });
-            
-            // Fechar modal se aberto
-            const modalEl = document.getElementById('surgeryModal');
-            if (modalEl) {
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-            }
-            
-            loadSurgeries();
-        } else {
-            showAlert('❌ ' + (result.error || 'Erro ao salvar'), 'danger');
-        }
-    })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('❌ Erro ao salvar cirurgia', 'danger');
-    });
-}
-
-// Carregar e exibir cirurgias
-function loadSurgeries() {
-    console.log('loadSurgeries chamada, patientId:', patientId);
-    
-    fetch(`/api/patient/${patientId}/surgeries`)
-        .then(r => {
-            console.log('Status cirurgias:', r.status);
-            return r.json();
-        })
-        .then(surgeries => {
-            console.log('Cirurgias carregadas:', surgeries);
-            renderSurgeries(surgeries);
-        })
-        .catch(err => console.error('Erro ao carregar cirurgias:', err));
-}
-
 function renderSurgeries(surgeries) {
     const container = document.getElementById('surgeriesList');
+    if (!container) return;
     
     if (!surgeries || surgeries.length === 0) {
         container.innerHTML = '<div class="alert alert-info"><em>Nenhuma cirurgia registrada</em></div>';
@@ -197,6 +232,7 @@ function viewEvolutions(surgeryId) {
         .then(r => r.json())
         .then(data => {
             const container = document.getElementById(`evolutions-${surgeryId}`);
+            if (!container) return;
             if (!data.evolutions || data.evolutions.length === 0) {
                 container.innerHTML = '<div class="alert alert-secondary py-1 px-2 mb-0"><small>Nenhuma evolução registrada</small></div>';
                 return;
@@ -233,29 +269,6 @@ function viewEvolutions(surgeryId) {
         .catch(err => console.error('Erro ao carregar evoluções:', err));
 }
 
-// Deletar cirurgia
-function deleteSurgery(surgeryId) {
-    if (!confirm('❌ Tem certeza que deseja deletar esta cirurgia? Esta ação é irreversível.')) return;
-    
-    fetch(`/api/surgery/${surgeryId}`, {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'}
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('✅ Cirurgia deletada!', 'success');
-            loadSurgeries();
-        } else {
-            showAlert('❌ ' + (result.error || 'Erro ao deletar'), 'danger');
-        }
-    })
-    .catch(err => {
-        console.error('Erro ao deletar cirurgia:', err);
-        showAlert('❌ Erro ao deletar cirurgia', 'danger');
-    });
-}
-
 function calculateDaysSince(surgeryDate) {
     let dateStr = surgeryDate;
     if (surgeryDate.includes('/')) {
@@ -269,11 +282,7 @@ function calculateDaysSince(surgeryDate) {
 }
 
 function createEvolutionForSurgery(surgeryId, surgeryDate) {
-    console.log('Criar evolução para cirurgia:', surgeryId, surgeryDate);
-    
     const daysSince = calculateDaysSince(surgeryDate);
-    console.log('Dias desde cirurgia:', daysSince);
-    
     const modalHtml = `
         <div class="modal fade" id="surgeryEvolutionModal" tabindex="-1">
             <div class="modal-dialog modal-lg">
@@ -286,32 +295,22 @@ function createEvolutionForSurgery(surgeryId, surgeryDate) {
                         <div class="alert alert-secondary mb-3">
                             <i class="bi bi-clock"></i> <strong>${daysSince} dias</strong> desde a cirurgia
                         </div>
-                        
                         <div class="mb-4">
                             <label class="form-label fw-bold">Tipo de Evolução:</label>
                             <div class="btn-group w-100" role="group">
                                 <input type="radio" class="btn-check" name="evolution_type" id="evo_rotina" value="general" checked>
-                                <label class="btn btn-outline-secondary" for="evo_rotina">
-                                    <i class="bi bi-journal-text"></i> Rotina
-                                </label>
+                                <label class="btn btn-outline-secondary" for="evo_rotina">Rotina</label>
                                 <input type="radio" class="btn-check" name="evolution_type" id="evo_7dias" value="7_days">
-                                <label class="btn btn-outline-warning" for="evo_7dias">
-                                    <i class="bi bi-calendar-week"></i> 7 Dias
-                                </label>
+                                <label class="btn btn-outline-warning" for="evo_7dias">7 Dias</label>
                                 <input type="radio" class="btn-check" name="evolution_type" id="evo_1ano" value="1_year">
-                                <label class="btn btn-outline-info" for="evo_1ano">
-                                    <i class="bi bi-calendar-check"></i> 1 Ano
-                                </label>
+                                <label class="btn btn-outline-info" for="evo_1ano">1 Ano</label>
                             </div>
                         </div>
-                        
                         <div id="evolutionFormContainer"></div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-success" id="btnSaveEvolution">
-                            <i class="bi bi-check-lg"></i> Salvar Evolucao
-                        </button>
+                        <button type="button" class="btn btn-success" id="btnSaveEvolution">Salvar Evolução</button>
                     </div>
                 </div>
             </div>
@@ -320,9 +319,7 @@ function createEvolutionForSurgery(surgeryId, surgeryDate) {
     
     const existingModal = document.getElementById('surgeryEvolutionModal');
     if (existingModal) existingModal.remove();
-    
     document.body.insertAdjacentHTML('beforeend', modalHtml);
-    
     document.getElementById('evolutionFormContainer').innerHTML = getEvolutionFormHtml('general');
     
     document.getElementById('btnSaveEvolution').addEventListener('click', function() {
@@ -346,88 +343,41 @@ function getEvolutionFormHtml(type) {
                 <label class="form-label fw-bold">Resultado:</label>
                 <div class="btn-group w-100" role="group">
                     <input type="radio" class="btn-check" name="result_rating" id="result_otimo" value="otimo">
-                    <label class="btn btn-outline-success" for="result_otimo">Otimo</label>
+                    <label class="btn btn-outline-success" for="result_otimo">Ótimo</label>
                     <input type="radio" class="btn-check" name="result_rating" id="result_bom" value="bom">
                     <label class="btn btn-outline-primary" for="result_bom">Bom</label>
                     <input type="radio" class="btn-check" name="result_rating" id="result_medio" value="medio">
-                    <label class="btn btn-outline-warning" for="result_medio">Medio</label>
+                    <label class="btn btn-outline-warning" for="result_medio">Médio</label>
                     <input type="radio" class="btn-check" name="result_rating" id="result_ruim" value="ruim">
                     <label class="btn btn-outline-danger" for="result_ruim">Ruim</label>
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label fw-bold">Indicacao de nova cirurgia:</label>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="needs_another_surgery">
-                    <label class="form-check-label" for="needs_another_surgery">Sim, paciente precisa de nova cirurgia</label>
+                    <label class="form-check-label" for="needs_another_surgery">Indicação de nova cirurgia</label>
                 </div>
-                <small class="text-muted">Se marcado, o paciente será adicionado à lista de CRM para contato</small>
             </div>
-            <div class="mb-3">
-                <label for="evolution_content" class="form-label fw-bold">Observacoes:</label>
-                <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a evolucao..."></textarea>
-            </div>
+            <textarea class="form-control" id="evolution_content" rows="4" placeholder="Observações..."></textarea>
         `;
     } else if (type === '7_days') {
         return `
             <div class="row mb-3">
-                <div class="col-6">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="has_necrosis">
-                        <label class="form-check-label" for="has_necrosis">
-                            <i class="bi bi-x-circle text-danger"></i> Necrose
-                        </label>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="has_scabs">
-                        <label class="form-check-label" for="has_scabs">
-                            <i class="bi bi-bandaid text-warning"></i> Crostas
-                        </label>
-                    </div>
-                </div>
+                <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="has_necrosis"><label class="form-check-label">Necrose</label></div></div>
+                <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="has_scabs"><label class="form-check-label">Crostas</label></div></div>
+                <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="has_infection"><label class="form-check-label">Infecção</label></div></div>
+                <div class="col-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="has_follicle_loss"><label class="form-check-label">Perda Folículos</label></div></div>
             </div>
-            <div class="row mb-3">
-                <div class="col-6">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="has_infection">
-                        <label class="form-check-label" for="has_infection">
-                            <i class="bi bi-bug text-danger"></i> Infeccao
-                        </label>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="has_follicle_loss">
-                        <label class="form-check-label" for="has_follicle_loss">
-                            <i class="bi bi-droplet text-secondary"></i> Perda de Foliculos
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <div class="mb-3">
-                <label for="evolution_content" class="form-label fw-bold">Observacoes:</label>
-                <textarea class="form-control" id="evolution_content" rows="4" placeholder="Descreva a evolucao do paciente..."></textarea>
-            </div>
-        `;
-    } else {
-        return `
-            <div class="mb-3">
-                <label for="evolution_content" class="form-label fw-bold">Descricao:</label>
-                <textarea class="form-control" id="evolution_content" rows="6" placeholder="Descreva a evolucao do paciente..."></textarea>
-            </div>
+            <textarea class="form-control" id="evolution_content" rows="4" placeholder="Observações..."></textarea>
         `;
     }
+    return `<textarea class="form-control" id="evolution_content" rows="6" placeholder="Descrição da evolução..."></textarea>`;
 }
 
 function saveSurgeryEvolution(surgeryId) {
-    const content = document.getElementById('evolution_content')?.value || '';
-    const evolutionType = document.querySelector('input[name="evolution_type"]:checked')?.value || 'general';
-    
     const data = {
-        content: content,
-        evolution_type: evolutionType,
+        content: document.getElementById('evolution_content')?.value || '',
+        evolution_type: document.querySelector('input[name="evolution_type"]:checked')?.value || 'general',
         has_necrosis: document.getElementById('has_necrosis')?.checked || false,
         has_scabs: document.getElementById('has_scabs')?.checked || false,
         has_infection: document.getElementById('has_infection')?.checked || false,
@@ -438,30 +388,29 @@ function saveSurgeryEvolution(surgeryId) {
     
     fetch(`/api/surgery/${surgeryId}/evolution`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': typeof getCSRFToken === 'function' ? getCSRFToken() : ''
+        },
         body: JSON.stringify(data)
     })
     .then(r => r.json())
     .then(result => {
         if (result.success) {
             bootstrap.Modal.getInstance(document.getElementById('surgeryEvolutionModal')).hide();
-            showAlert('Evolução salva com sucesso!', 'success');
-            loadSurgeries();
+            if (typeof showAlert === 'function') showAlert('✅ Evolução salva!', 'success');
+            window.loadSurgeries();
         } else {
-            showAlert(result.error || 'Erro ao salvar evolução', 'danger');
+            if (typeof showAlert === 'function') showAlert('❌ Erro: ' + result.error, 'danger');
         }
     })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro ao salvar evolução', 'danger');
-    });
+    .catch(err => console.error('Erro:', err));
 }
 
-// Chamar ao carregar página se o elemento existir
 document.addEventListener('DOMContentLoaded', function() {
     const surgeriesList = document.getElementById('surgeriesList');
     if (surgeriesList && typeof patientId !== 'undefined') {
-        console.log('Carregando cirurgias na inicialização');
-        loadSurgeries();
+        window.loadSurgeries();
     }
 });
+
