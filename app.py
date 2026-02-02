@@ -495,6 +495,20 @@ def get_patient_history(id):
         'history': history
     })
 
+@app.route('/api/appointments/<int:appointment_id>', methods=['DELETE'])
+@login_required
+def delete_appointment(appointment_id):
+    """Deleta um agendamento"""
+    appointment = Appointment.query.get_or_404(appointment_id)
+    
+    # Se médico, só pode deletar seus próprios
+    if current_user.is_doctor() and appointment.doctor_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+    
+    db.session.delete(appointment)
+    db.session.commit()
+    return jsonify({'success': True})
+
 @app.route('/api/appointments', methods=['POST'])
 @login_required
 def create_appointment():

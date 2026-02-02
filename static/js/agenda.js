@@ -472,8 +472,45 @@
         const start = parseLocalDateTime(app.start);
         document.getElementById('editAppointmentDate').value = start.toISOString().split('T')[0];
         document.getElementById('editAppointmentTime').value = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+        
+        // Adicionar botão de deletar se não existir
+        let footer = modalEl.querySelector('.modal-footer');
+        if (footer && !document.getElementById('btnDeleteAppointment')) {
+            const btnDelete = document.createElement('button');
+            btnDelete.id = 'btnDeleteAppointment';
+            btnDelete.className = 'btn btn-danger me-auto';
+            btnDelete.innerHTML = '<i class="bi bi-trash"></i> Excluir';
+            btnDelete.onclick = () => window.deleteAppointment(app.id);
+            footer.prepend(btnDelete);
+        } else if (document.getElementById('btnDeleteAppointment')) {
+            document.getElementById('btnDeleteAppointment').onclick = () => window.deleteAppointment(app.id);
+        }
+        
         new bootstrap.Modal(modalEl).show();
     }
+
+    window.deleteAppointment = function(id) {
+        if (!confirm('Deseja realmente excluir este agendamento?')) return;
+        
+        fetch(`/api/appointments/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCSRFToken() }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('Agendamento excluido!');
+                const modalEl = document.getElementById('editAppointmentModal');
+                if (modalEl) {
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                }
+                loadAppointments();
+            } else {
+                showAlert(data.error || 'Erro ao excluir', 'danger');
+            }
+        });
+    };
 
     window.searchPatientsDetailed = function() {
         const q = document.getElementById('patientSearchInput').value.trim();
