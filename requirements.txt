@@ -15,3 +15,5 @@ python-dateutil
 openai
 gunicorn
 Pillow
+openpyxl
+pandas
