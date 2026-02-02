@@ -1415,16 +1415,23 @@ def finalizar_atendimento(patient_id):
         sections = ['queixa', 'anamnese', 'diagnostico']
         note_ids = {}
 
-        # Atualizar status do agendamento para "atendido" e remover da sala de espera
+        # ATENÇÃO: Garantir status "atendido" e saída da sala de espera
+        # Fazemos isso no início da transação para garantir que ocorra mesmo se houver erro posterior
         if appointment_id:
-            appointment = db.session.get(Appointment, int(appointment_id))
-            if appointment and appointment.patient_id == patient_id:
-                appointment.status = 'atendido'
-                appointment.waiting = False
-                if not appointment.checked_in_time:
-                    appointment.checked_in_time = get_brazil_time()
-                db.session.add(appointment)
-                print(f"DEBUG: Appointment {appointment_id} updated to atendido and waiting=False")
+            try:
+                # Buscar o agendamento sem restrição de médico para correção de bugs antigos
+                appt = db.session.get(Appointment, int(appointment_id))
+                if appt and appt.patient_id == patient_id:
+                    appt.status = 'atendido'
+                    appt.waiting = False
+                    if not appt.checked_in_time:
+                        appt.checked_in_time = get_brazil_time()
+                    db.session.add(appt)
+                    db.session.flush() # Força a ida para o DB dentro da transação
+                    print(f"DEBUG CRÍTICO: Appointment {appointment_id} forçado para atendido")
+            except Exception as appt_err:
+                print(f"Erro ao atualizar status do agendamento: {appt_err}")
+
         
         for section in sections:
             content = data.get(section, '').strip()
