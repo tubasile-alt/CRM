@@ -120,17 +120,33 @@
             if (webcamStream) {
                 webcamStream.getTracks().forEach(track => track.stop());
             }
-            webcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            // Especificar explicitamente que queremos video, não arquivos
+            webcamStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: "user",
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }, 
+                audio: false 
+            });
+            
             if (video) {
                 video.srcObject = webcamStream;
-                video.style.display = 'block';
+                video.onloadedmetadata = () => {
+                    video.play();
+                    video.style.display = 'block';
+                };
             }
             if (placeholder) placeholder.style.display = 'none';
             if (startBtn) startBtn.style.display = 'none';
             if (captureBtn) captureBtn.style.display = 'inline-block';
         } catch (err) {
             console.error("Erro webcam:", err);
-            alert("Não foi possível acessar a câmera.");
+            if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                showAlert("Permissão de câmera negada. Por favor, habilite o acesso no navegador.", "danger");
+            } else {
+                showAlert("Não foi possível acessar a câmera. Verifique se ela está conectada.", "danger");
+            }
         }
     }
 
@@ -166,13 +182,45 @@
 
     function setupWebcamHandlers() {
         document.addEventListener('click', function(e) {
-            const id = e.target.id || e.target.closest('button')?.id;
-            if (id === 'start-webcam-btn') startWebcam('webcam-video', 'webcam-placeholder', 'start-webcam-btn', 'capture-photo-btn');
-            if (id === 'capture-photo-btn') capturePhoto('webcam-video', 'photo-canvas', 'patient-photo-preview', 'capture-photo-btn', 'retake-photo-btn', 'patientPhotoData');
+            const btn = e.target.closest('button');
+            if (!btn) return;
+            const id = btn.id;
+            
+            if (id === 'start-webcam-btn') {
+                e.preventDefault();
+                e.stopPropagation();
+                startWebcam('webcam-video', 'webcam-placeholder', 'start-webcam-btn', 'capture-photo-btn');
+            }
+            if (id === 'capture-photo-btn') {
+                e.preventDefault();
+                e.stopPropagation();
+                capturePhoto('webcam-video', 'photo-canvas', 'patient-photo-preview', 'capture-photo-btn', 'retake-photo-btn', 'patientPhotoData');
+            }
             if (id === 'retake-photo-btn') {
+                e.preventDefault();
+                e.stopPropagation();
                 const preview = document.getElementById('patient-photo-preview');
                 if (preview) preview.style.display = 'none';
                 startWebcam('webcam-video', 'webcam-placeholder', 'start-webcam-btn', 'capture-photo-btn');
+            }
+            
+            // Handlers para o modal de edição (secretária)
+            if (id === 'edit-start-webcam-btn') {
+                e.preventDefault();
+                e.stopPropagation();
+                startWebcam('edit-webcam-video', 'edit-webcam-placeholder', 'edit-start-webcam-btn', 'edit-capture-photo-btn');
+            }
+            if (id === 'edit-capture-photo-btn') {
+                e.preventDefault();
+                e.stopPropagation();
+                capturePhoto('edit-webcam-video', 'edit-photo-canvas', 'edit-patient-photo-preview', 'edit-capture-photo-btn', 'edit-retake-photo-btn', 'edit-patientPhotoData');
+            }
+            if (id === 'edit-retake-photo-btn') {
+                e.preventDefault();
+                e.stopPropagation();
+                const preview = document.getElementById('edit-patient-photo-preview');
+                if (preview) preview.style.display = 'none';
+                startWebcam('edit-webcam-video', 'edit-webcam-placeholder', 'edit-start-webcam-btn', 'edit-capture-photo-btn');
             }
         });
     }
