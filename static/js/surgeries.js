@@ -254,7 +254,12 @@ function renderSurgeries(surgeries) {
 }
 
 function viewEvolutions(surgeryId) {
-    fetch('/api/surgery/' + surgeryId + '/evolutions')
+    var pId = typeof patientId !== 'undefined' ? patientId : null;
+    if (!pId) {
+        var el = document.getElementById('detailPatientId');
+        if (el) pId = el.value;
+    }
+    fetch('/api/patient/' + pId + '/surgery/' + surgeryId + '/evolutions')
         .then(function(r) { return r.json(); })
         .then(function(data) {
             var container = document.getElementById('evolutions-' + surgeryId);
@@ -385,6 +390,12 @@ function getEvolutionFormHtml(type) {
 }
 
 function saveSurgeryEvolution(surgeryId) {
+    var pId = typeof patientId !== 'undefined' ? patientId : null;
+    if (!pId) {
+        var el = document.getElementById('detailPatientId');
+        if (el) pId = el.value;
+    }
+    
     var contentEl = document.getElementById('evolution_content');
     var typeEl = document.querySelector('input[name="evolution_type"]:checked');
     var necrosisEl = document.getElementById('has_necrosis');
@@ -405,7 +416,7 @@ function saveSurgeryEvolution(surgeryId) {
         needs_another_surgery: needsSurgeryEl ? needsSurgeryEl.checked : false
     };
     
-    fetch('/api/surgery/' + surgeryId + '/evolution', {
+    fetch('/api/patient/' + pId + '/surgery/' + surgeryId + '/evolution', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

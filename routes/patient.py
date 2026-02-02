@@ -77,6 +77,31 @@ def delete_patient_surgery(surgery_id):
     
     return jsonify({'success': True})
 
+@patient_bp.route('/<int:patient_id>/surgery/<int:surgery_id>/evolutions', methods=['GET'])
+@login_required
+def get_surgery_evolutions(patient_id, surgery_id):
+    """Listar evoluções de uma cirurgia específica"""
+    surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
+    if surgery.patient_id != patient_id:
+        return jsonify({'error': 'Cirurgia não pertence ao paciente'}), 400
+    
+    evolutions = SurgeryEvolution.query.filter_by(surgery_id=surgery_id).order_by(SurgeryEvolution.evolution_date.desc()).all()
+    return jsonify({
+        'evolutions': [{
+            'id': e.id,
+            'evolution_date': e.evolution_date.isoformat(),
+            'content': e.content,
+            'evolution_type': e.evolution_type if hasattr(e, 'evolution_type') else 'general',
+            'has_necrosis': e.has_necrosis if hasattr(e, 'has_necrosis') else False,
+            'has_scabs': e.has_scabs if hasattr(e, 'has_scabs') else False,
+            'has_infection': e.has_infection if hasattr(e, 'has_infection') else False,
+            'has_follicle_loss': e.has_follicle_loss if hasattr(e, 'has_follicle_loss') else False,
+            'result_rating': e.result_rating if hasattr(e, 'result_rating') else None,
+            'needs_another_surgery': e.needs_another_surgery if hasattr(e, 'needs_another_surgery') else False,
+            'doctor_name': e.doctor.name
+        } for e in evolutions]
+    })
+
 @patient_bp.route('/<int:patient_id>/surgery/<int:surgery_id>/evolution', methods=['POST'])
 @login_required
 def create_surgery_evolution(patient_id, surgery_id):
