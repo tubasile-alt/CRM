@@ -44,7 +44,10 @@ window.saveSurgery = function() {
             observations: observations
         })
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) throw new Error('Servidor retornou erro');
+        return r.json();
+    })
     .then(result => {
         if (result.success) {
             if (typeof showAlert === 'function') showAlert('Cirurgia registrada com sucesso!', 'success');
@@ -61,7 +64,7 @@ window.saveSurgery = function() {
                 if (modal) modal.hide();
             }
             
-            if (typeof loadSurgeries === 'function') loadSurgeries();
+            if (typeof window.loadSurgeries === 'function') window.loadSurgeries();
         } else {
             if (typeof showAlert === 'function') showAlert('Erro: ' + (result.error || 'Erro ao salvar'), 'danger');
         }
@@ -74,7 +77,7 @@ window.saveSurgery = function() {
 
 window.loadSurgeries = function() {
     console.log('loadSurgeries chamada');
-    // Forçar busca do patientId se necessário
+    // Forcar busca do patientId se necessario
     const pId = typeof patientId !== 'undefined' ? patientId : (document.getElementById('detailPatientId')?.value || null);
     if (!pId) {
         console.warn('loadSurgeries: pId nao encontrado');
@@ -82,7 +85,10 @@ window.loadSurgeries = function() {
     }
     
     fetch(`/api/patient/${pId}/surgeries`)
-        .then(r => r.json())
+        .then(r => {
+            if (!r.ok) throw new Error('Servidor retornou erro');
+            return r.json();
+        })
         .then(surgeries => {
             console.log('Cirurgias carregadas:', surgeries);
             renderSurgeries(surgeries);
@@ -93,7 +99,16 @@ window.loadSurgeries = function() {
 window.deleteSurgery = function(surgeryId) {
     if (!confirm('Tem certeza que deseja deletar esta cirurgia?')) return;
     
-    fetch(`/api/patient/delete/${surgeryId}`, {
+    console.log('Deletando cirurgia ID:', surgeryId);
+    
+    // Garantir que surgeryId seja numero
+    const id = parseInt(surgeryId);
+    if (isNaN(id)) {
+        console.error('ID invalido para delecao:', surgeryId);
+        return;
+    }
+    
+    fetch(`/api/patient/delete/${id}`, {
         method: 'DELETE',
         headers: {
             'Content-Type': 'application/json',
@@ -101,22 +116,30 @@ window.deleteSurgery = function(surgeryId) {
         }
     })
     .then(r => {
-        if (!r.ok) throw new Error('Falha na resposta do servidor');
+        if (!r.ok) {
+            console.error('Erro na resposta do servidor:', r.status);
+            throw new Error('Falha na resposta do servidor');
+        }
         return r.json();
     })
     .then(result => {
+        console.log('Resultado delecao:', result);
         if (result.success) {
             if (typeof showAlert === 'function') showAlert('Cirurgia deletada!', 'success');
-            window.loadSurgeries();
+            if (typeof window.loadSurgeries === 'function') window.loadSurgeries();
         } else {
+            console.error('Erro retornado pelo servidor:', result.error);
             if (typeof showAlert === 'function') showAlert('Erro: ' + (result.error || 'Erro ao deletar'), 'danger');
         }
     })
     .catch(err => {
-        console.error('Erro:', err);
+        console.error('Erro ao deletar cirurgia:', err);
         if (typeof showAlert === 'function') showAlert('Erro ao deletar cirurgia', 'danger');
     });
 };
+
+window.createEvolutionForSurgery = createEvolutionForSurgery;
+window.viewEvolutions = viewEvolutions;
 
 window.createEvolutionForSurgery = createEvolutionForSurgery;
 window.viewEvolutions = viewEvolutions;
