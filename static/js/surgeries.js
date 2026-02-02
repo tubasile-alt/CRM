@@ -8,11 +8,11 @@ window.saveSurgery = function() {
     const pId = typeof patientId !== 'undefined' ? patientId : (document.getElementById('detailPatientId')?.value || null);
     
     if (!pId) {
-        console.error('patientId não encontrado!');
+        console.error('patientId nao encontrado!');
         if (typeof showAlert === 'function') {
-            showAlert('❌ Erro: ID do paciente não encontrado.', 'danger');
+            showAlert('Erro: ID do paciente nao encontrado.', 'danger');
         } else {
-            alert('Erro: ID do paciente não encontrado.');
+            alert('Erro: ID do paciente nao encontrado.');
         }
         return;
     }
@@ -23,12 +23,12 @@ window.saveSurgery = function() {
     const observations = (document.getElementById('surgeryObservations')?.value || document.getElementById('surgeryModalComplications')?.value || '').trim();
     
     if (!surgeryDate) {
-        if (typeof showAlert === 'function') showAlert('⚠️ Selecione a data da cirurgia!', 'warning');
+        if (typeof showAlert === 'function') showAlert('Selecione a data da cirurgia!', 'warning');
         return;
     }
     
     if (!surgicalData) {
-        if (typeof showAlert === 'function') showAlert('⚠️ Preencha os dados cirúrgicos!', 'warning');
+        if (typeof showAlert === 'function') showAlert('Preencha os dados cirurgicos!', 'warning');
         return;
     }
     
@@ -47,8 +47,8 @@ window.saveSurgery = function() {
     .then(r => r.json())
     .then(result => {
         if (result.success) {
-            if (typeof showAlert === 'function') showAlert('✅ Cirurgia registrada com sucesso!', 'success');
-            // Limpar campos de ambos os formulários
+            if (typeof showAlert === 'function') showAlert('Cirurgia registrada com sucesso!', 'success');
+            // Limpar campos de ambos os formularios
             ['surgeryDate', 'surgicalData', 'surgeryObservations', 'surgeryModalDate', 'surgeryModalSurgicalPlanning', 'surgeryModalComplications'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
@@ -63,12 +63,12 @@ window.saveSurgery = function() {
             
             if (typeof loadSurgeries === 'function') loadSurgeries();
         } else {
-            if (typeof showAlert === 'function') showAlert('❌ ' + (result.error || 'Erro ao salvar'), 'danger');
+            if (typeof showAlert === 'function') showAlert('Erro: ' + (result.error || 'Erro ao salvar'), 'danger');
         }
     })
     .catch(err => {
         console.error('Erro:', err);
-        if (typeof showAlert === 'function') showAlert('❌ Erro ao salvar cirurgia', 'danger');
+        if (typeof showAlert === 'function') showAlert('Erro ao salvar cirurgia', 'danger');
     });
 };
 
@@ -87,7 +87,7 @@ window.loadSurgeries = function() {
 };
 
 window.deleteSurgery = function(surgeryId) {
-    if (!confirm('❌ Tem certeza que deseja deletar esta cirurgia? Esta ação é irreversível.')) return;
+    if (!confirm('Tem certeza que deseja deletar esta cirurgia?')) return;
     
     fetch(`/api/surgery/${surgeryId}`, {
         method: 'DELETE',
@@ -99,15 +99,15 @@ window.deleteSurgery = function(surgeryId) {
     .then(r => r.json())
     .then(result => {
         if (result.success) {
-            if (typeof showAlert === 'function') showAlert('✅ Cirurgia deletada!', 'success');
+            if (typeof showAlert === 'function') showAlert('Cirurgia deletada!', 'success');
             window.loadSurgeries();
         } else {
-            if (typeof showAlert === 'function') showAlert('❌ ' + (result.error || 'Erro ao deletar'), 'danger');
+            if (typeof showAlert === 'function') showAlert('Erro: ' + (result.error || 'Erro ao deletar'), 'danger');
         }
     })
     .catch(err => {
         console.error('Erro:', err);
-        if (typeof showAlert === 'function') showAlert('❌ Erro ao deletar cirurgia', 'danger');
+        if (typeof showAlert === 'function') showAlert('Erro ao deletar cirurgia', 'danger');
     });
 };
 
