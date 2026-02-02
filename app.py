@@ -1652,11 +1652,18 @@ def finalizar_atendimento(patient_id):
         
         # Atualizar status do agendamento para "atendido"
         appointment_id = data.get('appointment_id')
+        print(f"DEBUG finalizar: appointment_id={appointment_id}, patient_id={patient_id}, doctor_id={current_user.id}")
+        
         if appointment_id:
+            # Primeiro buscar sem filtro de doctor para debug
+            appointment_check = Appointment.query.filter_by(id=appointment_id).first()
+            if appointment_check:
+                print(f"DEBUG: Appointment encontrado - doctor_id no DB: {appointment_check.doctor_id}, current_user.id: {current_user.id}")
+            
+            # Buscar o appointment (sem filtro de doctor_id para permitir atualizar)
             appointment = Appointment.query.filter_by(
                 id=appointment_id,
-                patient_id=patient_id,
-                doctor_id=current_user.id
+                patient_id=patient_id
             ).first()
             
             if appointment:
@@ -1665,9 +1672,9 @@ def finalizar_atendimento(patient_id):
                 if not appointment.checked_in_time:
                     appointment.checked_in_time = get_brazil_time()
                 db.session.add(appointment)
-                print(f"DEBUG: Appointment {appointment_id} updated to atendido")
+                print(f"DEBUG: Appointment {appointment_id} updated to atendido, status={appointment.status}")
             else:
-                print(f"Warning: Appointment {appointment_id} not found or not owned by current doctor")
+                print(f"Warning: Appointment {appointment_id} not found for patient {patient_id}")
         
         # Commit da transação
         db.session.commit()
