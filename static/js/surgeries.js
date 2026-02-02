@@ -42,13 +42,22 @@ function calculateSurgeryTime(surgeryDate) {
     }
 }
 
-// Salvar nova cirurgia
 function saveSurgery() {
-    console.log('saveSurgery chamada, patientId:', patientId);
+    console.log('saveSurgery chamada');
     
-    const surgeryDate = document.getElementById('surgeryDate').value;
-    const surgicalData = document.getElementById('surgicalData').value.trim();
-    const observations = document.getElementById('surgeryObservations').value.trim();
+    // Tentar pegar patientId de várias fontes
+    const pId = typeof patientId !== 'undefined' ? patientId : (document.getElementById('detailPatientId')?.value || null);
+    
+    if (!pId) {
+        console.error('patientId não encontrado!');
+        showAlert('❌ Erro: ID do paciente não encontrado.', 'danger');
+        return;
+    }
+
+    // IDs dos campos podem variar entre a aba "Cirurgias" e o modal de "Planejamento"
+    const surgeryDate = document.getElementById('surgeryDate')?.value || document.getElementById('surgeryModalDate')?.value;
+    const surgicalData = (document.getElementById('surgicalData')?.value || document.getElementById('surgeryModalSurgicalPlanning')?.value || '').trim();
+    const observations = (document.getElementById('surgeryObservations')?.value || document.getElementById('surgeryModalComplications')?.value || '').trim();
     
     if (!surgeryDate) {
         showAlert('⚠️ Selecione a data da cirurgia!', 'warning');
@@ -60,36 +69,40 @@ function saveSurgery() {
         return;
     }
     
-    console.log('Enviando cirurgia:', { surgeryDate, surgicalData, observations });
-    
-    fetch(`/api/patient/${patientId}/surgery`, {
+    fetch(`/api/patient/${pId}/surgery`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': typeof getCSRFToken === 'function' ? getCSRFToken() : ''},
         body: JSON.stringify({
-            surgery_date: surgeryDate,
+            surgery_date: surgeryDate.split('T')[0], // Garantir apenas data YYYY-MM-DD
             surgical_data: surgicalData,
             observations: observations
         })
     })
-    .then(r => {
-        console.log('Status:', r.status);
-        return r.json();
-    })
+    .then(r => r.json())
     .then(result => {
-        console.log('Resultado:', result);
         if (result.success) {
             showAlert('✅ Cirurgia registrada com sucesso!', 'success');
-            document.getElementById('surgeryDate').value = '';
-            document.getElementById('surgicalData').value = '';
-            document.getElementById('surgeryObservations').value = '';
+            // Limpar campos de ambos os formulários
+            ['surgeryDate', 'surgicalData', 'surgeryObservations', 'surgeryModalDate', 'surgeryModalSurgicalPlanning', 'surgeryModalComplications'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            
+            // Fechar modal se aberto
+            const modalEl = document.getElementById('surgeryModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+            
             loadSurgeries();
         } else {
-            showAlert('❌ ' + (result.error || 'Erro ao salvar cirurgia'), 'danger');
+            showAlert('❌ ' + (result.error || 'Erro ao salvar'), 'danger');
         }
     })
     .catch(err => {
-        console.error('Erro ao salvar cirurgia:', err);
-        showAlert('❌ Erro ao salvar cirurgia: ' + err.message, 'danger');
+        console.error('Erro:', err);
+        showAlert('❌ Erro ao salvar cirurgia', 'danger');
     });
 }
 
