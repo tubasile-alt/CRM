@@ -1,10 +1,10 @@
 // ========== GERENCIAR CIRURGIAS ==========
 
-// Tornar as funções globais anexando ao objeto window explicitamente
+// Tornar as funcoes globais anexando ao objeto window explicitamente
 window.saveSurgery = function() {
     console.log('saveSurgery chamada');
     
-    // Tentar pegar patientId de várias fontes
+    // Tentar pegar patientId de varias fontes
     const pId = typeof patientId !== 'undefined' ? patientId : (document.getElementById('detailPatientId')?.value || null);
     
     if (!pId) {
@@ -74,8 +74,12 @@ window.saveSurgery = function() {
 
 window.loadSurgeries = function() {
     console.log('loadSurgeries chamada');
+    // Forçar busca do patientId se necessário
     const pId = typeof patientId !== 'undefined' ? patientId : (document.getElementById('detailPatientId')?.value || null);
-    if (!pId) return;
+    if (!pId) {
+        console.warn('loadSurgeries: pId nao encontrado');
+        return;
+    }
     
     fetch(`/api/patient/${pId}/surgeries`)
         .then(r => r.json())
@@ -89,14 +93,17 @@ window.loadSurgeries = function() {
 window.deleteSurgery = function(surgeryId) {
     if (!confirm('Tem certeza que deseja deletar esta cirurgia?')) return;
     
-    fetch(`/api/surgery/${surgeryId}`, {
+    fetch(`/api/patient/delete/${surgeryId}`, {
         method: 'DELETE',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': typeof getCSRFToken === 'function' ? getCSRFToken() : ''
         }
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) throw new Error('Falha na resposta do servidor');
+        return r.json();
+    })
     .then(result => {
         if (result.success) {
             if (typeof showAlert === 'function') showAlert('Cirurgia deletada!', 'success');
