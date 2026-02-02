@@ -183,6 +183,47 @@
         renderTimeColumn();
     };
 
+    window.openNewAppointmentAtTime = function(hour, minutes) {
+        const modalEl = document.getElementById('newAppointmentModal');
+        if (!modalEl) {
+            showAlert('Modal de agendamento nao encontrado', 'danger');
+            return;
+        }
+        
+        const dateField = document.getElementById('appointmentDate');
+        const timeField = document.getElementById('appointmentTime');
+        const doctorSelect = document.getElementById('appointmentDoctor');
+        
+        if (dateField) {
+            const year = selectedDate.getFullYear();
+            const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(selectedDate.getDate()).padStart(2, '0');
+            dateField.value = `${year}-${month}-${day}`;
+        }
+        
+        if (timeField) {
+            timeField.value = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        }
+        
+        // Pre-selecionar medico do filtro atual (para secretaria)
+        if (doctorSelect && currentDoctorFilter) {
+            doctorSelect.value = currentDoctorFilter;
+        }
+        
+        // Limpar campos do paciente
+        const fieldsToReset = [
+            'selectedPatientId', 'patientName', 'patientCode', 'patientCPF',
+            'patientBirthDate', 'patientPhone', 'patientAddress', 'patientCity',
+            'patientMotherName', 'patientIndicationSource', 'patientOccupation'
+        ];
+        fieldsToReset.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
+        
+        new bootstrap.Modal(modalEl).show();
+    };
+
     function renderTimeColumn() {
         const timeColumn = document.getElementById('timeColumn');
         if (!timeColumn) return;
@@ -193,7 +234,7 @@
                 slot.className = 'hour-slot';
                 slot.textContent = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
                 slot.style.cursor = 'pointer';
-                slot.onclick = () => openNewAppointmentAtTime(hour, minutes);
+                slot.onclick = () => window.openNewAppointmentAtTime(hour, minutes);
                 timeColumn.appendChild(slot);
             }
         }
@@ -741,9 +782,23 @@
     };
 
     window.filterByDoctor = function(doctorId) {
-        currentDoctorFilter = doctorId === 'all' ? null : doctorId;
+        currentDoctorFilter = doctorId === 'all' ? null : parseInt(doctorId);
         loadAppointments();
         if (calendar) calendar.refetchEvents();
+        
+        // Atualizar botoes de filtro
+        document.querySelectorAll('.doctor-filter-btns .btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        if (event && event.target) {
+            event.target.classList.add('active');
+        }
+        
+        // Pre-selecionar medico no formulario de novo agendamento
+        const doctorSelect = document.getElementById('appointmentDoctor');
+        if (doctorSelect && currentDoctorFilter) {
+            doctorSelect.value = currentDoctorFilter;
+        }
     };
 
     window.switchView = function(view) {
