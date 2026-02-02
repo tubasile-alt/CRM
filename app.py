@@ -497,7 +497,7 @@ def get_patient_history(id):
 
 @app.route('/api/appointments/<int:appointment_id>', methods=['DELETE'])
 @login_required
-def delete_appointment(appointment_id):
+def delete_appointment_api(appointment_id):
     """Deleta um agendamento"""
     appointment = Appointment.query.get_or_404(appointment_id)
     
