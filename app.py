@@ -1632,6 +1632,8 @@ def finalizar_atendimento(patient_id):
                 appointment.waiting = False
                 if not appointment.checked_in_time:
                     appointment.checked_in_time = get_brazil_time()
+                db.session.add(appointment)
+                print(f"DEBUG: Appointment {appointment_id} updated to atendido")
             else:
                 print(f"Warning: Appointment {appointment_id} not found or not owned by current doctor")
         

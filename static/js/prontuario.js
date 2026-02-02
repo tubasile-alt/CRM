@@ -169,7 +169,11 @@ function finishConsultation() {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ duration: duration })
+            body: JSON.stringify({ 
+                duration: duration,
+                appointment_id: appointmentId,
+                consultation_started: true
+            })
         })
         .then(response => response.json())
         .then(result => {
@@ -223,7 +227,9 @@ function saveNote(noteType) {
     const data = {
         type: noteType,
         content: content,
-        duration: getConsultationDuration()
+        duration: getConsultationDuration(),
+        appointment_id: appointmentId,
+        consultation_started: !!timerStartTime
     };
     
     if (noteType === 'anamnese') {
