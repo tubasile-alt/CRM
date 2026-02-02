@@ -711,17 +711,22 @@
         }
     };
 
-    window.filterByDoctor = function(doctorId) {
+    window.filterByDoctor = function(doctorId, btn) {
         currentDoctorFilter = doctorId === 'all' ? null : parseInt(doctorId);
         loadAppointments();
         if (calendar) calendar.refetchEvents();
         
         // Atualizar botoes de filtro
-        document.querySelectorAll('.doctor-filter-btns .btn').forEach(btn => {
-            btn.classList.remove('active');
+        document.querySelectorAll('.doctor-filter-btns .btn').forEach(b => {
+            b.classList.remove('active');
         });
-        if (event && event.target) {
-            event.target.classList.add('active');
+        if (btn) {
+            btn.classList.add('active');
+        } else {
+            // Se nao passou o botao, tenta achar pelo doctorId
+            const targetBtn = document.querySelector(`.doctor-filter-btns button[onclick*="'${doctorId}'"]`) || 
+                             document.querySelector(`.doctor-filter-btns button[onclick*="${doctorId}"]`);
+            if (targetBtn) targetBtn.classList.add('active');
         }
         
         // Pre-selecionar medico no formulario de novo agendamento
