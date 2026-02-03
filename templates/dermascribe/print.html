@@ -17,11 +17,16 @@
             max-width: 800px;
             margin: 0 auto;
         }
+        @page {
+            margin-top: 1cm;
+            margin-bottom: 1cm;
+        }
         .header {
             text-align: center;
             border-bottom: 2px solid #333;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            margin-top: 0;
         }
         .header h1 {
             font-size: 24pt;
@@ -154,8 +159,10 @@
     </div>
 
     <div class="patient-info">
-        <p><strong>Paciente:</strong> {{ patient.name }}</p>
-        <p><strong>Data:</strong> {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <p><strong>Paciente:</strong> {{ patient.name }}</p>
+            <p><strong>Data:</strong> {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}</p>
+        </div>
     </div>
 
     {% if prescription.medications_oral and prescription.medications_oral|length > 0 %}
