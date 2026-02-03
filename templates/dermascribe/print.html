@@ -89,6 +89,36 @@
             border: none;
             border-top: 1px solid #333;
         }
+        .doctor-signature {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .doctor-signature img {
+            width: 50px;
+            height: auto;
+        }
+        .doctor-info {
+            text-align: left;
+        }
+        .doctor-info .doctor-name {
+            font-weight: bold;
+            color: #2c5545;
+            font-size: 14pt;
+            margin: 0;
+        }
+        .doctor-info .doctor-crm {
+            color: #2c5545;
+            font-size: 11pt;
+            margin: 2px 0;
+        }
+        .doctor-info .doctor-specialty {
+            color: #666;
+            font-size: 11pt;
+            margin: 0;
+        }
         @media print {
             body {
                 padding: 20px;
@@ -162,10 +192,14 @@
 
     <div class="signature-line">
         <hr>
-        <p><strong>{{ doctor.name if doctor else 'Médico Responsável' }}</strong></p>
-        {% if doctor and doctor.specialty %}
-        <p>{{ doctor.specialty }}</p>
-        {% endif %}
+        <div class="doctor-signature">
+            <img src="{{ url_for('static', filename='images/assinatura-medico.png') }}" alt="SBD">
+            <div class="doctor-info">
+                <p class="doctor-name">Dr. Arthur Basile</p>
+                <p class="doctor-crm">CRM 125.217</p>
+                <p class="doctor-specialty">Dermatologista</p>
+            </div>
+        </div>
     </div>
 
     <div class="footer">
