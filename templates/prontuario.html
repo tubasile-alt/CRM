@@ -1424,9 +1424,23 @@ function deletePatientPhoto() {
 const patientId = {{ patient.id }};
 window.patientId = {{ patient.id }};
 window.patientName = "{{ patient.name }}";
-const appointmentId = {{ appointment_id | tojson }};
+let appointmentId = {{ appointment_id | tojson }};
+console.log('DEBUG prontuario: appointmentId from URL =', appointmentId);
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Se nao tem appointment_id, buscar o ultimo agendamento do paciente para hoje
+    if (!appointmentId) {
+        fetch(`/api/patient/${patientId}/today-appointment`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.appointment_id) {
+                    appointmentId = data.appointment_id;
+                    console.log('DEBUG: Loaded today appointment_id =', appointmentId);
+                }
+            })
+            .catch(err => console.log('No today appointment found'));
+    }
+    
     if (typeof loadPrescriptionHistory === 'function') {
         loadPrescriptionHistory();
     }

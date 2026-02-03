@@ -857,6 +857,33 @@ def search_patients():
     
     return jsonify(result)
 
+@app.route('/api/patient/<int:patient_id>/today-appointment', methods=['GET'])
+@login_required
+def get_patient_today_appointment(patient_id):
+    """Busca o agendamento de hoje para o paciente (para finalizar atendimento)"""
+    today = get_brazil_time().date()
+    
+    # Buscar agendamento de hoje que ainda nao foi atendido
+    appointment = Appointment.query.filter(
+        Appointment.patient_id == patient_id,
+        db.func.date(Appointment.date_time) == today,
+        Appointment.status != 'atendido'
+    ).order_by(Appointment.date_time.desc()).first()
+    
+    if appointment:
+        return jsonify({'appointment_id': appointment.id})
+    
+    # Se nao encontrar pendente, buscar qualquer um de hoje
+    appointment = Appointment.query.filter(
+        Appointment.patient_id == patient_id,
+        db.func.date(Appointment.date_time) == today
+    ).order_by(Appointment.date_time.desc()).first()
+    
+    if appointment:
+        return jsonify({'appointment_id': appointment.id})
+    
+    return jsonify({'appointment_id': None})
+
 @app.route('/api/appointments/<int:id>/notes', methods=['GET'])
 @login_required
 def get_appointment_notes(id):
