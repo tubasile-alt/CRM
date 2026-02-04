@@ -171,7 +171,7 @@ function finishConsultation() {
             },
             body: JSON.stringify({ 
                 duration: duration,
-                appointment_id: appointmentId,
+                appointment_id: window.appointmentId,
                 consultation_started: true
             })
         })
@@ -228,7 +228,7 @@ function saveNote(noteType) {
         type: noteType,
         content: content,
         duration: getConsultationDuration(),
-        appointment_id: appointmentId,
+        appointment_id: window.appointmentId,
         consultation_started: !!timerStartTime
     };
     
@@ -869,9 +869,12 @@ function finalizarAtendimento() {
         consultation_type: document.querySelector('input[name="patient_type"]')?.value || 'Particular'
     };
     
-    // Incluir appointment_id se disponível
-    if (typeof appointmentId !== 'undefined' && appointmentId !== null) {
-        payload.appointment_id = appointmentId;
+    // Incluir appointment_id se disponível (usando window.appointmentId)
+    if (typeof window.appointmentId !== 'undefined' && window.appointmentId !== null) {
+        payload.appointment_id = window.appointmentId;
+        console.log('DEBUG finalizarAtendimento: Enviando appointment_id =', window.appointmentId);
+    } else {
+        console.log('DEBUG finalizarAtendimento: ATENCAO - appointment_id NAO disponivel!');
     }
     
     // Adicionar indicação de transplante (na aba Conduta)
