@@ -1,0 +1,257 @@
+✅ TEMPLATE NOVO DO RECEITUÁRIO (IGUAL AO MODELO) — COPIAR E COLAR
+
+ARQUIVO:
+templates/dermascribe/print.html
+
+SUBSTITUA TUDO pelo código abaixo:
+
+------------------------------------------------------------
+templates/dermascribe/print.html
+------------------------------------------------------------
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Prescrição Médica</title>
+
+  <style>
+    @page { size: A4; margin: 22mm 18mm 18mm 18mm; }
+
+    body{
+      font-family: Arial, Helvetica, sans-serif;
+      color:#111;
+      margin:0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page{
+      min-height: 297mm;
+      position: relative;
+    }
+
+    /* Cabeçalho central */
+    .header{
+      text-align:center;
+      margin-top: 26mm;
+      margin-bottom: 14mm;
+    }
+
+    .title{
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: .2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color:#222;
+    }
+
+    .icon{
+      width: 22px; height: 22px;
+      display:inline-block;
+    }
+
+    .patient-line{
+      margin-top: 18px;
+      text-align:left;
+      font-size: 14px;
+    }
+    .patient-line b{ font-weight: 800; }
+
+    /* Corpo */
+    .content{
+      margin-top: 18px;
+      font-size: 13.5px;
+      line-height: 1.55;
+    }
+
+    .section{
+      margin-top: 16px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .section-title{
+      font-weight: 800;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .med{
+      margin-bottom: 10px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .med-name{
+      font-weight: 800;
+      display:block;
+      margin-bottom: 2px;
+      text-transform: none;
+    }
+
+    .med-instr{
+      display:block;
+      color:#222;
+    }
+
+    /* Rodapé fixo */
+    .footer{
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 18mm;
+      display:flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+    }
+
+    .doctor-box{
+      display:flex;
+      align-items:flex-end;
+      gap: 14px;
+      min-width: 360px;
+    }
+
+    /* “Selo” (placeholder). Se tiver imagem, trocamos por <img>. */
+    .seal{
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1px solid #bbb;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size: 10px;
+      color:#666;
+    }
+
+    .doctor-info{
+      font-size: 12.5px;
+      line-height: 1.35;
+    }
+
+    .signature-line{
+      width: 170px;
+      border-top: 2px solid #333;
+      margin-bottom: 6px;
+    }
+
+    .doctor-name{ font-weight: 800; }
+
+    .date-box{
+      font-size: 13px;
+      min-width: 170px;
+      text-align:right;
+    }
+
+    .date-blank{
+      display:inline-block;
+      min-width: 120px;
+      border-bottom: 2px solid #333;
+      transform: translateY(-2px);
+    }
+
+    @media print{
+      body { margin:0; }
+    }
+  </style>
+</head>
+
+<body onload="window.print()">
+  <div class="page">
+
+    <div class="header">
+      <div class="title">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#222" d="M6 2h9l3 3v17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V6h2.5L14 3.5zM7 9h10v1.6H7V9zm0 4h10v1.6H7V13zm0 4h8v1.6H7V17z"/>
+        </svg>
+        <span>PRESCRIÇÃO MÉDICA</span>
+      </div>
+
+      <div class="patient-line">
+        <b>Paciente:</b> {{ patient.name }}
+      </div>
+    </div>
+
+    <div class="content">
+
+      {% set topical = prescription.medications_topical or [] %}
+      {% set oral = prescription.medications_oral or [] %}
+
+      {% if topical|length > 0 %}
+      <div class="section">
+        <div class="section-title">Uso Tópico</div>
+        {% for m in topical %}
+          <div class="med">
+            <span class="med-name">{{ m.get('medication','') }}</span>
+            <span class="med-instr">{{ m.get('instructions','') }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if oral|length > 0 %}
+      <div class="section">
+        <div class="section-title">Uso Oral</div>
+        {% for m in oral %}
+          <div class="med">
+            <span class="med-name">{{ m.get('medication','') }}</span>
+            <span class="med-instr">{{ m.get('instructions','') }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if (topical|length == 0) and (oral|length == 0) %}
+        <div class="section">
+          <div class="section-title">Prescrição</div>
+          <div style="color:#666;">Nenhuma medicação informada.</div>
+        </div>
+      {% endif %}
+
+    </div>
+
+    <div class="footer">
+
+      <div class="doctor-box">
+        <div class="seal">SELO</div>
+
+        <div class="doctor-info">
+          <div class="signature-line"></div>
+          <div class="doctor-name">Dr. {{ doctor.name }}</div>
+          <div>
+            CRM
+            {% if doctor.crm %}{{ doctor.crm }}{% else %}—{% endif %}
+          </div>
+          <div>
+            {% if doctor.specialty %}
+              {{ doctor.specialty }}
+            {% else %}
+              Médico(a)
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="date-box">
+        Data:&nbsp; <span class="date-blank">&nbsp;</span>
+      </div>
+
+    </div>
+
+  </div>
+</body>
+</html>
+------------------------------------------------------------
+
+✅ O QUE VOCÊ VAI GANHAR COM ISSO
+- Sai igual ao seu modelo (título central, paciente, seções, assinatura/CRM, data)
+- Puxa automaticamente: prescription.medications_topical e prescription.medications_oral
+- Não fica página vazia
+- Pronto pra imprimir A4
+
+FIM ✅
