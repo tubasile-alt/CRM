@@ -207,7 +207,10 @@ def print_prescription(prescription_id):
     prescription = Prescription.query.get_or_404(prescription_id)
     patient = Patient.query.get(prescription.patient_id)
     
-    return render_template('dermascribe/print.html', 
-                         prescription=prescription, 
-                         patient=patient,
-                         doctor=prescription.doctor)
+    # template novo com nome novo (zero chance de pegar o antigo)
+    return render_template(
+        'dermascribe/print_v2.html', 
+        prescription=prescription, 
+        patient=patient,
+        doctor=prescription.doctor
+    )

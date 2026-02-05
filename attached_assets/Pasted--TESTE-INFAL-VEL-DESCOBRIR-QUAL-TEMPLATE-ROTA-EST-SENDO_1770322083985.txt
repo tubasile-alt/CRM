@@ -1,0 +1,63 @@
+✅ TESTE INFALÍVEL: DESCOBRIR QUAL TEMPLATE/ROTA ESTÁ SENDO USADA
+
+PASSO 1) ABRA ESTE ARQUIVO:
+routes/dermascribe.py
+
+ACHE a rota:
+@dermascribe_bp.route('/prescription/<int:prescription_id>/print')
+
+E SUBSTITUA TEMPORARIAMENTE a função inteira por esta:
+
+---------------------------------------------------------
+@dermascribe_bp.route('/prescription/<int:prescription_id>/print')
+@login_required
+def print_prescription(prescription_id):
+    return "<h1 style='font-size:60px;color:red'>TESTE PRINT NOVO OK</h1>"
+---------------------------------------------------------
+
+✅ AGORA:
+1) Salve
+2) Stop / Run no Replit (reinicie)
+3) Abra novamente a impressão
+
+SE VOCÊ NÃO VIR o texto gigante vermelho:
+➡️ Você NÃO está abrindo essa rota (ou existe outra rota igual sobrescrevendo).
+
+PASSO 2) ACHAR A ROTA QUE VOCÊ ESTÁ ABRINDO (SEM ADIVINHAÇÃO)
+No Replit, use a busca (Ctrl+Shift+F) por:
+
+1) "/prescription/"   (procure outros endpoints parecidos)
+2) "print.html"       (procure outros templates de impressão)
+3) "window.print"     (procure outra página que abre a impressão)
+4) "Receituário"      (texto que aparece no topo do seu print)
+
+Você vai achar qual arquivo realmente gera esse print.
+
+PASSO 3) QUANDO O TESTE FUNCIONAR (VOCÊ VIU O TEXTO VERMELHO)
+Volte a função para renderizar um template NOVO (para acabar com cache e confusão):
+
+---------------------------------------------------------
+@dermascribe_bp.route('/prescription/<int:prescription_id>/print')
+@login_required
+def print_prescription(prescription_id):
+    prescription = Prescription.query.get_or_404(prescription_id)
+    patient = Patient.query.get(prescription.patient_id)
+
+    # template novo com nome novo (zero chance de pegar o antigo)
+    return render_template(
+        'dermascribe/print_v2.html',
+        prescription=prescription,
+        patient=patient,
+        doctor=prescription.doctor
+    )
+---------------------------------------------------------
+
+Depois:
+1) Crie o arquivo: templates/dermascribe/print_v2.html
+2) Cole nele o layout que eu te passei (com carimbo)
+
+PASSO 4) FORÇAR SEM CACHE (RECOMENDADO)
+Quando abrir o print, use Ctrl+Shift+R (hard reload).
+No Chrome: abra devtools (F12) > Network > marque "Disable cache".
+
+FIM ✅
