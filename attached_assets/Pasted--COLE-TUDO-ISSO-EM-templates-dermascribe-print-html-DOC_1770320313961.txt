@@ -1,0 +1,187 @@
+<!-- COLE TUDO ISSO EM: templates/dermascribe/print.html -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Prescrição</title>
+
+  <style>
+    @page { size: A4; margin: 0; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #fff;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111;
+    }
+
+    /* A4 com margens “reais” como no modelo */
+    .sheet{
+      width: 210mm;
+      height: 297mm;
+      box-sizing: border-box;
+      padding: 22mm 18mm 18mm 18mm;
+      position: relative;
+    }
+
+    /* ✅ MARCADOR (pra confirmar que esse template está sendo usado) */
+    .version {
+      position: absolute;
+      top: 6mm;
+      right: 18mm;
+      font-size: 12px;
+      color: #c00;
+      font-weight: 700;
+    }
+
+    .header{
+      text-align: center;
+      margin-top: 40mm; /* <-- isso coloca o conteúdo mais “no meio”, igual ao seu modelo */
+      margin-bottom: 16mm;
+    }
+
+    .title{
+      font-size: 22px;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #222;
+    }
+
+    .icon{
+      width: 22px;
+      height: 22px;
+      display:inline-block;
+    }
+
+    .patient{
+      margin-top: 18px;
+      text-align: left;
+      font-size: 14px;
+    }
+    .patient b{ font-weight: 800; }
+
+    .section{
+      margin-top: 16px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .section-title{
+      font-weight: 800;
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+
+    .med{
+      margin-bottom: 10px;
+      font-size: 13.5px;
+      line-height: 1.55;
+    }
+    .med strong{
+      display:block;
+      font-weight: 800;
+      margin-bottom: 2px;
+    }
+
+    /* Rodapé fixo (carimbo + data) */
+    .footer{
+      position: absolute;
+      left: 18mm;
+      right: 18mm;
+      bottom: 18mm;
+      display:flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+    }
+
+    .stamp{
+      width: 95px;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .date{
+      font-size: 13px;
+      min-width: 170px;
+      text-align: right;
+    }
+
+    .date-line{
+      display:inline-block;
+      min-width: 120px;
+      border-bottom: 2px solid #333;
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="sheet">
+
+    <div class="version">VERSAO-PRINT-OK-2026</div>
+
+    <div class="header">
+      <div class="title">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="#222" d="M6 2h9l3 3v17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V6h2.5L14 3.5zM7 9h10v1.6H7V9zm0 4h10v1.6H7V13zm0 4h8v1.6H7V17z"/>
+        </svg>
+        <span>PRESCRIÇÃO MÉDICA</span>
+      </div>
+
+      <div class="patient">
+        <b>Paciente:</b> {{ patient.name }}
+      </div>
+    </div>
+
+    {% set topical = prescription.medications_topical or [] %}
+    {% set oral = prescription.medications_oral or [] %}
+
+    {% if topical|length > 0 %}
+      <div class="section">
+        <div class="section-title">Uso Tópico</div>
+        {% for m in topical %}
+          <div class="med">
+            <strong>{{ m.get('medication','') }}</strong>
+            {{ m.get('instructions','') }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if oral|length > 0 %}
+      <div class="section">
+        <div class="section-title">Uso Oral</div>
+        {% for m in oral %}
+          <div class="med">
+            <strong>{{ m.get('medication','') }}</strong>
+            {{ m.get('instructions','') }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="footer">
+      <div>
+        <img
+          src="{{ url_for('static', filename='img/carimbo_dr_arthur.png') }}"
+          class="stamp"
+          alt="Carimbo"
+        />
+      </div>
+
+      <div class="date">
+        Data:&nbsp; <span class="date-line">&nbsp;</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // opcional: imprimir automático
+    // window.print();
+  </script>
+</body>
+</html>

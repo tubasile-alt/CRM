@@ -1,141 +1,112 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Receituario</title>
+    <title>Prescricao Medica</title>
 
     <style>
         @page {
             size: A4;
-            margin: 2cm;
-        }
-
-        html, body {
-            width: 210mm;
-            height: 297mm;
-            margin: 0;
-            padding: 0;
+            margin: 2.5cm;
         }
 
         body {
             font-family: "Times New Roman", serif;
-            font-size: 14px;
             color: #000;
         }
 
-        .page {
-            width: 100%;
-            min-height: 100%;
-            box-sizing: border-box;
-        }
-
-        .header {
+        h1 {
             text-align: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 10px;
-            margin-bottom: 30px;
-        }
-
-        .header h2 {
-            margin: 0;
             font-size: 18px;
-            letter-spacing: 1px;
+            margin-bottom: 5px;
         }
 
         .patient {
-            margin-top: 10px;
+            text-align: center;
             font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #000;
+            margin: 15px 0;
         }
 
         .section-title {
-            margin-top: 25px;
             font-weight: bold;
-            font-size: 14px;
-            border-bottom: 1px solid #000;
-            padding-bottom: 4px;
-        }
-
-        .content {
             margin-top: 20px;
-            font-size: 15px;
-            line-height: 1.8;
-            white-space: pre-wrap;
+            margin-bottom: 5px;
+            font-size: 14px;
         }
 
-        .med {
-            margin-bottom: 15px;
+        .medication {
+            margin-left: 15px;
+            margin-bottom: 8px;
+            font-size: 13px;
         }
 
         .footer {
+            margin-top: 60px;
             display: flex;
             justify-content: space-between;
-            align-items: flex-end;
-            margin-top: 80px;
+            align-items: center;
         }
 
         .stamp {
-            width: 95px;
-            height: auto;
+            width: 260px;
         }
 
-        .doctor-text {
-            font-size: 13px;
+        .stamp img {
+            width: 100%;
         }
 
         .date {
             font-size: 13px;
         }
 
+        /* ISSO GARANTE QUE O CHROME IMPRIMA A IMAGEM */
         @media print {
             body {
-                margin: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
         }
     </style>
 </head>
-
 <body>
 
-<div class="page">
+    <h1>PRESCRICAO MEDICA</h1>
 
-    <div class="header">
-        <h2>RECEITUARIO</h2>
-        <div class="patient">
-            Paciente: <strong>{{ patient.name }}</strong>
-        </div>
+    <div class="patient">
+        <strong>Paciente:</strong> {{ patient.name }}
     </div>
+
+    <hr>
 
     {% if prescription.medications_topical %}
-    <div class="section-title">USO TOPICO</div>
-    <div class="content">
+        <div class="section-title">Uso Topico</div>
         {% for med in prescription.medications_topical %}
-        <div class="med">
-            <strong>{{ med.medication if med is mapping else med }}</strong><br>
-            {{ med.instructions if med is mapping else '' }}
-        </div>
+            <div class="medication">
+                <strong>{{ med.medication if med is mapping else med }}</strong><br>
+                {{ med.instructions if med is mapping else '' }}
+            </div>
         {% endfor %}
-    </div>
     {% endif %}
 
     {% if prescription.medications_oral %}
-    <div class="section-title">USO ORAL</div>
-    <div class="content">
+        <div class="section-title">Uso Oral</div>
         {% for med in prescription.medications_oral %}
-        <div class="med">
-            <strong>{{ med.medication if med is mapping else med }}</strong><br>
-            {{ med.instructions if med is mapping else '' }}
-        </div>
+            <div class="medication">
+                <strong>{{ med.medication if med is mapping else med }}</strong><br>
+                {{ med.instructions if med is mapping else '' }}
+            </div>
         {% endfor %}
-    </div>
     {% endif %}
 
     <div class="footer">
-        <div class="doctor-text">
-            <img
-                src="{{ url_for('static', filename='img/carimbo_dr_arthur.png') }}"
-                alt="Carimbo Medico"
-                class="stamp"
-            >
+        <div class="stamp">
+            <img src="{{ url_for('static', filename='img/carimbo.png') }}">
         </div>
 
         <div class="date">
@@ -143,15 +114,13 @@
         </div>
     </div>
 
-</div>
-
-<script>
-    window.onload = function() {
-        setTimeout(function() {
-            window.print();
-        }, 500);
-    };
-</script>
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
+    </script>
 
 </body>
 </html>
