@@ -1,0 +1,155 @@
+✅ CHECKLIST RÁPIDO (SEM ACHISMO)
+
+IMPORTANTE:
+Seu blueprint tem: url_prefix='/espera'
+Então as URLs reais são:
+
+✅ CHECKOUT:
+POST /espera/api/checkout/<appointment_id>
+
+✅ REMOVE:
+POST /espera/api/remove/<appointment_id>
+
+Se o seu JS estiver chamando:
+POST /api/checkout/<id>
+NÃO VAI BATER NA ROTA (e nada vai mudar).
+
+
+========================================================
+1) COLOQUE LOGS PARA TER CERTEZA QUE A ROTA ESTÁ SENDO CHAMADA
+========================================================
+
+Edite routes/waiting_room.py e coloque prints:
+
+----------------------------------------
+# routes/waiting_room.py
+----------------------------------------
+
+@waiting_room_bp.route('/api/checkout/<int:appointment_id>', methods=['POST'])
+@login_required
+def check_out(appointment_id):
+    try:
+        print("=== CHECKOUT CHAMADO ===")
+        print("appointment_id recebido:", appointment_id)
+
+        result = waiting_service.check_out(appointment_id)
+
+        print("resultado do service:", result)
+        return jsonify({'success': True, 'data': result})
+    except ValueError as e:
+        print("ERRO ValueError:", e)
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        print("ERRO Exception:", e)
+        return jsonify({'error': 'Erro ao realizar check-out'}), 500
+
+
+========================================================
+2) GARANTA QUE O STATUS REALMENTE FOI PARA O BANCO (APÓS COMMIT)
+========================================================
+
+Edite services/waiting_service.py e force uma leitura do banco após commit:
+
+----------------------------------------
+# services/waiting_service.py
+----------------------------------------
+
+def check_out(self, appointment_id):
+    appointment = Appointment.query.get(appointment_id)
+    if not appointment:
+        raise ValueError("Agendamento não encontrado")
+
+    appointment.waiting = False
+    appointment.status = 'atendido'
+
+    # (seu cálculo de wait_time continua aqui...)
+
+    db.session.commit()
+
+    # ✅ RECARREGA do banco pra confirmar persistência
+    db.session.refresh(appointment)
+    print("STATUS NO BANCO APÓS COMMIT:", appointment.status)
+
+    return {
+        'id': appointment.id,
+        'waiting': False,
+        'status': appointment.status
+    }
+
+
+========================================================
+3) TESTE DIRETO PELO BROWSER (SEM FRONT)
+========================================================
+
+Abra o DevTools (F12) > Console e rode:
+
+fetch('/espera/api/checkout/ID_AQUI', { method: 'POST' })
+  .then(r => r.json())
+  .then(console.log)
+
+Se o retorno vier com:
+data.status = "atendido"
+o backend está ok.
+
+Se NÃO vier, a rota não está sendo chamada ou o id está errado.
+
+
+========================================================
+4) SE O BACKEND ESTÁ OK, ENTÃO É A TELA (REFRESH)
+========================================================
+
+Mesmo o backend mudando, a agenda só muda se você:
+
+A) Atualizar a lista local
+OU
+B) Recarregar a agenda (refetch)
+
+Exemplo (genérico) após finalizar:
+
+const res = await fetch(`/espera/api/checkout/${window.appointmentId}`, { method: 'POST' });
+const json = await res.json();
+
+if (json.success) {
+  // Opção A: atualiza o item localmente
+  // updateAppointmentInUI(json.data.id, json.data.status);
+
+  // Opção B: refaz o GET da agenda
+  // loadAppointments();
+}
+
+OBS: se você não tem nenhuma dessas duas coisas depois do checkout,
+a tela vai ficar mostrando o status antigo para sempre.
+
+
+========================================================
+5) CAUSA MUITO COMUM: VOCÊ "FINALIZA ATENDIMENTO" EM OUTRA ROTA
+========================================================
+
+Às vezes o botão "Finalizar atendimento" na tela de consulta
+NÃO chama /espera/api/checkout.
+
+Ele chama outra rota que salva Note/Evolution/Prescription.
+Se for esse o caso, o status nunca vai mudar porque check_out não roda.
+
+✅ COMO CONFIRMAR:
+No DevTools > Network, clique no botão "Finalizar atendimento"
+e veja QUAL endpoint foi chamado.
+
+- Se NÃO for /espera/api/checkout/<id>, então o status tem que ser atualizado
+  nessa OUTRA rota também.
+
+========================================================
+6) CAÇA AO “SOBRESCREVE STATUS”
+========================================================
+
+Procure no projeto inteiro por:
+"status ="
+"appointment.status"
+
+Se existir algum lugar que faz:
+appointment.status = 'agendado'
+ou define status baseado em outra regra,
+ele pode estar voltando o status sem você perceber.
+========================================================
+
+FIM DO CHECKLIST ✅

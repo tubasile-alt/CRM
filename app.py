@@ -866,22 +866,25 @@ def get_patient_today_appointment(patient_id):
     # Buscar agendamento de hoje que ainda nao foi atendido
     appointment = Appointment.query.filter(
         Appointment.patient_id == patient_id,
-        db.func.date(Appointment.date_time) == today,
+        db.func.date(Appointment.start_time) == today,
         Appointment.status != 'atendido'
-    ).order_by(Appointment.date_time.desc()).first()
+    ).order_by(Appointment.start_time.desc()).first()
     
     if appointment:
+        print(f"DEBUG today-appointment: Encontrado appointment_id={appointment.id} para patient_id={patient_id}")
         return jsonify({'appointment_id': appointment.id})
     
     # Se nao encontrar pendente, buscar qualquer um de hoje
     appointment = Appointment.query.filter(
         Appointment.patient_id == patient_id,
-        db.func.date(Appointment.date_time) == today
-    ).order_by(Appointment.date_time.desc()).first()
+        db.func.date(Appointment.start_time) == today
+    ).order_by(Appointment.start_time.desc()).first()
     
     if appointment:
+        print(f"DEBUG today-appointment: Encontrado (qualquer) appointment_id={appointment.id} para patient_id={patient_id}")
         return jsonify({'appointment_id': appointment.id})
     
+    print(f"DEBUG today-appointment: Nenhum agendamento encontrado para patient_id={patient_id} em {today}")
     return jsonify({'appointment_id': None})
 
 @app.route('/api/appointments/<int:id>/notes', methods=['GET'])
