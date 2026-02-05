@@ -1,0 +1,137 @@
+✅ AUTO “FALTOU” INTELIGENTE (30 MIN APÓS O HORÁRIO) — CÓDIGO COMPLETO
+
+OBJETIVO (INTELIGENTE):
+A cada X minutos (ex: 5), o sistema procura agendamentos do DIA que:
+- já passaram do horário marcado + 30 minutos
+- NÃO fizeram check-in (checked_in_time IS NULL)
+- NÃO estão atendidos
+- NÃO estão faltou
+e então muda status para: "faltou"
+
+VANTAGEM:
+- Não depende de 12:00 / 18:00
+- Funciona para qualquer horário do dia automaticamente
+
+========================================================
+PASSO 0 — REQUIREMENTS
+========================================================
+No requirements.txt adicione (se ainda não tiver):
+APScheduler==3.10.4
+
+========================================================
+PASSO 1 — CRIAR ARQUIVO: services/auto_no_show_service.py
+========================================================
+Crie:
+services/auto_no_show_service.py
+
+Cole este código:
+
+--------------------------------------------------------
+# services/auto_no_show_service.py
+--------------------------------------------------------
+from datetime import datetime, timedelta
+import pytz
+from models import db, Appointment
+
+TZ = pytz.timezone("America/Sao_Paulo")
+
+def _now_sp():
+    return datetime.now(TZ)
+
+def mark_no_shows_grace_minutes(grace_minutes: int = 30):
+    """
+    Marca como 'faltou' todos os agendamentos do dia que:
+    - start_time <= agora - grace_minutes
+    - checked_in_time IS NULL
+    - status NOT IN ('atendido', 'faltou')
+    """
+    now = _now_sp()
+    cutoff = now - timedelta(minutes=grace_minutes)
+
+    # Filtra só agendamentos que já passaram do cutoff
+    q = Appointment.query.filter(
+        Appointment.start_time <= cutoff,
+        Appointment.checked_in_time.is_(None),
+        Appointment.status.notin_(["atendido", "faltou"])
+    )
+
+    appts = q.all()
+    changed = 0
+
+    for a in appts:
+        a.status = "faltou"
+        changed += 1
+
+    if changed:
+        db.session.commit()
+
+    return changed
+
+========================================================
+PASSO 2 — ATIVAR O SCHEDULER NO app.py
+========================================================
+Abra app.py e adicione:
+
+--------------------------------------------------------
+# app.py (adicione imports)
+--------------------------------------------------------
+from apscheduler.schedulers.background import BackgroundScheduler
+import pytz
+
+def _run_in_app_context(app, fn):
+    with app.app_context():
+        changed = fn()
+        print(f"[AUTO-FALTOU] {fn.__name__}: {changed} agendamentos atualizados")
+
+def start_smart_no_show_scheduler(app):
+    tz = pytz.timezone("America/Sao_Paulo")
+    scheduler = BackgroundScheduler(timezone=tz)
+
+    from services.auto_no_show_service import mark_no_shows_grace_minutes
+
+    # Roda a cada 5 minutos (ajuste como quiser)
+    scheduler.add_job(
+        func=lambda: _run_in_app_context(app, lambda: mark_no_shows_grace_minutes(30)),
+        trigger="interval",
+        minutes=5,
+        id="smart_no_show_30min",
+        replace_existing=True
+    )
+
+    scheduler.start()
+
+========================================================
+PASSO 3 — CHAMAR UMA VEZ start_smart_no_show_scheduler(app)
+========================================================
+No final do app.py (após criar app e inicializar db), chame:
+
+start_smart_no_show_scheduler(app)
+
+Exemplo:
+--------------------------------------------------------
+# app.py
+--------------------------------------------------------
+start_smart_no_show_scheduler(app)
+
+========================================================
+IMPORTANTE (EVITAR MARCAR ERRADO)
+========================================================
+1) Se você tem status como "cancelado", "remarcado", etc,
+   você deve excluir do filtro.
+   Exemplo: adicionar no notin_:
+   ["atendido", "faltou", "cancelado", "remarcado"]
+
+2) Se você quer que PACIENTE EM ESPERA (waiting=True) também vire faltou:
+   NÃO recomendo, porque ele apareceu.
+   Mas se quiser, me fale que ajusto a regra.
+
+========================================================
+COMPORTAMENTO FINAL
+========================================================
+✅ A cada 5 minutos:
+- Se passou 30 min do horário marcado
+- e não fez check-in
+- e não foi atendido
+→ status vira "faltou"
+
+FIM ✅

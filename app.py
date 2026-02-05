@@ -2665,6 +2665,34 @@ def delete_patient_photo(patient_id):
     
     return jsonify({'success': True})
 
+# ========== AUTO-FALTOU SCHEDULER ==========
+from apscheduler.schedulers.background import BackgroundScheduler
+
+def _run_in_app_context(app_instance, fn):
+    with app_instance.app_context():
+        changed = fn()
+        if changed > 0:
+            print(f"[AUTO-FALTOU] {changed} agendamentos marcados como faltou")
+
+def start_smart_no_show_scheduler(app_instance):
+    tz = pytz.timezone("America/Sao_Paulo")
+    scheduler = BackgroundScheduler(timezone=tz)
+
+    from services.auto_no_show_service import mark_no_shows_grace_minutes
+
+    scheduler.add_job(
+        func=lambda: _run_in_app_context(app_instance, lambda: mark_no_shows_grace_minutes(30)),
+        trigger="interval",
+        minutes=5,
+        id="smart_no_show_30min",
+        replace_existing=True
+    )
+
+    scheduler.start()
+    print("[AUTO-FALTOU] Scheduler iniciado - verificando a cada 5 minutos")
+
+start_smart_no_show_scheduler(app)
+
 # Note: When using Gunicorn for production, app.run() is not needed
 # Gunicorn handles the server execution
 if __name__ == '__main__':

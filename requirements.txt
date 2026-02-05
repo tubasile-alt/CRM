@@ -17,3 +17,4 @@ gunicorn
 Pillow
 openpyxl
 pandas
+APScheduler
