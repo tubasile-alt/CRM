@@ -1,0 +1,149 @@
+✅ 3 CORREÇÕES (TUDO EM UM SÓ TEXTO PARA COPIAR/COLAR)
+
+========================================================
+CORREÇÃO 1 — BACKEND: services/waiting_service.py
+========================================================
+PROBLEMA:
+Seu JS da sala de espera usa p.appointment_id e p.wait_time,
+mas o backend não retorna appointment_id e retorna wait_time_minutes.
+
+SOLUÇÃO:
+No arquivo services/waiting_service.py, na função get_waiting_list(),
+substitua o waiting_list.append({...}) pelo bloco abaixo:
+
+--------------------------------------------------------
+# services/waiting_service.py  (dentro de get_waiting_list)
+--------------------------------------------------------
+waiting_list.append({
+    # ✅ para o JS: appointment_id
+    'appointment_id': apt.id,
+    # (compatibilidade)
+    'id': apt.id,
+
+    'patient_id': apt.patient_id,
+    'patient_name': apt.patient.name if apt.patient else 'Paciente',
+    'appointment_type': apt.appointment_type or 'Consulta',
+    'scheduled_time': apt.start_time.strftime('%H:%M'),
+    'checked_in_time': checked_in_iso,
+
+    # ✅ para o JS: wait_time
+    'wait_time': wait_time,
+    # (mantém o original)
+    'wait_time_minutes': wait_time,
+
+    'room': apt.room
+})
+
+========================================================
+CORREÇÃO 2 — FRONTEND: static/js/agenda.js (CRIAR FINALIZAR)
+========================================================
+PROBLEMA:
+Seu agenda.js NÃO chama o endpoint:
+POST /espera/api/checkout/<id>
+Então o status nunca muda automaticamente.
+
+SOLUÇÃO:
+No arquivo static/js/agenda.js, cole as 2 funções abaixo (ex: perto do doCheckin):
+
+--------------------------------------------------------
+# static/js/agenda.js  (cole em qualquer lugar dentro do IIFE)
+--------------------------------------------------------
+window.doCheckout = function(appointmentId) {
+  fetch(`/espera/api/checkout/${appointmentId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
+  })
+  .then(r => r.json())
+  .then(resp => {
+    if (resp.success) {
+      showAlert('Atendimento finalizado! Status: atendido');
+      loadAppointments();
+      loadWaitingRoom();
+    } else {
+      showAlert(resp.error || 'Erro ao finalizar atendimento', 'danger');
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    showAlert('Erro ao finalizar atendimento', 'danger');
+  });
+};
+
+window.removeFromWaiting = function(appointmentId) {
+  fetch(`/espera/api/remove/${appointmentId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
+  })
+  .then(r => r.json())
+  .then(resp => {
+    if (resp.success) {
+      showAlert('Removido da espera (sem finalizar)');
+      loadAppointments();
+      loadWaitingRoom();
+    } else {
+      showAlert(resp.error || 'Erro ao remover da espera', 'danger');
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    showAlert('Erro ao remover da espera', 'danger');
+  });
+};
+
+========================================================
+CORREÇÃO 3 — FRONTEND: static/js/agenda.js (MOSTRAR BOTÕES NA AGENDA)
+========================================================
+PROBLEMA:
+Quando isWaiting === true você só mostra o badge “Aguardando”,
+mas não existe botão “Finalizar”, então ninguém chama o checkout.
+
+SOLUÇÃO:
+No arquivo static/js/agenda.js, dentro de renderDayView(),
+procure este trecho:
+
+    } else if (isWaiting) {
+        actionBadgeHtml = `<span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>`;
+    } else {
+        actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+    }
+
+E SUBSTITUA por este:
+
+--------------------------------------------------------
+# static/js/agenda.js  (dentro do renderDayView)
+--------------------------------------------------------
+} else if (isWaiting) {
+    actionBadgeHtml = `
+      <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
+      <button class="btn btn-sm btn-success ms-2"
+              onclick="event.stopPropagation(); doCheckout(${app.id})"
+              title="Finalizar atendimento">
+        <i class="bi bi-check2-circle"></i> Finalizar
+      </button>
+      <button class="btn btn-sm btn-outline-danger ms-1"
+              onclick="event.stopPropagation(); removeFromWaiting(${app.id})"
+              title="Remover da espera (sem finalizar)">
+        <i class="bi bi-x-circle"></i> Remover
+      </button>
+    `;
+} else {
+    actionBadgeHtml = `
+      <button class="checkin-btn"
+              onclick="event.stopPropagation(); doCheckin(${app.id})"
+              title="Fazer Check-in">
+        <i class="bi bi-box-arrow-in-right"></i> Check In
+      </button>
+    `;
+}
+
+========================================================
+RESULTADO ESPERADO (APÓS AS 3 CORREÇÕES)
+========================================================
+1) Check-in → paciente entra na espera (waiting=True)
+2) Finalizar (botão na agenda) → chama POST /espera/api/checkout/<id>
+   → backend executa check_out() → status vira 'atendido'
+   → loadAppointments() recarrega a agenda mostrando “ATENDIDO”
+3) Remover da espera → chama POST /espera/api/remove/<id>
+   → backend executa undo_check_in() → NÃO muda status
+
+FIM ✅

@@ -390,7 +390,15 @@
             } else if (status === 'faltou') {
                 actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>`;
             } else if (isWaiting) {
-                actionBadgeHtml = `<span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>`;
+                actionBadgeHtml = `
+                    <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
+                    <button class="btn btn-sm btn-success ms-2" onclick="event.stopPropagation(); doCheckout(${app.id})" title="Finalizar atendimento">
+                        <i class="bi bi-check2-circle"></i> Finalizar
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger ms-1" onclick="event.stopPropagation(); removeFromWaiting(${app.id})" title="Remover da espera (sem finalizar)">
+                        <i class="bi bi-x-circle"></i> Remover
+                    </button>
+                `;
             } else {
                 actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
             }
@@ -433,6 +441,48 @@
             } else {
                 showAlert(data.error || 'Erro no check-in', 'danger');
             }
+        });
+    };
+
+    window.doCheckout = function(appointmentId) {
+        fetch(`/espera/api/checkout/${appointmentId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
+        })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp.success) {
+                showAlert('Atendimento finalizado! Status: atendido');
+                loadAppointments();
+                loadWaitingRoom();
+            } else {
+                showAlert(resp.error || 'Erro ao finalizar atendimento', 'danger');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showAlert('Erro ao finalizar atendimento', 'danger');
+        });
+    };
+
+    window.removeFromWaiting = function(appointmentId) {
+        fetch(`/espera/api/remove/${appointmentId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() }
+        })
+        .then(r => r.json())
+        .then(resp => {
+            if (resp.success) {
+                showAlert('Removido da espera (sem finalizar)');
+                loadAppointments();
+                loadWaitingRoom();
+            } else {
+                showAlert(resp.error || 'Erro ao remover da espera', 'danger');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showAlert('Erro ao remover da espera', 'danger');
         });
     };
 

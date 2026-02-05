@@ -158,12 +158,14 @@ class WaitingService:
                 checked_in_iso = checkin_time.isoformat()
             
             waiting_list.append({
+                'appointment_id': apt.id,
                 'id': apt.id,
                 'patient_id': apt.patient_id,
-                'patient_name': apt.patient.name,
+                'patient_name': apt.patient.name if apt.patient else 'Paciente',
                 'appointment_type': apt.appointment_type or 'Consulta',
                 'scheduled_time': apt.start_time.strftime('%H:%M'),
                 'checked_in_time': checked_in_iso,
+                'wait_time': wait_time,
                 'wait_time_minutes': wait_time,
                 'room': apt.room
             })
