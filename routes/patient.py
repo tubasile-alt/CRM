@@ -21,6 +21,7 @@ def get_patient_surgeries(patient_id):
                 'id': s.id,
                 'surgery_date': s.surgery_date.strftime('%d/%m/%Y'),
                 'surgery_date_iso': s.surgery_date.isoformat(),
+                'surgery_type': s.surgery_type or '',
                 'surgical_data': s.surgical_data,
                 'observations': s.observations,
                 'doctor_name': s.doctor.name,
@@ -53,6 +54,7 @@ def create_patient_surgery(patient_id):
         patient_id=patient_id,
         doctor_id=current_user.id,
         surgery_date=surgery_date,
+        surgery_type=data.get('surgery_type', ''),
         surgical_data=data.get('surgical_data', ''),
         observations=data.get('observations', '')
     )

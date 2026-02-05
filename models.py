@@ -219,6 +219,7 @@ class TransplantSurgeryRecord(db.Model):
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
     doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
     surgery_date = db.Column(db.Date, nullable=False, index=True)
+    surgery_type = db.Column(db.String(200), nullable=True)
     surgical_data = db.Column(db.Text, nullable=True)
     observations = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=get_brazil_time)

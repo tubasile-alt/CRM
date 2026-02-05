@@ -34,6 +34,17 @@ window.saveSurgery = function() {
     var surgeryModalCompEl = document.getElementById('surgeryModalComplications');
     var observations = ((observationsEl && observationsEl.value) || (surgeryModalCompEl && surgeryModalCompEl.value) || '').trim();
     
+    // Coletar tipos de cirurgia selecionados
+    var surgeryTypes = [];
+    var typeCheckboxes = ['surgeryTypeCapilar', 'surgeryTypeBodyHair', 'surgeryTypeSobrancelhas', 'surgeryTypeBarba', 'surgeryTypeRetoque'];
+    typeCheckboxes.forEach(function(id) {
+        var cb = document.getElementById(id);
+        if (cb && cb.checked) {
+            surgeryTypes.push(cb.value);
+        }
+    });
+    var surgeryType = surgeryTypes.join(', ');
+    
     if (!surgeryDate) {
         if (typeof showAlert === 'function') showAlert('Selecione a data da cirurgia!', 'warning');
         return;
@@ -53,7 +64,8 @@ window.saveSurgery = function() {
         body: JSON.stringify({
             surgery_date: surgeryDate.split('T')[0],
             surgical_data: surgicalData,
-            observations: observations
+            observations: observations,
+            surgery_type: surgeryType
         })
     })
     .then(function(r) {
@@ -68,6 +80,11 @@ window.saveSurgery = function() {
             ids.forEach(function(id) {
                 var el = document.getElementById(id);
                 if (el) el.value = '';
+            });
+            // Limpar checkboxes de tipo de cirurgia
+            ['surgeryTypeCapilar', 'surgeryTypeBodyHair', 'surgeryTypeSobrancelhas', 'surgeryTypeBarba', 'surgeryTypeRetoque'].forEach(function(id) {
+                var cb = document.getElementById(id);
+                if (cb) cb.checked = false;
             });
             
             // Fechar modal se aberto
@@ -230,11 +247,17 @@ function renderSurgeries(surgeries) {
             obsHtml = '<div class="mb-2"><strong>Observacoes:</strong><p class="mb-0 p-2 bg-light rounded" style="white-space: pre-wrap; font-size: 0.9rem;">' + surgery.observations + '</p></div>';
         }
         
+        var typeHtml = '';
+        if (surgery.surgery_type) {
+            typeHtml = '<div class="mb-2"><span class="badge bg-info me-2">Tipo:</span><strong>' + surgery.surgery_type + '</strong></div>';
+        }
+        
         return '<div class="card mb-3 border-left border-success" style="border-left: 5px solid #198754;">' +
             '<div class="card-body">' +
                 '<div class="row">' +
                     '<div class="col-md-8">' +
                         '<h6 class="mb-2 text-success"><i class="bi bi-calendar2-check"></i> <strong>' + calculateSurgeryTime(surgery.surgery_date) + '</strong></h6>' +
+                        typeHtml +
                         '<div class="mb-2"><strong>Dados Cirurgicos:</strong><p class="mb-0 p-2 bg-light rounded" style="white-space: pre-wrap; font-size: 0.9rem;">' + surgery.surgical_data + '</p></div>' +
                         obsHtml +
                         '<small class="text-muted"><i class="bi bi-person-fill"></i> Dr. ' + surgery.doctor_name + '</small>' +
