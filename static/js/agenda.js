@@ -388,7 +388,8 @@
             if (status === 'atendido') {
                 actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
             } else if (status === 'faltou') {
-                actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>`;
+                actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
+                    <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
             } else if (isWaiting) {
                 actionBadgeHtml = `
                     <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
