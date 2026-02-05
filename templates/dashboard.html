@@ -368,6 +368,56 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+<!-- Estatisticas por Tipo de Cirurgia -->
+<div class="row g-3 mt-2 mb-4">
+    <div class="col-lg-6">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Cirurgias por Tipo</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center" id="stats-surgery-types">
+                    <div class="col">
+                        <h4 class="text-primary" id="stat-capilar">-</h4>
+                        <small>Capilar</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-info" id="stat-bodyhair">-</h4>
+                        <small>Body Hair</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-secondary" id="stat-sobrancelhas">-</h4>
+                        <small>Sobrancelhas</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-dark" id="stat-barba">-</h4>
+                        <small>Barba</small>
+                    </div>
+                    <div class="col">
+                        <h4 class="text-warning" id="stat-retoque">-</h4>
+                        <small>Retoque</small>
+                    </div>
+                </div>
+                <div class="text-center mt-3">
+                    <span class="badge bg-success fs-6">Total: <span id="stat-total-surgeries">-</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0"><i class="bi bi-calendar3"></i> Cirurgias por Mes (12 meses)</h6>
+            </div>
+            <div class="card-body">
+                <div id="monthly-chart" style="max-height: 150px; overflow-y: auto;">
+                    <p class="text-muted text-center">Carregando...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 fetch('/api/dashboard/surgery-stats', {credentials: 'same-origin'})
     .then(r => r.json())
@@ -381,7 +431,34 @@ fetch('/api/dashboard/surgery-stats', {credentials: 'same-origin'})
         document.getElementById('stat-medio').textContent = data.one_year_stats?.results?.medio || 0;
         document.getElementById('stat-ruim').textContent = data.one_year_stats?.results?.ruim || 0;
         document.getElementById('stat-nova-cirurgia').textContent = data.one_year_stats?.needs_another_surgery || 0;
+        
+        // Estatisticas por tipo de cirurgia
+        if (data.surgery_types) {
+            document.getElementById('stat-capilar').textContent = data.surgery_types['Capilar'] || 0;
+            document.getElementById('stat-bodyhair').textContent = data.surgery_types['Body Hair'] || 0;
+            document.getElementById('stat-sobrancelhas').textContent = data.surgery_types['Sobrancelhas'] || 0;
+            document.getElementById('stat-barba').textContent = data.surgery_types['Barba'] || 0;
+            document.getElementById('stat-retoque').textContent = data.surgery_types['Retoque'] || 0;
+        }
+        document.getElementById('stat-total-surgeries').textContent = data.total_surgeries || 0;
+        
+        // Grafico mensal (barras simples)
+        if (data.monthly_stats) {
+            var chartHtml = '<div class="d-flex flex-wrap gap-1">';
+            data.monthly_stats.forEach(function(m) {
+                var pct = Math.min(100, (m.count / Math.max(1, data.total_surgeries)) * 500);
+                chartHtml += '<div class="text-center" style="flex: 1; min-width: 60px;">';
+                chartHtml += '<div style="height: 60px; display: flex; align-items: flex-end; justify-content: center;">';
+                chartHtml += '<div style="width: 30px; height: ' + Math.max(5, pct) + '%; background: #0d6efd; border-radius: 3px 3px 0 0;"></div>';
+                chartHtml += '</div>';
+                chartHtml += '<small class="d-block"><strong>' + m.count + '</strong></small>';
+                chartHtml += '<small class="text-muted" style="font-size: 0.7rem;">' + m.month + '</small>';
+                chartHtml += '</div>';
+            });
+            chartHtml += '</div>';
+            document.getElementById('monthly-chart').innerHTML = chartHtml;
+        }
     })
-    .catch(e => console.error('Erro ao carregar estatísticas de cirurgia:', e));
+    .catch(e => console.error('Erro ao carregar estatisticas de cirurgia:', e));
 </script>
 {% endblock %}

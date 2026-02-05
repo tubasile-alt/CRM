@@ -105,10 +105,52 @@ def health():
 @login_required  
 def get_surgery_stats():
     """Estatisticas de evolucoes cirurgicas para o dashboard"""
-    from models import SurgeryEvolution
+    from models import SurgeryEvolution, TransplantSurgeryRecord
+    from sqlalchemy import func, extract
+    from datetime import datetime
+    import pytz
     
     evolutions_7days = SurgeryEvolution.query.filter_by(evolution_type='7_days').all()
     evolutions_1year = SurgeryEvolution.query.filter_by(evolution_type='1_year').all()
+    
+    # Estatisticas por tipo de cirurgia
+    all_surgeries = TransplantSurgeryRecord.query.all()
+    type_counts = {
+        'Capilar': 0,
+        'Body Hair': 0,
+        'Sobrancelhas': 0,
+        'Barba': 0,
+        'Retoque': 0,
+        'Outros': 0
+    }
+    for s in all_surgeries:
+        if s.surgery_type:
+            types = [t.strip() for t in s.surgery_type.split(',')]
+            for t in types:
+                if t in type_counts:
+                    type_counts[t] += 1
+                elif t:
+                    type_counts['Outros'] += 1
+    
+    # Estatisticas por mes (ultimos 12 meses)
+    tz = pytz.timezone('America/Sao_Paulo')
+    now = datetime.now(tz)
+    monthly_stats = []
+    for i in range(12):
+        month = now.month - i
+        year = now.year
+        if month <= 0:
+            month += 12
+            year -= 1
+        count = TransplantSurgeryRecord.query.filter(
+            extract('month', TransplantSurgeryRecord.surgery_date) == month,
+            extract('year', TransplantSurgeryRecord.surgery_date) == year
+        ).count()
+        monthly_stats.append({
+            'month': f'{month:02d}/{year}',
+            'count': count
+        })
+    monthly_stats.reverse()
     
     stats = {
         'seven_day_stats': {
@@ -127,7 +169,10 @@ def get_surgery_stats():
                 'ruim': sum(1 for e in evolutions_1year if e.result_rating == 'ruim')
             },
             'needs_another_surgery': sum(1 for e in evolutions_1year if e.needs_another_surgery)
-        }
+        },
+        'surgery_types': type_counts,
+        'total_surgeries': len(all_surgeries),
+        'monthly_stats': monthly_stats
     }
     
     return jsonify(stats)
