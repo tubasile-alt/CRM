@@ -84,7 +84,38 @@ class WaitingService:
             'id': appointment.id,
             'patient_name': appointment.patient.name if appointment.patient else "Desconhecido",
             'wait_time_minutes': wait_time,
-            'waiting': False
+            'waiting': False,
+            'status': appointment.status
+        }
+    
+    def undo_check_in(self, appointment_id):
+        """
+        Remove paciente da lista de espera (DESFAZ check-in)
+        - NAO finaliza atendimento
+        - NAO marca como atendido
+        
+        Args:
+            appointment_id: ID do agendamento
+            
+        Returns:
+            dict: Dados do undo
+        """
+        appointment = Appointment.query.get(appointment_id)
+        if not appointment:
+            raise ValueError("Agendamento nao encontrado")
+        
+        appointment.waiting = False
+        appointment.checked_in_time = None
+        appointment.total_waiting_minutes = None
+        appointment.room = None
+        
+        db.session.commit()
+        
+        return {
+            'id': appointment.id,
+            'patient_name': appointment.patient.name if appointment.patient else "Desconhecido",
+            'waiting': False,
+            'status': appointment.status
         }
     
     def get_waiting_list(self, doctor_id=None, date=None):

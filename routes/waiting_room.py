@@ -78,9 +78,9 @@ def assign_room(appointment_id):
 @waiting_room_bp.route('/api/remove/<int:appointment_id>', methods=['POST'])
 @login_required
 def remove_from_waiting(appointment_id):
-    """Remove paciente da lista de espera (desfazer check-in)"""
+    """Remove paciente da lista de espera (desfazer check-in, NAO finaliza atendimento)"""
     try:
-        result = waiting_service.check_out(appointment_id)
+        result = waiting_service.undo_check_in(appointment_id)
         return jsonify({'success': True, 'data': result})
     except ValueError as e:
         return jsonify({'error': str(e)}), 400

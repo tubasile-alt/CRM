@@ -1,0 +1,164 @@
+✅ PROBLEMA
+Você disse: “finalizo o atendimento, os dados salvam, mas o status da agenda não muda automaticamente para ATENDIDO”.
+
+Pelo seu código, o BACK-END já muda o status:
+
+    appointment.status = 'atendido'
+    db.session.commit()
+
+Então, quando “não muda automaticamente”, geralmente é porque:
+1) A TELA (front-end) não faz refresh/refetch da agenda depois do checkout, então continua mostrando o status antigo.
+E/OU
+2) Existe um BUG: a rota “remover da espera” usa o mesmo check_out(), e isso marca como “atendido” mesmo quando só era pra desfazer o check-in.
+
+✅ SOLUÇÃO COMPLETA (recomendada)
+A) Separar “FINALIZAR ATENDIMENTO” (checkout) de “REMOVER DA ESPERA” (undo check-in)
+B) Fazer o checkout retornar o status na resposta (pra tela poder atualizar na hora)
+
+========================================================
+A) PATCH 1 — services/waiting_service.py
+========================================================
+
+1) MANTENHA o check_out() finalizando e marcando como atendido
+2) ADICIONE um método novo undo_check_in() para “remover da espera” sem marcar como atendido
+3) RETORNE status no check_out() (para o front atualizar automaticamente)
+
+👉 Substitua o método check_out() e adicione o undo_check_in() assim:
+
+----------------------------------------
+# services/waiting_service.py
+----------------------------------------
+
+def check_out(self, appointment_id):
+    """
+    Realiza check-out de um paciente (FINALIZA atendimento)
+    - Sai da espera
+    - Marca status como 'atendido'
+    """
+    appointment = Appointment.query.get(appointment_id)
+    if not appointment:
+        raise ValueError("Agendamento não encontrado")
+
+    appointment.waiting = False
+    appointment.status = 'atendido'  # minúsculo (consistente com 'agendado')
+
+    # Calcular tempo de espera e registrar
+    wait_time = None
+    if appointment.checked_in_time:
+        try:
+            checked_in = appointment.checked_in_time
+            if checked_in.tzinfo is None:
+                checked_in = self.tz.localize(checked_in)
+
+            now = datetime.now(self.tz)
+            delta = now - checked_in
+            wait_time = int(delta.total_seconds() / 60)
+
+            if wait_time >= 0:
+                appointment.total_waiting_minutes = wait_time
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao calcular tempo de espera: {e}")
+            wait_time = None
+
+    db.session.commit()
+
+    # ✅ IMPORTANTE: retornar status pra UI atualizar imediatamente
+    return {
+        'id': appointment.id,
+        'patient_name': appointment.patient.name if appointment.patient else "Desconhecido",
+        'wait_time_minutes': wait_time,
+        'waiting': False,
+        'status': appointment.status
+    }
+
+
+def undo_check_in(self, appointment_id):
+    """
+    Remove paciente da lista de espera (DESFAZ check-in)
+    - NÃO finaliza atendimento
+    - NÃO marca como atendido
+    """
+    appointment = Appointment.query.get(appointment_id)
+    if not appointment:
+        raise ValueError("Agendamento não encontrado")
+
+    appointment.waiting = False
+    appointment.checked_in_time = None
+    appointment.total_waiting_minutes = None
+    appointment.room = None
+
+    # ⚠️ NÃO muda appointment.status aqui!
+    db.session.commit()
+
+    return {
+        'id': appointment.id,
+        'patient_name': appointment.patient.name if appointment.patient else "Desconhecido",
+        'waiting': False,
+        'status': appointment.status
+    }
+
+
+========================================================
+B) PATCH 2 — routes/waiting_room.py
+========================================================
+
+Agora a rota /api/remove (remover da espera) NÃO pode chamar check_out().
+Ela deve chamar undo_check_in().
+
+👉 Troque seu endpoint remove_from_waiting por este:
+
+----------------------------------------
+# routes/waiting_room.py
+----------------------------------------
+
+@waiting_room_bp.route('/api/remove/<int:appointment_id>', methods=['POST'])
+@login_required
+def remove_from_waiting(appointment_id):
+    """Remove paciente da lista de espera (desfazer check-in)"""
+    try:
+        result = waiting_service.undo_check_in(appointment_id)  # ✅ AQUI MUDA
+        return jsonify({'success': True, 'data': result})
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': 'Erro ao remover da lista'}), 500
+
+
+========================================================
+C) O QUE FAZER NO FRONT-END (tela da agenda)
+========================================================
+
+Depois de chamar:
+POST /espera/api/checkout/<appointment_id>
+
+Você precisa:
+- OU refazer o GET da agenda (refetch)
+- OU atualizar o item na lista usando a resposta.
+
+Como agora o back-end retorna:
+data.status = "atendido"
+
+você pode fazer algo assim no JS (exemplo genérico):
+
+1) Após o checkout:
+- Pegue response.data.data.status
+- Atualize o item na lista da agenda com o mesmo id
+
+Exemplo (pseudo-código):
+- const res = await fetch('/espera/api/checkout/123', { method: 'POST' })
+- const json = await res.json()
+- se (json.success) então:
+    - atualize o appointment de id json.data.id para status json.data.status
+    - ou chame a função que recarrega a agenda
+
+========================================================
+D) TESTE RÁPIDO
+========================================================
+
+1) Faça checkout do paciente
+2) Confira no banco/endpoint de listagem de appointments se o status virou 'atendido'
+3) Se no banco virou e na tela não → é 100% refresh no front.
+   (com o retorno status no checkout, normalmente resolve)
+
+FIM ✅
