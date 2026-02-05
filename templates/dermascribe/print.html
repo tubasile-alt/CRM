@@ -2,12 +2,19 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Prescricao Medica</title>
+    <title>Receituario</title>
 
     <style>
         @page {
             size: A4;
             margin: 2cm;
+        }
+
+        html, body {
+            width: 210mm;
+            height: 297mm;
+            margin: 0;
+            padding: 0;
         }
 
         body {
@@ -16,49 +23,66 @@
             color: #000;
         }
 
+        .page {
+            width: 100%;
+            min-height: 100%;
+            box-sizing: border-box;
+        }
+
         .header {
             text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
             margin-bottom: 30px;
         }
 
         .header h2 {
-            font-size: 18px;
             margin: 0;
+            font-size: 18px;
+            letter-spacing: 1px;
         }
 
         .patient {
-            margin-top: 20px;
+            margin-top: 10px;
             font-size: 14px;
         }
 
+        .section-title {
+            margin-top: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 4px;
+        }
+
         .content {
-            margin-top: 40px;
-            min-height: 350px;
+            margin-top: 20px;
             font-size: 15px;
             line-height: 1.8;
             white-space: pre-wrap;
+        }
+
+        .med {
+            margin-bottom: 15px;
         }
 
         .footer {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            margin-top: 60px;
+            margin-top: 80px;
         }
 
         .stamp {
             width: 95px;
             height: auto;
-            object-fit: contain;
         }
 
-        .doctor-info {
-            text-align: left;
+        .doctor-text {
             font-size: 13px;
         }
 
         .date {
-            text-align: right;
             font-size: 13px;
         }
 
@@ -72,35 +96,43 @@
 
 <body>
 
+<div class="page">
+
     <div class="header">
-        <h2>PRESCRICAO MEDICA</h2>
+        <h2>RECEITUARIO</h2>
+        <div class="patient">
+            Paciente: <strong>{{ patient.name }}</strong>
+        </div>
     </div>
 
-    <div class="patient">
-        <strong>Paciente:</strong> {{ patient.name }}
-    </div>
-
+    {% if prescription.medications_topical %}
+    <div class="section-title">USO TOPICO</div>
     <div class="content">
-{% if prescription.medications_topical %}
-{% for med in prescription.medications_topical %}
-<strong>{{ med.medication if med is mapping else med }}</strong>
-{{ med.instructions if med is mapping else '' }}
-
-{% endfor %}
-{% endif %}
-{% if prescription.medications_oral %}
-{% for med in prescription.medications_oral %}
-<strong>{{ med.medication if med is mapping else med }}</strong>
-{{ med.instructions if med is mapping else '' }}
-
-{% endfor %}
-{% endif %}
+        {% for med in prescription.medications_topical %}
+        <div class="med">
+            <strong>{{ med.medication if med is mapping else med }}</strong><br>
+            {{ med.instructions if med is mapping else '' }}
+        </div>
+        {% endfor %}
     </div>
+    {% endif %}
+
+    {% if prescription.medications_oral %}
+    <div class="section-title">USO ORAL</div>
+    <div class="content">
+        {% for med in prescription.medications_oral %}
+        <div class="med">
+            <strong>{{ med.medication if med is mapping else med }}</strong><br>
+            {{ med.instructions if med is mapping else '' }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <div class="footer">
-        <div class="doctor-info">
-            <img 
-                src="{{ url_for('static', filename='img/carimbo_dr_arthur.png') }}" 
+        <div class="doctor-text">
+            <img
+                src="{{ url_for('static', filename='img/carimbo_dr_arthur.png') }}"
                 alt="Carimbo Medico"
                 class="stamp"
             >
@@ -111,13 +143,15 @@
         </div>
     </div>
 
-    <script>
-        window.onload = function() {
-            setTimeout(function() {
-                window.print();
-            }, 500);
-        };
-    </script>
+</div>
+
+<script>
+    window.onload = function() {
+        setTimeout(function() {
+            window.print();
+        }, 500);
+    };
+</script>
 
 </body>
 </html>

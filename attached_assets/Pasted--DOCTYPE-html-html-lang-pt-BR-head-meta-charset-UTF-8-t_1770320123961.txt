@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Receituário</title>
+
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+
+        html, body {
+            width: 210mm;
+            height: 297mm;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Times New Roman", serif;
+            font-size: 14px;
+            color: #000;
+        }
+
+        /* CONTAINER CENTRAL – ISSO É O QUE FALTAVA */
+        .page {
+            width: 100%;
+            min-height: 100%;
+            box-sizing: border-box;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: 1px;
+        }
+
+        .patient {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .section-title {
+            margin-top: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            border-bottom: 1px solid #000;
+            padding-bottom: 4px;
+        }
+
+        .content {
+            margin-top: 20px;
+            font-size: 15px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+
+        .med {
+            margin-bottom: 15px;
+        }
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 80px;
+        }
+
+        .stamp {
+            width: 95px;
+            height: auto;
+        }
+
+        .doctor-text {
+            font-size: 13px;
+        }
+
+        .date {
+            font-size: 13px;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="page">
+
+    <div class="header">
+        <h2>RECEITUÁRIO</h2>
+        <div class="patient">
+            Paciente: <strong>{{ patient.name }}</strong>
+        </div>
+    </div>
+
+    {% if prescription.medications_topical %}
+    <div class="section-title">🧴 USO TÓPICO</div>
+    <div class="content">
+        {% for med in prescription.medications_topical %}
+        <div class="med">
+            <strong>{{ med.medication }}</strong><br>
+            {{ med.instructions }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if prescription.medications_oral %}
+    <div class="section-title">💊 USO ORAL</div>
+    <div class="content">
+        {% for med in prescription.medications_oral %}
+        <div class="med">
+            <strong>{{ med.medication }}</strong><br>
+            {{ med.instructions }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <div class="doctor-text">
+            <img
+                src="{{ url_for('static', filename='img/carimbo_dr_arthur.png') }}"
+                alt="Carimbo Médico"
+                class="stamp"
+            >
+        </div>
+
+        <div class="date">
+            Data: {{ prescription.created_at.strftime('%d/%m/%Y') }}
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>
