@@ -1,0 +1,90 @@
+✅ CORREÇÃO DEFINITIVA — AUTO “FALTOU” SÓ SE PASSOU DO HORÁRIO + 30 MIN (E SÓ HOJE)
+
+SUBSTITUA o conteúdo do arquivo:
+services/auto_no_show_service.py
+por este:
+
+--------------------------------------------------------
+# services/auto_no_show_service.py
+--------------------------------------------------------
+from datetime import datetime, timedelta, time
+import pytz
+from models import db, Appointment
+
+TZ = pytz.timezone("America/Sao_Paulo")
+
+def _now_sp_naive():
+    """
+    Retorna 'agora' em SP, mas SEM timezone (naive),
+    para comparar com start_time salvo como naive no banco.
+    """
+    return datetime.now(TZ).replace(tzinfo=None)
+
+def _today_sp():
+    return datetime.now(TZ).date()
+
+def mark_no_shows_grace_minutes(grace_minutes: int = 30):
+    """
+    Marca como 'faltou' SOMENTE agendamentos de HOJE que:
+    - start_time <= agora - grace_minutes
+    - checked_in_time IS NULL
+    - status NOT IN ('atendido', 'faltou')
+    """
+    now_naive = _now_sp_naive()
+    cutoff = now_naive - timedelta(minutes=grace_minutes)
+
+    today = _today_sp()
+    start_of_day = datetime.combine(today, time(0, 0, 0))
+    end_of_day = datetime.combine(today, time(23, 59, 59))
+
+    q = Appointment.query.filter(
+        # ✅ só hoje
+        Appointment.start_time >= start_of_day,
+        Appointment.start_time <= end_of_day,
+
+        # ✅ só horários que já passaram do cutoff (ex: +30min)
+        Appointment.start_time <= cutoff,
+
+        # ✅ não fez check-in
+        Appointment.checked_in_time.is_(None),
+
+        # ✅ não mexe nos já finalizados
+        Appointment.status.notin_(["atendido", "faltou"])
+    )
+
+    appts = q.all()
+    changed = 0
+
+    for a in appts:
+        a.status = "faltou"
+        changed += 1
+
+    if changed:
+        db.session.commit()
+
+    return changed
+
+--------------------------------------------------------
+PRONTO ✅
+
+O que isso garante:
+- NÃO marca “faltou” para horários futuros
+- Só marca para agendamentos do DIA (hoje)
+- Só marca quando já passou (horário + 30min)
+
+========================================================
+EXTRA (RECOMENDADO): NÃO MARCAR “faltou” SE ESTÁ NA ESPERA
+========================================================
+Se você quer que quem está "waiting=True" nunca vire faltou,
+adicione MAIS UM filtro dentro do q:
+
+Appointment.waiting.is_(False),
+
+Ficaria assim:
+q = Appointment.query.filter(
+    ...
+    Appointment.waiting.is_(False),
+    ...
+)
+
+FIM ✅
