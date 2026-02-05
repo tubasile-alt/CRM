@@ -1,238 +1,123 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Prescricao Medica</title>
+    <meta charset="UTF-8">
+    <title>Prescricao Medica</title>
 
-  <style>
-    @page { size: A4; margin: 22mm 18mm 18mm 18mm; }
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
 
-    body{
-      font-family: Arial, Helvetica, sans-serif;
-      color:#111;
-      margin:0;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
+        body {
+            font-family: "Times New Roman", serif;
+            font-size: 14px;
+            color: #000;
+        }
 
-    .page{
-      min-height: 297mm;
-      position: relative;
-    }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
 
-    /* Cabecalho central */
-    .header{
-      text-align:center;
-      margin-top: 26mm;
-      margin-bottom: 14mm;
-    }
+        .header h2 {
+            font-size: 18px;
+            margin: 0;
+        }
 
-    .title{
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: .2px;
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      color:#222;
-    }
+        .patient {
+            margin-top: 20px;
+            font-size: 14px;
+        }
 
-    .icon{
-      width: 22px; height: 22px;
-      display:inline-block;
-    }
+        .content {
+            margin-top: 40px;
+            min-height: 350px;
+            font-size: 15px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
 
-    .patient-line{
-      margin-top: 18px;
-      text-align:left;
-      font-size: 14px;
-    }
-    .patient-line b{ font-weight: 800; }
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 60px;
+        }
 
-    /* Corpo */
-    .content{
-      margin-top: 18px;
-      font-size: 13.5px;
-      line-height: 1.55;
-    }
+        .stamp {
+            width: 95px;
+            height: auto;
+            object-fit: contain;
+        }
 
-    .section{
-      margin-top: 16px;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
+        .doctor-info {
+            text-align: left;
+            font-size: 13px;
+        }
 
-    .section-title{
-      font-weight: 800;
-      font-size: 15px;
-      margin-bottom: 8px;
-    }
+        .date {
+            text-align: right;
+            font-size: 13px;
+        }
 
-    .med{
-      margin-bottom: 10px;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-
-    .med-name{
-      font-weight: 800;
-      display:block;
-      margin-bottom: 2px;
-      text-transform: none;
-    }
-
-    .med-instr{
-      display:block;
-      color:#222;
-    }
-
-    /* Rodape fixo */
-    .footer{
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 18mm;
-      display:flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 20px;
-    }
-
-    .doctor-box{
-      display:flex;
-      align-items:flex-end;
-      gap: 14px;
-      min-width: 360px;
-    }
-
-    /* "Selo" (placeholder). Se tiver imagem, trocamos por <img>. */
-    .seal{
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      border: 1px solid #bbb;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size: 10px;
-      color:#666;
-    }
-
-    .doctor-info{
-      font-size: 12.5px;
-      line-height: 1.35;
-    }
-
-    .signature-line{
-      width: 170px;
-      border-top: 2px solid #333;
-      margin-bottom: 6px;
-    }
-
-    .doctor-name{ font-weight: 800; }
-
-    .date-box{
-      font-size: 13px;
-      min-width: 170px;
-      text-align:right;
-    }
-
-    .date-blank{
-      display:inline-block;
-      min-width: 120px;
-      border-bottom: 2px solid #333;
-      transform: translateY(-2px);
-    }
-
-    @media print{
-      body { margin:0; }
-    }
-  </style>
+        @media print {
+            body {
+                margin: 0;
+            }
+        }
+    </style>
 </head>
 
-<body onload="window.print()">
-  <div class="page">
+<body>
 
     <div class="header">
-      <div class="title">
-        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="#222" d="M6 2h9l3 3v17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm8 1.5V6h2.5L14 3.5zM7 9h10v1.6H7V9zm0 4h10v1.6H7V13zm0 4h8v1.6H7V17z"/>
-        </svg>
-        <span>PRESCRICAO MEDICA</span>
-      </div>
+        <h2>PRESCRICAO MEDICA</h2>
+    </div>
 
-      <div class="patient-line">
-        <b>Paciente:</b> {{ patient.name }}
-      </div>
+    <div class="patient">
+        <strong>Paciente:</strong> {{ patient.name }}
     </div>
 
     <div class="content">
+{% if prescription.medications_topical %}
+{% for med in prescription.medications_topical %}
+<strong>{{ med.medication if med is mapping else med }}</strong>
+{{ med.instructions if med is mapping else '' }}
 
-      {% set topical = prescription.medications_topical or [] %}
-      {% set oral = prescription.medications_oral or [] %}
+{% endfor %}
+{% endif %}
+{% if prescription.medications_oral %}
+{% for med in prescription.medications_oral %}
+<strong>{{ med.medication if med is mapping else med }}</strong>
+{{ med.instructions if med is mapping else '' }}
 
-      {% if topical|length > 0 %}
-      <div class="section">
-        <div class="section-title">Uso Topico</div>
-        {% for m in topical %}
-          <div class="med">
-            <span class="med-name">{{ m.get('medication','') }}</span>
-            <span class="med-instr">{{ m.get('instructions','') }}</span>
-          </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      {% if oral|length > 0 %}
-      <div class="section">
-        <div class="section-title">Uso Oral</div>
-        {% for m in oral %}
-          <div class="med">
-            <span class="med-name">{{ m.get('medication','') }}</span>
-            <span class="med-instr">{{ m.get('instructions','') }}</span>
-          </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      {% if (topical|length == 0) and (oral|length == 0) %}
-        <div class="section">
-          <div class="section-title">Prescricao</div>
-          <div style="color:#666;">Nenhuma medicacao informada.</div>
-        </div>
-      {% endif %}
-
+{% endfor %}
+{% endif %}
     </div>
 
     <div class="footer">
-
-      <div class="doctor-box">
-        <div class="seal">SELO</div>
-
         <div class="doctor-info">
-          <div class="signature-line"></div>
-          <div class="doctor-name">Dr. {{ doctor.name }}</div>
-          <div>
-            CRM
-            {% if doctor.crm %}{{ doctor.crm }}{% else %}-{% endif %}
-          </div>
-          <div>
-            {% if doctor.specialty %}
-              {{ doctor.specialty }}
-            {% else %}
-              Medico(a)
-            {% endif %}
-          </div>
+            <img 
+                src="{{ url_for('static', filename='img/carimbo_dr_arthur.png') }}" 
+                alt="Carimbo Medico"
+                class="stamp"
+            >
         </div>
-      </div>
 
-      <div class="date-box">
-        Data:&nbsp; <span class="date-blank">&nbsp;</span>
-      </div>
-
+        <div class="date">
+            Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
+        </div>
     </div>
 
-  </div>
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
+    </script>
+
 </body>
 </html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Prescrição Médica</title>
+
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+
+        body {
+            font-family: "Times New Roman", serif;
+            font-size: 14px;
+            color: #000;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h2 {
+            font-size: 18px;
+            margin: 0;
+        }
+
+        .patient {
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .content {
+            margin-top: 40px;
+            min-height: 350px;
+            font-size: 15px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 60px;
+        }
+
+        .stamp {
+            width: 95px;
+            height: auto;
+            object-fit: contain;
+        }
+
+        .doctor-info {
+            text-align: left;
+            font-size: 13px;
+        }
+
+        .date {
+            text-align: right;
+            font-size: 13px;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h2>📄 PRESCRIÇÃO MÉDICA</h2>
+    </div>
+
+    <div class="patient">
+        <strong>Paciente:</strong> {{ patient.name }}
+    </div>
+
+    <div class="content">
+{% for med in prescription.medications_topical %}
+<strong>{{ med.medication }}</strong>
+{{ med.instructions }}
+
+{% endfor %}
+
+{% for med in prescription.medications_oral %}
+<strong>{{ med.medication }}</strong>
+{{ med.instructions }}
+
+{% endfor %}
+    </div>
+
+    <div class="footer">
+        <div class="doctor-info">
+            <img 
+                src="{{ url_for('static', filename='img/carimbo_dr_arthur.png') }}" 
+                alt="Carimbo Médico"
+                class="stamp"
+            >
+        </div>
+
+        <div class="date">
+            Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
+        </div>
+    </div>
+
+</body>
+</html>
