@@ -400,28 +400,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==============================
     // PATCH FINAL (ROBUSTO) - SALVAR + IMPRIMIR
     // ==============================
-    if (savePrescriptionBtn) {
-        savePrescriptionBtn.addEventListener('click', async function(e) {
-            e.preventDefault();
-            
-            // Evita duplo clique
-            if (savePrescriptionBtn.dataset.loading === '1') return;
+    async function handleSaveAndPrint(e) {
+        if (e) e.preventDefault();
+        
+        // Evita duplo clique
+        if (savePrescriptionBtn && savePrescriptionBtn.dataset.loading === '1') return;
 
-            const patient_id = patientIdInput?.value?.trim();
-            const patient_name = patientNameInput?.value?.trim() || '';
+        const patient_id = patientIdInput?.value?.trim();
+        const patient_name = patientNameInput?.value?.trim() || '';
 
-            if (!patient_id) {
-                alert('ID do paciente é obrigatório. Abra esta página a partir do prontuário.');
-                return;
-            }
+        if (!patient_id) {
+            alert('ID do paciente é obrigatório. Abra esta página a partir do prontuário.');
+            return;
+        }
 
-            // Coleta medicamentos das variáveis locais (medications.oral / medications.topical)
-            if (medications.oral.length === 0 && medications.topical.length === 0) {
-                const ok = confirm('Nenhum medicamento foi adicionado. Deseja salvar mesmo assim?');
-                if (!ok) return;
-            }
+        // Coleta medicamentos das variáveis locais (medications.oral / medications.topical)
+        if (medications.oral.length === 0 && medications.topical.length === 0) {
+            const ok = confirm('Nenhum medicamento foi adicionado. Deseja salvar mesmo assim?');
+            if (!ok) return;
+        }
 
-            const setButtonLoading = (isLoading) => {
+        const setButtonLoading = (isLoading) => {
+            if (savePrescriptionBtn) {
                 savePrescriptionBtn.disabled = isLoading;
                 savePrescriptionBtn.style.opacity = isLoading ? '0.6' : '1';
                 savePrescriptionBtn.style.cursor = isLoading ? 'not-allowed' : 'pointer';
@@ -431,54 +431,60 @@ document.addEventListener('DOMContentLoaded', function() {
                 } else {
                     savePrescriptionBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Receita no Prontuário';
                 }
-            };
-
-            setButtonLoading(true);
-
-            try {
-                const res = await fetch('/dermascribe/api/save-prescription', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        patient_id: Number(patient_id),
-                        patient_name: patient_name,
-                        oral: medications.oral,
-                        topical: medications.topical
-                    })
-                });
-
-                const data = await res.json();
-
-                if (data.status === 'success') {
-                    // Feedback visual
-                    const prescriptionId = data.prescription_id;
-                    
-                    if (prescriptionId) {
-                        // Abrir impressão em nova aba
-                        const printUrl = `/dermascribe/prescription/${prescriptionId}/print`;
-                        window.open(printUrl, '_blank', 'noopener,noreferrer');
-                    }
-
-                    if (window.opener && !window.opener.closed) {
-                        window.opener.postMessage({
-                            type: 'prescription_saved',
-                            prescription_id: prescriptionId,
-                            patient_id: patient_id
-                        }, '*');
-                    }
-                    
-                    // Limpar e fechar
-                    alert('Receita salva com sucesso!');
-                    setTimeout(() => window.close(), 500);
-                } else {
-                    alert('Erro ao salvar receita: ' + (data.message || 'Erro desconhecido'));
-                }
-            } catch (error) {
-                console.error('Erro ao salvar receita:', error);
-                alert('Falha ao salvar: ' + error.message);
-            } finally {
-                setButtonLoading(false);
             }
-        });
+        };
+
+        setButtonLoading(true);
+
+        try {
+            const res = await fetch('/dermascribe/api/save-prescription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_id: Number(patient_id),
+                    patient_name: patient_name,
+                    oral: medications.oral,
+                    topical: medications.topical
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                const prescriptionId = data.prescription_id;
+                
+                if (prescriptionId) {
+                    // Abrir impressão em nova aba (rota profissional)
+                    const printUrl = `/dermascribe/prescription/${prescriptionId}/print`;
+                    window.open(printUrl, '_blank', 'noopener,noreferrer');
+                }
+
+                if (window.opener && !window.opener.closed) {
+                    window.opener.postMessage({
+                        type: 'prescription_saved',
+                        prescription_id: prescriptionId,
+                        patient_id: patient_id
+                    }, '*');
+                }
+                
+                alert('Receita salva com sucesso!');
+                setTimeout(() => window.close(), 500);
+            } else {
+                alert('Erro ao salvar receita: ' + (data.message || 'Erro desconhecido'));
+            }
+        } catch (error) {
+            console.error('Erro ao salvar receita:', error);
+            alert('Falha ao salvar: ' + error.message);
+        } finally {
+            setButtonLoading(false);
+        }
+    }
+
+    if (savePrescriptionBtn) {
+        savePrescriptionBtn.addEventListener('click', handleSaveAndPrint);
+    }
+
+    if (printPrescription) {
+        printPrescription.addEventListener('click', handleSaveAndPrint);
     }
 });
