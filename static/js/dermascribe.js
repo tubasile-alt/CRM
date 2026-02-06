@@ -302,9 +302,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    printPrescription.addEventListener('click', function() {
-        window.print();
-    });
 
     clearFormBtn.addEventListener('click', function() {
         medications = { oral: [], topical: [] };
