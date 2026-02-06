@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Prescrição Médica</title>
+  <style>
+    /* REMOVE QUALQUER HERANÇA DO SITE */
+    html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
+    /* CONFIGURA A FOLHA */
+    @page { size: A4; margin: 0; }
+    /* GARANTE QUE NADA DO BOOTSTRAP ATRAPALHE NA IMPRESSÃO */
+    @media print {
+      .container, .container-fluid, .row, [class^="col-"], [class*=" col-"] {
+        all: unset !important;
+      }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    /* FOLHA A4 REAL */
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      padding: 25mm 20mm 20mm 20mm;
+      box-sizing: border-box;
+      position: relative;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111;
+    }
+    /* CABEÇALHO COM ÍCONE */
+    .header {
+      text-align: center;
+      margin-bottom: 20mm;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: #333;
+    }
+    /* ÍCONE DE DOCUMENTO */
+    .doc-icon {
+      width: 28px;
+      height: 32px;
+      position: relative;
+      display: inline-block;
+    }
+    .doc-icon svg {
+      width: 100%;
+      height: 100%;
+    }
+    /* LINHA DO PACIENTE */
+    .patient-line {
+      margin-top: 20px;
+      text-align: left;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .patient-line b { 
+      font-weight: 700;
+      margin-right: 5px;
+    }
+    /* CORPO */
+    .content {
+      margin-top: 25px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .section {
+      margin-top: 20px;
+      break-inside: avoid;
+    }
+    .section-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .med {
+      margin-bottom: 12px;
+      break-inside: avoid;
+    }
+    .med-name {
+      font-weight: 700;
+      display: block;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+      font-size: 13px;
+    }
+    .med-instr {
+      display: block;
+      color: #333;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+    /* RODAPÉ FIXO COM CARIMBO */
+    .footer {
+      position: absolute;
+      left: 20mm;
+      right: 20mm;
+      bottom: 20mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-top: 10px;
+    }
+    /* ÁREA DO CARIMBO */
+    .stamp-box {
+      width: 220px;
+      text-align: left;
+    }
+    .stamp-divider {
+      border-top: 1.5px dashed #333;
+      width: 180px;
+      margin-bottom: 10px;
+    }
+    .stamp-box img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    /* CAMPO DE DATA */
+    .date-box {
+      font-size: 13px;
+      text-align: right;
+      font-weight: 500;
+    }
+    @media print {
+      body { margin: 0; }
+    }
+  </style>
+</head>
+<body onload="window.print()">
+  <div class="sheet">
+    <div class="header">
+      <div class="title">
+        <span class="doc-icon">
+          <svg viewBox="0 0 24 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2 0C0.9 0 0 0.9 0 2V30C0 31.1 0.9 32 2 32H22C23.1 32 24 31.1 24 30V8L16 0H2Z" fill="#555"/>
+            <path d="M16 0V8H24L16 0Z" fill="#333"/>
+            <rect x="5" y="14" width="14" height="2" fill="white"/>
+            <rect x="5" y="18" width="14" height="2" fill="white"/>
+            <rect x="5" y="22" width="10" height="2" fill="white"/>
+          </svg>
+        </span>
+        <span>PRESCRIÇÃO MÉDICA</span>
+      </div>
+      <div class="patient-line">
+        <b>Paciente:</b>{{ patient.name|upper }}
+      </div>
+    </div>
+
+    <div class="content">
+      {% if prescription.medications_topical %}
+      <div class="section">
+        <div class="section-title">Uso Tópico</div>
+        {% for med in prescription.medications_topical %}
+        <div class="med">
+          <span class="med-name">{{ med.medication if med is mapping else med }}</span>
+          <span class="med-instr">{{ med.instructions if med is mapping else '' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if prescription.medications_oral %}
+      <div class="section">
+        <div class="section-title">Uso Oral</div>
+        {% for med in prescription.medications_oral %}
+        <div class="med">
+          <span class="med-name">{{ med.medication if med is mapping else med }}</span>
+          <span class="med-instr">{{ med.instructions if med is mapping else '' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="footer">
+      <div class="stamp-box">
+        <div class="stamp-divider"></div>
+        <img src="{{ url_for('static', filename='img/carimbo.jpeg') }}" alt="Carimbo Médico">
+      </div>
+      <div class="date-box">
+        Data: ___/___/_____
+      </div>
+    </div>
+  </div>
+</body>
+</html>
