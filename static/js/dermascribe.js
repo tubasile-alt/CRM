@@ -455,8 +455,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (prescriptionId) {
                     // Abrir impressão em nova aba (rota profissional)
-                    const printUrl = `/dermascribe/prescription/${prescriptionId}/print`;
-                    window.open(printUrl, '_blank', 'noopener,noreferrer');
+                    const pdfUrl = `/dermascribe/prescription/${prescriptionId}/pdf`;
+                    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
                 }
 
                 if (window.opener && !window.opener.closed) {

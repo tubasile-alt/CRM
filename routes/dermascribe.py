@@ -1,7 +1,9 @@
-from flask import Blueprint, render_template, request, jsonify, send_file
+from flask import Blueprint, render_template, request, jsonify, send_file, make_response
 from flask_login import login_required, current_user
 from models import db, Medication, MedicationUsage, Prescription, Patient
 from services.openai_service import suggest_medications
+from sqlalchemy.orm import joinedload
+from weasyprint import HTML
 import io
 import csv
 from datetime import datetime
@@ -201,13 +203,9 @@ def api_patient_prescriptions(patient_id):
     
     return jsonify({'prescriptions': result})
 
-from sqlalchemy.orm import joinedload
-from datetime import datetime
-
 @dermascribe_bp.route('/prescription/<int:prescription_id>/print')
 @login_required
 def print_prescription(prescription_id):
-    # Carrega prescription + doctor em 1 query (evita lazy-load/erro em produção)
     prescription = (
         Prescription.query
         .options(joinedload(Prescription.doctor))
@@ -216,7 +214,6 @@ def print_prescription(prescription_id):
 
     patient = Patient.query.get_or_404(prescription.patient_id)
 
-    # Fallback robusto se created_at estiver None por algum motivo
     if not getattr(prescription, "created_at", None):
         prescription.created_at = datetime.now()
 
@@ -226,3 +223,31 @@ def print_prescription(prescription_id):
         patient=patient,
         doctor=prescription.doctor
     )
+
+@dermascribe_bp.route('/prescription/<int:prescription_id>/pdf')
+@login_required
+def prescription_pdf(prescription_id):
+    prescription = (
+        Prescription.query
+        .options(joinedload(Prescription.doctor))
+        .get_or_404(prescription_id)
+    )
+
+    patient = Patient.query.get_or_404(prescription.patient_id)
+
+    if not getattr(prescription, "created_at", None):
+        prescription.created_at = datetime.now()
+
+    html_str = render_template(
+        'dermascribe/print.html',
+        prescription=prescription,
+        patient=patient,
+        doctor=prescription.doctor
+    )
+
+    pdf = HTML(string=html_str, base_url=request.host_url).write_pdf()
+
+    response = make_response(pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=prescricao_{prescription_id}.pdf'
+    return response
