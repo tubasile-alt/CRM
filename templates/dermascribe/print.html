@@ -2,17 +2,22 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Prescrição Médica</title>
 
   <style>
     /* REMOVE QUALQUER HERANÇA DO SITE */
-    html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      color: #111;
+    }
 
     /* CONFIGURA A FOLHA */
     @page { size: A4; margin: 0; }
 
-    /* GARANTE QUE NADA DO BOOTSTRAP ATRAPALHE NA IMPRESSAO */
+    /* GARANTE QUE NADA DO BOOTSTRAP ATRAPALHE NA IMPRESSÃO */
     @media print {
       .container, .container-fluid, .row, [class^="col-"], [class*=" col-"] {
         all: unset !important;
@@ -29,16 +34,15 @@
       position: relative;
       font-family: Arial, Helvetica, sans-serif;
       color: #111;
-      background: #fff;
-      isolation: isolate; /* ajuda a blindar contra estilos externos */
     }
 
-    /* CABECALHO (IGUAL AO MODELO) */
+    /* CABEÇALHO (IGUAL AO MODELO) */
     .header {
       text-align: center;
       margin-top: 35mm;
       margin-bottom: 16mm;
     }
+
     .title {
       font-size: 22px;
       font-weight: 800;
@@ -46,8 +50,15 @@
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      color:#222;
+      color: #222;
       text-transform: uppercase;
+    }
+
+    .title .icon {
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      transform: translateY(-1px);
     }
 
     .patient-line {
@@ -77,7 +88,6 @@
       font-size: 15px;
       margin-bottom: 8px;
       text-decoration: underline;
-      text-underline-offset: 2px;
     }
 
     .med {
@@ -90,16 +100,15 @@
       font-weight: 800;
       display: block;
       margin-bottom: 2px;
-      text-transform: uppercase; /* no seu print o nome fica em caixa alta */
     }
 
     .med-instr {
       display: block;
       color: #222;
-      text-transform: uppercase; /* no seu print a instrução fica em caixa alta */
+      white-space: pre-wrap;
     }
 
-    /* RODAPE FIXO COM CARIMBO */
+    /* RODAPÉ FIXO COM CARIMBO */
     .footer {
       position: absolute;
       left: 18mm;
@@ -108,6 +117,7 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
+      gap: 20px;
     }
 
     .stamp-box {
@@ -124,53 +134,71 @@
       white-space: nowrap;
     }
 
-    @media print { body { margin: 0; } }
+    @media print {
+      body { margin: 0; }
+    }
   </style>
 </head>
 
-<body>
+<body onload="window.print()">
   <div class="sheet">
+
     <div class="header">
       <div class="title">
-        <!-- Se quiser o ícone igual ao print: substitua por SVG/PNG -->
+        <span class="icon">📝</span>
         <span>PRESCRIÇÃO MÉDICA</span>
       </div>
+
       <div class="patient-line">
         <b>Paciente:</b> {{ patient.name }}
       </div>
     </div>
 
     <div class="content">
-      {% if prescription.medications_topical %}
+
+      {# -------- USO TÓPICO -------- #}
+      {% set topical = prescription.medications_topical or [] %}
+      {% if topical|length > 0 %}
       <div class="section">
         <div class="section-title">Uso Tópico</div>
-        {% for med in prescription.medications_topical %}
-        <div class="med">
-          <span class="med-name">{{ med.medication if med is mapping else med }}</span>
-          <span class="med-instr">{{ med.instructions if med is mapping else '' }}</span>
-        </div>
+
+        {% for med in topical %}
+          {% set name = (med.get('medication') if med is mapping else med) %}
+          {% set instr = (med.get('instructions') if med is mapping else '') %}
+          {% if name %}
+          <div class="med">
+            <span class="med-name">{{ name }}</span>
+            {% if instr %}<span class="med-instr">{{ instr }}</span>{% endif %}
+          </div>
+          {% endif %}
         {% endfor %}
       </div>
       {% endif %}
 
-      {% if prescription.medications_oral %}
+      {# -------- USO ORAL -------- #}
+      {% set oral = prescription.medications_oral or [] %}
+      {% if oral|length > 0 %}
       <div class="section">
         <div class="section-title">Uso Oral</div>
-        {% for med in prescription.medications_oral %}
-        <div class="med">
-          <span class="med-name">{{ med.medication if med is mapping else med }}</span>
-          <span class="med-instr">{{ med.instructions if med is mapping else '' }}</span>
-        </div>
+
+        {% for med in oral %}
+          {% set name = (med.get('medication') if med is mapping else med) %}
+          {% set instr = (med.get('instructions') if med is mapping else '') %}
+          {% if name %}
+          <div class="med">
+            <span class="med-name">{{ name }}</span>
+            {% if instr %}<span class="med-instr">{{ instr }}</span>{% endif %}
+          </div>
+          {% endif %}
         {% endfor %}
       </div>
       {% endif %}
+
     </div>
 
     <div class="footer">
       <div class="stamp-box">
-        <img id="stampImg"
-             src="{{ url_for('static', filename='img/carimbo.jpeg') }}"
-             alt="Carimbo Médico">
+        <img src="{{ url_for('static', filename='img/carimbo.jpeg') }}" alt="Carimbo Médico">
       </div>
 
       <div class="date-box">
@@ -182,30 +210,7 @@
         {% endif %}
       </div>
     </div>
+
   </div>
-
-  <script>
-    // Evita o bug comum: print disparar antes do carimbo carregar
-    (function () {
-      const img = document.getElementById('stampImg');
-      let printed = false;
-
-      function doPrint() {
-        if (printed) return;
-        printed = true;
-        window.print();
-      }
-
-      if (img && !img.complete) {
-        img.addEventListener('load', doPrint);
-        img.addEventListener('error', doPrint); // imprime mesmo se falhar (pra não travar)
-        // fallback: se demorar demais, imprime
-        setTimeout(doPrint, 1200);
-      } else {
-        // imagem já carregada
-        setTimeout(doPrint, 100);
-      }
-    })();
-  </script>
 </body>
 </html>

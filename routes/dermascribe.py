@@ -201,13 +201,28 @@ def api_patient_prescriptions(patient_id):
     
     return jsonify({'prescriptions': result})
 
+from sqlalchemy.orm import joinedload
+from datetime import datetime
+
 @dermascribe_bp.route('/prescription/<int:prescription_id>/print')
 @login_required
 def print_prescription(prescription_id):
-    prescription = Prescription.query.get_or_404(prescription_id)
-    patient = Patient.query.get(prescription.patient_id)
-    
-    return render_template('dermascribe/print.html', 
-                         prescription=prescription, 
-                         patient=patient,
-                         doctor=prescription.doctor)
+    # Carrega prescription + doctor em 1 query (evita lazy-load/erro em produção)
+    prescription = (
+        Prescription.query
+        .options(joinedload(Prescription.doctor))
+        .get_or_404(prescription_id)
+    )
+
+    patient = Patient.query.get_or_404(prescription.patient_id)
+
+    # Fallback robusto se created_at estiver None por algum motivo
+    if not getattr(prescription, "created_at", None):
+        prescription.created_at = datetime.now()
+
+    return render_template(
+        'dermascribe/print.html',
+        prescription=prescription,
+        patient=patient,
+        doctor=prescription.doctor
+    )

@@ -1,0 +1,257 @@
+# =========================
+# PATCH FINAL — DERMASCRIBE
+# =========================
+# A) routes/dermascribe.py  (substitua APENAS a função print_prescription por esta versão)
+# B) templates/dermascribe/print.html (crie/substitua o arquivo inteiro com o HTML abaixo)
+
+# -------------------------
+# A) routes/dermascribe.py
+# -------------------------
+from sqlalchemy.orm import joinedload
+from datetime import datetime
+
+@dermascribe_bp.route('/prescription/<int:prescription_id>/print')
+@login_required
+def print_prescription(prescription_id):
+    # Carrega prescription + doctor em 1 query (evita lazy-load/erro em produção)
+    prescription = (
+        Prescription.query
+        .options(joinedload(Prescription.doctor))
+        .get_or_404(prescription_id)
+    )
+
+    patient = Patient.query.get_or_404(prescription.patient_id)
+
+    # Fallback robusto se created_at estiver None por algum motivo
+    if not getattr(prescription, "created_at", None):
+        prescription.created_at = datetime.now()
+
+    return render_template(
+        'dermascribe/print.html',
+        prescription=prescription,
+        patient=patient,
+        doctor=prescription.doctor
+    )
+
+
+# -----------------------------------
+# B) templates/dermascribe/print.html
+# -----------------------------------
+"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Prescrição Médica</title>
+
+  <style>
+    /* REMOVE QUALQUER HERANÇA DO SITE */
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      color: #111;
+    }
+
+    /* CONFIGURA A FOLHA */
+    @page { size: A4; margin: 0; }
+
+    /* GARANTE QUE NADA DO BOOTSTRAP ATRAPALHE NA IMPRESSÃO */
+    @media print {
+      .container, .container-fluid, .row, [class^="col-"], [class*=" col-"] {
+        all: unset !important;
+      }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+
+    /* FOLHA A4 REAL */
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      padding: 22mm 18mm 18mm 18mm;
+      box-sizing: border-box;
+      position: relative;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111;
+    }
+
+    /* CABEÇALHO (IGUAL AO MODELO) */
+    .header {
+      text-align: center;
+      margin-top: 35mm;
+      margin-bottom: 16mm;
+    }
+
+    .title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: .2px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #222;
+      text-transform: uppercase;
+    }
+
+    .title .icon {
+      font-size: 20px;
+      line-height: 1;
+      display: inline-block;
+      transform: translateY(-1px);
+    }
+
+    .patient-line {
+      margin-top: 18px;
+      text-align: left;
+      font-size: 14px;
+      border-bottom: 1px solid #000;
+      padding-bottom: 5px;
+    }
+    .patient-line b { font-weight: 800; }
+
+    /* CORPO */
+    .content {
+      margin-top: 18px;
+      font-size: 13.5px;
+      line-height: 1.55;
+    }
+
+    .section {
+      margin-top: 16px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .section-title {
+      font-weight: 800;
+      font-size: 15px;
+      margin-bottom: 8px;
+      text-decoration: underline;
+    }
+
+    .med {
+      margin-bottom: 10px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .med-name {
+      font-weight: 800;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .med-instr {
+      display: block;
+      color: #222;
+      white-space: pre-wrap;
+    }
+
+    /* RODAPÉ FIXO COM CARIMBO */
+    .footer {
+      position: absolute;
+      left: 18mm;
+      right: 18mm;
+      bottom: 18mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+    }
+
+    .stamp-box {
+      width: 260px;
+    }
+    .stamp-box img {
+      width: 100%;
+      display: block;
+    }
+
+    .date-box {
+      font-size: 13px;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    @media print {
+      body { margin: 0; }
+    }
+  </style>
+</head>
+
+<body onload="window.print()">
+  <div class="sheet">
+
+    <div class="header">
+      <div class="title">
+        <span class="icon">📝</span>
+        <span>PRESCRIÇÃO MÉDICA</span>
+      </div>
+
+      <div class="patient-line">
+        <b>Paciente:</b> {{ patient.name }}
+      </div>
+    </div>
+
+    <div class="content">
+
+      {# -------- USO TÓPICO -------- #}
+      {% set topical = prescription.medications_topical or [] %}
+      {% if topical|length > 0 %}
+      <div class="section">
+        <div class="section-title">Uso Tópico</div>
+
+        {% for med in topical %}
+          {% set name = (med.get('medication') if med is mapping else med) %}
+          {% set instr = (med.get('instructions') if med is mapping else '') %}
+          {% if name %}
+          <div class="med">
+            <span class="med-name">{{ name }}</span>
+            {% if instr %}<span class="med-instr">{{ instr }}</span>{% endif %}
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# -------- USO ORAL -------- #}
+      {% set oral = prescription.medications_oral or [] %}
+      {% if oral|length > 0 %}
+      <div class="section">
+        <div class="section-title">Uso Oral</div>
+
+        {% for med in oral %}
+          {% set name = (med.get('medication') if med is mapping else med) %}
+          {% set instr = (med.get('instructions') if med is mapping else '') %}
+          {% if name %}
+          <div class="med">
+            <span class="med-name">{{ name }}</span>
+            {% if instr %}<span class="med-instr">{{ instr }}</span>{% endif %}
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </div>
+
+    <div class="footer">
+      <div class="stamp-box">
+        <img src="{{ url_for('static', filename='img/carimbo.png') }}" alt="Carimbo Médico">
+      </div>
+
+      <div class="date-box">
+        Data:
+        {% if prescription.created_at %}
+          {{ prescription.created_at.strftime('%d/%m/%Y') }}
+        {% else %}
+          ____/____/____
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
+"""
