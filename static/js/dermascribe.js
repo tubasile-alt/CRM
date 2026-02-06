@@ -397,70 +397,88 @@ document.addEventListener('DOMContentLoaded', function() {
         updatePreview();
     }
 
+    // ==============================
+    // PATCH FINAL (ROBUSTO) - SALVAR + IMPRIMIR
+    // ==============================
     if (savePrescriptionBtn) {
-        savePrescriptionBtn.addEventListener('click', function() {
-            const patientId = patientIdInput ? patientIdInput.value : '';
-            const patientName = patientNameInput.value.trim();
+        savePrescriptionBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
             
-            if (!patientId) {
-                alert('Erro: ID do paciente não encontrado. Abra esta página a partir do prontuário.');
+            // Evita duplo clique
+            if (savePrescriptionBtn.dataset.loading === '1') return;
+
+            const patient_id = patientIdInput?.value?.trim();
+            const patient_name = patientNameInput?.value?.trim() || '';
+
+            if (!patient_id) {
+                alert('ID do paciente é obrigatório. Abra esta página a partir do prontuário.');
                 return;
             }
-            
+
+            // Coleta medicamentos das variáveis locais (medications.oral / medications.topical)
             if (medications.oral.length === 0 && medications.topical.length === 0) {
-                alert('Por favor, adicione pelo menos um medicamento antes de salvar.');
-                return;
+                const ok = confirm('Nenhum medicamento foi adicionado. Deseja salvar mesmo assim?');
+                if (!ok) return;
             }
-            
-            savePrescriptionBtn.disabled = true;
-            savePrescriptionBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
-            
-            fetch('/dermascribe/api/save-prescription', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    patient_id: patientId,
-                    patient_name: patientName,
-                    oral: medications.oral,
-                    topical: medications.topical
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
+
+            const setButtonLoading = (isLoading) => {
+                savePrescriptionBtn.disabled = isLoading;
+                savePrescriptionBtn.style.opacity = isLoading ? '0.6' : '1';
+                savePrescriptionBtn.style.cursor = isLoading ? 'not-allowed' : 'pointer';
+                savePrescriptionBtn.dataset.loading = isLoading ? '1' : '0';
+                if (isLoading) {
+                    savePrescriptionBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
+                } else {
+                    savePrescriptionBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Receita no Prontuário';
+                }
+            };
+
+            setButtonLoading(true);
+
+            try {
+                const res = await fetch('/dermascribe/api/save-prescription', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patient_id: Number(patient_id),
+                        patient_name: patient_name,
+                        oral: medications.oral,
+                        topical: medications.topical
+                    })
+                });
+
+                const data = await res.json();
+
                 if (data.status === 'success') {
-                    alert('Receita salva com sucesso!');
+                    // Feedback visual
+                    const prescriptionId = data.prescription_id;
                     
+                    if (prescriptionId) {
+                        // Abrir impressão em nova aba
+                        const printUrl = `/dermascribe/prescription/${prescriptionId}/print`;
+                        window.open(printUrl, '_blank', 'noopener,noreferrer');
+                    }
+
                     if (window.opener && !window.opener.closed) {
                         window.opener.postMessage({
                             type: 'prescription_saved',
-                            prescription_id: data.prescription_id,
-                            patient_id: patientId,
-                            patient_name: patientName,
-                            oral: medications.oral,
-                            topical: medications.topical
+                            prescription_id: prescriptionId,
+                            patient_id: patient_id
                         }, '*');
                     }
                     
-                    medications = { oral: [], topical: [] };
-                    updateMedicationsList();
-                    updatePreview();
-                    updateMedicationCount();
-                    
-                    setTimeout(() => {
-                        window.close();
-                    }, 500);
+                    // Limpar e fechar
+                    alert('Receita salva com sucesso!');
+                    setTimeout(() => window.close(), 500);
                 } else {
                     alert('Erro ao salvar receita: ' + (data.message || 'Erro desconhecido'));
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Erro ao salvar receita:', error);
-                alert('Erro ao salvar receita. Tente novamente.');
-            })
-            .finally(() => {
-                savePrescriptionBtn.disabled = false;
-                savePrescriptionBtn.innerHTML = '<i class="fas fa-save me-2"></i>Salvar Receita no Prontuário';
-            });
+                alert('Falha ao salvar: ' + error.message);
+            } finally {
+                setButtonLoading(false);
+            }
         });
     }
 });

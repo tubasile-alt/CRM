@@ -1,0 +1,152 @@
+// ==============================
+// PATCH FINAL (ROBUSTO) - SALVAR + IMPRIMIR
+// Cole este bloco no static/js/dermascribe.js
+// no lugar do seu savePrescriptionBtn.addEventListener atual
+// ==============================
+
+(function () {
+  // ⚠️ Ajuste estes seletores se no seu HTML forem diferentes
+  const savePrescriptionBtn = document.getElementById('savePrescriptionBtn');
+  const patientNameInput    = document.getElementById('patientName');
+  const patientIdInput      = document.getElementById('patientId'); // hidden/input com patient_id
+
+  // Função que você provavelmente já tem: deve retornar arrays no formato:
+  // oral = [{ medication: '...', instructions: '...', type: 'oral' }, ...]
+  // topical = [{ medication: '...', instructions: '...', type: 'topical' }, ...]
+  // Se você já tiver arrays globais, adapte aqui.
+  function collectMedicationsSafely() {
+    // ✅ TENTE reaproveitar suas variáveis já existentes
+    // Ex.: window.oralMeds / window.topicalMeds / arrays no escopo
+    const oral = Array.isArray(window.oralMedications) ? window.oralMedications : [];
+    const topical = Array.isArray(window.topicalMedications) ? window.topicalMedications : [];
+
+    // Normaliza para garantir formato consistente
+    const norm = (arr, defaultType) => arr
+      .filter(Boolean)
+      .map(m => {
+        // Se já vier como objeto ok
+        if (typeof m === 'object') {
+          return {
+            medication: (m.medication || m.name || '').toString().trim(),
+            instructions: (m.instructions || m.instr || '').toString().trim(),
+            type: (m.type || defaultType).toString().trim()
+          };
+        }
+        // Se vier como string
+        return {
+          medication: m.toString().trim(),
+          instructions: '',
+          type: defaultType
+        };
+      })
+      .filter(m => m.medication.length > 0);
+
+    return {
+      oral: norm(oral, 'oral'),
+      topical: norm(topical, 'topical')
+    };
+  }
+
+  function setButtonLoading(isLoading) {
+    if (!savePrescriptionBtn) return;
+    savePrescriptionBtn.disabled = isLoading;
+    savePrescriptionBtn.style.opacity = isLoading ? '0.6' : '1';
+    savePrescriptionBtn.style.cursor = isLoading ? 'not-allowed' : 'pointer';
+    savePrescriptionBtn.dataset.loading = isLoading ? '1' : '0';
+  }
+
+  async function saveAndPrintPrescription() {
+    if (!savePrescriptionBtn) {
+      alert('Botão salvar não encontrado (savePrescriptionBtn). Verifique o ID no HTML.');
+      return;
+    }
+
+    // Evita duplo clique
+    if (savePrescriptionBtn.dataset.loading === '1') return;
+
+    const patient_id = patientIdInput?.value?.trim();
+    const patient_name = patientNameInput?.value?.trim() || '';
+
+    if (!patient_id) {
+      alert('ID do paciente é obrigatório. Verifique se o patient_id está sendo preenchido pelo prontuário.');
+      return;
+    }
+
+    const { oral, topical } = collectMedicationsSafely();
+
+    if (oral.length === 0 && topical.length === 0) {
+      const ok = confirm('Nenhum medicamento foi adicionado. Deseja salvar mesmo assim?');
+      if (!ok) return;
+    }
+
+    const payload = {
+      patient_id: Number(patient_id),
+      patient_name,
+      oral,
+      topical
+    };
+
+    setButtonLoading(true);
+
+    // Timeout robusto
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    try {
+      const res = await fetch('/dermascribe/api/save-prescription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (e) {
+        // Se backend retornou HTML por erro 500, por exemplo
+        throw new Error('Resposta inválida do servidor (não é JSON).');
+      }
+
+      if (!res.ok || !data || data.status !== 'success') {
+        const msg = (data && (data.message || data.error)) || `Erro ao salvar (HTTP ${res.status}).`;
+        alert(msg);
+        return;
+      }
+
+      const prescriptionId = data.prescription_id;
+
+      if (!prescriptionId) {
+        alert('Prescrição salva, mas o servidor não retornou prescription_id.');
+        return;
+      }
+
+      // ✅ ÚNICA forma correta: imprimir usando o ID real retornado
+      const printUrl = `/dermascribe/prescription/${prescriptionId}/print`;
+      window.open(printUrl, '_blank', 'noopener,noreferrer');
+
+      // Opcional: feedback visual
+      // alert('Prescrição salva. Abrindo impressão...');
+
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        alert('O servidor demorou para responder (timeout). Tente novamente.');
+      } else {
+        alert(`Falha ao salvar: ${err.message || err}`);
+      }
+    } finally {
+      setButtonLoading(false);
+    }
+  }
+
+  // Bind do botão salvar
+  if (savePrescriptionBtn) {
+    savePrescriptionBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      saveAndPrintPrescription();
+    });
+  }
+})();
