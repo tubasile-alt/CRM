@@ -7,7 +7,7 @@ from googleapiclient.discovery import build
 
 SPREADSHEET_TITLE = "CRM Clínica Basile - Procedimentos"
 SHEET_HEADERS = [
-    "Data", "Horário", "Paciente", "Procedimento", "Valor (R$)", "Tipo Consulta", "Status", "Médico"
+    "Nome Completo", "Procedimento", "Data do Procedimento", "Data do Retorno", "Telefone"
 ]
 
 
@@ -146,28 +146,24 @@ def _do_append_batch(procedures_data):
 
         rows = []
         for proc in procedures_data:
-            value = proc.get('value', 0)
             rows.append([
-                proc.get('date', ''),
-                proc.get('time', ''),
                 proc.get('patient_name', ''),
                 proc.get('procedure_name', ''),
-                f"R$ {value:.2f}" if isinstance(value, (int, float)) else str(value),
-                proc.get('consultation_type', ''),
-                proc.get('status', 'Realizado'),
-                proc.get('doctor_name', '')
+                proc.get('procedure_date', ''),
+                proc.get('return_date', ''),
+                proc.get('phone', ''),
             ])
 
         if rows:
             sheets.spreadsheets().values().append(
                 spreadsheetId=spreadsheet_id,
-                range='Procedimentos!A:H',
+                range='Procedimentos!A:E',
                 valueInputOption='USER_ENTERED',
                 insertDataOption='INSERT_ROWS',
                 body={'values': rows}
             ).execute()
 
-            print(f"✓ Google Sheets: {len(rows)} procedimentos adicionados em batch")
+            print(f"✓ Google Sheets: {len(rows)} procedimentos adicionados")
         return True
     except Exception as e:
         print(f"✗ Erro Google Sheets batch: {e}")
@@ -177,17 +173,3 @@ def _do_append_batch(procedures_data):
 def append_procedures_batch(procedures_data):
     t = threading.Thread(target=_do_append_batch, args=(procedures_data,), daemon=True)
     t.start()
-
-
-def append_procedure_row(patient_name, procedure_date, procedure_time, procedure_name, value, consultation_type, status, doctor_name):
-    row_data = [{
-        'date': procedure_date,
-        'time': procedure_time,
-        'patient_name': patient_name,
-        'procedure_name': procedure_name,
-        'value': value,
-        'consultation_type': consultation_type,
-        'status': status,
-        'doctor_name': doctor_name
-    }]
-    append_procedures_batch(row_data)

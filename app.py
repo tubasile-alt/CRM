@@ -1757,27 +1757,29 @@ def finalizar_atendimento(patient_id):
         # === GOOGLE SHEETS: Registrar procedimentos realizados ===
         try:
             from services.google_sheets import append_procedures_batch
+            from dateutil.relativedelta import relativedelta
             patient = Patient.query.get(patient_id)
             patient_name = patient.name if patient else f"Paciente #{patient_id}"
-            doctor_name = current_user.name if current_user else "Médico"
+            patient_phone = patient.phone if patient else ''
             now = get_brazil_time()
-            date_str = now.strftime('%d/%m/%Y')
-            time_str = now.strftime('%H:%M')
-            consultation_type = data.get('consultation_type', 'Particular')
 
             gs_rows = []
             if category == 'cosmiatria':
                 for proc in data.get('cosmetic_procedures', []):
                     if proc.get('performed', False):
+                        performed_date = now.date()
+                        follow_up_months = proc.get('follow_up_months')
+                        if follow_up_months and int(follow_up_months) > 0:
+                            return_date = performed_date + relativedelta(months=int(follow_up_months))
+                            return_date_str = return_date.strftime('%d/%m/%Y')
+                        else:
+                            return_date_str = ''
                         gs_rows.append({
-                            'date': date_str,
-                            'time': time_str,
                             'patient_name': patient_name,
                             'procedure_name': proc.get('name', 'Procedimento'),
-                            'value': float(proc.get('budget', proc.get('value', 0))),
-                            'consultation_type': consultation_type,
-                            'status': 'Realizado',
-                            'doctor_name': doctor_name
+                            'procedure_date': performed_date.strftime('%d/%m/%Y'),
+                            'return_date': return_date_str,
+                            'phone': patient_phone or '',
                         })
 
             if gs_rows:
