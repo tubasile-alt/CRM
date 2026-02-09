@@ -1754,6 +1754,59 @@ def finalizar_atendimento(patient_id):
         # Commit da transação
         db.session.commit()
         
+        # === GOOGLE SHEETS: Registrar procedimentos realizados ===
+        try:
+            from services.google_sheets import append_procedures_batch
+            patient = Patient.query.get(patient_id)
+            patient_name = patient.name if patient else f"Paciente #{patient_id}"
+            doctor_name = current_user.name if current_user else "Médico"
+            now = get_brazil_time()
+            date_str = now.strftime('%d/%m/%Y')
+            time_str = now.strftime('%H:%M')
+            consultation_type = data.get('consultation_type', 'Particular')
+
+            gs_rows = []
+            if category == 'cosmiatria':
+                for proc in data.get('cosmetic_procedures', []):
+                    if proc.get('performed', False):
+                        gs_rows.append({
+                            'date': date_str,
+                            'time': time_str,
+                            'patient_name': patient_name,
+                            'procedure_name': proc.get('name', 'Procedimento'),
+                            'value': float(proc.get('budget', proc.get('value', 0))),
+                            'consultation_type': consultation_type,
+                            'status': 'Realizado',
+                            'doctor_name': doctor_name
+                        })
+            elif category == 'transplante_capilar':
+                gs_rows.append({
+                    'date': date_str,
+                    'time': time_str,
+                    'patient_name': patient_name,
+                    'procedure_name': 'Transplante Capilar',
+                    'value': 0,
+                    'consultation_type': 'Transplante Capilar',
+                    'status': 'Planejado',
+                    'doctor_name': doctor_name
+                })
+            else:
+                gs_rows.append({
+                    'date': date_str,
+                    'time': time_str,
+                    'patient_name': patient_name,
+                    'procedure_name': f'Consulta ({category})',
+                    'value': 0,
+                    'consultation_type': consultation_type,
+                    'status': 'Atendido',
+                    'doctor_name': doctor_name
+                })
+
+            if gs_rows:
+                append_procedures_batch(gs_rows)
+        except Exception as gs_error:
+            print(f"⚠ Google Sheets (não-crítico): {gs_error}")
+        
         return jsonify({
             'success': True,
             'message': 'Atendimento finalizado com sucesso',

@@ -18,3 +18,5 @@ Pillow
 openpyxl
 pandas
 APScheduler
+google-api-python-client
+google-auth

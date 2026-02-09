@@ -1,11 +1,11 @@
 modules = ["python-3.11", "postgresql-16"]
 [agent]
 expertMode = true
-integrations = ["flask_authentication:1.0.0"]
+integrations = ["flask_authentication:1.0.0", "google-sheet:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["freetype", "glibcLocales", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib", "pango", "gdk-pixbuf", "gobject-introspection"]
+packages = ["freetype", "gdk-pixbuf", "glibcLocales", "gobject-introspection", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "pango", "tcl", "tk", "zlib"]
 
 [workflows]
 runButton = "Project"
