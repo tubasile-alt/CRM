@@ -95,34 +95,38 @@ def _create_spreadsheet():
         }]
     }).execute()
     spreadsheet_id = spreadsheet['spreadsheetId']
+    actual_sheet_id = spreadsheet['sheets'][0]['properties']['sheetId']
 
-    sheets.spreadsheets().batchUpdate(
-        spreadsheetId=spreadsheet_id,
-        body={
-            'requests': [{
-                'repeatCell': {
-                    'range': {
-                        'sheetId': 0,
-                        'startRowIndex': 0,
-                        'endRowIndex': 1,
-                    },
-                    'cell': {
-                        'userEnteredFormat': {
-                            'backgroundColor': {'red': 0.2, 'green': 0.4, 'blue': 0.7},
-                            'textFormat': {'bold': True, 'foregroundColor': {'red': 1, 'green': 1, 'blue': 1}},
-                            'horizontalAlignment': 'CENTER'
-                        }
-                    },
-                    'fields': 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'
-                }
-            }, {
-                'updateSheetProperties': {
-                    'properties': {'sheetId': 0, 'gridProperties': {'frozenRowCount': 1}},
-                    'fields': 'gridProperties.frozenRowCount'
-                }
-            }]
-        }
-    ).execute()
+    try:
+        sheets.spreadsheets().batchUpdate(
+            spreadsheetId=spreadsheet_id,
+            body={
+                'requests': [{
+                    'repeatCell': {
+                        'range': {
+                            'sheetId': actual_sheet_id,
+                            'startRowIndex': 0,
+                            'endRowIndex': 1,
+                        },
+                        'cell': {
+                            'userEnteredFormat': {
+                                'backgroundColor': {'red': 0.2, 'green': 0.4, 'blue': 0.7},
+                                'textFormat': {'bold': True, 'foregroundColor': {'red': 1, 'green': 1, 'blue': 1}},
+                                'horizontalAlignment': 'CENTER'
+                            }
+                        },
+                        'fields': 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)'
+                    }
+                }, {
+                    'updateSheetProperties': {
+                        'properties': {'sheetId': actual_sheet_id, 'gridProperties': {'frozenRowCount': 1}},
+                        'fields': 'gridProperties.frozenRowCount'
+                    }
+                }]
+            }
+        ).execute()
+    except Exception as fmt_err:
+        print(f"⚠ Formatação da planilha falhou (não-crítico): {fmt_err}")
 
     print(f"✓ Planilha Google criada: {SPREADSHEET_TITLE} (ID: {spreadsheet_id})")
     return spreadsheet_id
