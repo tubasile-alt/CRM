@@ -1779,28 +1779,6 @@ def finalizar_atendimento(patient_id):
                             'status': 'Realizado',
                             'doctor_name': doctor_name
                         })
-            elif category == 'transplante_capilar':
-                gs_rows.append({
-                    'date': date_str,
-                    'time': time_str,
-                    'patient_name': patient_name,
-                    'procedure_name': 'Transplante Capilar',
-                    'value': 0,
-                    'consultation_type': 'Transplante Capilar',
-                    'status': 'Planejado',
-                    'doctor_name': doctor_name
-                })
-            else:
-                gs_rows.append({
-                    'date': date_str,
-                    'time': time_str,
-                    'patient_name': patient_name,
-                    'procedure_name': f'Consulta ({category})',
-                    'value': 0,
-                    'consultation_type': consultation_type,
-                    'status': 'Atendido',
-                    'doctor_name': doctor_name
-                })
 
             if gs_rows:
                 append_procedures_batch(gs_rows)
