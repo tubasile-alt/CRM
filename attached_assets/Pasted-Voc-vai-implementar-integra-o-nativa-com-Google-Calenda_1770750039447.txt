@@ -1,0 +1,221 @@
+Você vai implementar integração nativa com Google Calendar pessoal por usuário (médico) em um projeto Flask já existente.
+
+O objetivo é:
+
+Quando uma cirurgia for criada no sistema, um evento deve ser criado automaticamente no Google Calendar do médico responsável, usando OAuth do próprio médico.
+
+O projeto usa:
+
+Flask
+
+Flask-Login
+
+SQLAlchemy
+
+PostgreSQL
+
+estrutura de rotas existente
+
+já existe model de User (médico) e Surgery
+
+IMPORTANTE:
+Não usar service account.
+Cada médico deve conectar o próprio Google uma única vez.
+Depois disso o sistema cria eventos automaticamente sem nova autorização.
+
+1) Dependências
+
+Adicionar ao requirements.txt:
+
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+
+2) Variáveis de ambiente (Replit Secrets)
+
+O sistema deve usar variáveis de ambiente:
+
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GOOGLE_REDIRECT_URI
+
+NUNCA salvar credenciais em arquivos JSON no repositório.
+
+3) Banco de Dados
+
+Criar novo model SQLAlchemy:
+
+UserGoogleAuth
+
+Campos:
+
+id (PK)
+user_id (FK para User.id)
+google_email (string)
+refresh_token (text)
+connected_at (datetime)
+
+Relacionamento:
+User.google_auth = relationship("UserGoogleAuth", uselist=False)
+
+4) Rotas OAuth
+
+Criar blueprint:
+
+routes/google_oauth.py
+
+Rota 1
+
+GET /google/connect
+
+Redireciona o usuário logado para o consentimento Google usando OAuth2.
+
+Scopes:
+
+https://www.googleapis.com/auth/calendar.events
+
+Parâmetros obrigatórios:
+
+access_type=offline
+prompt=consent
+
+Rota 2
+
+GET /google/callback
+
+Fluxo:
+
+Recebe "code" do Google
+
+Troca por tokens
+
+Extrai refresh_token
+
+Obtém email do usuário Google
+
+Salva no UserGoogleAuth vinculado ao current_user
+
+Redireciona para /dashboard com mensagem "Google Calendar conectado com sucesso"
+
+Se refresh_token não vier, forçar novo consentimento.
+
+5) Serviço de Calendar
+
+Criar arquivo:
+
+services/google_calendar_service.py
+
+Função:
+
+get_user_credentials(user)
+
+Usa refresh_token salvo
+
+Reconstrói Credentials
+
+Renova access_token automaticamente
+
+Função principal:
+
+create_surgery_event(surgery, doctor)
+
+Usar Google Calendar API:
+
+calendarId = "primary"
+
+Criar evento com:
+
+summary:
+"Cirurgia - {paciente.nome}"
+
+description:
+Paciente
+Tipo
+Unidade
+Observações
+
+start.dateTime = surgery.start_datetime
+end.dateTime = surgery.end_datetime
+timeZone = "America/Sao_Paulo"
+
+extendedProperties.private:
+{
+"surgery_id": surgery.id
+}
+
+Retornar event_id.
+
+6) Alterar model Surgery
+
+Adicionar campos:
+
+google_event_id (string)
+google_last_sync (datetime)
+google_sync_error (text)
+
+7) Integração no fluxo existente
+
+Localizar onde a cirurgia é criada no sistema (db.session.add(Surgery)).
+
+Após db.session.flush() (quando já existe surgery.id):
+
+verificar se doctor possui google_auth
+
+se possuir → chamar create_surgery_event()
+
+salvar event_id em surgery.google_event_id
+
+não impedir criação da cirurgia se o Google falhar
+
+salvar erro em google_sync_error
+
+Após db.session.commit() o evento deve existir no calendário.
+
+8) Atualização e cancelamento
+
+Se horário da cirurgia mudar:
+→ atualizar evento (events.update)
+
+Se cirurgia for cancelada:
+→ deletar evento (events.delete)
+
+Usar google_event_id.
+
+9) Interface
+
+Adicionar botão no perfil do usuário:
+
+"Conectar Google Calendar"
+
+Se conectado:
+mostrar email Google conectado
+
+10) Requisitos importantes
+
+Sistema deve funcionar em produção
+
+Não bloquear criação de cirurgia se Google falhar
+
+Evitar duplicar eventos
+
+Recriar evento se não existir mais no Google
+
+Usar timezone America/Sao_Paulo
+
+Fim da implementação.
+
+O que vai acontecer depois que você rodar esse prompt
+
+O Replit AI vai:
+
+criar a autenticação Google
+
+permitir o médico conectar 1 vez
+
+salvar o refresh_token
+
+cada cirurgia nova → automaticamente aparecer no Google Calendar dele
+
+Na prática:
+Secretária agenda → cirurgia salva → médico abre o celular → cirurgia já está no Google Agenda dele.
