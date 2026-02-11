@@ -118,7 +118,19 @@ def create_surgery():
             created_by=current_user.id
         )
         
-        # Calcular duração
+        try:
+            from services.google_calendar import create_surgery_event
+            create_surgery_event(
+                patient_name=surgery.patient_name,
+                procedure_name=surgery.procedure_name,
+                surgery_date=surgery.date,
+                start_time=surgery.start_time,
+                end_time=surgery.end_time,
+                notes=data.get('notes', '')
+            )
+        except Exception as cal_err:
+            print(f"⚠ Google Calendar (não-crítico): {cal_err}")
+        
         start_dt = datetime.combine(datetime.today(), surgery.start_time)
         end_dt = datetime.combine(datetime.today(), surgery.end_time)
         duration_minutes = int((end_dt - start_dt).total_seconds() / 60)

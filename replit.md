@@ -48,6 +48,7 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **window.appointmentId** - Variável global para compartilhamento entre template e JS externo
 - ✅ **WeasyPrint PDF** - Rota /pdf para geração de PDF real de receitas (sem depender do browser)
 - ✅ **Google Sheets Integration** - Procedimentos realizados são enviados automaticamente para planilha Google (webhook n8n)
+- ✅ **Google Calendar Integration** - Cirurgias agendadas criam evento automático no Google Calendar com nome do paciente e descrição
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 

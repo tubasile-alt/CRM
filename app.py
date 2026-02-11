@@ -711,6 +711,20 @@ def create_appointment():
     
     db.session.commit()
     
+    if surgery_created:
+        try:
+            from services.google_calendar import create_surgery_event
+            create_surgery_event(
+                patient_name=patient.name,
+                procedure_name=data.get('surgery_name', 'Cirurgia'),
+                surgery_date=surgery.date,
+                start_time=surgery.start_time,
+                end_time=surgery.end_time,
+                notes=data.get('notes', '')
+            )
+        except Exception as cal_err:
+            print(f"⚠ Google Calendar (não-crítico): {cal_err}")
+    
     return jsonify({'success': True, 'id': appointment.id, 'surgery_created': surgery_created})
 
 @app.route('/api/appointments/<int:id>', methods=['PUT'])
