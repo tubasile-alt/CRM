@@ -5,7 +5,6 @@
 <title>Prescrição Médica</title>
 
 <style>
-/* RESET TOTAL */
 * { margin:0; padding:0; box-sizing:border-box; }
 
 @page { size: A4; margin: 0; }
@@ -18,7 +17,6 @@ html, body {
   color: #000;
 }
 
-/* FOLHA */
 .sheet {
   width: 210mm;
   height: 297mm;
@@ -26,7 +24,6 @@ html, body {
   position: relative;
 }
 
-/* TÍTULO */
 .title {
   text-align: center;
   font-size: 22px;
@@ -35,9 +32,8 @@ html, body {
   margin-bottom: 18px;
 }
 
-/* PACIENTE */
 .patient {
-  text-align: center;
+  text-align: left;
   font-size: 14px;
   margin-bottom: 12px;
 }
@@ -47,7 +43,6 @@ html, body {
   margin: 14px 0 18px;
 }
 
-/* SEÇÕES */
 .section {
   margin-top: 18px;
 }
@@ -71,19 +66,21 @@ html, body {
   font-size: 13px;
 }
 
-/* RODAPÉ */
 .footer {
   position: absolute;
   bottom: 25mm;
   left: 25mm;
   right: 25mm;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
+  text-align: center;
 }
 
-.date {
+.footer-date {
   font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.footer-stamp img {
+  height: 60px;
 }
 </style>
 </head>
@@ -124,11 +121,11 @@ html, body {
   {% endif %}
 
   <div class="footer">
-    <div>
-      <img src="{{ url_for('static', filename='img/carimbo.jpeg') }}" style="width:220px">
-    </div>
-    <div class="date">
+    <div class="footer-date">
       Data: {{ prescription.created_at.strftime('%d/%m/%Y') }}
+    </div>
+    <div class="footer-stamp">
+      <img src="{{ url_for('static', filename='img/carimbo_new.png') }}">
     </div>
   </div>
 
