@@ -30,6 +30,7 @@ html, body {
   font-weight: bold;
   letter-spacing: .5px;
   margin-bottom: 18px;
+  margin-top: 264px;
 }
 
 .patient {
@@ -71,20 +72,22 @@ html, body {
   bottom: 15mm;
   left: 25mm;
   right: 25mm;
-  text-align: center;
 }
 
-.footer-date {
-  font-size: 13px;
-  margin-bottom: 10px;
-}
-
-.footer-stamp {
+.footer-signature {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 20px;
   margin-bottom: 10px;
 }
 
 .footer-stamp img {
-  height: 55px;
+  width: 152px;
+}
+
+.footer-date {
+  font-size: 13px;
 }
 
 .footer-line {
@@ -96,6 +99,7 @@ html, body {
   font-size: 10px;
   color: #555;
   line-height: 1.5;
+  text-align: center;
 }
 </style>
 </head>
@@ -136,11 +140,13 @@ html, body {
   {% endif %}
 
   <div class="footer">
-    <div class="footer-date">
-      Data: {{ prescription.created_at.strftime('%d/%m/%Y') }}
-    </div>
-    <div class="footer-stamp">
-      <img src="{{ url_for('static', filename='img/carimbo_new.png') }}">
+    <div class="footer-signature">
+      <div class="footer-stamp">
+        <img src="{{ url_for('static', filename='img/carimbo_new.png') }}">
+      </div>
+      <div class="footer-date">
+        Data: {{ prescription.created_at.strftime('%d/%m/%Y') }}
+      </div>
     </div>
     <div class="footer-line"></div>
     <div class="footer-info">
