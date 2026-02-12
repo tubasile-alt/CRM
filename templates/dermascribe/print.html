@@ -68,7 +68,7 @@ html, body {
 
 .footer {
   position: absolute;
-  bottom: 25mm;
+  bottom: 15mm;
   left: 25mm;
   right: 25mm;
   text-align: center;
@@ -76,11 +76,26 @@ html, body {
 
 .footer-date {
   font-size: 13px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+}
+
+.footer-stamp {
+  margin-bottom: 10px;
 }
 
 .footer-stamp img {
-  height: 60px;
+  height: 55px;
+}
+
+.footer-line {
+  border-top: 1px solid #ccc;
+  margin: 8px 0;
+}
+
+.footer-info {
+  font-size: 10px;
+  color: #555;
+  line-height: 1.5;
 }
 </style>
 </head>
@@ -126,6 +141,13 @@ html, body {
     </div>
     <div class="footer-stamp">
       <img src="{{ url_for('static', filename='img/carimbo_new.png') }}">
+    </div>
+    <div class="footer-line"></div>
+    <div class="footer-info">
+      Especialista em Dermatologia SBD<br>
+      Av. Prof. Jo&atilde;o Fi&uacute;sa, 2300, Ribeir&atilde;o Preto, SP, Brasil<br>
+      www.clinicabasile.com.br | Fone/Fax: (16) 3602-7785<br>
+      Instagram: @clinicabasilemed
     </div>
   </div>
 
