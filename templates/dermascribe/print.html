@@ -30,7 +30,7 @@ html, body {
   font-weight: bold;
   letter-spacing: .5px;
   margin-bottom: 18px;
-  margin-top: 70px;
+  margin-top: 45px;
 }
 
 .patient {
@@ -39,19 +39,28 @@ html, body {
   margin-bottom: 12px;
 }
 
+.patient span {
+  font-weight: bold;
+}
+
+.patient strong {
+  font-weight: normal;
+}
+
 .line {
   border-top: 1px solid #000;
   margin: 14px 0 18px;
 }
 
 .section {
-  margin-top: 18px;
+  margin-top: 30px;
 }
 
 .section-title {
   font-weight: bold;
   font-size: 15px;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
+  text-decoration: underline;
 }
 
 .med {
@@ -109,7 +118,7 @@ html, body {
   <div class="title">PRESCRIÇÃO MÉDICA</div>
 
   <div class="patient">
-    Paciente: <strong>{{ patient.name }}</strong>
+    <span>Paciente:</span> {{ patient.name }}
   </div>
 
   <div class="line"></div>
