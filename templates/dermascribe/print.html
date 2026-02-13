@@ -53,14 +53,22 @@ html, body {
 }
 
 .section {
-  margin-top: 30px;
+  margin-top: 35px;
 }
 
 .section-title {
-  font-weight: bold;
-  font-size: 15px;
-  margin-bottom: 20px;
+  font-weight: normal;
+  font-size: 16px;
+  margin-bottom: 25px;
   text-decoration: underline;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-title img {
+  height: 24px;
+  width: auto;
 }
 
 .med {
@@ -125,7 +133,10 @@ html, body {
 
   {% if prescription.medications_oral %}
   <div class="section">
-    <div class="section-title">USO ORAL</div>
+    <div class="section-title">
+      <img src="{{ url_for('static', filename='img/icon_oral.png') }}">
+      Uso Oral
+    </div>
     {% for med in prescription.medications_oral %}
       <div class="med">
         <div class="med-name">{{ med.medication }}</div>
@@ -137,7 +148,10 @@ html, body {
 
   {% if prescription.medications_topical %}
   <div class="section">
-    <div class="section-title">USO TÓPICO</div>
+    <div class="section-title">
+      <img src="{{ url_for('static', filename='img/icon_topico.png') }}">
+      Uso Tópico
+    </div>
     {% for med in prescription.medications_topical %}
       <div class="med">
         <div class="med-name">{{ med.medication }}</div>
