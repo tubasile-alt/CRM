@@ -1382,6 +1382,54 @@ function deletePatientPhoto() {
                     <label class="form-label"><strong>Descrição</strong></label>
                     <textarea id="evolutionContent" class="form-control" rows="5" placeholder="Descreva a evolução do paciente desde a última consulta..."></textarea>
                 </div>
+                <div id="surgicalEvolutionFindings" class="mb-3" style="display:none;">
+                  <label class="form-label"><strong>Achados Cirúrgicos (marque quantos quiser)</strong></label>
+
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-check">
+                        <input class="form-check-input surg-find" type="checkbox" id="sfNecrose" value="necrose">
+                        <label class="form-check-label" for="sfNecrose">Necrose</label>
+                      </div>
+
+                      <div class="form-check">
+                        <input class="form-check-input surg-find" type="checkbox" id="sfCrostas" value="crostas">
+                        <label class="form-check-label" for="sfCrostas">Crostas</label>
+                      </div>
+
+                      <div class="form-check">
+                        <input class="form-check-input surg-find" type="checkbox" id="sfInfeccao" value="infeccao_secundaria">
+                        <label class="form-check-label" for="sfInfeccao">Infecção secundária</label>
+                      </div>
+
+                      <div class="form-check">
+                        <input class="form-check-input surg-find" type="checkbox" id="sfFolAguda" value="foliculite_aguda">
+                        <label class="form-check-label" for="sfFolAguda">Foliculite aguda</label>
+                      </div>
+                    </div>
+
+                    <div class="col-md-6">
+                      <div class="form-check">
+                        <input class="form-check-input surg-find" type="checkbox" id="sfFolCron" value="foliculite_cronica">
+                        <label class="form-check-label" for="sfFolCron">Foliculite crônica</label>
+                      </div>
+
+                      <div class="form-check">
+                        <input class="form-check-input surg-find" type="checkbox" id="sfRarefacao" value="rarefacao_capilar">
+                        <label class="form-check-label" for="sfRarefacao">Rarefação capilar</label>
+                      </div>
+
+                      <div class="form-check">
+                        <input class="form-check-input surg-find" type="checkbox" id="sfFalha" value="falha_localizada">
+                        <label class="form-check-label" for="sfFalha">Falha localizada</label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <small class="text-muted d-block mt-2">
+                    * Esses achados serão salvos junto da evolução (padronizado) e podem coexistir.
+                  </small>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -1447,6 +1495,142 @@ function deletePatientPhoto() {
 {% endblock %}
 
 {% block extra_js %}
+<script>
+/**
+ * PATCH DEFINITIVO - Evolução Cirúrgica com checkboxes (somente em cirurgia)
+ *
+ * Estratégia (sem mexer no backend):
+ * - Detecta contexto "cirurgia" por:
+ *   (A) texto do select #evolutionConsultation contendo "cirurgia"
+ *   (B) texto do display verde #evolutionConsultationName contendo "cirurgia"
+ * - Quando for cirurgia: mostra checkboxes
+ * - Quando não for: esconde e limpa
+ * - No saveEvolution(): injeta um bloco padronizado dentro do texto da evolução
+ *   para garantir persistência mesmo se o backend ainda salva só "content".
+ */
+
+(function() {
+  function $(id){ return document.getElementById(id); }
+
+  function isSurgeryContext() {
+    // 1) Se o modal tiver dataset.context explícito, respeita
+    const modal = $('evolutionModal');
+    const ctx = modal?.dataset?.context;
+    if (ctx === 'surgery') return true;
+    if (ctx === 'consultation') return false;
+
+    // 2) Tenta detectar pelo select
+    const sel = $('evolutionConsultation');
+    const selText = sel?.options?.[sel.selectedIndex]?.textContent?.toLowerCase?.() || '';
+    if (selText.includes('cirurgia')) return true;
+
+    // 3) Tenta detectar pelo display verde
+    const disp = $('evolutionConsultationName');
+    const dispText = disp?.textContent?.toLowerCase?.() || '';
+    if (dispText.includes('cirurgia')) return true;
+
+    return false;
+  }
+
+  function showHideSurgicalBox() {
+    const box = $('surgicalEvolutionFindings');
+    if (!box) return;
+    if (isSurgeryContext()) {
+      box.style.display = 'block';
+    } else {
+      box.style.display = 'none';
+      document.querySelectorAll('.surg-find').forEach(cb => cb.checked = false);
+    }
+  }
+
+  function getCheckedFindings() {
+    return Array.from(document.querySelectorAll('.surg-find:checked')).map(x => x.value);
+  }
+
+  function findingsToHuman(findings) {
+    const map = {
+      necrose: 'Necrose',
+      crostas: 'Crostas',
+      infeccao_secundaria: 'Infecção secundária',
+      foliculite_aguda: 'Foliculite aguda',
+      foliculite_cronica: 'Foliculite crônica',
+      rarefacao_capilar: 'Rarefação capilar',
+      falha_localizada: 'Falha localizada'
+    };
+    return findings.map(f => map[f] || f);
+  }
+
+  function injectFindingsIntoContentIfNeeded() {
+    if (!isSurgeryContext()) return;
+
+    const txt = $('evolutionContent');
+    if (!txt) return;
+
+    const findings = getCheckedFindings();
+    // Sempre padroniza: se não marcar nada, salva como "Sem achados selecionados"
+    const human = findings.length ? findingsToHuman(findings).join(', ') : 'Sem achados selecionados';
+
+    const blockHeader = '[ACHADOS CIRÚRGICOS - CHECKLIST]';
+    const block = `${blockHeader}\n- ${human}\n[/ACHADOS CIRÚRGICOS]\n`;
+
+    // Remove bloco antigo para evitar duplicar
+    const current = txt.value || '';
+    const cleaned = current
+      .replace(/\[ACHADOS CIRÚRGICOS - CHECKLIST\][\s\S]*?\[\/ACHADOS CIRÚRGICOS\]\n?/g, '')
+      .trim();
+
+    // Insere no topo (padrão fixo)
+    txt.value = (block + '\n' + cleaned).trim();
+  }
+
+  // ---- Ganchos para atualização do contexto ----
+  document.addEventListener('DOMContentLoaded', function() {
+    // 1) Ao mudar o select, reavalia contexto
+    const sel = $('evolutionConsultation');
+    if (sel) {
+      sel.addEventListener('change', function() {
+        // opcional: se quiser fixar dataset.context automaticamente
+        const modal = $('evolutionModal');
+        const txt = sel.options[sel.selectedIndex]?.textContent?.toLowerCase?.() || '';
+        if (modal) modal.dataset.context = txt.includes('cirurgia') ? 'surgery' : 'consultation';
+        showHideSurgicalBox();
+      });
+    }
+
+    // 2) Ao abrir o modal, reavalia
+    const modalEl = $('evolutionModal');
+    if (modalEl) {
+      modalEl.addEventListener('shown.bs.modal', function() {
+        showHideSurgicalBox();
+      });
+    }
+
+    // 3) Se o usuário clicar nos checkboxes, mantém o texto sempre preparado
+    document.addEventListener('change', function(e) {
+      if (e.target && e.target.classList && e.target.classList.contains('surg-find')) {
+        // não injeta automaticamente (para não atrapalhar enquanto digita),
+        // mas pode ser útil manter o bloco pronto se você quiser:
+        // injectFindingsIntoContentIfNeeded();
+      }
+    });
+
+    // 4) Intercepta saveEvolution() SEM precisar editar o arquivo JS original:
+    //    - Se saveEvolution existir globalmente, “wrap” com injeção do checklist antes de salvar
+    const originalSaveEvolution = window.saveEvolution;
+    if (typeof originalSaveEvolution === 'function') {
+      window.saveEvolution = function() {
+        // garante que o checklist vai junto (no texto)
+        injectFindingsIntoContentIfNeeded();
+        return originalSaveEvolution.apply(this, arguments);
+      };
+    }
+
+    // Primeira avaliação
+    showHideSurgicalBox();
+  });
+
+})();
+</script>
 <script>
 const patientId = {{ patient.id }};
 window.patientId = {{ patient.id }};
