@@ -1380,18 +1380,24 @@ function renderEvolutionsInAccordion(consultations = []) {
             }
             
             if (!container) {
-                console.log(`Container não encontrado para consultaID ${consultation.id}, criando...`);
-                // Criar container se não existir
-                const collapseDiv = document.getElementById(`collapse${consultation.id}`);
-                if (collapseDiv) {
-                    const newContainer = document.createElement('div');
-                    newContainer.id = containerId;
-                    newContainer.className = 'mt-2';
-                    collapseDiv.appendChild(newContainer);
-                    container = newContainer;
+                console.log(`Container não encontrado para consultaID ${consultation.id}, tentando encontrar container global de evoluções ou criando um.`);
+                // Se não encontrou o container específico do accordion, pode ser a consulta atual que está fora do accordion
+                // Vamos tentar injetar em um container fixo se existir
+                const globalContainer = document.getElementById('currentConsultationEvolutions');
+                if (globalContainer && String(window.appointmentId) === String(consultation.id)) {
+                    container = globalContainer;
                 } else {
-                    console.log(`Collapse div também não encontrada para ${consultation.id}`);
-                    return;
+                    const collapseDiv = document.getElementById(`collapse${consultation.id}`);
+                    if (collapseDiv) {
+                        const newContainer = document.createElement('div');
+                        newContainer.id = containerId;
+                        newContainer.className = 'mt-2';
+                        collapseDiv.appendChild(newContainer);
+                        container = newContainer;
+                    } else {
+                        console.log(`Collapse div também não encontrada para ${consultation.id}. Ignorando renderização.`);
+                        return;
+                    }
                 }
             }
             

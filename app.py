@@ -2574,22 +2574,25 @@ def get_evolutions(patient_id):
     consultation_ids_with_evolutions = set()
     
     result = []
-    # Inverter para o loop processar da mais antiga para a mais recente internamente, 
-    # mas o resultado final 'result' será invertido de volta para manter a ordem cronológica inversa na UI
+    # Consultas que estão visíveis no histórico (status 'atendido')
+    visible_consultation_ids = []
+    
     for consultation in consultations:
         # Buscar evoluções desta consulta
         evolutions = Evolution.query.filter_by(consultation_id=consultation.id).order_by(Evolution.evolution_date.asc()).all()
         
-        # Se tem evoluções ou queremos mostrar todas as consultas
         consultation_data = {
-            'id': consultation.id,  # ID do appointment (consulta)
+            'id': consultation.id,
             'date': consultation.start_time.strftime('%d/%m/%Y %H:%M'),
             'category': consultation.appointment_type or 'Consulta',
             'doctor_name': consultation.doctor.name if consultation.doctor else 'N/A',
+            'status': consultation.status,
             'evolutions': []
         }
         
-        # Adicionar evoluções desta consulta
+        if consultation.status == 'atendido':
+            visible_consultation_ids.append(consultation.id)
+        
         for evo in evolutions:
             consultation_ids_with_evolutions.add(consultation.id)
             consultation_data['evolutions'].append({
@@ -2602,27 +2605,32 @@ def get_evolutions(patient_id):
         
         result.append(consultation_data)
     
-    # Inverter o resultado para que a consulta mais recente apareça primeiro na timeline
+    # Inverter para mostrar mais recente primeiro
     result.reverse()
     
-    # Buscar evoluções sem consultation_id (orphaned) - estas precisam ser vinculadas a uma consulta real
+    # Buscar evoluções sem consultation_id (orphaned)
     orphaned_evolutions = Evolution.query.filter_by(patient_id=patient_id, consultation_id=None).order_by(Evolution.evolution_date.desc()).all()
     
-    # Vincular evoluções órfãs à consulta mais recente
     if orphaned_evolutions and result:
-        # A primeira entrada no result agora é a consulta mais recente
-        most_recent_consultation_entry = result[0]
+        # Tentar anexar à consulta visível mais recente ou à primeiríssima se nenhuma visível
+        target_entry = None
+        for entry in result:
+            if entry['status'] == 'atendido':
+                target_entry = entry
+                break
         
+        if not target_entry:
+            target_entry = result[0]
+            
         for evo in orphaned_evolutions:
-            most_recent_consultation_entry['evolutions'].append({
+            target_entry['evolutions'].append({
                 'id': evo.id,
                 'date': evo.evolution_date.strftime('%d/%m/%Y %H:%M'),
                 'content': evo.content,
                 'doctor': evo.doctor.name,
                 'evolution_date': evo.evolution_date.isoformat()
             })
-        # Ordenar evoluções por data
-        most_recent_consultation_entry['evolutions'].sort(key=lambda x: x['evolution_date'])
+        target_entry['evolutions'].sort(key=lambda x: x['evolution_date'])
     
     return jsonify(result)
 
