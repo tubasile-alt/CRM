@@ -1384,25 +1384,39 @@ function renderEvolutionsInAccordion(consultations = []) {
                 
                 // 1. Tentar encontrar o container global para a consulta ATUAL
                 const globalContainer = document.getElementById('currentConsultationEvolutions');
+                // Usar window.appointmentId ou extrair do URL
                 const currentApptId = window.appointmentId || new URLSearchParams(window.location.search).get('appointment_id');
                 
+                console.log(`DEBUG: currentApptId=${currentApptId}, consultation.id=${consultation.id}, hasGlobal=${!!globalContainer}`);
+
                 if (globalContainer && String(currentApptId) === String(consultation.id)) {
                     console.log("Injetando no container global de evolução atual.");
                     container = globalContainer;
                 } else {
                     // 2. Tentar encontrar ou criar no collapse do accordion (histórico)
-                    const collapseDiv = document.getElementById(`collapse${consultation.id}`);
+                    const collapseId = `collapse${consultation.id}`;
+                    const collapseDiv = document.getElementById(collapseId);
                     if (collapseDiv) {
-                        const newContainer = document.createElement('div');
-                        newContainer.id = containerId;
-                        newContainer.className = 'mt-2';
-                        collapseDiv.appendChild(newContainer);
-                        container = newContainer;
+                        console.log(`Achou collapseDiv ${collapseId}`);
+                        // Tentar achar o container dentro do collapse
+                        container = collapseDiv.querySelector(`#${containerId}`);
+                        if (!container) {
+                            console.log(`Criando novo containerId ${containerId} dentro de collapseDiv`);
+                            const newContainer = document.createElement('div');
+                            newContainer.id = containerId;
+                            newContainer.className = 'mt-2';
+                            collapseDiv.appendChild(newContainer);
+                            container = newContainer;
+                        }
                     } else {
-                        console.log(`ERRO: Não foi possível encontrar ou criar container para consulta ${consultation.id}`);
-                        return;
+                        console.log(`Collapse div ${collapseId} não encontrada.`);
                     }
                 }
+            }
+            
+            if (!container) {
+                console.log(`ERRO: Não foi possível encontrar ou criar container para consulta ${consultation.id}`);
+                return;
             }
             
             container.innerHTML = '';
@@ -1448,17 +1462,19 @@ function renderEvolutionsInAccordion(consultations = []) {
             
             consultation.evolutions.forEach(evo => {
                 const evoDiv = document.createElement('div');
-                evoDiv.className = 'mb-3 p-3 bg-light border-start rounded';
+                evoDiv.className = 'mb-3 p-3 bg-white border-start rounded shadow-sm';
                 evoDiv.style.borderLeft = '4px solid #198754';
                 
                 evoDiv.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="flex-grow-1">
-                            <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
-                            <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
-                            <small class="text-muted">Dr. ${evo.doctor}</small>
+                            <div class="d-flex align-items-center mb-2">
+                                <span class="badge bg-success me-2"><i class="bi bi-clock"></i> ${evo.date}</span>
+                                <span class="text-muted small">Dr. ${evo.doctor}</span>
+                            </div>
+                            <p class="mb-0" style="white-space: pre-wrap; font-size: 1.1rem; color: #333;">${evo.content}</p>
                         </div>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteEvolution(${evo.id})">
+                        <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteEvolution(${evo.id})">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>

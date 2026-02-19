@@ -2574,8 +2574,6 @@ def get_evolutions(patient_id):
     consultation_ids_with_evolutions = set()
     
     result = []
-    # Consultas que estão visíveis no histórico (status 'atendido')
-    visible_consultation_ids = []
     
     for consultation in consultations:
         # Buscar evoluções desta consulta
@@ -2589,9 +2587,6 @@ def get_evolutions(patient_id):
             'status': consultation.status,
             'evolutions': []
         }
-        
-        if consultation.status == 'atendido':
-            visible_consultation_ids.append(consultation.id)
         
         for evo in evolutions:
             consultation_ids_with_evolutions.add(consultation.id)
@@ -2612,24 +2607,20 @@ def get_evolutions(patient_id):
     orphaned_evolutions = Evolution.query.filter_by(patient_id=patient_id, consultation_id=None).order_by(Evolution.evolution_date.desc()).all()
     
     if orphaned_evolutions and result:
-        # Tentar anexar à consulta visível mais recente ou à primeiríssima se nenhuma visível
-        target_entry = None
-        for entry in result:
-            if entry['status'] == 'atendido':
-                target_entry = entry
-                break
-        
-        if not target_entry:
-            target_entry = result[0]
+        # IMPORTANTE: Anexar evoluções órfãs à consulta mais RECENTE (result[0])
+        # Mesmo que ela não esteja com status 'atendido' ainda
+        target_entry = result[0]
             
         for evo in orphaned_evolutions:
-            target_entry['evolutions'].append({
-                'id': evo.id,
-                'date': evo.evolution_date.strftime('%d/%m/%Y %H:%M'),
-                'content': evo.content,
-                'doctor': evo.doctor.name,
-                'evolution_date': evo.evolution_date.isoformat()
-            })
+            # Evitar duplicatas se já foi adicionada por algum motivo
+            if not any(e['id'] == evo.id for e in target_entry['evolutions']):
+                target_entry['evolutions'].append({
+                    'id': evo.id,
+                    'date': evo.evolution_date.strftime('%d/%m/%Y %H:%M'),
+                    'content': evo.content,
+                    'doctor': evo.doctor.name,
+                    'evolution_date': evo.evolution_date.isoformat()
+                })
         target_entry['evolutions'].sort(key=lambda x: x['evolution_date'])
     
     return jsonify(result)
