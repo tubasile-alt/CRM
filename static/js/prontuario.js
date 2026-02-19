@@ -1685,7 +1685,7 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
         const data = {
             consultation_id: consultationId,
             content: content,
-            date: date,
+            evolution_date: date,
             evolution_type: evoType,
             has_necrosis: document.getElementById('has_necrosis_m')?.checked || false,
             has_scabs: document.getElementById('has_scabs_m')?.checked || false,
@@ -1695,7 +1695,7 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
             needs_another_surgery: document.getElementById('needs_surgery_m')?.checked || false
         };
 
-        const endpoint = surgeryId ? `/api/surgery/${surgeryId}/evolution` : `/api/patient/${patientId}/evolutions`;
+        const endpoint = surgeryId ? `/api/surgery/${surgeryId}/evolution` : `/api/patient/${patientId}/evolution`;
         
         fetch(endpoint, {
             method: 'POST',
