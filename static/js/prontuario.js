@@ -1380,13 +1380,17 @@ function renderEvolutionsInAccordion(consultations = []) {
             }
             
             if (!container) {
-                console.log(`Container não encontrado para consultaID ${consultation.id}, tentando encontrar container global de evoluções ou criando um.`);
-                // Se não encontrou o container específico do accordion, pode ser a consulta atual que está fora do accordion
-                // Vamos tentar injetar em um container fixo se existir
+                console.log(`Container não encontrado para consultaID ${consultation.id}, tentando encontrar container global ou criar no collapse.`);
+                
+                // 1. Tentar encontrar o container global para a consulta ATUAL
                 const globalContainer = document.getElementById('currentConsultationEvolutions');
-                if (globalContainer && String(window.appointmentId) === String(consultation.id)) {
+                const currentApptId = window.appointmentId || new URLSearchParams(window.location.search).get('appointment_id');
+                
+                if (globalContainer && String(currentApptId) === String(consultation.id)) {
+                    console.log("Injetando no container global de evolução atual.");
                     container = globalContainer;
                 } else {
+                    // 2. Tentar encontrar ou criar no collapse do accordion (histórico)
                     const collapseDiv = document.getElementById(`collapse${consultation.id}`);
                     if (collapseDiv) {
                         const newContainer = document.createElement('div');
@@ -1395,7 +1399,7 @@ function renderEvolutionsInAccordion(consultations = []) {
                         collapseDiv.appendChild(newContainer);
                         container = newContainer;
                     } else {
-                        console.log(`Collapse div também não encontrada para ${consultation.id}. Ignorando renderização.`);
+                        console.log(`ERRO: Não foi possível encontrar ou criar container para consulta ${consultation.id}`);
                         return;
                     }
                 }
