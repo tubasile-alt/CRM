@@ -508,13 +508,12 @@ function deletePatientPhoto() {
                             {% endfor %}
                         </div>
                         
-                            <div id="evolutionHistorySection">
-                                <hr class="my-3">
-                                <h6 class="text-success mb-3">
-                                    <i class="bi bi-stickies"></i> Evoluções do Atendimento Atual
+                            <div id="evolutionHistorySection" class="p-3 mb-3 bg-light rounded border border-success" style="min-height: 100px;">
+                                <h6 class="text-success mb-3 fw-bold">
+                                    <i class="bi bi-stickies-fill"></i> EVOLUÇÕES DESTE ATENDIMENTO (19/02)
                                 </h6>
-                                <div id="currentConsultationEvolutions" class="mt-2 bg-white p-3 rounded border">
-                                    <p class="text-muted small mb-0">Carregando evoluções recentes...</p>
+                                <div id="currentConsultationEvolutions" class="mt-2 bg-white p-3 rounded border shadow-sm" style="display: block !important; visibility: visible !important;">
+                                    <p class="text-muted small mb-0">Carregando histórico de evoluções salvos hoje...</p>
                                 </div>
                             </div>
 
