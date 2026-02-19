@@ -1708,7 +1708,8 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
                 const mod = bootstrap.Modal.getInstance(document.getElementById('evolutionModal'));
                 if (mod) mod.hide();
                 showAlert('Evolução salva com sucesso!', 'success');
-                setTimeout(() => location.reload(), 1000);
+                // Em vez de recarregar a página inteira, recarrega apenas a timeline
+                loadTimeline();
             } else {
                 showAlert(result.error || 'Erro ao salvar evolução', 'danger');
             }
