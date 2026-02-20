@@ -411,7 +411,7 @@
                 <div class="appointment-content">
                     <div class="appointment-info-line">
                         <span class="appointment-time-badge">${timeStr}</span>
-                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId}) goToPatientChart(${patientId}, ${app.id})" style="cursor:${patientId ? 'pointer' : 'default'}; text-decoration:${patientId ? 'underline' : 'none'};">${patientName}</span>
+                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId}) { goToPatientChart(${patientId}, '${app.id}') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }" style="cursor:${patientId ? 'pointer' : 'default'}; text-decoration:${patientId ? 'underline' : 'none'};">${patientName}</span>
                         <span class="appointment-code">cod:${patientCode}</span>
                         <span class="appointment-type-label">pac:${patientType}</span>
                         <span class="appointment-consult-label">cons:${appointmentType}</span>

@@ -429,6 +429,13 @@ def get_appointments():
             start_iso = surg_start_dt.isoformat() + '-03:00'
             end_iso = surg_end_dt.isoformat() + '-03:00'
             
+            # Tentar encontrar o paciente pelo nome para vincular o ID
+            target_patient_id = None
+            if surg.patient_name:
+                patient_match = Patient.query.filter(Patient.name.ilike(surg.patient_name)).first()
+                if patient_match:
+                    target_patient_id = patient_match.id
+
             events.append({
                 'id': f"surg_{surg.id}",
                 'title': f"{surg.patient_name} - {surg.procedure_name}",
@@ -444,7 +451,7 @@ def get_appointments():
                     'doctorName': surg.doctor.name if surg.doctor else 'Dr. Arthur',
                     'notes': surg.notes or '',
                     'isSurgeryMap': True,
-                    'patientId': None # Cirurgias do mapa podem não ter patient_id vinculado ainda
+                    'patientId': target_patient_id
                 }
             })
         except Exception as e:
