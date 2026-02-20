@@ -333,6 +333,7 @@
             'UNIMED': 'appointment-unimed',
             'Cortesia': 'appointment-cortesia',
             'Transplante Capilar': 'appointment-transplante',
+            'Cirurgia': 'appointment-cirurgia',
             'Botox': 'appointment-botox',
             'Laser': 'appointment-laser',
             'Preenchimento': 'appointment-preenchimento'
