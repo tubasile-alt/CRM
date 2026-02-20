@@ -404,7 +404,49 @@ def get_appointments():
     
     appointments = query.all()
     
+    # BUSCAR CIRURGIAS DO MAPA CIRÚRGICO PARA ESTE DIA
+    from models import Surgery
+    surgery_query = Surgery.query
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+            surgery_query = surgery_query.filter(Surgery.date == target_date)
+            if doctor_id:
+                surgery_query = surgery_query.filter(Surgery.doctor_id == doctor_id)
+        except:
+            pass
+    
+    surgeries = surgery_query.all()
+    
     events = []
+    
+    # ADICIONAR CIRURGIAS COMO EVENTOS NA AGENDA
+    for surg in surgeries:
+        try:
+            # Timezone offset -03:00
+            start_iso = datetime.combine(surg.date, surg.start_time).isoformat() + '-03:00'
+            end_iso = datetime.combine(surg.date, surg.end_time).isoformat() + '-03:00'
+            
+            events.append({
+                'id': f"surg_{surg.id}",
+                'title': f"{surg.patient_name} - {surg.procedure_name}",
+                'start': start_iso,
+                'end': end_iso,
+                'backgroundColor': '#dc3545', # Cor de cirurgia
+                'borderColor': '#842029',
+                'extendedProps': {
+                    'status': surg.status or 'agendado',
+                    'appointmentType': 'Cirurgia',
+                    'patientName': surg.patient_name,
+                    'doctorId': surg.doctor_id,
+                    'doctorName': surg.doctor.name if surg.doctor else 'Dr. Arthur',
+                    'notes': surg.notes or '',
+                    'isSurgeryMap': True
+                }
+            })
+        except Exception as e:
+            print(f"Erro ao processar cirurgia {surg.id} para agenda: {e}")
+
     for apt in appointments:
         try:
             # Get doctor color from DoctorPreference

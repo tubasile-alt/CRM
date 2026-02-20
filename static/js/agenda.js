@@ -377,9 +377,11 @@
             const typeClass = getAppointmentTypeClass(appointmentType);
             const statusClass = `status-${status}`;
             const patientId = app.extendedProps?.patientId || app.patientId;
+            const isSurgeryMap = app.extendedProps?.isSurgeryMap || false;
 
             const block = document.createElement('div');
             block.className = `appointment-block ${typeClass} ${statusClass}`;
+            if (isSurgeryMap) block.classList.add('appointment-cirurgia');
             block.style.cursor = 'pointer';
             block.dataset.appointmentId = app.id;
 
