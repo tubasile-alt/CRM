@@ -424,8 +424,10 @@ def get_appointments():
     for surg in surgeries:
         try:
             # Timezone offset -03:00
-            start_iso = datetime.combine(surg.date, surg.start_time).isoformat() + '-03:00'
-            end_iso = datetime.combine(surg.date, surg.end_time).isoformat() + '-03:00'
+            surg_start_dt = datetime.combine(surg.date, surg.start_time)
+            surg_end_dt = datetime.combine(surg.date, surg.end_time)
+            start_iso = surg_start_dt.isoformat() + '-03:00'
+            end_iso = surg_end_dt.isoformat() + '-03:00'
             
             events.append({
                 'id': f"surg_{surg.id}",
@@ -441,7 +443,8 @@ def get_appointments():
                     'doctorId': surg.doctor_id,
                     'doctorName': surg.doctor.name if surg.doctor else 'Dr. Arthur',
                     'notes': surg.notes or '',
-                    'isSurgeryMap': True
+                    'isSurgeryMap': True,
+                    'patientId': None # Cirurgias do mapa podem não ter patient_id vinculado ainda
                 }
             })
         except Exception as e:
