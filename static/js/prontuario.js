@@ -452,12 +452,13 @@ function toggleCategoryTabs() {
 
 // ========== COSMIATRIA: PLANEJAMENTO CLÍNICO ==========
 function performCosmeticProcedure(planId, procedureName) {
+    console.log('performCosmeticProcedure called:', planId, procedureName);
     const today = new Date().toISOString().split('T')[0];
-    const dateInput = prompt(`Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`, today);
+    const dateInput = prompt('Marcar "' + procedureName + '" como realizado em qual data? (AAAA-MM-DD)', today);
     
     if (!dateInput) return;
 
-    fetch(`/api/cosmetic-plans/${planId}/perform`, {
+    fetch('/api/cosmetic-plans/' + planId + '/perform', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -467,18 +468,35 @@ function performCosmeticProcedure(planId, procedureName) {
             performed_date: dateInput
         })
     })
-    .then(r => r.json())
-    .then(result => {
+    .then(function(r) {
+        console.log('Response status:', r.status);
+        return r.json();
+    })
+    .then(function(result) {
+        console.log('Result:', result);
         if (result.success) {
-            showAlert('Procedimento marcado como realizado e evolução criada!', 'success');
-            setTimeout(() => location.reload(), 1000);
+            if (typeof showAlert === 'function') {
+                showAlert('Procedimento marcado como realizado e evolução criada!', 'success');
+            } else {
+                alert('Procedimento marcado como realizado e evolução criada!');
+            }
+            setTimeout(function() { location.reload(); }, 1000);
         } else {
-            showAlert(result.error || 'Erro ao processar', 'danger');
+            var msg = result.error || 'Erro ao processar';
+            if (typeof showAlert === 'function') {
+                showAlert(msg, 'danger');
+            } else {
+                alert(msg);
+            }
         }
     })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro na comunicação com o servidor', 'danger');
+    .catch(function(err) {
+        console.error('Erro na requisição:', err);
+        if (typeof showAlert === 'function') {
+            showAlert('Erro na comunicação com o servidor', 'danger');
+        } else {
+            alert('Erro na comunicação com o servidor');
+        }
     });
 }
 
