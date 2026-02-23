@@ -1051,7 +1051,11 @@ function deletePatientPhoto() {
                                                     {% if plan.was_performed %}
                                                     <span class="badge bg-success">FEITO</span>
                                                     {% else %}
-                                                    <span class="badge bg-danger">PENDENTE</span>
+                                                    <button class="btn btn-sm btn-danger py-0 px-2 fw-bold" 
+                                                            onclick="performCosmeticProcedure({{ plan.id }}, '{{ plan.procedure_name }}')"
+                                                            title="Clique para marcar como realizado hoje e abrir evolução">
+                                                        PENDENTE
+                                                    </button>
                                                     {% endif %}
                                                 </div>
                                             </div>

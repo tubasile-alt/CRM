@@ -96,6 +96,29 @@ def format_brazil_datetime(dt):
     
     return dt.strftime('%d/%m/%Y %H:%M')
 
+@app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
+@login_required
+def perform_cosmetic_plan(plan_id):
+    from models import CosmeticProcedurePlan, Evolution
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    
+    # Marcar como realizado
+    plan.was_performed = True
+    plan.performed_date = get_brazil_time().strftime('%Y-%m-%d')
+    
+    # Criar uma evolução automática
+    evolution = Evolution(
+        patient_id=plan.note.patient_id if plan.note else None,
+        doctor_id=current_user.id,
+        content=f"Procedimento realizado: {plan.procedure_name} (Planejado em {plan.note.created_at.strftime('%d/%m/%Y') if plan.note else 'data desconhecida'})",
+        evolution_date=get_brazil_time().date(),
+        appointment_id=request.json.get('appointment_id')
+    )
+    db.session.add(evolution)
+    db.session.commit()
+    
+    return jsonify({'success': True, 'evolution_id': evolution.id})
+
 @app.route('/health')
 def health():
     """Lightweight health check endpoint for deployment"""

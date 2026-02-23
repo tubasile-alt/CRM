@@ -451,6 +451,36 @@ function toggleCategoryTabs() {
 }
 
 // ========== COSMIATRIA: PLANEJAMENTO CLÍNICO ==========
+function performCosmeticProcedure(planId, procedureName) {
+    if (!confirm(`Deseja marcar "${procedureName}" como realizado hoje?\n\nIsso criará automaticamente uma evolução clínica para o atendimento de hoje.`)) {
+        return;
+    }
+
+    fetch(`/api/cosmetic-plans/${planId}/perform`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            appointment_id: window.appointmentId
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Procedimento marcado como realizado e evolução criada!', 'success');
+            // Recarregar para mostrar a nova evolução e o status atualizado
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert(result.error || 'Erro ao processar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro na comunicação com o servidor', 'danger');
+    });
+}
+
 function addCosmeticProcedure() {
     const nameInput = document.getElementById('newProcedureName');
     const valueInput = document.getElementById('newProcedureValue');
