@@ -1592,231 +1592,134 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     console.log('openEvolutionFromConsultation - consultationId:', consultationId);
     
     // Tentar encontrar o collapse correspondente no histórico (Timeline)
-    const collapseId = `collapse${consultationId}`;
-    const collapseEl = document.getElementById(collapseId);
+    var collapseId = 'collapse' + consultationId;
+    var collapseEl = document.getElementById(collapseId);
     
     if (collapseEl) {
         // Se encontrou o elemento no histórico, apenas rola até ele e abre
         collapseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+        var bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
         bsCollapse.show();
         
         // Pequeno destaque visual
-        const content = collapseEl.querySelector('.timeline-content');
+        var content = collapseEl.querySelector('.timeline-content');
         if (content) {
             content.style.backgroundColor = '#fff3cd';
-            setTimeout(() => { content.style.backgroundColor = ''; }, 2000);
+            setTimeout(function() { content.style.backgroundColor = ''; }, 2000);
         }
         return;
     }
 
     // Se NÃO encontrou no histórico (Timeline), abre o modal de nova evolução
-    // Código original do modal...
-    const consultation = (window.timelineConsultations || []).find(c => String(c.id) === String(consultationId));
+    var consultations = window.timelineConsultations || [];
+    var consultation = null;
+    for (var i = 0; i < consultations.length; i++) {
+        if (String(consultations[i].id) === String(consultationId)) {
+            consultation = consultations[i];
+            break;
+        }
+    }
     
-    const category = consultation ? consultation.category : 'Consulta';
-    const displayDate = consultation ? consultation.date : consultationDate;
-    
-    const isSurgery = category && category.toLowerCase().includes('cirurgia');
-    const surgeryDateOnly = displayDate ? displayDate.split(' ')[0] : null;
-    
-    const modalHtml = `
-        <div class="modal fade" id="evolutionModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Nova Evolução</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="alert alert-success d-flex align-items-center mb-3">
-                            <i class="bi bi-calendar-event me-2"></i>
-                            <div><strong>${category} de ${displayDate}</strong></div>
-                        </div>
+    var category = consultation ? consultation.category : 'Consulta';
+    var displayDate = consultation ? consultation.date : consultationDate;
+    var isSurgery = category && category.toLowerCase().indexOf('cirurgia') !== -1;
+    var surgeryDateOnly = displayDate ? displayDate.split(' ')[0] : null;
 
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Data da Evolução</label>
-                            <input type="datetime-local" class="form-control" id="evolution_date_manual">
-                        </div>
-                        
-                        ${isSurgery ? `
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Tipo de Evolução Pós-Cirúrgica:</label>
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="evolution_type_manual" id="evo_rotina_m" value="general" checked>
-                                <label class="btn btn-outline-secondary" for="evo_rotina_m">
-                                    <i class="bi bi-journal-text"></i> Rotina
-                                </label>
-                                <input type="radio" class="btn-check" name="evolution_type_manual" id="evo_7dias_m" value="7_days">
-                                <label class="btn btn-outline-warning" for="evo_7dias_m">
-                                    <i class="bi bi-calendar-week"></i> 7 Dias
-                                </label>
-                                <input type="radio" class="btn-check" name="evolution_type_manual" id="evo_1ano_m" value="1_year">
-                                <label class="btn btn-outline-info" for="evo_1ano_m">
-                                    <i class="bi bi-calendar-check"></i> 1 Ano
-                                </label>
-                            </div>
-                        </div>
-                        ` : ''}
+    var modalHtml = '<div class="modal fade" id="evolutionModal" tabindex="-1">' +
+        '<div class="modal-dialog modal-lg">' +
+            '<div class="modal-content">' +
+                '<div class="modal-header bg-success text-white">' +
+                    '<h5 class="modal-title"><i class="bi bi-plus-circle"></i> Nova Evolução</h5>' +
+                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                    '<div class="alert alert-success d-flex align-items-center mb-3">' +
+                        '<i class="bi bi-calendar-event me-2"></i>' +
+                        '<div><strong>' + category + ' de ' + displayDate + '</strong></div>' +
+                    '</div>' +
+                    '<div class="mb-3">' +
+                        '<label class="form-label fw-bold">Data da Evolução</label>' +
+                        '<input type="datetime-local" class="form-control" id="evolution_date_manual">' +
+                    '</div>' +
+                    (isSurgery ? 
+                    '<div class="mb-4">' +
+                        '<label class="form-label fw-bold">Tipo de Evolução Pós-Cirúrgica:</label>' +
+                        '<div class="btn-group w-100" role="group">' +
+                            '<input type="radio" class="btn-check" name="evolution_type_manual" id="evo_rotina_m" value="general" checked>' +
+                            '<label class="btn btn-outline-secondary" for="evo_rotina_m"><i class="bi bi-journal-text"></i> Rotina</label>' +
+                            '<input type="radio" class="btn-check" name="evolution_type_manual" id="evo_7dias_m" value="7_days">' +
+                            '<label class="btn btn-outline-warning" for="evo_7dias_m"><i class="bi bi-calendar-week"></i> 7 Dias</label>' +
+                            '<input type="radio" class="btn-check" name="evolution_type_manual" id="evo_1ano_m" value="1_year">' +
+                            '<label class="btn btn-outline-info" for="evo_1ano_m"><i class="bi bi-calendar-check"></i> 1 Ano</label>' +
+                        '</div>' +
+                    '</div>' : '') +
+                    '<div id="evolutionFormContainerManual">' +
+                        '<div class="mb-3">' +
+                            '<label class="form-label fw-bold">Descrição</label>' +
+                            '<textarea class="form-control" id="evolution_content_manual" rows="6" placeholder="Descreva a evolução do paciente..."></textarea>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="modal-footer">' +
+                    '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>' +
+                    '<button type="button" class="btn btn-success" id="btnSaveEvolutionManual"><i class="bi bi-save"></i> Salvar</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
 
-                        <div id="evolutionFormContainerManual">
-                            <div class="mb-3">
-                                <label class="form-label fw-bold">Descrição</label>
-                                <textarea class="form-control" id="evolution_content_manual" rows="6" placeholder="Descreva a evolução do paciente..."></textarea>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-success" id="btnSaveEvolutionManual">
-                            <i class="bi bi-save"></i> Salvar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const existingModal = document.getElementById('evolutionModal');
+    var existingModal = document.getElementById('evolutionModal');
     if (existingModal) existingModal.remove();
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
-    const now = new Date();
-    const offset = now.getTimezoneOffset() * 60000;
-    const localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
+    var now = new Date();
+    var offset = now.getTimezoneOffset() * 60000;
+    var localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
     document.getElementById('evolution_date_manual').value = localISOTime;
 
-    if (isSurgery) {
-        document.querySelectorAll('input[name="evolution_type_manual"]').forEach(radio => {
-            radio.addEventListener('change', function() {
-                const container = document.getElementById('evolutionFormContainerManual');
-                if (this.value === '7_days') {
-                    container.innerHTML = `
-                        <div class="row mb-3">
-                            <div class="col-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="has_necrosis_m">
-                                    <label class="form-check-label" for="has_necrosis_m"><i class="bi bi-x-circle text-danger"></i> Necrose</label>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="has_scabs_m">
-                                    <label class="form-check-label" for="has_scabs_m"><i class="bi bi-bandaid text-warning"></i> Crostas</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="row mb-3">
-                            <div class="col-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="has_infection_m">
-                                    <label class="form-check-label" for="has_infection_m"><i class="bi bi-bug text-danger"></i> Infeccao</label>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="has_follicle_loss_m">
-                                    <label class="form-check-label" for="has_follicle_loss_m"><i class="bi bi-droplet text-secondary"></i> Perda de Foliculos</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Observacoes</label>
-                            <textarea class="form-control" id="evolution_content_manual" rows="4" placeholder="Descreva a evolucao..."></textarea>
-                        </div>
-                    `;
-                } else if (this.value === '1_year') {
-                    container.innerHTML = `
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Resultado:</label>
-                            <div class="btn-group w-100" role="group">
-                                <input type="radio" class="btn-check" name="result_rating_m" id="res_otimo_m" value="otimo">
-                                <label class="btn btn-outline-success" for="res_otimo_m">Otimo</label>
-                                <input type="radio" class="btn-check" name="result_rating_m" id="res_bom_m" value="bom">
-                                <label class="btn btn-outline-primary" for="res_bom_m">Bom</label>
-                                <input type="radio" class="btn-check" name="result_rating" id="res_medio_m" value="medio">
-                                <label class="btn btn-outline-warning" for="res_medio_m">Medio</label>
-                                <input type="radio" class="btn-check" name="result_rating" id="res_ruim_m" value="ruim">
-                                <label class="btn btn-outline-danger" for="res_ruim_m">Ruim</label>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Indicacao de nova cirurgia:</label>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="needs_surgery_m">
-                                <label class="form-check-label" for="needs_surgery_m">Sim, precisa de nova cirurgia</label>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Observacoes</label>
-                            <textarea class="form-control" id="evolution_content_manual" rows="4" placeholder="Descreva a avaliacao..."></textarea>
-                        </div>
-                    `;
-                } else {
-                    container.innerHTML = `
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Descricao</label>
-                            <textarea class="form-control" id="evolution_content_manual" rows="6" placeholder="Descreva a evolucao..."></textarea>
-                        </div>
-                    `;
-                }
-            });
-        });
-    }
+    var modalElement = document.getElementById('evolutionModal');
+    var bsModal = new bootstrap.Modal(modalElement);
+    bsModal.show();
 
     document.getElementById('btnSaveEvolutionManual').onclick = function() {
-        const content = document.getElementById('evolution_content_manual').value;
-        const date = document.getElementById('evolution_date_manual').value;
+        var content = document.getElementById('evolution_content_manual').value;
+        var date = document.getElementById('evolution_date_manual').value;
         
         if (!content) {
-            showAlert('Por favor, descreva a evolução.', 'warning');
+            alert('Por favor, descreva a evolução');
             return;
         }
 
-        let surgeryId = null;
+        var surgeryId = null;
         if (isSurgery && typeof window.timelineSurgeries !== 'undefined') {
-            const matchedSurgery = window.timelineSurgeries.find(s => s.surgery_date === surgeryDateOnly);
+            var matchedSurgery = window.timelineSurgeries.find(function(s) { return s.surgery_date === surgeryDateOnly; });
             if (matchedSurgery) surgeryId = matchedSurgery.id;
         }
 
-        const evoType = isSurgery ? (document.querySelector('input[name="evolution_type_manual"]:checked')?.value || 'general') : 'general';
-
-        const data = {
+        var payload = {
             consultation_id: consultationId,
             content: content,
             evolution_date: date,
-            evolution_type: evoType,
-            has_necrosis: document.getElementById('has_necrosis_m')?.checked || false,
-            has_scabs: document.getElementById('has_scabs_m')?.checked || false,
-            has_infection: document.getElementById('has_infection_m')?.checked || false,
-            has_follicle_loss: document.getElementById('has_follicle_loss_m')?.checked || false,
-            result_rating: document.querySelector('input[name="result_rating_m"]:checked')?.value || null,
-            needs_another_surgery: document.getElementById('needs_surgery_m')?.checked || false
+            evolution_type: isSurgery ? (document.querySelector('input[name="evolution_type_manual"]:checked')?.value || 'general') : 'general'
         };
 
-        const endpoint = surgeryId ? `/api/surgery/${surgeryId}/evolution` : `/api/patient/${patientId}/evolution`;
-        
+        var endpoint = surgeryId ? ('/api/surgery/' + surgeryId + '/evolution') : ('/api/patient/' + (window.patientId || '') + '/evolution');
+
         fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify(payload)
         })
-        .then(r => r.json())
-        .then(result => {
-            if (result.success) {
-                const mod = bootstrap.Modal.getInstance(document.getElementById('evolutionModal'));
-                if (mod) mod.hide();
-                showAlert('Evolução salva com sucesso!', 'success');
-                // Em vez de recarregar a página inteira, recarrega apenas a timeline
-                loadTimeline();
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success) {
+                bsModal.hide();
+                location.reload();
             } else {
-                showAlert(result.error || 'Erro ao salvar evolução', 'danger');
+                alert('Erro ao salvar: ' + (res.error || 'Erro desconhecido'));
             }
         });
     };
-
-    const modal = new bootstrap.Modal(document.getElementById('evolutionModal'));
-    modal.show();
 }
 
 function openEvolutionModal() {
