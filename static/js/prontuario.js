@@ -1572,7 +1572,27 @@ function deleteSurgeryEvolution(evolutionId) {
 function openEvolutionFromConsultation(consultationId, consultationDate) {
     console.log('openEvolutionFromConsultation - consultationId:', consultationId);
     
-    // Tentar encontrar a consulta no array global
+    // Tentar encontrar o collapse correspondente no histórico (Timeline)
+    const collapseId = `collapse${consultationId}`;
+    const collapseEl = document.getElementById(collapseId);
+    
+    if (collapseEl) {
+        // Se encontrou o elemento no histórico, apenas rola até ele e abre
+        collapseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+        bsCollapse.show();
+        
+        // Pequeno destaque visual
+        const content = collapseEl.querySelector('.timeline-content');
+        if (content) {
+            content.style.backgroundColor = '#fff3cd';
+            setTimeout(() => { content.style.backgroundColor = ''; }, 2000);
+        }
+        return;
+    }
+
+    // Se NÃO encontrou no histórico (Timeline), abre o modal de nova evolução
+    // Código original do modal...
     const consultation = (window.timelineConsultations || []).find(c => String(c.id) === String(consultationId));
     
     const category = consultation ? consultation.category : 'Consulta';
@@ -1586,7 +1606,7 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
             <div class="modal-dialog modal-lg">
                 <div class="modal-content">
                     <div class="modal-header bg-success text-white">
-                        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Nova Evolucao</h5>
+                        <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Nova Evolução</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
@@ -1596,13 +1616,13 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Data da Evolucao</label>
+                            <label class="form-label fw-bold">Data da Evolução</label>
                             <input type="datetime-local" class="form-control" id="evolution_date_manual">
                         </div>
                         
                         ${isSurgery ? `
                         <div class="mb-4">
-                            <label class="form-label fw-bold">Tipo de Evolucao Pos-Cirurgica:</label>
+                            <label class="form-label fw-bold">Tipo de Evolução Pós-Cirúrgica:</label>
                             <div class="btn-group w-100" role="group">
                                 <input type="radio" class="btn-check" name="evolution_type_manual" id="evo_rotina_m" value="general" checked>
                                 <label class="btn btn-outline-secondary" for="evo_rotina_m">
@@ -1622,8 +1642,8 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
 
                         <div id="evolutionFormContainerManual">
                             <div class="mb-3">
-                                <label class="form-label fw-bold">Descricao</label>
-                                <textarea class="form-control" id="evolution_content_manual" rows="6" placeholder="Descreva a evolucao do paciente..."></textarea>
+                                <label class="form-label fw-bold">Descrição</label>
+                                <textarea class="form-control" id="evolution_content_manual" rows="6" placeholder="Descreva a evolução do paciente..."></textarea>
                             </div>
                         </div>
                     </div>
