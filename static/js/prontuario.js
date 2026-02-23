@@ -452,9 +452,10 @@ function toggleCategoryTabs() {
 
 // ========== COSMIATRIA: PLANEJAMENTO CLÍNICO ==========
 function performCosmeticProcedure(planId, procedureName) {
-    if (!confirm(`Deseja marcar "${procedureName}" como realizado hoje?\n\nIsso criará automaticamente uma evolução clínica para o atendimento de hoje.`)) {
-        return;
-    }
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = prompt(`Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`, today);
+    
+    if (!dateInput) return;
 
     fetch(`/api/cosmetic-plans/${planId}/perform`, {
         method: 'POST',
@@ -462,14 +463,14 @@ function performCosmeticProcedure(planId, procedureName) {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            appointment_id: window.appointmentId
+            appointment_id: window.appointmentId,
+            performed_date: dateInput
         })
     })
     .then(r => r.json())
     .then(result => {
         if (result.success) {
             showAlert('Procedimento marcado como realizado e evolução criada!', 'success');
-            // Recarregar para mostrar a nova evolução e o status atualizado
             setTimeout(() => location.reload(), 1000);
         } else {
             showAlert(result.error || 'Erro ao processar', 'danger');

@@ -102,17 +102,29 @@ def perform_cosmetic_plan(plan_id):
     from models import CosmeticProcedurePlan, Evolution
     plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
     
+    data = request.json or {}
+    performed_date_str = data.get('performed_date')
+    
     # Marcar como realizado
     plan.was_performed = True
-    plan.performed_date = get_brazil_time().strftime('%Y-%m-%d')
+    plan.performed_date = performed_date_str or get_brazil_time().strftime('%Y-%m-%d')
     
+    # Data para a evolução (converter string AAAA-MM-DD para objeto date)
+    try:
+        if performed_date_str:
+            evo_date = datetime.strptime(performed_date_str, '%Y-%m-%d').date()
+        else:
+            evo_date = get_brazil_time().date()
+    except:
+        evo_date = get_brazil_time().date()
+
     # Criar uma evolução automática
     evolution = Evolution(
         patient_id=plan.note.patient_id if plan.note else None,
         doctor_id=current_user.id,
         content=f"Procedimento realizado: {plan.procedure_name} (Planejado em {plan.note.created_at.strftime('%d/%m/%Y') if plan.note else 'data desconhecida'})",
-        evolution_date=get_brazil_time().date(),
-        appointment_id=request.json.get('appointment_id')
+        evolution_date=evo_date,
+        appointment_id=data.get('appointment_id')
     )
     db.session.add(evolution)
     db.session.commit()
