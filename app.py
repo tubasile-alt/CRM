@@ -473,8 +473,10 @@ def get_appointments():
     for surg in surgeries:
         try:
             # Timezone offset -03:00
-            surg_start_dt = datetime.combine(surg.date, surg.start_time)
-            surg_end_dt = datetime.combine(surg.date, surg.end_time)
+            # Correção do erro: local variable 'datetime' referenced before assignment
+            from datetime import datetime as dt_local
+            surg_start_dt = dt_local.combine(surg.date, surg.start_time)
+            surg_end_dt = dt_local.combine(surg.date, surg.end_time)
             start_iso = surg_start_dt.isoformat() + '-03:00'
             end_iso = surg_end_dt.isoformat() + '-03:00'
             

@@ -1459,7 +1459,11 @@ function renderSurgeries(surgeries = []) {
     });
 }
 
-function renderEvolutionsInAccordion(consultations = []) {
+function renderEvolutionsInAccordion(consultations) {
+    if (!Array.isArray(consultations)) {
+        console.warn('renderEvolutionsInAccordion: consultations não é um array', consultations);
+        consultations = [];
+    }
     // Aguardar um pouco para garantir que o DOM foi renderizado
     setTimeout(() => {
         consultations.forEach(consultation => {
@@ -1811,10 +1815,66 @@ function deleteEvolution(evoId) {
     });
 }
 
-function renderTimeline(consultations = [], surgeries = []) {
+function renderTimeline(consultations, surgeries) {
     console.log('renderTimeline - consultations:', consultations, 'surgeries:', surgeries);
-    renderEvolutionsInAccordion(consultations || []);
-    renderSurgeries(surgeries || []);
+    var container = document.getElementById('evolutionTimeline');
+    if (!container) return;
+
+    var evolutions = [];
+    if (Array.isArray(consultations)) {
+        evolutions = consultations;
+    } else if (consultations && Array.isArray(consultations.evolutions)) {
+        evolutions = consultations.evolutions;
+    }
+
+    if (evolutions.length === 0 && (!surgeries || (Array.isArray(surgeries) && surgeries.length === 0))) {
+        container.innerHTML = '<div class="timeline-evolution-empty">Nenhum histórico encontrado.</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+    var allEvents = [];
+    
+    evolutions.forEach(function(evo) {
+        allEvents.push({
+            date: new Date(evo.created_at),
+            type: 'evolution',
+            category: evo.category || 'Geral',
+            content: evo.content
+        });
+    });
+
+    var surgArray = Array.isArray(surgeries) ? surgeries : (surgeries && Array.isArray(surgeries.surgeries) ? surgeries.surgeries : []);
+    surgArray.forEach(function(surg) {
+        allEvents.push({
+            date: new Date(surg.surgery_date),
+            type: 'surgery',
+            category: 'Cirurgia',
+            content: surg.surgical_planning
+        });
+    });
+
+    allEvents.sort(function(a, b) { return b.date - a.date; });
+
+    allEvents.forEach(function(event) {
+        var entry = document.createElement('div');
+        entry.className = 'timeline-entry';
+        var dateStr = event.date.toLocaleDateString('pt-BR', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+        var badgeClass = event.type === 'surgery' ? 'bg-danger' : 'bg-primary';
+        entry.innerHTML = ' \
+            <div class="timeline-dot"></div> \
+            <div class="timeline-content"> \
+                <div class="d-flex justify-content-between mb-1"> \
+                    <small class="fw-bold text-primary">' + dateStr + '</small> \
+                    <span class="badge ' + badgeClass + '" style="font-size: 0.65rem">' + event.category + '</span> \
+                </div> \
+                <div class="timeline-evolution-text">' + (event.content || 'Sem conteúdo') + '</div> \
+            </div>';
+        container.appendChild(entry);
+    });
 }
 
 function loadTimeline() {
