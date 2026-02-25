@@ -96,6 +96,20 @@ def format_brazil_datetime(dt):
     
     return dt.strftime('%d/%m/%Y %H:%M')
 
+@app.route('/api/patient/<int:patient_id>/evolutions', methods=['GET'])
+@login_required
+def get_patient_evolutions(patient_id):
+    evolutions = Evolution.query.filter_by(patient_id=patient_id).order_by(Evolution.created_at.desc()).all()
+    return jsonify({
+        'success': True,
+        'evolutions': [{
+            'id': e.id,
+            'content': e.content,
+            'category': e.category,
+            'created_at': e.created_at.isoformat()
+        } for e in evolutions]
+    })
+
 @app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
 @login_required
 def perform_cosmetic_plan(plan_id):

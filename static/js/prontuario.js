@@ -346,6 +346,9 @@ async function loadExistingPlans() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Carregar linha do tempo de evoluções
+    loadEvolutionTimeline();
+
     // Carregar planos existentes ao iniciar
     setTimeout(loadExistingPlans, 500);
     
@@ -876,6 +879,49 @@ function saveHairTransplant() {
         showAlert('Erro ao salvar dados de transplante.', 'danger');
         console.error(error);
     });
+}
+
+// ========== LINHA DO TEMPO (TIMELINE) ==========
+function loadEvolutionTimeline() {
+    var container = document.getElementById('evolutionTimeline');
+    if (!container) return;
+
+    fetch('/api/patient/' + patientId + '/evolutions')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success && data.evolutions.length > 0) {
+                container.innerHTML = '';
+                data.evolutions.forEach(function(evo) {
+                    var entry = document.createElement('div');
+                    entry.className = 'timeline-entry';
+                    
+                    var dateStr = new Date(evo.created_at).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+
+                    entry.innerHTML = ' \
+                        <div class="timeline-dot"></div> \
+                        <div class="timeline-content"> \
+                            <div class="d-flex justify-content-between mb-1"> \
+                                <small class="fw-bold text-primary">' + dateStr + '</small> \
+                                <small class="text-muted">' + (evo.category || 'Geral') + '</small> \
+                            </div> \
+                            <div class="timeline-evolution-text">' + (evo.content || 'Sem conteúdo') + '</div> \
+                        </div>';
+                    container.appendChild(entry);
+                });
+            } else {
+                container.innerHTML = '<div class="timeline-evolution-empty">Nenhuma evolução registrada anteriormente.</div>';
+            }
+        })
+        .catch(function(err) {
+            console.error('Erro ao carregar timeline:', err);
+            container.innerHTML = '<div class="text-danger">Erro ao carregar histórico.</div>';
+        });
 }
 
 // ========== FINALIZAR ATENDIMENTO ==========
