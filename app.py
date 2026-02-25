@@ -96,20 +96,6 @@ def format_brazil_datetime(dt):
     
     return dt.strftime('%d/%m/%Y %H:%M')
 
-@app.route('/api/patient/<int:patient_id>/evolutions', methods=['GET'])
-@login_required
-def get_patient_evolutions(patient_id):
-    evolutions = Evolution.query.filter_by(patient_id=patient_id).order_by(Evolution.created_at.desc()).all()
-    return jsonify({
-        'success': True,
-        'evolutions': [{
-            'id': e.id,
-            'content': e.content,
-            'category': e.category,
-            'created_at': e.created_at.isoformat()
-        } for e in evolutions]
-    })
-
 @app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
 @login_required
 def perform_cosmetic_plan(plan_id):
@@ -473,10 +459,8 @@ def get_appointments():
     for surg in surgeries:
         try:
             # Timezone offset -03:00
-            # Correção do erro: local variable 'datetime' referenced before assignment
-            from datetime import datetime as dt_local
-            surg_start_dt = dt_local.combine(surg.date, surg.start_time)
-            surg_end_dt = dt_local.combine(surg.date, surg.end_time)
+            surg_start_dt = datetime.combine(surg.date, surg.start_time)
+            surg_end_dt = datetime.combine(surg.date, surg.end_time)
             start_iso = surg_start_dt.isoformat() + '-03:00'
             end_iso = surg_end_dt.isoformat() + '-03:00'
             
