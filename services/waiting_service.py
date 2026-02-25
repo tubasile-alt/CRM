@@ -21,12 +21,15 @@ class WaitingService:
         Returns:
             dict: Dados do check-in
         """
-        appointment = Appointment.query.get(appointment_id)
+        appointment = db.session.get(Appointment, appointment_id)
         if not appointment:
             raise ValueError("Agendamento não encontrado")
-        
+
         if appointment.checked_in_time:
             raise ValueError("Paciente já realizou check-in")
+
+        if appointment.status in ('atendido', 'faltou', 'cancelado'):
+            raise ValueError("Não é possível fazer check-in para este status de atendimento")
         
         now = datetime.now(self.tz)
         appointment.checked_in_time = now
@@ -52,9 +55,12 @@ class WaitingService:
         Returns:
             dict: Dados do check-out
         """
-        appointment = Appointment.query.get(appointment_id)
+        appointment = db.session.get(Appointment, appointment_id)
         if not appointment:
             raise ValueError("Agendamento não encontrado")
+
+        if not appointment.waiting and not appointment.checked_in_time:
+            raise ValueError("Paciente não está em espera para fazer check-out")
         
         appointment.waiting = False
         appointment.status = 'atendido'
@@ -100,7 +106,7 @@ class WaitingService:
         Returns:
             dict: Dados do undo
         """
-        appointment = Appointment.query.get(appointment_id)
+        appointment = db.session.get(Appointment, appointment_id)
         if not appointment:
             raise ValueError("Agendamento nao encontrado")
         
@@ -260,10 +266,17 @@ class WaitingService:
         Returns:
             dict: Dados atualizados
         """
-        appointment = Appointment.query.get(appointment_id)
+        appointment = db.session.get(Appointment, appointment_id)
         if not appointment:
             raise ValueError("Agendamento não encontrado")
-        
+
+        if not room_name or not str(room_name).strip():
+            raise ValueError("Sala não informada")
+
+        room_name = str(room_name).strip()
+        if len(room_name) > 50:
+            raise ValueError("Nome da sala muito longo")
+
         appointment.room = room_name
         db.session.commit()
         
