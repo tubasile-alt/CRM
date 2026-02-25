@@ -43,7 +43,10 @@ def get_waiting_list():
     
     date = None
     if date_str:
-        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
     
     # Se não for médico e não especificou doctor_id, pega todos
     if not doctor_id and current_user.is_doctor():
@@ -96,7 +99,10 @@ def get_stats():
     
     date = None
     if date_str:
-        date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        try:
+            date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
     
     if not doctor_id and current_user.is_doctor():
         doctor_id = current_user.id

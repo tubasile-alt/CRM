@@ -1414,141 +1414,151 @@ function renderSurgeries(surgeries = []) {
 }
 
 function renderEvolutionsInAccordion(consultations = []) {
-    // Aguardar um pouco para garantir que o DOM foi renderizado
-    setTimeout(() => {
-        consultations.forEach(consultation => {
-            const containerId = `evolutionsContainer${consultation.id}`;
-            let container = document.getElementById(containerId);
-            
-            if (!container) {
-                // Tentar encontrar dentro do accordion body
-                const collapseDiv = document.getElementById(`collapse${consultation.id}`);
-                if (collapseDiv) {
-                    container = collapseDiv.querySelector(`#${containerId}`);
-                }
-            }
-            
-            if (!container) {
-                console.log(`Container não encontrado para consultaID ${consultation.id}, tentando encontrar container global ou criar no collapse.`);
-                
-                // 1. Tentar encontrar o container global para a consulta ATUAL
-                const globalContainer = document.getElementById('currentConsultationEvolutions');
-                // Usar window.appointmentId ou extrair do URL
-                const currentApptId = window.appointmentId || new URLSearchParams(window.location.search).get('appointment_id') || '284';
-                
-                console.log(`DEBUG: currentApptId=${currentApptId}, consultation.id=${consultation.id}, hasGlobal=${!!globalContainer}`);
+    const timelineContainer = document.getElementById('consultationTimelineList');
+    if (!timelineContainer) return;
 
-                // Se for a consulta de hoje ou o ID bater, forçar no container global
-                if (globalContainer && (String(currentApptId) === String(consultation.id) || consultation.date.includes('19/02/2026'))) {
-                    console.log("Forçando injeção no container global de evolução atual.");
-                    container = globalContainer;
-                    // Forçar visibilidade do pai
-                    const section = document.getElementById('evolutionHistorySection');
-                    if (section) section.style.display = 'block';
-                } else {
-                    // 2. Tentar encontrar ou criar no collapse do accordion (histórico)
-                    const collapseId = `collapse${consultation.id}`;
-                    const collapseDiv = document.getElementById(collapseId);
-                    if (collapseDiv) {
-                        console.log(`Achou collapseDiv ${collapseId}`);
-                        // Tentar achar o container dentro do collapse
-                        container = collapseDiv.querySelector(`#${containerId}`);
-                        if (!container) {
-                            console.log(`Criando novo containerId ${containerId} dentro de collapseDiv`);
-                            const newContainer = document.createElement('div');
-                            newContainer.id = containerId;
-                            newContainer.className = 'mt-2';
-                            collapseDiv.appendChild(newContainer);
-                            container = newContainer;
-                        }
-                    } else {
-                        console.log(`Collapse div ${collapseId} não encontrada.`);
-                    }
-                }
-            }
-            
-            if (!container) {
-                console.log(`ERRO: Não foi possível encontrar ou criar container para consulta ${consultation.id}`);
-                return;
-            }
-            
-            container.innerHTML = '';
-            
-            if (!consultation.evolutions || consultation.evolutions.length === 0) {
-                // Mostrar caixa de texto vazia para adicionar evolução
-                const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'p-3 bg-light rounded border-start';
-                emptyDiv.style.borderLeft = '4px solid #ccc';
-                
-                const button = document.createElement('button');
-                button.className = 'btn btn-sm btn-outline-primary w-100 mb-2';
-                button.innerHTML = '<i class="bi bi-plus-circle"></i> Adicionar Evolução';
-                button.type = 'button';
-                button.onclick = (e) => {
-                    e.preventDefault();
-                    openEvolutionFromConsultation(consultation.id, consultation.date);
-                };
-                
-                emptyDiv.appendChild(button);
-                
-                const textarea = document.createElement('textarea');
-                textarea.className = 'form-control form-control-sm';
-                textarea.rows = 4;
-                textarea.placeholder = 'Descreva a evolução do paciente...';
-                textarea.readOnly = true;
-                textarea.style.backgroundColor = '#fff';
-                textarea.style.cursor = 'pointer';
-                textarea.onclick = (e) => {
-                    e.preventDefault();
-                    openEvolutionFromConsultation(consultation.id, consultation.date);
-                };
-                emptyDiv.appendChild(textarea);
-                
-                const helpText = document.createElement('small');
-                helpText.className = 'text-muted d-block mt-2';
-                helpText.innerHTML = '<em>Clique no campo ou no botão para adicionar uma nova evolução</em>';
-                emptyDiv.appendChild(helpText);
-                
-                container.appendChild(emptyDiv);
-                return;
-            }
-            
-            consultation.evolutions.forEach(evo => {
-                const evoDiv = document.createElement('div');
-                evoDiv.className = 'mb-3 p-3 bg-white border-start rounded shadow-sm';
-                evoDiv.style.borderLeft = '4px solid #198754';
-                
-                evoDiv.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <div class="d-flex align-items-center mb-2">
-                                <span class="badge bg-success me-2"><i class="bi bi-clock"></i> ${evo.date}</span>
-                                <span class="text-muted small">Dr. ${evo.doctor}</span>
-                            </div>
-                            <p class="mb-0" style="white-space: pre-wrap; font-size: 1.1rem; color: #333;">${evo.content}</p>
-                        </div>
-                        <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteEvolution(${evo.id})">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                `;
-                
-                container.appendChild(evoDiv);
-            });
-            
-            // Adicionar botão para adicionar nova evolução após as existentes
-            if (consultation.evolutions && consultation.evolutions.length > 0) {
-                const addDiv = document.createElement('div');
-                addDiv.className = 'mt-3 p-2 border-top';
-                addDiv.innerHTML = `
-                    <button class="btn btn-sm btn-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')">
-                        <i class="bi bi-plus-circle"></i> Adicionar Evolução
+    window.timelineConsultations = consultations || [];
+
+    if (!consultations || consultations.length === 0) {
+        timelineContainer.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-4"></i>
+                <p class="mb-0 mt-2">Nenhuma consulta registrada para este paciente.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const escapeHtml = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const buildEvolutionItem = (evo) => `
+        <div class="timeline-evolution-item">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <div class="small text-muted mb-1"><i class="bi bi-clock"></i> ${evo.date} • Dr. ${evo.doctor}</div>
+                    <div class="timeline-evolution-text">${escapeHtml(evo.content)}</div>
+                </div>
+                <div class="d-flex gap-1 flex-shrink-0">
+                    <button class="btn btn-sm btn-outline-warning" title="Editar evolução" data-content="${escapeHtml(evo.content)}" onclick="editEvolution(${evo.id}, this)">
+                        <i class="bi bi-pencil"></i>
                     </button>
-                `;
-                container.appendChild(addDiv);
-            }
-        });
-    }, 100);
+                    <button class="btn btn-sm btn-outline-danger" title="Excluir evolução" onclick="deleteEvolution(${evo.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const buildQuickAdd = (consultation) => `
+        <div class="timeline-quick-add mt-2">
+            <textarea class="form-control form-control-sm" id="quickEvolution-${consultation.id}" rows="2" placeholder="Adicionar nova evolução..."></textarea>
+            <div class="d-flex justify-content-end mt-2">
+                <button class="btn btn-sm btn-success" onclick="saveQuickEvolution(${consultation.id})">
+                    <i class="bi bi-plus-circle"></i> Adicionar Evolução
+                </button>
+            </div>
+        </div>
+    `;
+
+    const timelineHtml = consultations.map((consultation, index) => {
+        const isCurrent = index === 0;
+        const evolutionsHtml = consultation.evolutions && consultation.evolutions.length > 0
+            ? consultation.evolutions.map(buildEvolutionItem).join('')
+            : `<div class="timeline-evolution-empty">Nenhuma evolução registrada.</div>`;
+
+        return `
+            <div class="timeline-entry ${isCurrent ? 'timeline-entry-current' : ''}">
+                <div class="timeline-dot ${isCurrent ? 'timeline-dot-current' : ''}"></div>
+                <div class="timeline-content">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                        <div>
+                            <h6 class="mb-1">${isCurrent ? '🔽 Atendimento Atual' : '⚫ Histórico'} • ${consultation.date}</h6>
+                            <div class="small text-muted">
+                                <span class="badge bg-primary">${consultation.category || 'Consulta'}</span>
+                                <span class="ms-2"><i class="bi bi-person-circle"></i> ${consultation.doctor_name || 'N/A'}</span>
+                                ${consultation.status !== 'atendido' ? '<span class="badge bg-secondary ms-2">Rascunho</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')">
+                                <i class="bi bi-plus-circle"></i> Evolução
+                            </button>
+                        </div>
+                    </div>
+                    <div class="timeline-evolution-list">${evolutionsHtml}</div>
+                    ${buildQuickAdd(consultation)}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    timelineContainer.innerHTML = `<div class="timeline-track">${timelineHtml}</div>`;
+}
+
+function saveQuickEvolution(consultationId) {
+    const input = document.getElementById(`quickEvolution-${consultationId}`);
+    if (!input) return;
+    const content = input.value.trim();
+    if (!content) {
+        showAlert('Digite o conteúdo da evolução.', 'warning');
+        return;
+    }
+
+    const id = window.patientId || patientId;
+    fetch(`/api/patient/${id}/evolution`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ content, consultation_id: consultationId })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            input.value = '';
+            showAlert('Evolução adicionada na linha do tempo!', 'success');
+            loadTimeline();
+        } else {
+            showAlert(result.error || 'Erro ao salvar evolução', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao salvar evolução', 'danger');
+    });
+}
+
+function editEvolution(evoId, buttonEl) {
+    const currentContent = buttonEl ? (buttonEl.dataset.content || '') : '';
+    const updatedContent = prompt('Editar evolução:', currentContent);
+    if (updatedContent === null) return;
+    if (!updatedContent.trim()) {
+        showAlert('Conteúdo não pode ficar vazio.', 'warning');
+        return;
+    }
+
+    fetch(`/api/evolution/${evoId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ content: updatedContent.trim() })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Evolução atualizada com sucesso!', 'success');
+            loadTimeline();
+        } else {
+            showAlert(result.error || 'Erro ao atualizar evolução', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao atualizar evolução', 'danger');
+    });
 }
 
 function openSurgeryEvolutionModal(surgeryId, surgeryDate) {
