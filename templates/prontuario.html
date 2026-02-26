@@ -296,11 +296,27 @@ function deletePatientPhoto() {
 <script>
 function scrollToConsultation(id) {
     const el = document.getElementById(id);
-    if (el) {
+    if (!el) return;
+
+    // Open the accordion item if collapsed
+    const collapseEl = el.querySelector('.accordion-collapse');
+    if (collapseEl && !collapseEl.classList.contains('show')) {
+        const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+        bsCollapse.show();
+    }
+
+    // Scroll the page to the Histórico de Consultas card first
+    const historicoCard = el.closest('.card');
+    if (historicoCard) {
+        historicoCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // After accordion opens, scroll directly to the item
+    setTimeout(() => {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         el.classList.add('highlight-consult');
         setTimeout(() => el.classList.remove('highlight-consult'), 2000);
-    }
+    }, 350);
 }
 </script>
 
@@ -1035,7 +1051,7 @@ function scrollToConsultation(id) {
                 {% if consultations %}
                 <div class="accordion" id="consultationsAccordion">
                     {% for consultation in consultations %}
-                    <div class="accordion-item mb-2">
+                    <div class="accordion-item mb-2" id="consult-{{ consultation.id }}">
                         <h2 class="accordion-header" id="heading{{ consultation.id }}">
                             <button class="accordion-button collapsed" type="button" 
                                     data-bs-toggle="collapse" 
