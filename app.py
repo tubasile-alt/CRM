@@ -458,6 +458,7 @@ def get_appointments():
     # ADICIONAR CIRURGIAS COMO EVENTOS NA AGENDA
     for surg in surgeries:
         try:
+            from datetime import datetime
             # Timezone offset -03:00
             surg_start_dt = datetime.combine(surg.date, surg.start_time)
             surg_end_dt = datetime.combine(surg.date, surg.end_time)
