@@ -156,12 +156,7 @@ function getConsultationDuration() {
 }
 
 function finishConsultation() {
-    if (!timerStartTime) {
-        showAlert('O atendimento ainda não foi iniciado.', 'warning');
-        return;
-    }
-
-    const duration = getConsultationDuration();
+    const duration = timerStartTime ? getConsultationDuration() : 0;
     
     if (confirm(`Deseja finalizar o atendimento? Duração total: ${duration} minutos.`)) {
         fetch(`/api/prontuario/${patientId}/finalizar`, {
@@ -880,19 +875,13 @@ function saveHairTransplant() {
 
 // ========== FINALIZAR ATENDIMENTO ==========
 function finalizarAtendimento() {
-    // Verificar se o atendimento foi iniciado
-    if (!timerStartTime) {
-        alert('É necessário iniciar o atendimento antes de finalizar!');
-        return;
-    }
-    
     // Confirmar finalização
     if (!confirm('Deseja finalizar o atendimento? Todos os dados serão salvos.')) {
         return;
     }
     
-    // Calcular duração em minutos
-    const duration = Math.floor((Date.now() - timerStartTime) / 60000);
+    // Calcular duração em minutos (0 se timer não foi iniciado — consulta retroativa)
+    const duration = timerStartTime ? Math.floor((Date.now() - timerStartTime) / 60000) : 0;
     
     // Coletar dados dos campos de texto
     const queixa = document.getElementById('queixaText')?.value || '';

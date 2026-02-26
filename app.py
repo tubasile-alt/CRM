@@ -1631,9 +1631,7 @@ def finalizar_atendimento(patient_id):
     if data is None:
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
-    # Validar que o atendimento foi iniciado
-    if not data.get('consultation_started'):
-        return jsonify({'success': False, 'error': 'É necessário iniciar o atendimento antes de finalizar'}), 400
+    # consultation_started não é mais obrigatório (permite salvar consultas retroativas)
     
     try:
         category = data.get('category', 'patologia')
