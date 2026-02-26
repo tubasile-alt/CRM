@@ -505,6 +505,9 @@ function scrollToConsultation(id) {
                     <li class="nav-item" id="tabSurgery" style="display:none;">
                         <a class="nav-link" data-bs-toggle="tab" href="#surgery"><i class="bi bi-heart-pulse"></i> Cirurgias</a>
                     </li>
+                    <li class="nav-item ms-auto">
+                        <a class="nav-link text-secondary" data-bs-toggle="tab" href="#data-consulta"><i class="bi bi-calendar-event me-1"></i>Data</a>
+                    </li>
                 </ul>
             </div>
             <div class="card-body">
@@ -1028,6 +1031,22 @@ function scrollToConsultation(id) {
 
                         <div class="alert alert-info mt-3">
                             <small><i class="bi bi-info-circle"></i> O planejamento cirúrgico será salvo automaticamente ao clicar em "Finalizar Atendimento" na aba Conduta.</small>
+                        </div>
+                    </div>
+
+                    <!-- ABA DATA DA CONSULTA -->
+                    <div class="tab-pane fade" id="data-consulta">
+                        <div class="py-3" style="max-width: 400px;">
+                            <h6 class="mb-1"><i class="bi bi-calendar-event me-2 text-primary"></i>Data da Consulta</h6>
+                            <p class="text-muted small mb-4">Altere a data para registrar consultas retroativas ou adiantar agendamentos.</p>
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">Data e Hora</label>
+                                <input type="datetime-local" id="consultationDateInput" class="form-control form-control-lg">
+                            </div>
+                            <button class="btn btn-primary px-4" onclick="saveConsultationDate()">
+                                <i class="bi bi-check-circle me-2"></i>Salvar Data
+                            </button>
+                            <span id="consultationDateStatus" class="ms-3 small"></span>
                         </div>
                     </div>
 
@@ -1771,6 +1790,7 @@ const patientId = {{ patient.id }};
 window.patientId = {{ patient.id }};
 window.patientName = "{{ patient.name }}";
 window.appointmentId = {{ appointment_id | tojson }};
+window.appointmentStartIso = {{ appointment_start_iso | tojson }};
 console.log('DEBUG prontuario: appointmentId from URL =', window.appointmentId);
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -1790,7 +1810,60 @@ document.addEventListener('DOMContentLoaded', function() {
     if (typeof loadPrescriptionHistory === 'function') {
         loadPrescriptionHistory();
     }
+
+    // Pre-preencher aba Data quando ela for aberta
+    document.querySelectorAll('a[href="#data-consulta"]').forEach(function(tab) {
+        tab.addEventListener('shown.bs.tab', function() {
+            const input = document.getElementById('consultationDateInput');
+            if (!input) return;
+            if (window.appointmentStartIso) {
+                input.value = window.appointmentStartIso;
+            } else {
+                const now = new Date();
+                now.setSeconds(0, 0);
+                input.value = now.toISOString().slice(0, 16);
+            }
+        });
+    });
 });
+
+function saveConsultationDate() {
+    const input = document.getElementById('consultationDateInput');
+    const status = document.getElementById('consultationDateStatus');
+    const apptId = window.appointmentId;
+
+    if (!apptId) {
+        status.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>Nenhum agendamento ativo encontrado.</span>';
+        return;
+    }
+    if (!input.value) {
+        status.innerHTML = '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Selecione uma data.</span>';
+        return;
+    }
+
+    status.innerHTML = '<span class="text-muted"><i class="bi bi-hourglass-split me-1"></i>Salvando...</span>';
+
+    const isoDate = new Date(input.value).toISOString();
+
+    fetch(`/api/appointments/${apptId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ start: isoDate })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success !== false) {
+            window.appointmentStartIso = input.value;
+            status.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Data salva com sucesso!</span>';
+            setTimeout(() => status.innerHTML = '', 3000);
+        } else {
+            status.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${data.error || 'Erro ao salvar.'}</span>`;
+        }
+    })
+    .catch(() => {
+        status.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>Erro de comunicação com o servidor.</span>';
+    });
+}
 </script>
     <script src="{{ url_for('static', filename='js/surgeries.js') }}?v={{ range(1, 100000) | random }}"></script>
 <script src="{{ url_for('static', filename='js/prontuario.js') }}"></script>

@@ -1511,6 +1511,13 @@ def prontuario(patient_id):
     
     # Pegar appointment_id da query string (opcional)
     appointment_id = request.args.get('appointment_id', type=int)
+
+    # Buscar data/hora do agendamento ativo para pré-preencher aba Data
+    appointment_start_iso = None
+    if appointment_id:
+        active_appt = Appointment.query.get(appointment_id)
+        if active_appt and active_appt.start_time:
+            appointment_start_iso = active_appt.start_time.strftime('%Y-%m-%dT%H:%M')
     
     # Calcular idade do paciente
     age = None
@@ -1527,6 +1534,7 @@ def prontuario(patient_id):
                          notes=notes,
                          consultations=consultations,
                          appointment_id=appointment_id,
+                         appointment_start_iso=appointment_start_iso,
                          age=age)
 
 @app.route('/api/prontuario/<int:patient_id>', methods=['POST'])
