@@ -43,6 +43,7 @@
         renderMiniCalendar();
         setupPatientAutocomplete();
         startWaitingRoomUpdates();
+        startWaitingClock();
         setupWebcamHandlers();
     });
 
@@ -640,6 +641,25 @@
         setInterval(loadWaitingRoom, 30000);
     };
 
+    function minutesSince(iso) {
+        if (!iso) return 0;
+        const t = new Date(iso).getTime();
+        if (isNaN(t)) return 0;
+        return Math.max(0, Math.floor((Date.now() - t) / 60000));
+    }
+
+    window.startWaitingClock = function() {
+        setInterval(function() {
+            document.querySelectorAll('#waitingRoomList .waiting-patient-item').forEach(function(el) {
+                const iso = el.getAttribute('data-checkedin');
+                const span = el.querySelector('[data-role="wait"]');
+                if (span && iso) {
+                    span.textContent = minutesSince(iso) + ' min';
+                }
+            });
+        }, 1000);
+    };
+
     function loadWaitingRoom() {
         fetch('/espera/api/list').then(r => r.json()).then(d => {
             const list = document.getElementById('waitingRoomList');
@@ -647,10 +667,10 @@
             const items = d.waiting_list || [];
             waitingRoomData = items;
             list.innerHTML = items.length ? items.map(p => `
-                <div class="waiting-patient-item" onclick="goToPatientChart(${p.patient_id}, ${p.appointment_id})" style="cursor:pointer; padding: 8px; border-bottom: 1px solid #eee; transition: background 0.2s;">
+                <div class="waiting-patient-item" data-checkedin="${p.checked_in_time || ''}" onclick="goToPatientChart(${p.patient_id}, ${p.appointment_id})" style="cursor:pointer; padding: 8px; border-bottom: 1px solid #eee; transition: background 0.2s;">
                     <div class="d-flex justify-content-between align-items-center">
                         <span style="font-weight: 500;">${p.patient_name}</span>
-                        <small class="text-muted">(${p.wait_time || '0 min'})</small>
+                        <small class="text-muted">(<span data-role="wait">${(p.wait_time_minutes ?? 0)} min</span>)</small>
                     </div>
                 </div>`).join('') : '<div class="waiting-empty">Sala de espera vazia</div>';
             

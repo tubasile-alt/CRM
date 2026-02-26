@@ -1,7 +1,7 @@
 """
 Serviço de gerenciamento de espera de pacientes
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from models import db, Appointment
 import pytz
 
@@ -28,7 +28,7 @@ class WaitingService:
         if appointment.checked_in_time:
             raise ValueError("Paciente já realizou check-in")
         
-        now = datetime.now(self.tz)
+        now = datetime.now(timezone.utc)
         appointment.checked_in_time = now
         appointment.waiting = True
         
@@ -37,8 +37,9 @@ class WaitingService:
         return {
             'id': appointment.id,
             'patient_name': appointment.patient.name,
-            'checked_in_time': now.strftime('%H:%M'),
+            'checked_in_time': now.isoformat(),
             'scheduled_time': appointment.start_time.strftime('%H:%M'),
+            'wait_time_minutes': 0,
             'waiting': True
         }
     
@@ -66,13 +67,12 @@ class WaitingService:
                 # Garantir que ambos têm timezone para comparação
                 checked_in = appointment.checked_in_time
                 if checked_in.tzinfo is None:
-                    checked_in = self.tz.localize(checked_in)
+                    checked_in = checked_in.replace(tzinfo=timezone.utc)
                 
-                now = datetime.now(self.tz)
+                now = datetime.now(timezone.utc)
                 delta = now - checked_in
-                wait_time = int(delta.total_seconds() / 60)  # minutos
-                if wait_time >= 0:
-                    appointment.total_waiting_minutes = wait_time
+                wait_time = max(0, int(delta.total_seconds() / 60))
+                appointment.total_waiting_minutes = wait_time
             except Exception as e:
                 import logging
                 logging.error(f"Erro ao calcular tempo de espera: {e}")
@@ -147,14 +147,14 @@ class WaitingService:
             wait_time = None
             checked_in_iso = None
             if apt.checked_in_time:
-                # Converter para timezone-aware se for naive
+                # Converter para timezone-aware se for naive (assumir UTC)
                 checkin_time = apt.checked_in_time
                 if checkin_time.tzinfo is None:
-                    checkin_time = self.tz.localize(checkin_time)
+                    checkin_time = checkin_time.replace(tzinfo=timezone.utc)
                 
-                current_time = datetime.now(self.tz)
+                current_time = datetime.now(timezone.utc)
                 delta = current_time - checkin_time
-                wait_time = int(delta.total_seconds() / 60)
+                wait_time = max(0, int(delta.total_seconds() // 60))
                 checked_in_iso = checkin_time.isoformat()
             
             waiting_list.append({
