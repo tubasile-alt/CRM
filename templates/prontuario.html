@@ -224,15 +224,15 @@ function deletePatientPhoto() {
                         {% for consult in consultations|reverse %}
                         <div class="timeline-item text-center position-relative" style="width: 120px;">
                             <div class="timeline-date mb-3 fw-bold text-muted small">
-                                {% if loop.last %}
+                                {% if loop.last and consult.date.date() == consult.date.today() %}
                                     HOJE ({{ consult.date.strftime('%d/%m/%Y') }})
                                 {% else %}
                                     {{ consult.date.strftime('%d/%m/%Y') }}
                                 {% endif %}
                             </div>
                             <div class="timeline-dot-wrapper d-flex justify-content-center">
-                                <div class="timeline-dot rounded-circle shadow-sm {% if loop.last %}bg-success{% else %}bg-secondary{% endif %}" 
-                                     style="width: 24px; height: 24px; border: 4px solid #fff; cursor: pointer; transition: transform 0.2s;"
+                                <div class="timeline-dot rounded-circle shadow-sm {% if loop.last and consult.duration == None %}bg-danger animate-pulse-red{% elif consult.is_finalized or loop.first %}bg-success{% else %}bg-secondary{% endif %}" 
+                                     style="width: 24px; height: 24px; border: 4px solid #fff; cursor: pointer; transition: all 0.2s;"
                                      onclick="scrollToConsultation('consult-{{ consult.id }}')"
                                      data-bs-toggle="tooltip" title="Ver detalhes desta consulta">
                                 </div>
@@ -282,6 +282,14 @@ function scrollToConsultation(id) {
 }
 .highlight-consult {
     animation: highlight 2s ease-out;
+}
+.animate-pulse-red {
+    animation: pulse-red 2s infinite;
+}
+@keyframes pulse-red {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
 }
 @keyframes highlight {
     0% { background-color: rgba(25, 135, 84, 0.1); }
