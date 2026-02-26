@@ -153,56 +153,145 @@ function deletePatientPhoto() {
 
 <div class="row">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div class="d-flex align-items-center gap-3">
-                <!-- Foto 3x4 do Paciente -->
-                <div class="patient-photo-container" style="position: relative;">
-                    <div id="patientPhotoWrapper" class="patient-photo" style="width: 80px; height: 100px; border: 2px dashed #ccc; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #f8f9fa; cursor: pointer;" onclick="document.getElementById('photoInput').click()">
-                        {% if patient.photo_url %}
-                        <img src="{{ patient.photo_url }}" alt="Foto do paciente" style="width: 100%; height: 100%; object-fit: cover;" id="patientPhoto">
-                        {% else %}
-                        <div style="text-align: center; color: #999;" id="photoPlaceholder">
-                            <i class="bi bi-camera" style="font-size: 24px;"></i>
-                            <div style="font-size: 10px;">Foto 3x4</div>
+        <div class="card mb-4 border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-4">
+                    <!-- Foto 3x4 do Paciente -->
+                    <div class="patient-photo-container" style="position: relative;">
+                        <div id="patientPhotoWrapper" class="patient-photo shadow-sm" style="width: 100px; height: 125px; border: 2px dashed #dee2e6; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #ffffff; cursor: pointer; transition: all 0.3s ease;" onclick="document.getElementById('photoInput').click()">
+                            {% if patient.photo_url %}
+                            <img src="{{ patient.photo_url }}" alt="Foto do paciente" style="width: 100%; height: 100%; object-fit: cover;" id="patientPhoto">
+                            {% else %}
+                            <div style="text-align: center; color: #adb5bd;" id="photoPlaceholder">
+                                <i class="bi bi-camera" style="font-size: 32px;"></i>
+                                <div style="font-size: 12px; font-weight: 500; margin-top: 5px;">Foto 3x4</div>
+                            </div>
+                            {% endif %}
                         </div>
+                        <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="uploadPatientPhoto(this)">
+                        {% if patient.photo_url %}
+                        <button class="btn btn-sm btn-danger shadow-sm" style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;" onclick="event.stopPropagation(); deletePatientPhoto()">
+                            <i class="bi bi-x"></i>
+                        </button>
                         {% endif %}
                     </div>
-                    <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="uploadPatientPhoto(this)">
-                    {% if patient.photo_url %}
-                    <button class="btn btn-sm btn-danger" style="position: absolute; top: -5px; right: -5px; padding: 2px 6px; border-radius: 50%;" onclick="event.stopPropagation(); deletePatientPhoto()">
-                        <i class="bi bi-x"></i>
-                    </button>
-                    {% endif %}
-                </div>
-                
-                <div>
-                    <h2>
-                        Prontuário: {{ patient.name }}
-                        {% if age %}
-                        <small class="text-muted">({{ age }} anos)</small>
-                        {% endif %}
-                        <button class="btn btn-sm btn-outline-primary ms-2" onclick="openEditPatientModal()">
-                            <i class="bi bi-pencil"></i> Editar Cadastro
-                        </button>
-                    </h2>
-                    <p class="text-muted mb-0">
-                        {% if patient.phone %}<i class="bi bi-telephone"></i> {{ patient.phone }} | {% endif %}
-                        {% if patient.email %}<i class="bi bi-envelope"></i> {{ patient.email }}{% endif %}
-                        <button class="btn btn-sm btn-warning ms-2" onclick="openAttentionModal()">
-                            <i class="bi bi-exclamation-circle"></i> Atenção
-                        </button>
-                        <span id="attentionBadge" class="badge bg-danger ms-2" style="display: {% if patient.attention_note %}inline{% else %}none{% endif %};">
-                            <i class="bi bi-exclamation-triangle"></i> Anotação
-                        </span>
-                    </p>
+                    
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <h2 class="mb-1 fw-bold" style="color: #2c3e50;">
+                                    Prontuário: {{ patient.name|upper }}
+                                    {% if age %}
+                                    <span class="text-muted fw-normal fs-4">({{ age }} anos)</span>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-secondary border-0 ms-2" onclick="openEditPatientModal()" title="Editar Cadastro">
+                                        <i class="bi bi-pencil-square"></i> Editar Cadastro
+                                    </button>
+                                </h2>
+                                <div class="d-flex align-items-center gap-3 text-muted">
+                                    {% if patient.phone %}
+                                    <span><i class="bi bi-telephone-fill me-1"></i> {{ patient.phone }}</span>
+                                    {% endif %}
+                                    <div class="vr"></div>
+                                    <button class="btn btn-sm btn-warning d-flex align-items-center gap-2 px-3 py-1 rounded-pill fw-bold text-dark border-0" onclick="openAttentionModal()" style="background-color: #ffc107;">
+                                        <i class="bi bi-exclamation-circle-fill"></i> Atenção
+                                    </button>
+                                    <span id="attentionBadge" class="badge rounded-pill bg-danger px-3 py-2" style="display: {% if patient.attention_note %}inline-block{% else %}none{% endif %};">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Anotação
+                                    </span>
+                                </div>
+                            </div>
+                            <button class="btn btn-light border shadow-sm px-4 rounded-pill" onclick="history.back()">
+                                <i class="bi bi-arrow-left me-2"></i> Voltar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <button class="btn btn-outline-secondary" onclick="history.back()">
-                <i class="bi bi-arrow-left"></i> Voltar
-            </button>
         </div>
     </div>
 </div>
+
+<!-- Timeline de Consultas -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body py-4">
+                <div class="consultation-timeline-container position-relative px-5">
+                    <div class="timeline-line position-absolute w-100" style="height: 4px; background: #e9ecef; top: 50%; left: 0; transform: translateY(-50%); z-index: 1;"></div>
+                    <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
+                        {% set total_consults = consultations|length %}
+                        {% for consult in consultations|reverse %}
+                        <div class="timeline-item text-center position-relative" style="width: 120px;">
+                            <div class="timeline-date mb-3 fw-bold text-muted small">
+                                {% if loop.last %}
+                                    HOJE ({{ consult.date.strftime('%d/%m/%Y') }})
+                                {% else %}
+                                    {{ consult.date.strftime('%d/%m/%Y') }}
+                                {% endif %}
+                            </div>
+                            <div class="timeline-dot-wrapper d-flex justify-content-center">
+                                <div class="timeline-dot rounded-circle shadow-sm {% if loop.last %}bg-success{% else %}bg-secondary{% endif %}" 
+                                     style="width: 24px; height: 24px; border: 4px solid #fff; cursor: pointer; transition: transform 0.2s;"
+                                     onclick="scrollToConsultation('consult-{{ consult.id }}')"
+                                     data-bs-toggle="tooltip" title="Ver detalhes desta consulta">
+                                </div>
+                            </div>
+                            {% if loop.last and consult.notes_by_type.evolution %}
+                            <div class="timeline-popover position-absolute bg-white p-3 rounded shadow-sm border text-start" 
+                                 style="top: 60px; left: 50%; transform: translateX(-50%); width: 300px; z-index: 1000;">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <small class="text-muted">{{ consult.date.strftime('%d/%m/%Y %H:%M') }} • Dr. {{ consult.doctor.name }}</small>
+                                    <div class="d-flex gap-2">
+                                        <i class="bi bi-pencil text-muted small cursor-pointer" onclick="editNote({{ consult.notes_by_type.evolution.id }})"></i>
+                                        <i class="bi bi-trash text-danger small cursor-pointer" onclick="deleteNote({{ consult.notes_by_type.evolution.id }})"></i>
+                                    </div>
+                                </div>
+                                <div class="small fw-bold mb-1">Evolução:</div>
+                                <div class="small text-truncate-3" style="font-size: 0.85rem; line-height: 1.4;">
+                                    {{ consult.notes_by_type.evolution.content }}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function scrollToConsultation(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('highlight-consult');
+        setTimeout(() => el.classList.remove('highlight-consult'), 2000);
+    }
+}
+</script>
+
+<style>
+.text-truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.highlight-consult {
+    animation: highlight 2s ease-out;
+}
+@keyframes highlight {
+    0% { background-color: rgba(25, 135, 84, 0.1); }
+    100% { background-color: transparent; }
+}
+.timeline-dot:hover {
+    transform: scale(1.3);
+}
+.cursor-pointer { cursor: pointer; }
+</style>
 
 <!-- Modal de Atenção -->
 <div class="modal fade" id="attentionModal" tabindex="-1">
