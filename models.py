@@ -83,6 +83,7 @@ class Appointment(db.Model):
     doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
+    consultation_date = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default='agendado')
     appointment_type = db.Column(db.String(20), default='Particular')
     notes = db.Column(db.Text)

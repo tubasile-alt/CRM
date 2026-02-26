@@ -825,6 +825,8 @@ def update_appointment(id):
     
     if 'start' in data:
         appointment.start_time = parse_datetime_with_tz(data['start'])
+    if 'consultation_date' in data:
+        appointment.consultation_date = parse_datetime_with_tz(data['consultation_date']) if data['consultation_date'] else None
     if 'end' in data:
         appointment.end_time = parse_datetime_with_tz(data['end'])
     if 'status' in data:
@@ -1437,7 +1439,10 @@ def prontuario(patient_id):
         
         # Obter appointment para pegar a data correta
         appointment = db.session.get(Appointment, appt_id)
-        consultation_date = appointment.start_time if appointment else (finalized_note.created_at if finalized_note else first_note.created_at)
+        if appointment:
+            consultation_date = appointment.consultation_date or appointment.start_time
+        else:
+            consultation_date = (finalized_note.created_at if finalized_note else first_note.created_at)
         
         consultations.append({
             'id': appt_id,  # Usar appointment_id como ID único
@@ -1516,8 +1521,10 @@ def prontuario(patient_id):
     appointment_start_iso = None
     if appointment_id:
         active_appt = Appointment.query.get(appointment_id)
-        if active_appt and active_appt.start_time:
-            appointment_start_iso = active_appt.start_time.strftime('%Y-%m-%dT%H:%M')
+        if active_appt:
+            effective_dt = active_appt.consultation_date or active_appt.start_time
+            if effective_dt:
+                appointment_start_iso = effective_dt.strftime('%Y-%m-%dT%H:%M')
     
     # Calcular idade do paciente
     age = None
@@ -2675,9 +2682,10 @@ def get_evolutions(patient_id):
         # Buscar evoluções desta consulta
         evolutions = Evolution.query.filter_by(consultation_id=consultation.id).order_by(Evolution.evolution_date.asc()).all()
         
+        effective_date = consultation.consultation_date or consultation.start_time
         consultation_data = {
             'id': consultation.id,
-            'date': consultation.start_time.strftime('%d/%m/%Y %H:%M'),
+            'date': effective_date.strftime('%d/%m/%Y %H:%M'),
             'category': consultation.appointment_type or 'Consulta',
             'doctor_name': consultation.doctor.name if consultation.doctor else 'N/A',
             'status': consultation.status,

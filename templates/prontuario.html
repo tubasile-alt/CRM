@@ -1848,7 +1848,7 @@ function saveConsultationDate() {
     fetch(`/api/appointments/${apptId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ start: isoDate })
+        body: JSON.stringify({ consultation_date: isoDate })
     })
     .then(r => r.json())
     .then(data => {

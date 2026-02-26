@@ -1,0 +1,91 @@
+1) BACKEND — Padronizar timestamps em UTC e evitar minutos negativos
+========================================
+Arquivo: services/waiting_service.py
+
+- Importar timezone:
+  from datetime import datetime, timezone
+
+- Ao fazer check-in, gravar checked_in_time timezone-aware em UTC:
+  appointment.checked_in_time = datetime.now(timezone.utc)
+
+- Ao serializar/calcular wait_time:
+  - Se checked_in_time existir e for “naive” (tzinfo is None), assumir UTC:
+      checkin_time = checkin_time.replace(tzinfo=timezone.utc)
+  - Calcular delta usando current_time = datetime.now(timezone.utc)
+  - wait_minutes = max(0, int(delta.total_seconds() // 60))
+  - Retornar no JSON:
+      "wait_time_minutes": wait_minutes,
+      "checked_in_time": checkin_time.isoformat()  (ISO com timezone)
+
+- Garantir que nenhum lugar retorne wait_time negativo.
+
+Se já existir retorno "wait_time", manter por compatibilidade, mas adicionar os novos campos acima e, se possível, padronizar o frontend para usar wait_time_minutes.
+
+========================================
+2) BACKEND — Corrigir rotas da Sala de Espera para bater com o frontend
+========================================
+Arquivo: routes/waiting_room.py
+
+Ajustar todas as rotas que atualmente estão sem o appointment_id na URL, mas cuja função recebe appointment_id.
+
+Consertar para:
+
+POST  /espera/api/checkin/<int:appointment_id>
+POST  /espera/api/checkout/<int:appointment_id>
+POST  /espera/api/assign-room/<int:appointment_id>
+POST  /espera/api/remove/<int:appointment_id>
+
+(Manter o blueprint prefix /espera se for esse o prefix existente.)
+
+Garantir que o JS que chama /espera/api/checkin/${appointmentId} funcione (200 OK).
+
+========================================
+3) FRONTEND — Relógio em tempo real na Sala de Espera
+========================================
+Arquivo: static/js/agenda.js
+
+- Onde renderiza cada paciente na “Sala de Espera”, garantir que:
+  - o elemento do paciente tenha data-checkedin com o ISO:
+      data-checkedin="...checked_in_time..."
+  - o texto do tempo sempre apareça como “X min”
+  - NÃO usar (p.wait_time || '0 min') porque 0 é falsy e quebra o texto
+  - Usar: (p.wait_time_minutes ?? 0) + ' min'
+
+- Implementar um cronômetro local no frontend:
+  1) Função minutesSince(iso):
+     - parse new Date(iso).getTime()
+     - se NaN, retornar 0
+     - calcular Math.floor((Date.now() - t)/60000)
+     - clamp: Math.max(0, mins)
+  2) startWaitingClock():
+     - setInterval a cada 1000ms
+     - para cada .waiting-patient (ou seletor equivalente):
+         ler data-checkedin
+         atualizar span do tempo (data-role="wait") para `${mins} min`
+
+- Chamar startWaitingClock() uma única vez no carregamento da página Agenda (ou ao inicializar o módulo).
+
+========================================
+4) TESTE MANUAL (executar e validar)
+========================================
+- Rodar o app.
+- Abrir Agenda.
+- Clicar “Check In” em um paciente.
+- Verificar:
+  1) paciente entra na Sala de Espera imediatamente
+  2) o tempo começa em 0 min e NÃO fica negativo
+  3) após 60s, vira 1 min automaticamente sem recarregar página
+  4) o texto sempre mostra “min” (ex.: “3 min”)
+
+========================================
+5) ENTREGÁVEIS
+========================================
+- Aplicar patch em todos os arquivos citados.
+- Se existirem referências antigas de p.wait_time, manter compatibilidade mas preferir p.wait_time_minutes no frontend.
+- Não quebrar outras telas.
+- Ao final, responder com:
+  - lista de arquivos alterados
+  - trechos principais alterados (diff ou resumo objetivo)
+  - instruções curtas de como testar
+
+Execute agora.
