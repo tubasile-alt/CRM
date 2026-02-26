@@ -1511,6 +1511,29 @@ def prontuario(patient_id):
             'is_finalized': finalized_note is not None
         })
     
+    # Incluir agendamentos "atendido" sem notas para que apareçam no Histórico
+    covered_appt_ids = {c['id'] for c in consultations}
+    empty_q = Appointment.query.filter(
+        Appointment.patient_id == patient_id,
+        Appointment.status == 'atendido'
+    )
+    if covered_appt_ids:
+        empty_q = empty_q.filter(~Appointment.id.in_(list(covered_appt_ids)))
+    empty_appts = empty_q.all()
+    for ea in empty_appts:
+        ea_date = ea.consultation_date or ea.start_time
+        consultations.append({
+            'id': ea.id,
+            'date': ea_date,
+            'doctor': ea.doctor,
+            'duration': None,
+            'category': ea.appointment_type or 'Consulta',
+            'notes_by_type': {},
+            'all_notes': [],
+            'cosmetic_plans': [],
+            'is_finalized': False
+        })
+
     # Reordenar por data (mais recente primeiro)
     consultations.sort(key=lambda x: x['date'], reverse=True)
     

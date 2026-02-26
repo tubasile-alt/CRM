@@ -1084,7 +1084,9 @@ function scrollToConsultation(id) {
                                         <strong>
                                             <i class="bi bi-calendar3"></i> 
                                             {{ consultation.date.strftime('%d/%m/%Y %H:%M') }}
-                                            {% if not consultation.is_finalized %}
+                                            {% if not consultation.all_notes %}
+                                            <span class="badge bg-warning text-dark ms-1" style="font-size: 0.7em;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Sem notas</span>
+                                            {% elif not consultation.is_finalized %}
                                             <span class="badge bg-secondary ms-1" style="font-size: 0.7em;">Rascunho</span>
                                             {% endif %}
                                         </strong>
@@ -1132,6 +1134,15 @@ function scrollToConsultation(id) {
                              aria-labelledby="heading{{ consultation.id }}" 
                              data-bs-parent="#consultationsAccordion">
                             <div class="accordion-body p-3">
+                                {% if not consultation.all_notes %}
+                                <div class="text-center py-3">
+                                    <i class="bi bi-journal-x text-warning" style="font-size: 2rem;"></i>
+                                    <p class="text-muted mt-2 mb-3">Nenhum conteúdo clínico foi salvo nesta consulta.</p>
+                                    <a href="/prontuario/{{ patient.id }}?appointment_id={{ consultation.id }}" class="btn btn-warning btn-sm px-4">
+                                        <i class="bi bi-pencil-square me-1"></i> Preencher Prontuário
+                                    </a>
+                                </div>
+                                {% endif %}
                                 <!-- Queixa Principal -->
                                 {% if 'queixa' in consultation.notes_by_type %}
                                 <div class="mb-3">
