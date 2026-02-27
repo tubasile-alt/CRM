@@ -158,17 +158,48 @@ function getConsultationDuration() {
 function finishConsultation() {
     const duration = timerStartTime ? getConsultationDuration() : 0;
     
+    // Capturar dados de Transplante Capilar se a categoria for essa
+    let transplantData = null;
+    if (currentCategory === 'transplante_capilar') {
+        transplantData = {
+            norwood: document.getElementById('norwood_class')?.value,
+            previous_transplant: document.querySelector('input[name="previous_transplant"]:checked')?.value,
+            transplant_location: document.getElementById('transplant_location')?.value,
+            frontal: document.getElementById('frontal_transplant')?.checked,
+            crown: document.getElementById('crown_transplant')?.checked,
+            complete: document.getElementById('complete_transplant')?.checked,
+            complete_body_hair: document.getElementById('complete_body_hair')?.checked,
+            dense_packing: document.getElementById('dense_packing')?.checked,
+            surgical_planning_text: document.getElementById('surgical_planning_text')?.value
+        };
+        console.log("DEBUG: Capturando dados de transplante para finalizar:", transplantData);
+    }
+
     if (confirm(`Deseja finalizar o atendimento? Duração total: ${duration} minutos.`)) {
+        const payload = { 
+            duration: duration,
+            appointment_id: window.appointmentId,
+            consultation_started: true,
+            category: currentCategory,
+            // Incluir campos de texto das abas
+            queixa: document.getElementById('queixaText')?.value,
+            anamnese: document.getElementById('anamneseText')?.value,
+            diagnostico: document.getElementById('diagnosticoText')?.value,
+            conduta: document.getElementById('condutaText')?.value,
+            // Dados estruturados
+            surgical_planning: transplantData,
+            transplant_indication: document.querySelector('input[name="transplant_indication"]:checked')?.value || 'nao',
+            indicated_procedures: Array.from(document.querySelectorAll('.indicated-proc:checked')).map(cb => parseInt(cb.value)),
+            performed_procedures: Array.from(document.querySelectorAll('.performed-proc:checked')).map(cb => parseInt(cb.value)),
+            cosmetic_procedures: currentCategory === 'cosmiatria' ? cosmeticProcedures : []
+        };
+
         fetch(`/api/prontuario/${patientId}/finalizar`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ 
-                duration: duration,
-                appointment_id: window.appointmentId,
-                consultation_started: true
-            })
+            body: JSON.stringify(payload)
         })
         .then(response => response.json())
         .then(result => {
