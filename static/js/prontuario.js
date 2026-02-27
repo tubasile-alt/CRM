@@ -1455,21 +1455,32 @@ function renderEvolutionsInAccordion(consultations = []) {
             
             container.innerHTML = '';
             
-            if (!consultation.evolutions || consultation.evolutions.length === 0) {
-                // Mostrar caixa de texto vazia para adicionar evolução
-                const emptyDiv = document.createElement('div');
-                emptyDiv.className = 'mt-3 p-3 bg-light rounded border';
-                emptyDiv.innerHTML = `
-                    <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Adicionar Evolução</h6>
-                    <textarea class="form-control mb-2" rows="3" id="newEvoText${consultation.id}" 
-                              placeholder="Descreva a evolução do paciente..." 
-                              style="background-color: #fff;"></textarea>
+            // Container para a caixa de texto (sempre visível para nova evolução)
+            const quickEvoDiv = document.createElement('div');
+            quickEvoDiv.className = 'mt-3 p-3 bg-light rounded border mb-3';
+            quickEvoDiv.innerHTML = `
+                <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Nova Evolução</h6>
+                <textarea class="form-control mb-2" rows="3" id="newEvoText${consultation.id}" 
+                          placeholder="Descreva a evolução do paciente..." 
+                          style="background-color: #fff;"></textarea>
+                <div class="d-flex justify-content-between">
                     <button class="btn btn-sm btn-success" onclick="saveQuickEvolution(${consultation.id})">
                         <i class="bi bi-save"></i> Salvar Evolução
                     </button>
-                `;
-                container.appendChild(emptyDiv);
-            } else {
+                    <button class="btn btn-sm btn-outline-secondary" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')">
+                        <i class="bi bi-arrows-fullscreen"></i> Tela Cheia
+                    </button>
+                </div>
+            `;
+            container.appendChild(quickEvoDiv);
+
+            if (consultation.evolutions && consultation.evolutions.length > 0) {
+                // Título para evoluções anteriores
+                const historyTitle = document.createElement('div');
+                historyTitle.className = 'border-top pt-2 mt-2 mb-2';
+                historyTitle.innerHTML = '<small class="text-muted fw-bold">Evoluções Anteriores:</small>';
+                container.appendChild(historyTitle);
+
                 // Renderizar evoluções existentes
                 consultation.evolutions.forEach(evo => {
                     const evoDiv = document.createElement('div');
@@ -1477,7 +1488,7 @@ function renderEvolutionsInAccordion(consultations = []) {
                     evoDiv.innerHTML = `
                         <div class="d-flex justify-content-between">
                             <small class="text-muted fw-bold">${evo.date} - Dr. ${evo.doctor}</small>
-                            <button class="btn btn-link btn-sm p-0 text-danger" onclick="deleteNote(${evo.id})">
+                            <button class="btn btn-link btn-sm p-0 text-danger" onclick="deleteEvolution(${evo.id})">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
@@ -1485,13 +1496,6 @@ function renderEvolutionsInAccordion(consultations = []) {
                     `;
                     container.appendChild(evoDiv);
                 });
-                
-                // Adicionar botão para nova evolução se já tiver
-                const addMoreBtn = document.createElement('button');
-                addMoreBtn.className = 'btn btn-sm btn-outline-success mt-2';
-                addMoreBtn.innerHTML = '<i class="bi bi-plus"></i> Nova Evolução';
-                addMoreBtn.onclick = () => openEvolutionFromConsultation(consultation.id, consultation.date);
-                container.appendChild(addMoreBtn);
             }
         });
     }, 500);
@@ -1499,6 +1503,7 @@ function renderEvolutionsInAccordion(consultations = []) {
 
 function saveQuickEvolution(consultationId) {
     const textarea = document.getElementById(`newEvoText${consultationId}`);
+    if (!textarea) return;
     const content = textarea.value.trim();
     
     if (!content) {
@@ -1519,7 +1524,7 @@ function saveQuickEvolution(consultationId) {
     .then(result => {
         if (result.success) {
             showAlert('Evolução salva com sucesso!', 'success');
-            location.reload();
+            loadTimeline(); // Recarregar sem refresh total
         } else {
             showAlert(result.error || 'Erro ao salvar', 'danger');
         }
@@ -1529,76 +1534,6 @@ function saveQuickEvolution(consultationId) {
         showAlert('Erro ao salvar evolução', 'danger');
     });
 }
-                emptyDiv.className = 'p-3 bg-light rounded border-start';
-                emptyDiv.style.borderLeft = '4px solid #ccc';
-                
-                const button = document.createElement('button');
-                button.className = 'btn btn-sm btn-outline-primary w-100 mb-2';
-                button.innerHTML = '<i class="bi bi-plus-circle"></i> Adicionar Evolução';
-                button.type = 'button';
-                button.onclick = (e) => {
-                    e.preventDefault();
-                    openEvolutionFromConsultation(consultation.id, consultation.date);
-                };
-                
-                emptyDiv.appendChild(button);
-                
-                const textarea = document.createElement('textarea');
-                textarea.className = 'form-control form-control-sm';
-                textarea.rows = 4;
-                textarea.placeholder = 'Descreva a evolução do paciente...';
-                textarea.readOnly = true;
-                textarea.style.backgroundColor = '#fff';
-                textarea.style.cursor = 'pointer';
-                textarea.onclick = (e) => {
-                    e.preventDefault();
-                    openEvolutionFromConsultation(consultation.id, consultation.date);
-                };
-                emptyDiv.appendChild(textarea);
-                
-                const helpText = document.createElement('small');
-                helpText.className = 'text-muted d-block mt-2';
-                helpText.innerHTML = '<em>Clique no campo ou no botão para adicionar uma nova evolução</em>';
-                emptyDiv.appendChild(helpText);
-                
-                container.appendChild(emptyDiv);
-                return;
-            }
-            
-            consultation.evolutions.forEach(evo => {
-                const evoDiv = document.createElement('div');
-                evoDiv.className = 'mb-3 p-3 bg-white border-start rounded shadow-sm';
-                evoDiv.style.borderLeft = '4px solid #198754';
-                
-                evoDiv.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <div class="d-flex align-items-center mb-2">
-                                <span class="badge bg-success me-2"><i class="bi bi-clock"></i> ${evo.date}</span>
-                                <span class="text-muted small">Dr. ${evo.doctor}</span>
-                            </div>
-                            <p class="mb-0" style="white-space: pre-wrap; font-size: 1.1rem; color: #333;">${evo.content}</p>
-                        </div>
-                        <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteEvolution(${evo.id})">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                `;
-                
-                container.appendChild(evoDiv);
-            });
-            
-            // Adicionar botão para adicionar nova evolução após as existentes
-            if (consultation.evolutions && consultation.evolutions.length > 0) {
-                const addDiv = document.createElement('div');
-                addDiv.className = 'mt-3 p-2 border-top';
-                addDiv.innerHTML = `
-                    <button class="btn btn-sm btn-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')">
-                        <i class="bi bi-plus-circle"></i> Adicionar Evolução
-                    </button>
-                `;
-                container.appendChild(addDiv);
-            }
         });
     }, 100);
 }
@@ -1790,27 +1725,6 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     };
 }
 
-function openEvolutionModal() {
-    // Limpar modal quando aberto sem consulta específica
-    const modal = document.getElementById('evolutionModal');
-    const now = new Date();
-    
-    document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
-    document.getElementById('evolutionContent').value = '';
-    document.getElementById('evolutionConsultation').value = '';
-    
-    document.getElementById('evolutionConsultation').style.display = 'block';
-    document.getElementById('evolutionConsultationDisplay').style.display = 'none';
-    
-    modal.dataset.fromConsultation = 'false';
-    modal.dataset.type = 'consultation';
-    delete modal.dataset.surgeryId;
-    delete modal.dataset.consultationId;
-    
-    loadConsultationsDropdown();
-    new bootstrap.Modal(modal).show();
-}
-
 function deleteEvolution(evoId) {
     if (!confirm('Tem certeza que deseja deletar esta evolução?')) return;
     
@@ -1832,6 +1746,27 @@ function deleteEvolution(evoId) {
         showAlert('Erro ao deletar evolução', 'danger');
     });
 }
+
+function openEvolutionModal() {
+    const modal = document.getElementById('evolutionModal');
+    const now = new Date();
+    
+    document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
+    document.getElementById('evolutionContent').value = '';
+    document.getElementById('evolutionConsultation').value = '';
+    
+    document.getElementById('evolutionConsultation').style.display = 'block';
+    document.getElementById('evolutionConsultationDisplay').style.display = 'none';
+    
+    modal.dataset.fromConsultation = 'false';
+    modal.dataset.type = 'consultation';
+    delete modal.dataset.surgeryId;
+    delete modal.dataset.consultationId;
+    
+    loadConsultationsDropdown();
+    new bootstrap.Modal(modal).show();
+}
+
 
 function renderTimeline(consultations = [], surgeries = []) {
     console.log('renderTimeline - consultations:', consultations, 'surgeries:', surgeries);
