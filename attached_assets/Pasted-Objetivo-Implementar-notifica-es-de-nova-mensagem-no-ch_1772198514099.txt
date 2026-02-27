@@ -1,0 +1,45 @@
+Objetivo: Implementar notificações de nova mensagem no chat (som e/ou popup), sem atrapalhar outras telas. NÃO usar modal. Usar Toast discreto + Notification API quando aba estiver oculta.
+
+1) FRONTEND (global):
+Arquivo: static/js/main.js
+- Implementar um “ChatNotifier” global que roda junto com updateChatBadge().
+- Guardar lastUnreadCount e lastNotifiedAt (em memória e localStorage).
+- Quando /api/chat/unread_count retornar count > lastUnreadCount:
+  a) Mostrar toast (Bootstrap toast ou div fixo top-right) com auto-hide 4-6s, clicável para window.location='/chat'.
+  b) Se document.hidden === true OU location.pathname !== '/chat':
+     - Disparar Notification API (se permitido) com título "Nova mensagem no chat" e corpo com preview se disponível.
+  c) Som: tocar um beep curto SOMENTE se o usuário habilitou em um toggle (usar localStorage 'chatSoundEnabled' = true/false).
+     - Criar pequeno botão/ícone no topo (ou dentro do menu) “🔔” para ligar/desligar som.
+     - Se o navegador bloquear autoplay, ao clicar no toggle, tocar um som de teste e habilitar.
+- Adicionar throttling: não notificar se (Date.now()-lastNotifiedAt) < 4000ms.
+- Atualizar lastUnreadCount após notificar.
+
+2) BACKEND (preview opcional mas recomendado):
+Arquivo: app.py
+- Criar endpoint GET /api/chat/latest_unread
+  - Buscar o ChatMessage mais recente onde recipient_id = current_user.id e ainda não tem MessageRead para esse usuário.
+  - Retornar {id, from_user_id, from_name, message (limit 80 chars), created_at iso}
+  - Se não houver, retornar {id:null}
+
+3) FRONTEND (usar preview):
+- No main.js, quando detectar aumento de unread_count:
+  - chamar /api/chat/latest_unread para preencher toast/notification com "De: X — mensagem..."
+  - Se falhar, usar fallback genérico "Nova mensagem no chat".
+
+4) UI do Toast:
+- Criar container fixo no canto superior direito (z-index alto, mas sem bloquear cliques fora).
+- Empilhar toasts (max 3) e remover automaticamente.
+- Clique no toast abre /chat.
+
+5) Critérios de aceite:
+- Em qualquer página, ao chegar mensagem nova:
+  - badge incrementa (já existe)
+  - aparece toast discreto sem travar nada
+  - se aba estiver em background, aparece notificação do sistema (se permitido)
+  - som só toca se habilitado
+- Não repetir notificação em loop a cada 5s sem mensagem nova.
+
+Execute o patch e me devolva:
+- lista de arquivos alterados
+- trechos principais do código adicionados
+- como testar em 1 minuto (passo a passo)

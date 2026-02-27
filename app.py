@@ -2236,6 +2236,27 @@ def mark_messages_read():
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/chat/latest_unread')
+@login_required
+def get_latest_unread():
+    from models import ChatMessage, MessageRead
+    # Buscar mensagens onde o usuário atual é o destinatário e não há registro de leitura
+    subquery = db.session.query(MessageRead.message_id).filter(MessageRead.user_id == current_user.id)
+    latest = ChatMessage.query.filter(
+        ChatMessage.recipient_id == current_user.id,
+        ~ChatMessage.id.in_(subquery)
+    ).order_by(ChatMessage.created_at.desc()).first()
+    
+    if latest:
+        return jsonify({
+            'id': latest.id,
+            'from_user_id': latest.sender_id,
+            'from_name': latest.sender.name if latest.sender else "Sistema",
+            'message': latest.content[:80] + ('...' if len(latest.content) > 80 else ''),
+            'created_at': latest.created_at.isoformat()
+        })
+    return jsonify({'id': None})
+
 @app.route('/api/chat/unread_count')
 @login_required
 def get_unread_count():
