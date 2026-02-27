@@ -3,7 +3,7 @@ from datetime import timedelta
 
 class Config:
     SECRET_KEY = os.environ.get('SESSION_SECRET') or 'dev-secret-key-change-in-production'
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///medcrm.db'
+    SQLALCHEMY_DATABASE_URI = f"sqlite:///{os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance', 'medcrm.db')}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     TIMEZONE = 'America/Sao_Paulo'
     PERMANENT_SESSION_LIFETIME = timedelta(hours=12)
