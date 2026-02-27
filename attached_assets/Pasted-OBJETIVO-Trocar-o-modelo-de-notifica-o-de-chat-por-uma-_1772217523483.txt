@@ -1,0 +1,106 @@
+OBJETIVO:
+Trocar o modelo de notificação de chat por uma “Janela lateral de resposta rápida” (Mini Chat Dock), semelhante ao pop-up do Microsoft Teams: aparece no canto inferior direito com a mensagem recebida e um campo para responder ali mesmo, sem abrir a página /chat e sem usar modal.
+
+REGRAS:
+- NÃO usar modal.
+- NÃO bloquear cliques na tela principal.
+- Janela pequena no canto inferior direito (fixed).
+- Deve permitir responder (input + botão enviar).
+- Auto-hide em 15-20s se não houver interação.
+- Empilhar no máximo 2-3 janelas; se passar disso, substituir a mais antiga.
+- Clique no título/autor abre /chat (opcional).
+- Deve funcionar em qualquer página (Agenda, CRM, etc.), usando o polling que já existe em static/js/main.js.
+
+========================================
+1) BACKEND — endpoint para pegar a última mensagem não lida
+========================================
+Arquivo: app.py (ou routes/chat_api.py se existir)
+
+Criar endpoint:
+GET /api/chat/latest_unread
+
+Lógica:
+- Requer login
+- Buscar a ChatMessage mais recente onde recipient_id = current_user.id
+- E NÃO está marcada como lida (não existe MessageRead para esse user/message, ou campo is_read == false, conforme seu modelo)
+- Retornar JSON:
+  {
+    "id": <message_id> | null,
+    "from_user_id": <id>,
+    "from_name": "<nome>",
+    "message": "<texto completo ou preview até 200 chars>",
+    "created_at": "<iso>"
+  }
+- Se não houver, retornar { "id": null }
+
+(Usar limit 1 order by created_at desc)
+
+========================================
+2) FRONTEND — criar o Mini Chat Dock (HTML/CSS/JS) global
+========================================
+Arquivo: static/js/main.js
+
+2.1) Injetar CSS + container ao carregar (uma única vez):
+- Criar um container fixo:
+  <div id="miniChatDock" class="mini-chat-dock"></div>
+
+CSS recomendado (injetar via <style>):
+- posição fixed bottom: 16px; right: 16px;
+- width 320px (desktop) e responsivo no mobile
+- z-index alto (ex 9999)
+- card com sombra, bordas arredondadas
+- NÃO criar overlay; apenas o card.
+
+2.2) Criar função showMiniChatPopup(payload)
+Payload vem do /api/chat/latest_unread.
+
+O popup deve mostrar:
+- header: avatar + from_name + hora (pequeno) + botão “x”
+- body: mensagem (quebrar linha, max-height com scroll)
+- footer: input (textarea pequena 2 linhas) + botão Enviar
+- link “Abrir chat” opcional (leva para /chat)
+
+2.3) Envio da resposta rápida
+- Ao clicar “Enviar”:
+  - POST /api/chat/send com JSON { recipient_id: from_user_id, message: texto }
+  - Em caso de sucesso:
+     - mostrar “Enviado ✓” (pequeno) e limpar input
+     - opcional: auto-fechar após 1.5s
+  - Em caso de erro:
+     - mostrar erro no próprio popup (sem alert modal)
+
+2.4) Marcar como lida
+- Após abrir o popup, chamar endpoint que marca como lida (se existir).
+- Se não existir, criar um endpoint POST /api/chat/mark_read/<message_id> para registrar lido.
+- Alternativa: ao responder, marcar como lido automaticamente.
+
+2.5) Integrar ao polling existente
+- No updateChatBadge() (já roda a cada 5s), ao detectar aumento de unread_count:
+  - chamar /api/chat/latest_unread
+  - se retornar id != null:
+     - chamar showMiniChatPopup() com os dados
+- Evitar loop:
+  - armazenar lastSeenMessageId em localStorage
+  - só mostrar popup se message.id != lastSeenMessageId
+  - salvar lastSeenMessageId quando abrir popup
+
+2.6) Auto-hide e UX
+- Se o usuário não interagir, fechar em 20s.
+- Se o usuário focar o input ou passar mouse, pausar auto-hide.
+- Empilhar no máximo 2 popups:
+  - Cada popup pode ser um “card” dentro do #miniChatDock
+  - Se já houver 2, remover o mais antigo antes de adicionar o novo
+
+========================================
+3) ENTREGÁVEIS
+========================================
+- Lista de arquivos alterados
+- Código principal adicionado (dock + endpoint)
+- Como testar:
+  1) Usuário A abre Agenda
+  2) Usuário B envia mensagem
+  3) A vê popup lateral e responde sem sair da Agenda
+  4) Verificar que não cria popups duplicados a cada 5s
+  5) Verificar que o unread_count diminui ao ler/responder
+
+Execute o patch agora.

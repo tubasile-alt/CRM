@@ -2257,6 +2257,17 @@ def get_latest_unread():
         })
     return jsonify({'id': None})
 
+@app.route('/api/chat/mark_read/<int:message_id>', methods=['POST'])
+@login_required
+def mark_message_read(message_id):
+    from models import MessageRead
+    read_record = MessageRead.query.filter_by(user_id=current_user.id, message_id=message_id).first()
+    if not read_record:
+        read_record = MessageRead(user_id=current_user.id, message_id=message_id)
+        db.session.add(read_record)
+        db.session.commit()
+    return jsonify({'success': True})
+
 @app.route('/api/chat/unread_count')
 @login_required
 def get_unread_count():

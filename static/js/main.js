@@ -55,6 +55,67 @@ function formatTime(date) {
 
 let lastUnreadCount = parseInt(localStorage.getItem('chatLastUnreadCount') || '0');
 let lastNotifiedAt = 0;
+let lastSeenMessageId = localStorage.getItem('chatLastSeenMessageId');
+
+const miniChatDockStyles = `
+<style>
+.mini-chat-dock {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    width: 320px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 10px;
+    pointer-events: none;
+}
+.mini-chat-card {
+    pointer-events: auto;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    border: 1px solid #dee2e6;
+    overflow: hidden;
+    animation: slideIn 0.3s ease-out;
+}
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+.mini-chat-header {
+    background: #0d6efd;
+    color: white;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+.mini-chat-body {
+    padding: 10px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.mini-chat-footer {
+    padding: 8px;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 5px;
+}
+.mini-chat-input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.85rem;
+    resize: none;
+}
+</style>
+`;
 
 function updateChatBadge() {
     const badge = document.getElementById('chat-badge');
@@ -68,7 +129,6 @@ function updateChatBadge() {
             
             if (count > 0) {
                 badge.style.display = 'inline-block';
-                // Notificar se houver aumento
                 if (count > lastUnreadCount) {
                     handleChatNotification(count);
                 }
@@ -78,80 +138,111 @@ function updateChatBadge() {
             lastUnreadCount = count;
             localStorage.setItem('chatLastUnreadCount', lastUnreadCount);
         })
-        .catch(error => {
-            console.error('Erro ao atualizar badge do chat:', error);
-        });
+        .catch(error => console.error('Erro badge:', error));
 }
 
-// Gerenciador de Notificações de Chat
 function handleChatNotification(currentCount) {
     const now = Date.now();
-    if (now - lastNotifiedAt < 4000) return; // Throttling 4s
+    if (now - lastNotifiedAt < 4000) return;
     lastNotifiedAt = now;
 
     fetch('/api/chat/latest_unread')
         .then(res => res.json())
         .then(data => {
-            const title = "Nova mensagem no chat";
-            const body = data.id ? `De: ${data.from_name}\n${data.message}` : "Você tem novas mensagens não lidas.";
+            if (!data.id || data.id == lastSeenMessageId) return;
             
-            // 1. Toast (Bootstrap)
-            showChatToast(data.from_name || "Sistema", data.message || "Nova mensagem recebida");
+            lastSeenMessageId = data.id;
+            localStorage.setItem('chatLastSeenMessageId', lastSeenMessageId);
 
-            // 2. Notification API (se em background ou fora do chat)
+            showMiniChatPopup(data);
+
             if (document.hidden || window.location.pathname !== '/chat') {
                 if (Notification.permission === "granted") {
-                    new Notification(title, { body: body, icon: '/static/images/logo-basile.jpg' });
-                } else if (Notification.permission !== "denied") {
-                    Notification.requestPermission();
+                    new Notification("Nova mensagem de " + data.from_name, { body: data.message });
                 }
             }
-
-            // 3. Som
             if (localStorage.getItem('chatSoundEnabled') === 'true') {
                 playChatBeep();
             }
         });
 }
 
-function showChatToast(sender, message) {
-    let container = document.getElementById('toast-container-chat');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toast-container-chat';
-        container.style.position = 'fixed';
-        container.style.top = '20px';
-        container.style.right = '20px';
-        container.style.zIndex = '9999';
-        document.body.appendChild(container);
+function showMiniChatPopup(data) {
+    let dock = document.getElementById('miniChatDock');
+    if (!dock) {
+        document.head.insertAdjacentHTML('beforeend', miniChatDockStyles);
+        dock = document.createElement('div');
+        dock.id = 'miniChatDock';
+        dock.className = 'mini-chat-dock';
+        document.body.appendChild(dock);
     }
 
-    const toastId = 'toast-' + Date.now();
-    const toastHtml = `
-        <div id="${toastId}" class="toast show shadow-lg" role="alert" aria-live="assertive" aria-atomic="true" style="cursor:pointer; min-width: 250px; background: white; border-left: 5px solid #0d6efd; margin-bottom: 10px;">
-            <div class="toast-header">
-                <strong class="me-auto"><i class="bi bi-chat-fill text-primary"></i> ${sender}</strong>
-                <small>Agora</small>
-                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-            </div>
-            <div class="toast-body">
-                ${message}
-            </div>
+    if (dock.children.length >= 3) {
+        dock.lastElementChild.remove();
+    }
+
+    const cardId = 'mini-chat-' + data.id;
+    if (document.getElementById(cardId)) return;
+
+    const card = document.createElement('div');
+    card.id = cardId;
+    card.className = 'mini-chat-card';
+    card.innerHTML = `
+        <div class="mini-chat-header" onclick="window.location.href='/chat'">
+            <span><i class="bi bi-person-circle"></i> ${data.from_name}</span>
+            <button class="btn-close btn-close-white" style="font-size: 0.7rem;"></button>
         </div>
+        <div class="mini-chat-body">${data.message}</div>
+        <div class="mini-chat-footer">
+            <textarea class="mini-chat-input" placeholder="Responder..." rows="1"></textarea>
+            <button class="btn btn-sm btn-primary btn-send">Enviar</button>
+        </div>
+        <div class="send-status text-success px-2 pb-1 small" style="display:none;">Enviado ✓</div>
     `;
-    
-    container.insertAdjacentHTML('beforeend', toastHtml);
-    const toastElement = document.getElementById(toastId);
-    
-    toastElement.onclick = (e) => {
-        if (!e.target.classList.contains('btn-close')) {
-            window.location.href = '/chat';
-        }
+
+    dock.prepend(card);
+
+    const closeBtn = card.querySelector('.btn-close');
+    closeBtn.onclick = (e) => { e.stopPropagation(); card.remove(); };
+
+    const input = card.querySelector('.mini-chat-input');
+    const sendBtn = card.querySelector('.btn-send');
+    const status = card.querySelector('.send-status');
+
+    let autoHideTimer = setTimeout(() => card.remove(), 20000);
+
+    const resetTimer = () => {
+        clearTimeout(autoHideTimer);
+        autoHideTimer = setTimeout(() => card.remove(), 20000);
     };
-    
-    setTimeout(() => {
-        if (toastElement && toastElement.parentElement) toastElement.remove();
-    }, 5000);
+
+    card.onmouseenter = () => clearTimeout(autoHideTimer);
+    card.onmouseleave = resetTimer;
+    input.onfocus = () => clearTimeout(autoHideTimer);
+
+    sendBtn.onclick = () => {
+        const text = input.value.trim();
+        if (!text) return;
+
+        sendBtn.disabled = true;
+        fetch('/api/chat/send', {
+            method: 'POST',
+            body: JSON.stringify({ recipient_id: data.from_user_id, message: text })
+        })
+        .then(res => res.json())
+        .then(resData => {
+            if (resData.success) {
+                status.style.display = 'block';
+                input.value = '';
+                setTimeout(() => card.remove(), 2000);
+                // Marcar como lida ao responder
+                fetch(`/api/chat/mark_read/${data.id}`, { method: 'POST' });
+            } else {
+                alert('Erro ao enviar');
+                sendBtn.disabled = false;
+            }
+        });
+    };
 }
 
 function playChatBeep() {
