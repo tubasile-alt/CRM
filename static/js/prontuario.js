@@ -451,28 +451,29 @@ function toggleCategoryTabs() {
     const cosmeticConductSection = document.getElementById('cosmeticConductSection');
     const indicatedProcedures = document.getElementById('indicatedProceduresSection');
     
+    console.log('toggleCategoryTabs - currentCategory:', currentCategory);
+    
     if (currentCategory === 'cosmiatria') {
-        tabPlanejamento.style.display = '';
-        tabTransplante.style.display = 'none';
+        if (tabPlanejamento) tabPlanejamento.style.setProperty('display', 'block', 'important');
+        if (tabTransplante) tabTransplante.style.display = 'none';
         if (tabSurgery) tabSurgery.style.display = 'none';
         if (conductProcedures) conductProcedures.style.display = 'none';
-        if (cosmeticConductSection) cosmeticConductSection.style.display = '';
+        if (cosmeticConductSection) cosmeticConductSection.style.display = 'block';
         if (indicatedProcedures) indicatedProcedures.style.display = 'none';
     } else if (currentCategory === 'transplante_capilar') {
-        tabPlanejamento.style.display = 'none';
-        tabTransplante.style.display = '';
-        if (tabSurgery) tabSurgery.style.display = '';
+        if (tabPlanejamento) tabPlanejamento.style.display = 'none';
+        if (tabTransplante) tabTransplante.style.display = 'block';
+        if (tabSurgery) tabSurgery.style.display = 'block';
         if (conductProcedures) conductProcedures.style.display = 'none';
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
         if (indicatedProcedures) indicatedProcedures.style.display = 'none';
     } else {
-        // Patologia - NÃO mostra checkboxes de procedimentos realizados
-        tabPlanejamento.style.display = 'none';
-        tabTransplante.style.display = 'none';
+        if (tabPlanejamento) tabPlanejamento.style.display = 'none';
+        if (tabTransplante) tabTransplante.style.display = 'none';
         if (tabSurgery) tabSurgery.style.display = 'none';
-        if (conductProcedures) conductProcedures.style.display = 'none';  // OCULTADO
+        if (conductProcedures) conductProcedures.style.display = 'none';
         if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
-        if (indicatedProcedures) indicatedProcedures.style.display = '';
+        if (indicatedProcedures) indicatedProcedures.style.display = 'block';
     }
 }
 
