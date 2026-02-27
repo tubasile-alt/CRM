@@ -1535,9 +1535,6 @@ function saveQuickEvolution(consultationId) {
         showAlert('Erro ao salvar evolução', 'danger');
     });
 }
-        });
-    }, 100);
-}
 
 function openSurgeryEvolutionModal(surgeryId, surgeryDate) {
     const modal = document.getElementById('evolutionModal');
