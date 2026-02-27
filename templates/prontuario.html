@@ -1418,7 +1418,7 @@ function scrollToConsultation(id) {
                                     {% endif %}
                                     
                                     <!-- Planejamento Cirúrgico (JSON) - Apenas para Transplante Capilar -->
-                                    {% if (consultation.category == 'transplante_capilar' or consultation.category == 'Transplante Capilar') and conduta_note.surgical_planning %}
+                                    {% if (consultation.category == 'transplante_capilar' or consultation.category == 'Transplante Capilar' or consultation.category == 'cosmiatria') and conduta_note.surgical_planning %}
                                     <div class="mb-3">
                                         <h6 class="text-success">
                                             <i class="bi bi-clipboard-check"></i> Detalhes do Planejamento
