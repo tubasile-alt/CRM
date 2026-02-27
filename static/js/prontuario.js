@@ -1449,46 +1449,7 @@ function renderEvolutionsInAccordion(consultations = []) {
             }
             
             if (!container) {
-                console.log(`Container não encontrado para consultaID ${consultation.id}, tentando encontrar container global ou criar no collapse.`);
-                
-                // 1. Tentar encontrar o container global para a consulta ATUAL
-                const globalContainer = document.getElementById('currentConsultationEvolutions');
-                // Usar window.appointmentId ou extrair do URL
-                const currentApptId = window.appointmentId || new URLSearchParams(window.location.search).get('appointment_id') || '284';
-                
-                console.log(`DEBUG: currentApptId=${currentApptId}, consultation.id=${consultation.id}, hasGlobal=${!!globalContainer}`);
-
-                // Se for a consulta de hoje ou o ID bater, forçar no container global
-                if (globalContainer && (String(currentApptId) === String(consultation.id) || consultation.date.includes('19/02/2026'))) {
-                    console.log("Forçando injeção no container global de evolução atual.");
-                    container = globalContainer;
-                    // Forçar visibilidade do pai
-                    const section = document.getElementById('evolutionHistorySection');
-                    if (section) section.style.display = 'block';
-                } else {
-                    // 2. Tentar encontrar ou criar no collapse do accordion (histórico)
-                    const collapseId = `collapse${consultation.id}`;
-                    const collapseDiv = document.getElementById(collapseId);
-                    if (collapseDiv) {
-                        console.log(`Achou collapseDiv ${collapseId}`);
-                        // Tentar achar o container dentro do collapse
-                        container = collapseDiv.querySelector(`#${containerId}`);
-                        if (!container) {
-                            console.log(`Criando novo containerId ${containerId} dentro de collapseDiv`);
-                            const newContainer = document.createElement('div');
-                            newContainer.id = containerId;
-                            newContainer.className = 'mt-2';
-                            collapseDiv.appendChild(newContainer);
-                            container = newContainer;
-                        }
-                    } else {
-                        console.log(`Collapse div ${collapseId} não encontrada.`);
-                    }
-                }
-            }
-            
-            if (!container) {
-                console.log(`ERRO: Não foi possível encontrar ou criar container para consulta ${consultation.id}`);
+                console.log(`Container não encontrado para consultaID ${consultation.id}`);
                 return;
             }
             
@@ -1497,6 +1458,77 @@ function renderEvolutionsInAccordion(consultations = []) {
             if (!consultation.evolutions || consultation.evolutions.length === 0) {
                 // Mostrar caixa de texto vazia para adicionar evolução
                 const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'mt-3 p-3 bg-light rounded border';
+                emptyDiv.innerHTML = `
+                    <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Adicionar Evolução</h6>
+                    <textarea class="form-control mb-2" rows="3" id="newEvoText${consultation.id}" 
+                              placeholder="Descreva a evolução do paciente..." 
+                              style="background-color: #fff;"></textarea>
+                    <button class="btn btn-sm btn-success" onclick="saveQuickEvolution(${consultation.id})">
+                        <i class="bi bi-save"></i> Salvar Evolução
+                    </button>
+                `;
+                container.appendChild(emptyDiv);
+            } else {
+                // Renderizar evoluções existentes
+                consultation.evolutions.forEach(evo => {
+                    const evoDiv = document.createElement('div');
+                    evoDiv.className = 'mb-2 p-2 bg-white rounded border-start border-4 border-success shadow-sm';
+                    evoDiv.innerHTML = `
+                        <div class="d-flex justify-content-between">
+                            <small class="text-muted fw-bold">${evo.date} - Dr. ${evo.doctor}</small>
+                            <button class="btn btn-link btn-sm p-0 text-danger" onclick="deleteNote(${evo.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="mt-1" style="white-space: pre-wrap;">${evo.content}</div>
+                    `;
+                    container.appendChild(evoDiv);
+                });
+                
+                // Adicionar botão para nova evolução se já tiver
+                const addMoreBtn = document.createElement('button');
+                addMoreBtn.className = 'btn btn-sm btn-outline-success mt-2';
+                addMoreBtn.innerHTML = '<i class="bi bi-plus"></i> Nova Evolução';
+                addMoreBtn.onclick = () => openEvolutionFromConsultation(consultation.id, consultation.date);
+                container.appendChild(addMoreBtn);
+            }
+        });
+    }, 500);
+}
+
+function saveQuickEvolution(consultationId) {
+    const textarea = document.getElementById(`newEvoText${consultationId}`);
+    const content = textarea.value.trim();
+    
+    if (!content) {
+        showAlert('Por favor, digite o conteúdo da evolução.', 'warning');
+        return;
+    }
+    
+    fetch(`/api/patient/${window.patientId}/evolution`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            content: content,
+            consultation_id: consultationId,
+            evolution_date: new Date().toISOString()
+        })
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('Evolução salva com sucesso!', 'success');
+            location.reload();
+        } else {
+            showAlert(result.error || 'Erro ao salvar', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao salvar evolução', 'danger');
+    });
+}
                 emptyDiv.className = 'p-3 bg-light rounded border-start';
                 emptyDiv.style.borderLeft = '4px solid #ccc';
                 
@@ -1616,11 +1648,22 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     var collapseEl = document.getElementById(collapseId);
     
     if (collapseEl) {
-        // Se encontrou o elemento no histórico, apenas rola até ele e abre
+        // Se encontrou o elemento no histórico, rola até ele e abre
         collapseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        var bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+        var bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapseEl);
         bsCollapse.show();
         
+        // Focar no textarea e garantir que está habilitado
+        setTimeout(function() {
+            var textarea = collapseEl.querySelector('textarea');
+            if (textarea) {
+                textarea.removeAttribute('readonly');
+                textarea.removeAttribute('disabled');
+                textarea.focus();
+                console.log('Textarea focused and enabled in history');
+            }
+        }, 400);
+
         // Pequeno destaque visual
         var content = collapseEl.querySelector('.timeline-content');
         if (content) {
@@ -1643,7 +1686,6 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     var category = consultation ? consultation.category : 'Consulta';
     var displayDate = consultation ? consultation.date : consultationDate;
     var isSurgery = category && category.toLowerCase().indexOf('cirurgia') !== -1;
-    var surgeryDateOnly = displayDate ? displayDate.split(' ')[0] : null;
 
     var modalHtml = '<div class="modal fade" id="evolutionModal" tabindex="-1">' +
         '<div class="modal-dialog modal-lg">' +
@@ -1700,6 +1742,12 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
     var modalElement = document.getElementById('evolutionModal');
     var bsModal = new bootstrap.Modal(modalElement);
     bsModal.show();
+    
+    // Focar no textarea do modal
+    setTimeout(function() {
+        var modalTextarea = document.getElementById('evolution_content_manual');
+        if (modalTextarea) modalTextarea.focus();
+    }, 500);
 
     document.getElementById('btnSaveEvolutionManual').onclick = function() {
         var content = document.getElementById('evolution_content_manual').value;
