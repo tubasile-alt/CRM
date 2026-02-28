@@ -757,20 +757,20 @@ function highlightConsultationGroup(consultationKey) {
 
 function renderCosmeticProcedures() {
     const tbody = document.getElementById('cosmeticPlanBody');
+    if (!tbody) return;
     tbody.innerHTML = '';
     
+    // Filtro para novos (ainda não salvos)
     const newProcedures = cosmeticProcedures.filter(p => !p.id);
     
     if (newProcedures.length > 0) {
         const headerRow = tbody.insertRow();
         headerRow.className = 'consultation-group-header';
-        headerRow.id = 'group-new';
         headerRow.innerHTML = `
-            <td colspan="4" class="bg-success bg-opacity-10 border-top border-bottom border-2 border-success">
+            <td colspan="5" class="bg-success bg-opacity-10 border-top border-bottom border-2 border-success">
                 <div class="d-flex align-items-center py-2">
                     <i class="bi bi-plus-circle me-2 text-success"></i>
-                    <strong class="text-success">Nova Consulta (não salvo)</strong>
-                    <span class="ms-2 text-muted small">(${newProcedures.length} procedimento${newProcedures.length > 1 ? 's' : ''})</span>
+                    <strong class="text-success">Nova Consulta (Planejamento Atual)</strong>
                 </div>
             </td>
         `;
@@ -778,17 +778,28 @@ function renderCosmeticProcedures() {
         newProcedures.forEach(proc => {
             const globalIndex = cosmeticProcedures.findIndex(p => p === proc);
             const row = tbody.insertRow();
-            row.className = 'consultation-group-item';
+            row.className = proc.performed ? 'table-success' : '';
             row.innerHTML = `
-                <td class="ps-4">${proc.name}</td>
-                <td class="text-end">R$ ${proc.value.toFixed(2).replace('.', ',')}</td>
-                <td class="text-center">${proc.months} meses</td>
-                <td><small>${proc.observations || '-'}</small></td>
+                <td class="ps-3">
+                    <div class="fw-bold text-primary">${proc.name}</div>
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm" value="${proc.budget || proc.value}" 
+                           onchange="updatePlanValue(${globalIndex}, this.value)">
+                </td>
+                <td>
+                    <input type="date" class="form-control form-control-sm" value="${proc.performedDate || ''}" 
+                           onchange="updatePlanDate(${globalIndex}, this.value)">
+                </td>
+                <td class="text-center align-middle">
+                    <div class="form-check d-flex justify-content-center">
+                        <input class="form-check-input" type="checkbox" 
+                               ${proc.performed ? 'checked' : ''} 
+                               onchange="togglePlanPerformed(${globalIndex}, this.checked)">
+                    </div>
+                </td>
                 <td class="text-center">
-                    <button class="btn btn-sm btn-primary me-1" onclick="editCosmeticProcedure(${globalIndex})" title="Editar">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="removeCosmeticProcedure(${globalIndex})" title="Remover">
+                    <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${globalIndex})">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -796,44 +807,82 @@ function renderCosmeticProcedures() {
         });
     }
     
-    if (groupedCosmeticPlans.length === 0 && newProcedures.length === 0) {
-        return;
-    }
-    
-    groupedCosmeticPlans.forEach(group => {
-        const headerRow = tbody.insertRow();
-        headerRow.className = 'consultation-group-header';
-        headerRow.id = `group-${group.consultation_key}`;
-        headerRow.innerHTML = `
-            <td colspan="4" class="bg-light border-top border-bottom border-2">
-                <div class="d-flex align-items-center py-2">
-                    <i class="bi bi-calendar3 me-2 text-primary"></i>
-                    <strong>Consulta de ${group.consultation_info.display_date}</strong>
-                    <span class="ms-2 text-muted small">(${group.procedures.length} procedimento${group.procedures.length > 1 ? 's' : ''})</span>
-                </div>
-            </td>
-        `;
-        
-        group.procedures.forEach(proc => {
-            const globalIndex = cosmeticProcedures.findIndex(p => p.id === proc.id);
-            const row = tbody.insertRow();
-            row.className = 'consultation-group-item';
-            row.innerHTML = `
-                <td class="ps-4">${proc.procedure_name}</td>
-                <td class="text-end">R$ ${parseFloat(proc.planned_value).toFixed(2).replace('.', ',')}</td>
-                <td class="text-center">${proc.follow_up_months} meses</td>
-                <td><small>${proc.observations || '-'}</small></td>
-                <td class="text-center">
-                    <button class="btn btn-sm btn-primary me-1" onclick="editCosmeticProcedure(${globalIndex})" title="Editar">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="removeCosmeticProcedure(${globalIndex})" title="Remover">
-                        <i class="bi bi-trash"></i>
-                    </button>
+    if (groupedCosmeticPlans.length > 0) {
+        groupedCosmeticPlans.forEach(group => {
+            const headerRow = tbody.insertRow();
+            headerRow.className = 'consultation-group-header';
+            headerRow.innerHTML = `
+                <td colspan="5" class="bg-light border-top border-bottom border-2">
+                    <div class="d-flex align-items-center py-2">
+                        <i class="bi bi-calendar3 me-2 text-primary"></i>
+                        <strong>Consulta de ${group.consultation_info.display_date}</strong>
+                    </div>
                 </td>
             `;
+            
+            group.procedures.forEach(proc => {
+                const globalIndex = cosmeticProcedures.findIndex(p => p.id === proc.id);
+                if (globalIndex === -1) return;
+                
+                const pObj = cosmeticProcedures[globalIndex];
+                const row = tbody.insertRow();
+                row.className = pObj.performed ? 'table-success' : '';
+                row.innerHTML = `
+                    <td class="ps-3">
+                        <div class="fw-bold text-primary">${pObj.name}</div>
+                    </td>
+                    <td>
+                        <input type="number" class="form-control form-control-sm" value="${pObj.budget || pObj.value}" 
+                               onchange="updatePlanValue(${globalIndex}, this.value)">
+                    </td>
+                    <td>
+                        <input type="date" class="form-control form-control-sm" value="${pObj.performedDate || ''}" 
+                               onchange="updatePlanDate(${globalIndex}, this.value)">
+                    </td>
+                    <td class="text-center align-middle">
+                        <div class="form-check d-flex justify-content-center">
+                            <input class="form-check-input" type="checkbox" 
+                                   ${pObj.performed ? 'checked' : ''} 
+                                   onchange="togglePlanPerformed(${globalIndex}, this.checked)">
+                        </div>
+                    </td>
+                    <td class="text-center">
+                        <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${globalIndex})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                `;
+            });
         });
-    });
+    }
+
+    if (cosmeticProcedures.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
+    }
+}
+
+function updatePlanValue(index, val) {
+    if (cosmeticProcedures[index]) {
+        cosmeticProcedures[index].budget = parseFloat(val) || 0;
+        updateCosmeticTotal();
+    }
+}
+
+function updatePlanDate(index, val) {
+    if (cosmeticProcedures[index]) {
+        cosmeticProcedures[index].performedDate = val;
+    }
+}
+
+function togglePlanPerformed(index, checked) {
+    if (cosmeticProcedures[index]) {
+        cosmeticProcedures[index].performed = checked;
+        if (checked && !cosmeticProcedures[index].performedDate) {
+            cosmeticProcedures[index].performedDate = new Date().toISOString().split('T')[0];
+        }
+        renderCosmeticProcedures();
+        updateCosmeticTotal();
+    }
 }
 
 function editCosmeticProcedure(index) {
@@ -870,13 +919,22 @@ function renderCosmeticConduct() {
     
     tbody.innerHTML = '';
     
+    if (cosmeticProcedures.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
+        return;
+    }
+    
     cosmeticProcedures.forEach((proc, index) => {
         // Apenas usar data se o procedimento foi realizado E tem data definida
         const procedureDate = proc.performedDate || '';
         
         const row = tbody.insertRow();
+        if (proc.performed) row.className = 'table-success';
         row.innerHTML = `
-            <td>${proc.name}</td>
+            <td>
+                <div class="fw-bold text-primary">${proc.name}</div>
+                <div class="text-xs text-muted">${proc.consultationDate || 'Novo'}</div>
+            </td>
             <td>
                 <input type="number" 
                        class="form-control form-control-sm" 
@@ -889,14 +947,18 @@ function renderCosmeticConduct() {
                        class="form-control form-control-sm" 
                        value="${procedureDate}"
                        onchange="updateProcedureDate(${index}, this.value)"
-                       ${!proc.performed ? 'disabled' : ''}
                        placeholder="${proc.performed ? 'Selecione a data' : ''}">
             </td>
+            <td class="text-center align-middle">
+                <div class="form-check d-flex justify-content-center">
+                    <input class="form-check-input" type="checkbox" 
+                           ${proc.performed ? 'checked' : ''} 
+                           onchange="toggleProcedurePerformed(${index})">
+                </div>
+            </td>
             <td class="text-center">
-                <button class="btn btn-sm ${proc.performed ? 'btn-success' : 'btn-outline-secondary'}" 
-                        onclick="toggleProcedurePerformed(${index})">
-                    <i class="bi ${proc.performed ? 'bi-check-circle-fill' : 'bi-circle'}"></i>
-                    ${proc.performed ? 'Feito' : 'Não Feito'}
+                <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${index})">
+                    <i class="bi bi-trash"></i>
                 </button>
             </td>
         `;
@@ -912,6 +974,8 @@ function updateProcedureDate(index, dateValue) {
 }
 
 function toggleProcedurePerformed(index) {
+    if (!cosmeticProcedures[index]) return;
+    
     cosmeticProcedures[index].performed = !cosmeticProcedures[index].performed;
     
     // Se marcou como "Feito" e não tem data, definir hoje como padrão
@@ -925,6 +989,7 @@ function toggleProcedurePerformed(index) {
     }
     
     renderCosmeticConduct();
+    if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
 }
 
 function saveCosmeticPlan() {
