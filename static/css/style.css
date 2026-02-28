@@ -680,17 +680,10 @@ body {
 }
 
 /* Badge de Faltou nos blocos */
-.faltou-badge {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    color: white;
-    padding: 3px 10px;
-    border-radius: 15px;
-    font-size: 0.7em;
-    font-weight: 600;
-    margin-left: 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+/* Estilos para o Highlight da Timeline */
+.timeline-highlight, .highlight-consult {
+  outline: 3px solid rgba(255, 193, 7, 0.9) !important;
+  border-radius: 10px;
+  transition: outline 0.2s ease-in-out;
+  box-shadow: 0 0 15px rgba(255, 193, 7, 0.4);
 }

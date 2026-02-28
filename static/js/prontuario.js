@@ -178,7 +178,14 @@ function recalculateEvolution(appointmentId) {
 }
 
 function scrollToConsultation(id) {
-    const el = document.getElementById(id);
+    let el = document.getElementById(id);
+    
+    // Fallback para IDs antigos se o novo falhar
+    if (!el && typeof id === 'string' && id.startsWith('consultation-')) {
+        const legacyId = id.replace('consultation-', 'consult-');
+        el = document.getElementById(legacyId);
+    }
+    
     if (!el) return;
 
     // Open the accordion item if collapsed
@@ -197,9 +204,63 @@ function scrollToConsultation(id) {
     // After accordion opens, scroll directly to the item
     setTimeout(() => {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.classList.add('highlight-consult');
-        setTimeout(() => el.classList.remove('highlight-consult'), 2000);
+        el.classList.add('timeline-highlight');
+        setTimeout(() => el.classList.remove('timeline-highlight'), 2000);
     }, 350);
+}
+
+function handleTimelineClick(el) {
+    const apptId = el.dataset.appointmentId;
+    const type = el.dataset.eventType;
+    
+    // Toggle the popover as usual
+    const popover = el.nextElementSibling;
+    if (popover) {
+        const isVisible = popover.style.display === 'block';
+        // Close all other popovers first
+        document.querySelectorAll('.timeline-popover').forEach(p => p.style.display = 'none');
+        popover.style.display = isVisible ? 'none' : 'block';
+    }
+
+    if (!apptId || apptId === 'None' || apptId === 'null') return;
+
+    // Tentar encontrar pelo ID novo, legado ou específico de evolução
+    const targetId = `consultation-${apptId}`;
+    const legacyId = `consult-${apptId}`;
+    const evolutionId = `evolution-${apptId}`;
+    let target = document.getElementById(targetId) || document.getElementById(legacyId) || document.getElementById(evolutionId);
+
+    if (target) {
+        performScrollAndHighlight(target, apptId);
+    } else {
+        // Retry logic if content not yet loaded/rendered
+        let attempts = 0;
+        const interval = setInterval(() => {
+            const retryTarget = document.getElementById(targetId) || document.getElementById(legacyId);
+            if (retryTarget) {
+                clearInterval(interval);
+                performScrollAndHighlight(retryTarget, apptId);
+            }
+            if (++attempts >= 5) clearInterval(interval);
+        }, 300);
+    }
+}
+
+function performScrollAndHighlight(target, apptId) {
+    // 1. Expand accordion if Bootstrap
+    // O ID do collapse costuma seguir o padrão collapse{{id}}
+    const collapseEl = document.getElementById(`collapse${apptId}`);
+    if (collapseEl && !collapseEl.classList.contains('show')) {
+        const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+        bsCollapse.show();
+    }
+
+    // 2. Scroll suave
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // 3. Highlight
+    target.classList.add('timeline-highlight');
+    setTimeout(() => target.classList.remove('timeline-highlight'), 2000);
 }
 
 function startConsultation() {

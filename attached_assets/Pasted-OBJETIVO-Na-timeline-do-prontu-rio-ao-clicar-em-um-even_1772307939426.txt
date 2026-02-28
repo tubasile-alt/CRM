@@ -1,0 +1,57 @@
+OBJETIVO:
+Na timeline do prontuário, ao clicar em um evento (consulta/evolução), o sistema deve rolar automaticamente para a seção de conteúdo correspondente (mais abaixo na página), em vez de apenas mostrar tooltip.
+
+REQUISITOS:
+- Clique na bolinha/card da timeline deve:
+  1) localizar o bloco da consulta no histórico (accordion)
+  2) expandir automaticamente o item do accordion
+  3) fazer scroll suave até ele
+  4) destacar (highlight) por 2 segundos
+
+PASSO 1 — Criar âncoras/IDs nos cards do histórico
+No template do histórico (onde renderiza cada consulta):
+- garantir que o container da consulta tenha id único:
+  <div class="consultation-card" id="consultation-{{ appointment.id }}">
+- se existir bloco de evolução separado, também:
+  <div id="evolution-{{ appointment.id }}">
+
+PASSO 2 — Colocar data-appointment-id nos itens da timeline
+No renderer da timeline (bolinhas e cards):
+- adicionar atributo:
+  data-appointment-id="{{ appointment_id }}"
+  data-event-type="appointment|evolution"
+
+PASSO 3 — Handler de clique
+No JS do prontuário/timeline:
+- ao clicar em um item:
+  const apptId = el.dataset.appointmentId
+  const targetId = `consultation-${apptId}` (fallback `evolution-${apptId}`)
+  const target = document.getElementById(targetId)
+
+- Se o target existir:
+  a) expandir accordion:
+     - se usa Bootstrap collapse, chamar:
+       new bootstrap.Collapse(collapseEl, {toggle: true})
+     - ou simular click no botão do accordion
+  b) scroll:
+     target.scrollIntoView({behavior:'smooth', block:'start'})
+  c) highlight:
+     target.classList.add('timeline-highlight')
+     setTimeout(()=>target.classList.remove('timeline-highlight'), 2000)
+
+- Se não existir (conteúdo ainda não carregado):
+  - chamar a função que carrega o histórico/accordion e depois repetir o scroll (retry 3x com setTimeout)
+
+PASSO 4 — CSS do highlight
+Adicionar em static/css/style.css ou equivalente:
+.timeline-highlight {
+  outline: 3px solid rgba(255, 193, 7, 0.9);
+  border-radius: 10px;
+  transition: outline 0.2s ease-in-out;
+}
+
+PASSO 5 — Critérios de aceite
+- Clicar em "Botox 26/02/2026 16:00" na timeline:
+  - deve rolar para a consulta correspondente no histórico
+  - deve abrir o item do accordion se estiver fechado
+  - deve destacar o bloco por 2s
