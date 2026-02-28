@@ -2,7 +2,7 @@
     let appointmentsList = [];
     let waitingRoomData = [];
     let calendar = null;
-    let selectedDate = new Date();
+    let selectedDate = new Date(2026, 1, 27); // Feb is 1 (0-indexed)
     let currentDoctorFilter = null;
     let currentView = 'day';
     let currentEvent = null;
