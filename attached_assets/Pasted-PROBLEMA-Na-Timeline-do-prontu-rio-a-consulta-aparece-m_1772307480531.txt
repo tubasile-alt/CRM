@@ -1,0 +1,70 @@
+PROBLEMA:
+Na Timeline do prontuário, a consulta aparece, mas a evolução clínica não.
+
+OBJETIVO:
+Incluir evolutions na Timeline SEM depender de relacionamento appointment.evolutions. A Timeline deve ser construída por patient_id e ordenada por data.
+
+PASSO 1 — Encontrar onde a Timeline é montada
+- Localize a rota/endpoint que gera a Timeline (pode estar dentro da rota do prontuário ou em /api/timeline/<patient_id>).
+- Localize o template/JS que renderiza a Timeline.
+
+PASSO 2 — Corrigir a busca das evolutions
+- Buscar evolutions diretamente pelo patient_id:
+  evolutions = Evolution.query.filter(Evolution.patient_id == patient_id).all()
+
+SE Evolution não tiver patient_id:
+- Buscar via join com appointments:
+  evolutions = Evolution.query.join(Appointment,
+      (Evolution.consultation_id == Appointment.id) OR
+      (Evolution.appointment_id == Appointment.id)
+    ).filter(Appointment.patient_id == patient_id).all()
+
+PASSO 3 — Normalizar eventos
+Construir uma lista events combinando:
+A) appointments (consultas)
+B) evolutions (texto clínico)
+
+Formato:
+events.append({
+  "type": "appointment",
+  "dt": appointment.date or appointment.created_at,
+  "title": f"{appointment.procedure} ({appointment.doctor_name})",
+  "body": ""
+})
+
+events.append({
+  "type": "evolution",
+  "dt": evolution.created_at or evolution.date,
+  "title": "Evolução clínica",
+  "body": evolution.text or evolution.content or evolution.evolution_text,
+  "appointment_id": evolution.consultation_id or evolution.appointment_id
+})
+
+PASSO 4 — Evitar evolutions vazias
+- Se body estiver vazio/whitespace:
+  - ainda assim incluir evento, mas com body="(Evolução sem texto — recuperar/gerar)"
+  - opcional: botão admin “Regerar” (não modal)
+
+PASSO 5 — Ordenar e renderizar
+- Ordenar events por dt DESC
+- No template/JS da timeline:
+  - adicionar render para type="evolution"
+  - preservar quebras de linha (white-space: pre-wrap)
+
+PASSO 6 — DEBUG VISÍVEL (para provar)
+Adicionar no topo da timeline um pequeno debug (apenas quando ?debug=1):
+- appointments_count
+- evolutions_count
+- events_total
+- exemplo do primeiro event evolution (primeiros 60 chars)
+
+CRITÉRIO DE ACEITE:
+- Para um paciente que você sabe ter evolução (ex.: paciente 288, consulta 26/02/2026):
+  - a timeline deve mostrar um item “Evolução clínica” com o texto
+- A consulta continua aparecendo
+- Se evolução estiver vazia, aparece aviso e não some silenciosamente
+
+ENTREGAR:
+- Arquivos alterados
+- Trechos principais (query + renderer)
+- Como testar com ?debug=1

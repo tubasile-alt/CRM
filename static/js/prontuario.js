@@ -148,6 +148,60 @@ function updatePatientStars(stars) {
     });
 }
 
+function recalculateEvolution(appointmentId) {
+    if (!appointmentId) {
+        showAlert('ID da consulta não encontrado', 'warning');
+        return;
+    }
+    
+    if (!confirm('Deseja regerar a evolução para esta consulta?')) return;
+    
+    fetch(`/api/admin/recalculate-evolution/${appointmentId}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCSRFToken()
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Evolução regerada com sucesso!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert(data.error || 'Erro ao regerar evolução', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro de conexão', 'danger');
+    });
+}
+
+function scrollToConsultation(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    // Open the accordion item if collapsed
+    const collapseEl = el.querySelector('.accordion-collapse');
+    if (collapseEl && !collapseEl.classList.contains('show')) {
+        const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
+        bsCollapse.show();
+    }
+
+    // Scroll the page to the Histórico de Consultas card first
+    const historicoCard = el.closest('.card');
+    if (historicoCard) {
+        historicoCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // After accordion opens, scroll directly to the item
+    setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.add('highlight-consult');
+        setTimeout(() => el.classList.remove('highlight-consult'), 2000);
+    }, 350);
+}
+
 function startConsultation() {
     const button = document.getElementById('startTimer');
     const display = document.getElementById('timerDisplay');

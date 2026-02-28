@@ -266,42 +266,70 @@ function deletePatientPhoto() {
     <div class="col-12">
         <div class="card border-0 shadow-sm">
             <div class="card-body py-4">
+                {% if debug_info %}
+                <div class="alert alert-info mx-5 mt-3 mb-0 py-2 small shadow-sm border-info" style="font-family: monospace; font-size: 11px;">
+                    <strong>DEBUG TIMELINE:</strong> 
+                    Appts: {{ debug_info.appointments_count }} | 
+                    Evos: {{ debug_info.evolutions_count }} | 
+                    Total: {{ debug_info.events_total }} |
+                    Sample: {{ debug_info.first_evolution_sample }}...
+                </div>
+                {% endif %}
+
                 <div class="consultation-timeline-container position-relative px-5">
                     <div class="timeline-line position-absolute w-100" style="height: 4px; background: #e9ecef; top: 50%; left: 0; transform: translateY(-50%); z-index: 1;"></div>
-                    <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
-                        {% set total_consults = consultations|length %}
-                        {% for consult in consultations|reverse %}
-                        <div class="timeline-item text-center position-relative" style="width: 120px;">
-                            <div class="timeline-date mb-3 fw-bold text-muted small">
-                                {% if loop.last and consult.date.date() == consult.date.today() %}
-                                    HOJE ({{ consult.date.strftime('%d/%m/%Y') }})
-                                {% else %}
-                                    {{ consult.date.strftime('%d/%m/%Y') }}
-                                {% endif %}
+                    <div class="d-flex align-items-center justify-content-start gap-4 position-relative py-5 overflow-auto" style="z-index: 2; scrollbar-width: thin;">
+                        {% for event in timeline_events %}
+                        <div class="timeline-item text-center position-relative" style="min-width: 140px;">
+                            <div class="timeline-date mb-2 fw-bold text-muted small">
+                                {{ event.dt.strftime('%d/%m/%Y') }}
+                                <div class="text-xs opacity-75">{{ event.dt.strftime('%H:%M') }}</div>
                             </div>
+                            
                             <div class="timeline-dot-wrapper d-flex justify-content-center">
-                                <div class="timeline-dot rounded-circle shadow-sm {% if loop.last and consult.duration == None %}bg-danger animate-pulse-red{% elif consult.is_finalized or loop.first %}bg-success{% else %}bg-secondary{% endif %}" 
+                                <div class="timeline-dot rounded-circle shadow-sm 
+                                    {% if event.type == 'evolution' %}
+                                        bg-primary
+                                    {% elif event.status == 'atendido' or loop.first %}
+                                        bg-success
+                                    {% else %}
+                                        bg-secondary
+                                    {% endif %}" 
                                      style="width: 24px; height: 24px; border: 4px solid #fff; cursor: pointer; transition: all 0.2s;"
-                                     onclick="scrollToConsultation('consult-{{ consult.id }}')"
-                                     data-bs-toggle="tooltip" title="Ver detalhes desta consulta">
+                                     onclick="this.nextElementSibling ? this.nextElementSibling.style.display = (this.nextElementSibling.style.display === 'none' ? 'block' : 'none') : null">
                                 </div>
-                            </div>
-                            {% if loop.last and consult.notes_by_type.evolution %}
-                            <div class="timeline-popover position-absolute bg-white p-3 rounded shadow-sm border text-start" 
-                                 style="top: 60px; left: 50%; transform: translateX(-50%); width: 300px; z-index: 1000;">
-                                <div class="d-flex justify-content-between align-items-start mb-1">
-                                    <small class="text-muted">{{ consult.date.strftime('%d/%m/%Y %H:%M') }} • Dr. {{ consult.doctor.name }}</small>
-                                    <div class="d-flex gap-2">
-                                        <i class="bi bi-pencil text-muted small cursor-pointer" onclick="editNote({{ consult.notes_by_type.evolution.id }})"></i>
-                                        <i class="bi bi-trash text-danger small cursor-pointer" onclick="deleteNote({{ consult.notes_by_type.evolution.id }})"></i>
+                                
+                                <div class="timeline-popover position-absolute bg-white p-3 rounded shadow-sm border text-start" 
+                                     style="width: 280px; top: 40px; left: 50%; transform: translateX(-50%); display: none; z-index: 1000;">
+                                    <div class="fw-bold mb-2 border-bottom pb-1 d-flex justify-content-between">
+                                        <span>{{ event.title }}</span>
+                                        {% if event.type == 'evolution' %}
+                                            <span class="badge bg-primary">Evolução</span>
+                                        {% endif %}
                                     </div>
-                                </div>
-                                <div class="small fw-bold mb-1">Evolução:</div>
-                                <div class="small text-truncate-3" style="font-size: 0.85rem; line-height: 1.4;">
-                                    {{ consult.notes_by_type.evolution.content }}
+                                    <div class="small text-muted mb-2">
+                                        <i class="bi bi-clock me-1"></i> {{ event.dt.strftime('%d/%m/%Y %H:%M') }}
+                                        {% if event.doctor %}<br><i class="bi bi-person me-1"></i> {{ event.doctor }}{% endif %}
+                                    </div>
+                                    <div class="timeline-body small text-dark" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">
+                                        {{ event.body|default("(Sem observações)", true) }}
+                                    </div>
+                                    {% if event.type == 'appointment' %}
+                                    <div class="mt-2 border-top pt-2 d-grid">
+                                        <button class="btn btn-sm btn-outline-primary" onclick="scrollToConsultation('consult-{{ event.id }}')">
+                                            Ver Consulta
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                    {% if event.type == 'evolution' and "(Evolução sem texto" in event.body %}
+                                    <div class="mt-2 border-top pt-2 d-grid">
+                                        <button class="btn btn-sm btn-warning" onclick="recalculateEvolution({{ event.appointment_id }})">
+                                            <i class="bi bi-arrow-clockwise"></i> Regerar Evolução
+                                        </button>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
-                            {% endif %}
                         </div>
                         {% endfor %}
                     </div>
@@ -311,32 +339,6 @@ function deletePatientPhoto() {
     </div>
 </div>
 
-<script>
-function scrollToConsultation(id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-
-    // Open the accordion item if collapsed
-    const collapseEl = el.querySelector('.accordion-collapse');
-    if (collapseEl && !collapseEl.classList.contains('show')) {
-        const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
-        bsCollapse.show();
-    }
-
-    // Scroll the page to the Histórico de Consultas card first
-    const historicoCard = el.closest('.card');
-    if (historicoCard) {
-        historicoCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    // After accordion opens, scroll directly to the item
-    setTimeout(() => {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.classList.add('highlight-consult');
-        setTimeout(() => el.classList.remove('highlight-consult'), 2000);
-    }, 350);
-}
-</script>
 
 <style>
 .text-truncate-3 {

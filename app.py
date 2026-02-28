@@ -1627,6 +1627,59 @@ def prontuario(patient_id):
         today = date.today()
         age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
     
+    # PASSO 1, 2 e 3 — Normalizar eventos para a Timeline (Construída por patient_id e ordenada por data)
+    from models import Evolution
+    all_appointments = Appointment.query.filter_by(patient_id=patient_id).order_by(Appointment.start_time.desc()).all()
+    
+    # Buscar evolutions diretamente pelo patient_id (PASSO 2)
+    all_evolutions = Evolution.query.filter_by(patient_id=patient_id).all()
+    
+    timeline_events = []
+    debug_mode = request.args.get('debug') == '1'
+    
+    # Normalizar appointments (PASSO 3-A)
+    for apt in all_appointments:
+        dt = apt.start_time
+        timeline_events.append({
+            "type": "appointment",
+            "dt": dt,
+            "title": f"{apt.appointment_type or 'Consulta'} ({apt.doctor.name if apt.doctor else 'Médico'})",
+            "body": apt.notes or "",
+            "id": apt.id,
+            "status": apt.status,
+            "doctor": apt.doctor.name if apt.doctor else 'Médico'
+        })
+        
+    # Normalizar evolutions (PASSO 3-B)
+    for evo in all_evolutions:
+        dt = evo.created_at or evo.evolution_date
+        # PASSO 4 — Evitar evolutions vazias
+        content = (evo.content or "").strip()
+        body_text = content if content else "(Evolução sem texto — recuperar/gerar)"
+        
+        timeline_events.append({
+            "type": "evolution",
+            "dt": dt,
+            "title": "Evolução clínica",
+            "body": body_text,
+            "appointment_id": evo.consultation_id,
+            "doctor": evo.doctor.name if evo.doctor else 'Médico'
+        })
+        
+    # PASSO 5 — Ordenar events por dt DESC
+    timeline_events.sort(key=lambda x: x['dt'] if x['dt'] else datetime.min, reverse=True)
+    
+    # PASSO 6 — DEBUG VISÍVEL
+    debug_info = None
+    if debug_mode:
+        first_evo = next((e for e in timeline_events if e['type'] == 'evolution'), None)
+        debug_info = {
+            'appointments_count': len(all_appointments),
+            'evolutions_count': len(all_evolutions),
+            'events_total': len(timeline_events),
+            'first_evolution_sample': first_evo['body'][:60] if first_evo else "Nenhuma evolução"
+        }
+
     return render_template('prontuario.html', 
                          patient=patient, 
                          procedures=procedures,
@@ -1636,7 +1689,9 @@ def prontuario(patient_id):
                          consultations=consultations,
                          appointment_id=appointment_id,
                          appointment_start_iso=appointment_start_iso,
-                         age=age)
+                         age=age,
+                         timeline_events=timeline_events,
+                         debug_info=debug_info)
 
 @app.route('/api/prontuario/<int:patient_id>', methods=['POST'])
 @login_required
@@ -3055,6 +3110,20 @@ def update_patient_ivp(id):
         return jsonify({'success': True})
     
     return jsonify({'success': False, 'error': 'Dados incompletos'}), 400
+
+@app.route('/api/admin/recalculate-evolution/<int:appointment_id>', methods=['POST'])
+@login_required
+def admin_recalculate_evolution(appointment_id):
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+        
+    from scripts.generate_missing_evolutions import generate_evolution_for_appointment
+    success, message = generate_evolution_for_appointment(appointment_id)
+    
+    if success:
+        return jsonify({'success': True, 'message': message})
+    else:
+        return jsonify({'success': False, 'error': message})
 
 if __name__ == '__main__':
     import os
