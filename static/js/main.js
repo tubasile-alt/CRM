@@ -265,11 +265,12 @@ function playChatBeep() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initChatNotifier() {
+    // Configurar toggle de som
     const soundToggle = document.getElementById('toggle-chat-sound');
     const soundIcon = document.getElementById('chat-sound-icon');
-    
-    if (soundToggle) {
+
+    if (soundToggle && soundIcon) {
         const updateIcon = (enabled) => {
             soundIcon.className = enabled ? 'bi bi-volume-up-fill text-success' : 'bi bi-volume-mute text-secondary';
         };
@@ -282,17 +283,38 @@ document.addEventListener('DOMContentLoaded', () => {
             enabled = !enabled;
             localStorage.setItem('chatSoundEnabled', enabled);
             updateIcon(enabled);
-            if (enabled) playChatBeep(); // Teste ao ativar
+            if (enabled) playChatBeep();
         };
     }
 
     // Solicitar permissão de notificação
-    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+    if (typeof Notification !== 'undefined' && Notification.permission !== "granted" && Notification.permission !== "denied") {
         Notification.requestPermission();
     }
-});
 
-if (document.getElementById('chat-badge')) {
+    // Iniciar polling do badge/notificações
     updateChatBadge();
     setInterval(updateChatBadge, 5000);
+
+    // Indicador de debug visual (canto inferior esquerdo)
+    const debugEl = document.createElement('div');
+    debugEl.id = 'chat-notifier-indicator';
+    debugEl.style.cssText = 'position:fixed;bottom:8px;left:8px;background:#198754;color:#fff;font-size:11px;padding:3px 8px;border-radius:4px;z-index:99999;opacity:0.8;pointer-events:none;';
+    debugEl.textContent = 'ChatNotifier ativo';
+    document.body.appendChild(debugEl);
+    setTimeout(() => { debugEl.style.display = 'none'; }, 8000);
+
+    console.log('[ChatNotifier] Inicializado com sucesso.');
 }
+
+function startChatNotifier() {
+    if (window.__chatNotifierStarted) return;
+    window.__chatNotifierStarted = true;
+    initChatNotifier();
+}
+
+// Iniciar imediatamente (script já está no final do body)
+startChatNotifier();
+
+// Fallback: garantir init após window.onload (caso haja race condition)
+window.addEventListener('load', startChatNotifier);
