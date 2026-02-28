@@ -1849,28 +1849,28 @@ def finalizar_atendimento(patient_id):
             
             if conduta_note_id and surgical_planning:
                 transplant = HairTransplant(
-                    case_type=surgical_planning.get("case_type", "primaria"),
-                    body_hair_needed=surgical_planning.get("body_hair_needed", False),
-                    eyebrow_transplant=surgical_planning.get("eyebrow_transplant", False),
-                    beard_transplant=surgical_planning.get("beard_transplant", False),
-                    feminine_hair_transplant=surgical_planning.get("feminine_hair_transplant", False),
-                    clinical_conduct=surgical_planning.get("clinical_conduct", ""),
-                    
                     note_id=conduta_note_id,
                     norwood_classification=surgical_planning.get('norwood'),
                     previous_transplant=surgical_planning.get('previous_transplant', 'nao'),
                     transplant_location=surgical_planning.get('transplant_location'),
+                    case_type=surgical_planning.get('case_type', 'primaria'),
+                    body_hair_needed=surgical_planning.get('body_hair_needed', False),
+                    eyebrow_transplant=surgical_planning.get('eyebrow_transplant', False),
+                    beard_transplant=surgical_planning.get('beard_transplant', False),
+                    feminine_hair_transplant=surgical_planning.get('feminine_hair_transplant', False),
                     frontal_transplant=surgical_planning.get('frontal', False),
                     crown_transplant=surgical_planning.get('crown', False),
                     complete_transplant=surgical_planning.get('complete', False),
                     complete_with_body_hair=surgical_planning.get('complete_body_hair', False),
-                    dense_packing=surgical_planning.get("dense_packing", False),
-                    clinical_conduct=surgical_planning.get("clinical_conduct", ""),
-                    
+                    dense_packing=surgical_planning.get('dense_packing', False),
                     surgical_planning=surgical_planning.get('surgical_planning_text', ''),
-                    clinical_conduct=data.get('conduta', '')
+                    clinical_conduct=surgical_planning.get('clinical_conduct', '')
                 )
                 db.session.add(transplant)
+                
+                # Marcar indicação no paciente se houver classificação Norwood
+                if surgical_planning.get('norwood'):
+                    patient.has_transplant_indication = True
         
         # Atualizar status do agendamento para "atendido"
         appointment_id = data.get('appointment_id')
@@ -2047,13 +2047,6 @@ def save_hair_transplant(patient_id):
     
     # Criar registro de transplante
     transplant = HairTransplant(
-                    case_type=surgical_planning.get("case_type", "primaria"),
-                    body_hair_needed=surgical_planning.get("body_hair_needed", False),
-                    eyebrow_transplant=surgical_planning.get("eyebrow_transplant", False),
-                    beard_transplant=surgical_planning.get("beard_transplant", False),
-                    feminine_hair_transplant=surgical_planning.get("feminine_hair_transplant", False),
-                    clinical_conduct=surgical_planning.get("clinical_conduct", ""),
-                    
         note_id=note.id,
         norwood_classification=request.form.get('norwood'),
         previous_transplant=request.form.get('previous_transplant', 'nao'),
