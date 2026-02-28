@@ -1640,19 +1640,39 @@ def prontuario(patient_id):
     # Normalizar appointments (PASSO 3-A)
     for apt in all_appointments:
         dt = apt.start_time
-        timeline_events.append({
-            "type": "appointment",
-            "dt": dt,
-            "title": f"{apt.appointment_type or 'Consulta'} ({apt.doctor.name if apt.doctor else 'Médico'})",
-            "body": apt.notes or "",
-            "id": apt.id,
-            "status": apt.status,
-            "doctor": apt.doctor.name if apt.doctor else 'Médico'
-        })
+        if dt:
+            # Garantir que temos um objeto datetime e adicionar info de timezone se necessário
+            # No banco é naive (São Paulo), então tratamos como tal
+            timeline_events.append({
+                "type": "appointment",
+                "dt": dt,
+                "dt_iso": apt.start_time.isoformat() + '-03:00' if apt.start_time else None,
+                "title": f"{apt.appointment_type or 'Consulta'} ({apt.doctor.name if apt.doctor else 'Médico'})",
+                "body": apt.notes or "",
+                "id": apt.id,
+                "status": apt.status,
+                "doctor": apt.doctor.name if apt.doctor else 'Médico'
+            })
         
     # Normalizar evolutions (PASSO 3-B)
     for evo in all_evolutions:
-        dt = evo.created_at or evo.evolution_date
+        dt = None
+        appointment_id = evo.consultation_id
+        
+        # TENTAR ANCORAR NA DATA DA CONSULTA (Requisito 1)
+        if appointment_id:
+            appt = db.session.get(Appointment, appointment_id)
+            if appt:
+                dt = appt.start_time
+        
+        # FALLBACK PARA DATA DE CRIAÇÃO (Requisito 1)
+        if not dt:
+            dt = evo.created_at or evo.evolution_date
+            
+        if not dt:
+            print(f"AVISO: Evolution {evo.id} sem data válida. Ignorando.")
+            continue
+
         # PASSO 4 — Evitar evolutions vazias
         content = (evo.content or "").strip()
         body_text = content if content else "(Evolução sem texto — recuperar/gerar)"
@@ -1660,9 +1680,10 @@ def prontuario(patient_id):
         timeline_events.append({
             "type": "evolution",
             "dt": dt,
+            "dt_iso": dt.isoformat() + '-03:00' if dt else None,
             "title": "Evolução clínica",
             "body": body_text,
-            "appointment_id": evo.consultation_id,
+            "appointment_id": appointment_id,
             "doctor": evo.doctor.name if evo.doctor else 'Médico'
         })
         

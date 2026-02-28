@@ -212,6 +212,17 @@ function scrollToConsultation(id) {
 function handleTimelineClick(el) {
     const apptId = el.dataset.appointmentId;
     const type = el.dataset.eventType;
+    const dtIso = el.dataset.dtIso;
+    
+    // Validar data (Requisito 2)
+    if (dtIso) {
+        const d = new Date(dtIso);
+        if (isNaN(d.getTime())) {
+            console.error("Data inválida na timeline:", dtIso);
+            showAlert("Data inválida para este evento", "warning");
+            return;
+        }
+    }
     
     // Toggle the popover as usual
     const popover = el.nextElementSibling;

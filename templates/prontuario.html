@@ -298,6 +298,7 @@ function deletePatientPhoto() {
                                      style="width: 24px; height: 24px; border: 4px solid #fff; cursor: pointer; transition: all 0.2s;"
                                      data-appointment-id="{{ event.appointment_id or event.id }}"
                                      data-event-type="{{ event.type }}"
+                                     data-dt-iso="{{ event.dt_iso }}"
                                      onclick="handleTimelineClick(this)">
                                 </div>
                                 
