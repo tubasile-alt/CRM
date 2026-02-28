@@ -1358,6 +1358,78 @@ def get_prescriptions(patient_id):
     
     return jsonify({'prescriptions': result})
 
+@app.route('/debug/prontuario/<int:pid>')
+@login_required
+def debug_prontuario(pid):
+    patient = db.session.get(Patient, pid)
+    if not patient:
+        return jsonify({'error': 'Paciente não encontrado'}), 404
+        
+    appts = Appointment.query.filter_by(patient_id=pid)\
+        .order_by(Appointment.start_time.desc())\
+        .limit(10).all()
+        
+    result = {
+        'patient_id': pid,
+        'patient_name': patient.name,
+        'appointments': []
+    }
+    
+    for a in appts:
+        notes_count = Note.query.filter_by(appointment_id=a.id).count()
+        evos_consultation = Evolution.query.filter_by(consultation_id=a.id).count()
+        
+        # Tentar pegar um texto de exemplo
+        sample_text = ""
+        first_note = Note.query.filter_by(appointment_id=a.id).first()
+        if first_note and first_note.content:
+            sample_text = first_note.content[:80]
+        else:
+            first_evo = Evolution.query.filter_by(consultation_id=a.id).first()
+            if first_evo and first_evo.content:
+                sample_text = first_evo.content[:80]
+                
+        result['appointments'].append({
+            'appointment_id': a.id,
+            'date': a.start_time.isoformat(),
+            'status': a.status,
+            'procedure': a.appointment_type,
+            'notes_count': notes_count,
+            'evolutions_count_consultation_id': evos_consultation,
+            'sample_text': sample_text
+        })
+        
+    return jsonify(result)
+
+@app.route('/debug/appointment/<int:appointment_id>')
+@login_required
+def debug_appointment(appointment_id):
+    appt = db.session.get(Appointment, appointment_id)
+    if not appt:
+        return jsonify({'error': 'Agendamento não encontrado'}), 404
+        
+    notes_count = Note.query.filter_by(appointment_id=appointment_id).count()
+    evos_consultation = Evolution.query.filter_by(consultation_id=appointment_id).count()
+    
+    sample_text = ""
+    first_note = Note.query.filter_by(appointment_id=appointment_id).first()
+    if first_note and first_note.content:
+        sample_text = first_note.content[:80]
+    else:
+        first_evo = Evolution.query.filter_by(consultation_id=appointment_id).first()
+        if first_evo and first_evo.content:
+            sample_text = first_evo.content[:80]
+            
+    return jsonify({
+        'appointment_id': appt.id,
+        'patient_id': appt.patient_id,
+        'date': appt.start_time.isoformat(),
+        'status': appt.status,
+        'notes_count': notes_count,
+        'evolutions_count_consultation_id': evos_consultation,
+        'sample_text': sample_text
+    })
+
 @app.route('/prontuario/<int:patient_id>')
 @login_required
 def prontuario(patient_id):
