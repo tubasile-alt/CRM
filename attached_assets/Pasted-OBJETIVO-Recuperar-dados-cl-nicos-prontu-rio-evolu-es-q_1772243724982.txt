@@ -1,0 +1,73 @@
+OBJETIVO:
+Recuperar dados clínicos (prontuário/evoluções) que desapareceram após problema no banco Neon.
+As consultas ainda aparecem na agenda, mas a tela mostra "Sem notas".
+Suspeita: registros clínicos ficaram órfãos (foreign key quebrada entre consulta e prontuário).
+
+TAREFA:
+Criar um script de recuperação automática que:
+1) localize todos os registros clínicos existentes no banco
+2) detecte quais não estão ligados a nenhuma consulta válida
+3) relacione novamente com a consulta correta baseada em:
+   - patient_id
+   - proximidade de data/hora
+   - médico (se existir)
+
+PASSOS:
+
+1) Localizar modelos/tabelas:
+- Consultation / Appointment
+- ClinicalNote / MedicalRecord / Evolution / Chart / Encounter
+(usar SQLAlchemy models)
+
+2) Identificar prontuários órfãos:
+Um registro clínico é órfão quando:
+- consultation_id é NULL
+OU
+- consultation_id não existe em Consultation.id
+
+Criar consulta SQLAlchemy para listar:
+clinical_records where consultation_id not in (select id from consultations)
+
+3) Para cada registro órfão:
+- obter patient_id e created_at (ou date)
+- buscar na tabela consultations uma consulta do MESMO paciente
+- escolher a consulta mais próxima no tempo (diferença máxima 48h)
+
+matching:
+abs(consultation.date - clinical_record.created_at) mínimo
+
+4) Atualizar:
+clinical_record.consultation_id = consultation.id
+
+5) Commitar mudanças.
+
+6) Criar comando CLI:
+python recover_clinical_records.py
+
+Arquivo a criar:
+scripts/recover_clinical_records.py
+
+O script deve:
+- imprimir quantos prontuários foram encontrados
+- quantos foram religados
+- quantos não puderam ser associados
+
+7) Segurança:
+Rodar primeiro em modo DRY RUN (sem salvar)
+Adicionar variável:
+DRY_RUN = True
+
+Depois permitir DRY_RUN = False para efetivar.
+
+8) Extra importante:
+Recalcular sequences do PostgreSQL:
+SELECT setval(pg_get_serial_sequence('consultations','id'), MAX(id)) FROM consultations;
+SELECT setval(pg_get_serial_sequence('clinical_records','id'), MAX(id)) FROM clinical_records;
+
+9) Após recuperação:
+Garantir que a tela "Histórico de Consultas" volte a exibir a evolução clínica.
+
+RESULTADO ESPERADO:
+- Consultas antigas devem voltar a mostrar prontuário preenchido
+- Nenhum dado clínico deve ser apagado
+- Sistema não deve criar duplicatas
