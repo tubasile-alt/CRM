@@ -1003,11 +1003,18 @@ function finalizarAtendimento() {
             norwood: norwood,
             previous_transplant: previousTransplant,
             transplant_location: transplantLocation,
+            case_type: document.querySelector('input[name="case_type"]:checked')?.value || 'primaria',
+            body_hair_needed: document.getElementById('bodyHairNeeded')?.checked || false,
+            eyebrow_transplant: document.getElementById('eyebrowTransplant')?.checked || false,
+            beard_transplant: document.getElementById('beardTransplant')?.checked || false,
+            feminine_hair_transplant: document.getElementById('feminineHairTransplant')?.checked || false,
             frontal: document.getElementById('frontalTransplant')?.checked || false,
             crown: document.getElementById('crownTransplant')?.checked || false,
             complete: document.getElementById('completeTransplant')?.checked || false,
             complete_body_hair: document.getElementById('completeBodyHair')?.checked || false,
-            surgical_planning: surgicalPlanning
+            dense_packing: document.getElementById('densePacking')?.checked || false,
+            surgical_planning: surgicalPlanning,
+            clinical_conduct: document.getElementById('clinicalConduct')?.value || ''
         };
     }
     

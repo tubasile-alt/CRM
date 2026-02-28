@@ -1,0 +1,110 @@
+OBJETIVO:
+No prontuário de Transplante Capilar, a aba “Planejamento Cirúrgico” deve:
+1) SALVAR os dados corretamente no banco quando o atendimento é finalizado/salvo.
+2) APARECER na “Evolução Clínica / Histórico de Consultas” em uma área própria, mas SOMENTE para casos de Transplante Capilar (ou quando o procedimento/consulta for “Transplante Capilar”).
+
+REQUISITOS:
+- Não quebrar outras consultas (botox, retorno etc).
+- Nada de mostrar o bloco em consultas não relacionadas a transplante.
+- Se não houver planejamento preenchido, não mostrar.
+- Mostrar no bloco de evolução: Indicação, Norwood, Tipo de caso, áreas, indicações cirúrgicas, texto livre de planejamento e anexos (se existirem).
+
+========================================
+PASSO 1 — Diagnóstico: verificar se está sendo enviado e salvo
+========================================
+1) Localize o endpoint que salva/finaliza a consulta do prontuário (onde o botão “Finalizar Atendimento” envia dados).
+   - Use busca no repo por:
+     - "Finalizar Atendimento"
+     - "/finalizar"
+     - "save_consult"
+     - "consultation"
+     - "planning"
+     - ids dos inputs do print: "norwood", "planejamento", "Transplante Capilar", etc.
+2) Confirme se os campos da aba Planejamento Cirúrgico estão no payload do POST/PUT.
+   - Se não estiverem, corrigir o front para incluir.
+3) Confirme que o backend está gravando e commitando.
+
+========================================
+PASSO 2 — Persistência: criar campos no Model da consulta
+========================================
+No model de consulta (ex.: Consultation/AppointmentNote/MedicalRecord — use o que representa “consulta” no prontuário):
+- Adicionar campos:
+  - hair_tx_plan_json = db.Column(db.JSON, nullable=True)  # ou Text se JSON não estiver disponível
+  - hair_tx_indication = db.Column(db.Boolean, default=False)
+  - hair_tx_norwood = db.Column(db.Integer, nullable=True)
+
+Se seu banco for Postgres (Neon), JSON é ok.
+Se estiver usando SQLite em dev, JSON do SQLAlchemy também funciona, ou use Text com json.dumps.
+
+Atualizar create_all/migrations conforme o projeto:
+- Se não usa Alembic, garantir que existe caminho de migração manual (ou instruções).
+
+========================================
+PASSO 3 — Frontend: coletar e enviar dados do Planejamento Cirúrgico
+========================================
+No arquivo JS do prontuário (o que envia o payload da consulta):
+- Coletar os campos do Planejamento Cirúrgico:
+  - Indicação de transplante (Sim/Não)
+  - Já fez transplante antes (Sim/Não)
+  - Norwood selecionado (1-6)
+  - Tipo de caso: Primária/Secundária
+  - Checkboxes: “Uma única cirurgia”, “Duas cirurgias”, “Body hair transplant”
+  - Checkboxes de áreas: sobrancelha/barba/feminino etc (se existirem)
+  - Indicações cirúrgicas (frontal/coroa/completo/body hair/dense packing)
+  - Texto livre de planejamento (textarea)
+  - Anexos (se são upload: garantir que backend já salva e guarda caminho/URL)
+- Montar um objeto:
+  const hairTxPlan = { ...campos... }
+- Inserir isso no payload principal da consulta como:
+  hair_tx_plan: hairTxPlan
+  hair_tx_indication: true/false
+  hair_tx_norwood: number|null
+
+Se seu envio é multipart/form-data por causa dos anexos:
+- enviar hair_tx_plan como JSON.stringify(hairTxPlan)
+
+========================================
+PASSO 4 — Backend: salvar no banco no final da consulta
+========================================
+No endpoint que salva/finaliza consulta:
+- Ler hair_tx_plan do request (json ou string)
+- Se procedimento/consulta for “Transplante Capilar” OU se houver qualquer campo de hair_tx_plan preenchido:
+  - consultation.hair_tx_plan_json = parsedPlan
+  - consultation.hair_tx_indication = parsedPlan.indicacao === true
+  - consultation.hair_tx_norwood = parsedPlan.norwood (int)
+- Caso contrário, não mexer nesses campos (ou limpar se preferir, mas não é obrigatório)
+- Garantir db.session.commit()
+
+========================================
+PASSO 5 — Evolução clínica: exibir bloco de Planejamento Cirúrgico
+========================================
+No template/HTML da “Evolução Clínica / Histórico de Consultas”:
+- Criar uma seção:
+  “🩺 Planejamento Cirúrgico (Transplante Capilar)”
+- Mostrar SOMENTE se:
+  - consultation.hair_tx_plan_json existe (não vazio)
+  E
+  - (consulta/procedimento == “Transplante Capilar” OU hair_tx_indication == true OU hair_tx_norwood não é null)
+
+Conteúdo do bloco:
+- Indicação: Sim/Não
+- Norwood: X
+- Tipo de caso: Primária/Secundária
+- Áreas/Indicações marcadas: listar como chips/badges
+- Texto do planejamento (quebra de linha preservada)
+- Links/nomes dos anexos (se houver paths)
+
+========================================
+PASSO 6 — Critérios de aceite (teste em 2 minutos)
+========================================
+1) Abrir uma consulta de Transplante Capilar
+2) Preencher Planejamento Cirúrgico (Norwood + texto + 2 checkboxes)
+3) Finalizar/salvar atendimento
+4) Reabrir a consulta: dados devem estar preenchidos
+5) Ir no Histórico/Evolução clínica: o bloco “Planejamento Cirúrgico” deve aparecer com os dados
+6) Abrir uma consulta de Botox: NÃO pode aparecer o bloco
+
+ENTREGA:
+- Lista de arquivos alterados
+- Trechos principais do código adicionados (model, endpoint, template, JS)
+- Passos curtos de como testar
