@@ -1656,8 +1656,12 @@ def finalizar_atendimento(patient_id):
                     db.session.add(appt)
                     db.session.flush() # Força a ida para o DB dentro da transação
                     print(f"DEBUG CRÍTICO: Appointment {appointment_id} forçado para atendido")
+                else:
+                    print(f"DEBUG: Appointment {appointment_id} não encontrado ou paciente não confere. Anulando ID para evitar erro de FK.")
+                    appointment_id = None # Anular para evitar erro de FK se o agendamento sumiu
             except Exception as appt_err:
                 print(f"Erro ao atualizar status do agendamento: {appt_err}")
+                appointment_id = None
 
         
         for section in sections:
