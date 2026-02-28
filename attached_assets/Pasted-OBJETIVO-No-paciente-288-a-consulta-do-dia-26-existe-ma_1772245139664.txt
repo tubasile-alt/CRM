@@ -1,0 +1,41 @@
+OBJETIVO:
+No paciente 288, a consulta do dia 26 existe, mas a evolução clínica está vazia (texto em branco). Quero recuperar o conteúdo do prontuário preenchido e exibir no histórico.
+
+TAREFAS:
+
+1) Identificar o appointment_id do paciente 288 na data 2026-02-26 (consulta “Botox” ou a consulta alvo).
+   Usar o endpoint /debug/prontuario/288 como referência.
+
+2) Debug do conteúdo real:
+   No backend, localizar onde o texto clínico realmente está salvo para aquela consulta:
+   - ClinicalNote fields (chief_complaint, anamnese, diagnosis, plan, exam…)
+   - Qualquer campo “text” em Appointment/Consultation (ex.: notes, clinical_text, evolution_text, observation, etc.)
+   - Se houver JSON do prontuário, extrair dele.
+
+3) Regenerar a evolução vazia:
+   Criar script: scripts/regenerate_evolution_for_appointment.py que:
+   - recebe appointment_id (hardcode temporário para o caso 288, ou arg via CLI)
+   - busca a evolution existente:
+       - se existir e o texto estiver vazio/whitespace, substituir
+       - se não existir, criar
+   - montar o conteúdo com FALLBACK:
+       - primeiro tenta campos estruturados da ClinicalNote
+       - se estiverem vazios, tenta campos de texto no Appointment/Consultation
+       - se existir JSON, usar conteúdo textual do JSON (resumo)
+   - salvar e commit
+
+4) Corrigir o gerador geral:
+   Atualizar scripts/generate_missing_evolutions.py para:
+   - NÃO criar evolution se o texto gerado for vazio
+   - Se existir evolution vazia, preencher (update) ao invés de deixar em branco
+
+5) Corrigir o fluxo de salvar prontuário:
+   No endpoint de “Finalizar Atendimento”:
+   - Após salvar a nota (ClinicalNote), gerar/atualizar a evolution no MESMO commit
+   - Garantir idempotência (não duplicar)
+   - Garantir que nunca salva evolution com texto vazio
+
+ENTREGÁVEIS:
+- Quais arquivos foram alterados
+- Executar o script para o appointment do paciente 288 (consulta do dia 26) e confirmar que o histórico passa a mostrar conteúdo
+- Passo a passo de teste: abrir /prontuario/288 e ver a evolução preenchida

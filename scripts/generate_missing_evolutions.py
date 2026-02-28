@@ -52,7 +52,16 @@ def generate():
             if content_parts:
                 evolution_content = "\n\n".join(content_parts)
                 
-                # Criar a evolução
+                if not evolution_content.strip():
+                    continue
+
+                # Criar ou atualizar a evolução
+                if existing_evo:
+                    if not existing_evo.content or not existing_evo.content.strip():
+                        existing_evo.content = evolution_content
+                        evolutions_created += 1
+                    continue
+                
                 # Usar o doctor_id da primeira nota ou da consulta
                 doctor_id = notes[0].doctor_id if notes else appt.doctor_id
                 
