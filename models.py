@@ -53,6 +53,11 @@ class Patient(db.Model):
     photo_url = db.Column(db.String(255))  # Foto 3x4 do paciente
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
+    # Índice de Valor do Paciente (IVP) - Estrelas 0-3
+    ivp_stars = db.Column(db.Integer, nullable=True)
+    ivp_manual_override = db.Column(db.Boolean, default=False)
+    ivp_updated_at = db.Column(db.DateTime, nullable=True)
+    
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
     notes = db.relationship('Note', backref='patient', lazy=True, cascade='all, delete-orphan')
     tags = db.relationship('PatientTag', backref='patient', lazy=True, cascade='all, delete-orphan')

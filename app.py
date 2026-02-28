@@ -553,7 +553,8 @@ def get_appointments():
                     'waiting': apt.waiting,
                     'checkedInTime': apt.checked_in_time.isoformat() + '-03:00' if apt.checked_in_time else None,
                     'phone': patient_phone,
-                    'notes': apt.notes or ''
+                    'notes': apt.notes or '',
+                    'ivpStars': apt.patient.ivp_stars if apt.patient else None
                 }
             })
         except Exception as e:
@@ -585,16 +586,13 @@ def search_detailed_patients():
         
         last_consult_date = last_appointment.start_time.strftime('%d/%m/%Y') if last_appointment else 'Nenhuma'
         
-        # Prontuário/Código (para a secretária, podemos usar o ID ou um código global se existir)
-        # O CRM usa PatientDoctor para códigos específicos por médico.
-        # Vamos retornar o ID como número do prontuário geral.
-        
         results.append({
             'id': p.id,
             'name': p.name,
             'cpf': p.cpf or '',
             'prontuario': p.id,
-            'last_consult': last_consult_date
+            'last_consult': last_consult_date,
+            'ivp_stars': p.ivp_stars
         })
     
     return jsonify(results)
@@ -994,7 +992,8 @@ def search_patients():
             'mother_name': patient.mother_name or '',
             'indication_source': patient.indication_source or '',
             'occupation': patient.occupation or '',
-            'patient_type': patient.patient_type or 'particular'
+            'patient_type': patient.patient_type or 'particular',
+            'ivp_stars': patient.ivp_stars
         }
         
         # Se foi passado doctor_id válido, buscar código do paciente
@@ -3029,6 +3028,34 @@ start_smart_no_show_scheduler(app)
 
 # Note: When using Gunicorn for production, app.run() is not needed
 # Gunicorn handles the server execution
+@app.route('/api/patients/<int:id>/ivp', methods=['PATCH'])
+@login_required
+def update_patient_ivp(id):
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos podem classificar pacientes'}), 403
+    
+    patient = Patient.query.get_or_404(id)
+    data = request.get_json()
+    
+    if 'ivp_stars' in data:
+        stars = data.get('ivp_stars')
+        if stars is not None:
+            try:
+                stars = int(stars)
+                if stars < 0 or stars > 3:
+                    return jsonify({'success': False, 'error': 'Valor de estrelas inválido (0-3)'}), 400
+            except ValueError:
+                return jsonify({'success': False, 'error': 'Valor de estrelas inválido'}), 400
+        
+        patient.ivp_stars = stars
+        patient.ivp_manual_override = data.get('ivp_manual_override', False)
+        patient.ivp_updated_at = get_brazil_time()
+        
+        db.session.commit()
+        return jsonify({'success': True})
+    
+    return jsonify({'success': False, 'error': 'Dados incompletos'}), 400
+
 if __name__ == '__main__':
     import os
     # Development server - runs when executed as script

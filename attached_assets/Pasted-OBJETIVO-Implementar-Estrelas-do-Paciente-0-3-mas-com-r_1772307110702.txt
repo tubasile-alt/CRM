@@ -1,0 +1,81 @@
+OBJETIVO
+Implementar “Estrelas do Paciente” (0–3), mas com regra visual:
+- Se paciente NÃO tiver estrelas (NULL), não mostrar nada (nem “0”, nem estrela vazia).
+- Mostrar estrelas na AGENDA (lista do dia/semana/mês) e na BUSCA de pacientes, sem abrir prontuário.
+- Permitir edição manual no prontuário (apenas interno).
+- NUNCA expor estrelas em PDF, impressão, exportações, portal do paciente ou mensagens.
+
+1) BANCO DE DADOS / MODELS
+- Adicionar campo nullable no Patient:
+  patient.ivp_stars INTEGER NULL
+  Regras:
+    NULL = “não classificado” (não exibir nada)
+    1,2,3 = estrelas exibidas
+- (Opcional) adicionar:
+  patient.ivp_manual_override BOOLEAN DEFAULT false
+  patient.ivp_updated_at TIMESTAMP
+
+2) MIGRATION
+- Criar migration (Alembic/SQL manual conforme padrão do projeto) para:
+  - ALTER TABLE patients ADD COLUMN ivp_stars INTEGER NULL;
+  - ALTER TABLE patients ADD COLUMN ivp_manual_override BOOLEAN DEFAULT false;
+  - ALTER TABLE patients ADD COLUMN ivp_updated_at TIMESTAMP NULL;
+
+3) BACKEND: ENDPOINTS USADOS PELA AGENDA
+- Identificar o endpoint atual que alimenta a agenda (ex: /api/appointments, /api/agenda/day, etc).
+- Modificar o SELECT/JOIN para retornar junto:
+  patient_id, patient_name, patient_phone (se existir) e patient.ivp_stars
+- IMPORTANTE: Não calcular estrelas no frontend. Apenas ler patient.ivp_stars persistido.
+
+4) BACKEND: BUSCA DE PACIENTES (autocomplete)
+- No endpoint de search (ex: /api/patients/search?q=...):
+  retornar também patient.ivp_stars
+- Garantir que NULL venha como null no JSON.
+
+5) FRONTEND: AGENDA (templates/agenda.html + static/js/agenda.js)
+- No render de cada item de consulta/slot:
+  - Se ivp_stars for null => não renderizar nada
+  - Se ivp_stars == 1 => renderizar "⭐"
+  - ==2 => "⭐⭐"
+  - ==3 => "⭐⭐⭐"
+- Deve aparecer ao lado do nome do paciente, sem quebrar o layout.
+
+6) FRONTEND: BUSCA DE PACIENTES
+- No componente de autocomplete/lista de resultados:
+  - exibir estrelas ao lado do nome usando a mesma regra (null => nada)
+
+7) FRONTEND: PRONTUÁRIO (edição manual)
+- No topo do prontuário:
+  exibir “Índice interno: ⭐⭐” (somente se ivp_stars não for null)
+  e botão pequeno “Editar”
+- Ao clicar em “Editar” abrir um POPOVER/DROPDOWN (não modal) com:
+  [Sem classificação] (seta para NULL)
+  ⭐  (set 1)
+  ⭐⭐ (set 2)
+  ⭐⭐⭐ (set 3)
+- Salvar via endpoint:
+  PATCH /api/patients/<id>/ivp
+  payload: { ivp_stars: null|1|2|3, ivp_manual_override: true }
+
+8) BACKEND: ENDPOINT PATCH
+- Criar rota autenticada (médico/secretária) para atualizar:
+  patient.ivp_stars
+  patient.ivp_manual_override = true
+  patient.ivp_updated_at = now()
+
+9) REGRAS DE SEGURANÇA / NÃO EXPOR
+- Garantir que:
+  - qualquer rota de exportação/print/pdf NÃO inclua ivp_stars
+  - qualquer template de impressão NÃO renderize estrelas
+  - qualquer endpoint público NÃO inclua ivp_stars
+
+10) ACEITE / TESTE RÁPIDO (3 min)
+- Definir um paciente como ⭐⭐⭐ no prontuário
+- Voltar na agenda: deve aparecer ⭐⭐⭐ ao lado do nome
+- Buscar o paciente: deve aparecer ⭐⭐⭐ no autocomplete
+- Paciente sem ivp_stars (NULL): não aparece nada, nem 0
+- Conferir que PDF/print não mostram estrelas
+
+ENTREGA OBRIGATÓRIA
+- Listar arquivos alterados
+- Mostrar os trechos principais adicionados (models, migration, endpoint agenda, endpoint search, render agenda e render search)

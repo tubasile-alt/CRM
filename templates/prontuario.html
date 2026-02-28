@@ -184,6 +184,24 @@ function deletePatientPhoto() {
                                     {% if age %}
                                     <span class="text-muted fw-normal fs-4">({{ age }} anos)</span>
                                     {% endif %}
+                                    <span id="patientStarsContainer" class="ms-2">
+                                        {% if patient.ivp_stars %}
+                                            <span class="text-warning">{% for i in range(patient.ivp_stars) %}⭐{% endfor %}</span>
+                                        {% endif %}
+                                    </span>
+                                    <div class="dropdown d-inline-block ms-1">
+                                        <button class="btn btn-sm btn-outline-secondary border-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <i class="bi bi-star"></i> <small>Classificar</small>
+                                        </button>
+                                        <ul class="dropdown-menu shadow-sm">
+                                            <li><h6 class="dropdown-header">Índice Interno</h6></li>
+                                            <li><a class="dropdown-item" href="#" onclick="updatePatientStars(null)">[Sem classificação]</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item" href="#" onclick="updatePatientStars(1)">⭐</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="updatePatientStars(2)">⭐⭐</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="updatePatientStars(3)">⭐⭐⭐</a></li>
+                                        </ul>
+                                    </div>
                                     <button class="btn btn-sm btn-outline-secondary border-0 ms-2" onclick="openEditPatientModal()" title="Editar Cadastro">
                                         <i class="bi bi-pencil-square"></i> Editar Cadastro
                                     </button>

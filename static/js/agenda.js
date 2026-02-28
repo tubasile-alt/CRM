@@ -79,7 +79,8 @@
                         div.className = 'p-2 border-bottom cursor-pointer hover-bg-light';
                         div.style.cursor = 'pointer';
                         const code = patient.patient_code ? `(${patient.patient_code})` : '';
-                        div.textContent = `${patient.name} ${code}`;
+                        const stars = patient.ivp_stars ? ' ⭐'.repeat(patient.ivp_stars) : '';
+                        div.textContent = `${patient.name} ${code}${stars}`;
                         div.onclick = () => selectPatient(patient);
                         suggestionsDiv.appendChild(div);
                     });
@@ -371,6 +372,9 @@
             const start = parseLocalDateTime(app.start);
             const timeStr = String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0');
             const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
+            const ivpStars = app.extendedProps?.ivpStars;
+            const starsHtml = ivpStars ? `<span class="text-warning ms-1">${'⭐'.repeat(ivpStars)}</span>` : '';
+            
             const appointmentType = app.extendedProps?.appointmentType || app.appointmentType || 'Particular';
             const patientType = app.extendedProps?.patientType || app.patientType || 'Particular';
             const patientCode = app.extendedProps?.patientCode || '-';
@@ -412,7 +416,7 @@
                 <div class="appointment-content">
                     <div class="appointment-info-line">
                         <span class="appointment-time-badge">${timeStr}</span>
-                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId}) { goToPatientChart(${patientId}, '${app.id}') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }" style="cursor:${patientId ? 'pointer' : 'default'}; text-decoration:${patientId ? 'underline' : 'none'};">${patientName}</span>
+                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId}) { goToPatientChart(${patientId}, '${app.id}') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }" style="cursor:${patientId ? 'pointer' : 'default'}; text-decoration:${patientId ? 'underline' : 'none'};">${patientName}${starsHtml}</span>
                         <span class="appointment-code">cod:${patientCode}</span>
                         <span class="appointment-type-label">pac:${patientType}</span>
                         <span class="appointment-consult-label">cons:${appointmentType}</span>

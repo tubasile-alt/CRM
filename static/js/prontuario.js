@@ -116,6 +116,38 @@ function stopDictation() {
     activeTextarea = null;
 }
 
+function updatePatientStars(stars) {
+    fetch(`/api/patients/${patientId}/ivp`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify({
+            ivp_stars: stars,
+            ivp_manual_override: true
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Classificação atualizada!', 'success');
+            const container = document.getElementById('patientStarsContainer');
+            if (stars) {
+                container.innerHTML = `<span class="text-warning">${'⭐'.repeat(stars)}</span>`;
+            } else {
+                container.innerHTML = '';
+            }
+        } else {
+            showAlert(data.error || 'Erro ao atualizar classificação', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error('Erro:', err);
+        showAlert('Erro ao atualizar classificação', 'danger');
+    });
+}
+
 function startConsultation() {
     const button = document.getElementById('startTimer');
     const display = document.getElementById('timerDisplay');
