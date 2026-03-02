@@ -2324,7 +2324,7 @@ def get_messages():
         'recipient': msg.recipient.name,
         'recipientId': msg.recipient_id,
         'message': msg.message,
-        'timestamp': msg.created_at.strftime('%H:%M'),
+        'timestamp': format_brazil_datetime(msg.created_at).split(' ')[1] if msg.created_at else '',
         'read': msg.read
     } for msg in messages])
 
