@@ -2344,7 +2344,8 @@ def send_message():
     message = ChatMessage(
         sender_id=current_user.id,
         recipient_id=int(recipient_id),
-        message=data.get('message', '')
+        message=data.get('message', ''),
+        created_at=get_brazil_time().replace(tzinfo=None)
     )
     
     db.session.add(message)
