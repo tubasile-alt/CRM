@@ -1919,20 +1919,20 @@ def finalizar_atendimento(patient_id):
         if appointment_id:
             try:
                 # Buscar o agendamento sem restrição de médico para correção de bugs antigos
-                appt = db.session.get(Appointment, int(appointment_id))
-                if appt and appt.patient_id == patient_id:
-                    appt.status = 'atendido'
-                    appt.waiting = False
-                    if not appt.checked_in_time:
-                        appt.checked_in_time = get_brazil_time()
-                    db.session.add(appt)
+                appt_to_update = db.session.get(Appointment, int(appointment_id))
+                if appt_to_update and appt_to_update.patient_id == patient_id:
+                    appt_to_update.status = 'atendido'
+                    appt_to_update.waiting = False
+                    if not appt_to_update.checked_in_time:
+                        appt_to_update.checked_in_time = get_brazil_time()
+                    db.session.add(appt_to_update)
                     db.session.flush() # Força a ida para o DB dentro da transação
                     print(f"DEBUG CRÍTICO: Appointment {appointment_id} forçado para atendido")
                 else:
                     print(f"DEBUG: Appointment {appointment_id} não encontrado ou paciente não confere. Anulando ID para evitar erro de FK.")
                     appointment_id = None # Anular para evitar erro de FK se o agendamento sumiu
             except Exception as appt_err:
-                print(f"Erro ao atualizar status do agendamento: {appt_err}")
+                print(f"Erro ao atualizar status do agendamento inicial: {appt_err}")
                 appointment_id = None
 
         
@@ -2009,13 +2009,13 @@ def finalizar_atendimento(patient_id):
             from models import CosmeticProcedurePlan, FollowUpReminder
             from datetime import timedelta
             
-            procedures = data.get('cosmetic_procedures', [])
+            cosmetic_procedures_data = data.get('cosmetic_procedures', [])
             conduta_note_id = note_ids.get('conduta')
             
-            if conduta_note_id and procedures:
+            if conduta_note_id and cosmetic_procedures_data:
                 # Batch update de lembretes ANTES do loop
-                performed_proc_names = [p['name'] for p in procedures if p.get('performed', False)]
-                non_performed_proc_names = [p['name'] for p in procedures if not p.get('performed', False)]
+                performed_proc_names = [p['name'] for p in cosmetic_procedures_data if p.get('performed', False)]
+                non_performed_proc_names = [p['name'] for p in cosmetic_procedures_data if not p.get('performed', False)]
                 
                 # Cancelar lembretes para procedimentos realizados
                 if performed_proc_names:
@@ -2036,42 +2036,42 @@ def finalizar_atendimento(patient_id):
                     ).update({'status': 'superseded'}, synchronize_session=False)
                 
                 # Criar registros de plano e novos lembretes
-                for proc in procedures:
-                    proc_name = proc['name']
+                for proc_item in cosmetic_procedures_data:
+                    proc_name = proc_item['name']
                     
                     # Criar novo plano para este atendimento
                     from datetime import datetime as dt
                     
                     # Processar data de realização se fornecida
                     performed_date_value = None
-                    if proc.get('performedDate'):
+                    if proc_item.get('performedDate'):
                         try:
-                            performed_date_value = dt.strptime(proc['performedDate'], '%Y-%m-%d').date()
+                            performed_date_value = dt.strptime(proc_item['performedDate'], '%Y-%m-%d').date()
                         except:
                             performed_date_value = None
                     
-                    plan = CosmeticProcedurePlan(
+                    plan_obj = CosmeticProcedurePlan(
                         note_id=conduta_note_id,
                         procedure_name=proc_name,
-                        planned_value=float(proc['value']),
-                        final_budget=float(proc.get('budget', proc['value'])),
-                        was_performed=bool(proc.get('performed', False)),
+                        planned_value=float(proc_item['value']),
+                        final_budget=float(proc_item.get('budget', proc_item['value'])),
+                        was_performed=bool(proc_item.get('performed', False)),
                         performed_date=performed_date_value,
-                        follow_up_months=int(proc['months']),
-                        observations=proc.get('observations', '')
+                        follow_up_months=int(proc_item['months']),
+                        observations=proc_item.get('observations', '')
                     )
-                    db.session.add(plan)
+                    db.session.add(plan_obj)
                     
                     # Criar novo lembrete APENAS para não realizados
-                    if not proc.get('performed', False):
-                        follow_up_date = (get_brazil_time() + timedelta(days=30 * int(proc['months']))).date()
-                        reminder = FollowUpReminder(
+                    if not proc_item.get('performed', False):
+                        follow_up_date = (get_brazil_time() + timedelta(days=30 * int(proc_item['months']))).date()
+                        reminder_obj = FollowUpReminder(
                             patient_id=patient_id,
                             procedure_name=proc_name,
                             scheduled_date=follow_up_date,
                             reminder_type='cosmetic_follow_up'
                         )
-                        db.session.add(reminder)
+                        db.session.add(reminder_obj)
             
         # CRIAR CHECKOUT AUTOMATICAMENTE para procedimentos realizados
         checkout_amount = data.get('checkout_amount', 0)
@@ -2168,28 +2168,27 @@ def finalizar_atendimento(patient_id):
                     patient.has_transplant_indication = True
         
         # Atualizar status do agendamento para "atendido"
-        appointment_id = data.get('appointment_id')
         print(f"DEBUG finalizar: appointment_id={appointment_id}, patient_id={patient_id}, doctor_id={current_user.id}")
         
         if appointment_id:
             # Primeiro buscar sem filtro de doctor para debug
-            appointment_check = Appointment.query.filter_by(id=appointment_id).first()
-            if appointment_check:
-                print(f"DEBUG: Appointment encontrado - doctor_id no DB: {appointment_check.doctor_id}, current_user.id: {current_user.id}")
+            appointment_check_val = Appointment.query.filter_by(id=appointment_id).first()
+            if appointment_check_val:
+                print(f"DEBUG: Appointment encontrado - doctor_id no DB: {appointment_check_val.doctor_id}, current_user.id: {current_user.id}")
             
             # Buscar o appointment (sem filtro de doctor_id para permitir atualizar)
-            appointment = Appointment.query.filter_by(
+            appointment_final = Appointment.query.filter_by(
                 id=appointment_id,
                 patient_id=patient_id
             ).first()
             
-            if appointment:
-                appointment.status = 'atendido'
-                appointment.waiting = False
-                if not appointment.checked_in_time:
-                    appointment.checked_in_time = get_brazil_time()
-                db.session.add(appointment)
-                print(f"DEBUG: Appointment {appointment_id} updated to atendido, status={appointment.status}")
+            if appointment_final:
+                appointment_final.status = 'atendido'
+                appointment_final.waiting = False
+                if not appointment_final.checked_in_time:
+                    appointment_final.checked_in_time = get_brazil_time()
+                db.session.add(appointment_final)
+                print(f"DEBUG: Appointment {appointment_id} updated to atendido, status={appointment_final.status}")
             else:
                 print(f"Warning: Appointment {appointment_id} not found for patient {patient_id}")
         
