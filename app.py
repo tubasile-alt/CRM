@@ -1652,6 +1652,7 @@ def prontuario(patient_id):
         for apt in appts:
             dt = apt.consultation_date or apt.start_time
             if dt:
+                # Normalizar para date para agrupamento (Garantir que d seja date, não datetime)
                 d = dt.date() if isinstance(dt, datetime) else dt
                 events_by_day[d].append({
                     "type": "consulta",
@@ -1736,6 +1737,7 @@ def prontuario(patient_id):
         for evo in evos:
             dt = evo.evolution_date or evo.created_at
             if dt:
+                # Normalizar para date para agrupamento (Garantir que d seja date, não datetime)
                 d = dt.date() if isinstance(dt, datetime) else dt
                 events_by_day[d].append({
                     "type": "evolution",
@@ -1749,9 +1751,10 @@ def prontuario(patient_id):
                     "doctor": evo.doctor.name if evo.doctor else 'Médico'
                 })
         
-        # Consolidar timeline DESC
+        # Consolidar timeline ASC (Cronológica)
         timeline = []
-        for d in sorted(events_by_day.keys(), reverse=True):
+        # Usar sorted(keys()) sem reverse=True para ordem crescente
+        for d in sorted(events_by_day.keys()):
             day_events = events_by_day[d]
             type_order = {"cirurgia": 0, "procedimento": 1, "consulta": 2, "evolution": 3}
             day_events.sort(key=lambda x: (type_order.get(x["type"], 99), x["dt"]))
