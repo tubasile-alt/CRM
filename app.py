@@ -1435,363 +1435,251 @@ def prontuario(patient_id):
     if not current_user.is_doctor() and not current_user.is_secretary():
         return redirect(url_for('agenda'))
     
-    # Verificar acesso: Médicos veem apenas seus próprios pacientes, secretárias veem todos
-    if current_user.is_doctor():
-        from models import PatientDoctor
-        pd = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
-        if not pd:
-            from flask import abort
-            abort(403)
-    
-    patient = Patient.query.get_or_404(patient_id)
-    procedures = Procedure.query.all()
-    tags = Tag.query.all()
-    patient_tags = [pt.tag_id for pt in patient.tags]
-    
-    # Carregar notas com todos os dados relacionados (eager loading)
-    from models import Note, Indication, CosmeticProcedurePlan, HairTransplant, TransplantImage
-    notes = Note.query.filter_by(patient_id=patient_id)\
-        .options(
-            db.joinedload(Note.indications).joinedload(Indication.procedure),
-            db.joinedload(Note.cosmetic_plans),
-            db.joinedload(Note.hair_transplants).joinedload(HairTransplant.images)
-        )\
-        .order_by(Note.created_at.desc())\
-        .all()
-    
-    # Agrupar notas por consulta - PRIORIZAR appointment_id quando disponível
-    from datetime import timedelta
-    from collections import defaultdict
-    
-    consultations = []
-    processed_notes = set()
-    
-    # Indexar notas por appointment_id (O(n))
-    notes_by_appointment = defaultdict(list)
-    notes_without_appointment = []
-    
-    for note in notes:
-        if note.appointment_id:
-            notes_by_appointment[note.appointment_id].append(note)
-        else:
-            notes_without_appointment.append(note)
-    
-    # Agrupar notas POR APPOINTMENT_ID (determinístico)
-    for appt_id, appt_notes in notes_by_appointment.items():
-        # Marcar como processadas
-        for note in appt_notes:
-            processed_notes.add(note.id)
+    try:
+        # Verificar acesso: Médicos veem apenas seus próprios pacientes, secretárias veem todos
+        if current_user.is_doctor():
+            from models import PatientDoctor
+            pd = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
+            if not pd:
+                from flask import abort
+                abort(403)
         
-        # Forçar carregamento de dados relacionados ENQUANTO a sessão está ativa
-        all_cosmetic_plans = []
-        for note in appt_notes:
-            _ = note.cosmetic_plans
-            _ = note.hair_transplants
-            _ = note.indications
-            # Extrair procedimentos cosméticos enquanto dados estão acessíveis
-            for plan in note.cosmetic_plans:
-                all_cosmetic_plans.append({
-                    'procedure_name': plan.procedure_name,
-                    'planned_value': plan.planned_value,
-                    'final_budget': plan.final_budget,
-                    'was_performed': plan.was_performed,
-                    'performed_date': plan.performed_date,
-                    'follow_up_months': plan.follow_up_months
-                })
+        patient = Patient.query.get_or_404(patient_id)
+        procedures = Procedure.query.all()
+        tags = Tag.query.all()
+        patient_tags = [pt.tag_id for pt in patient.tags]
         
-        # Separar notas por tipo
-        notes_by_type = {note.note_type: note for note in appt_notes}
+        # Carregar notas com todos os dados relacionados (eager loading)
+        from models import Note, Indication, CosmeticProcedurePlan, HairTransplant, TransplantImage
+        notes = Note.query.filter_by(patient_id=patient_id)\
+            .options(
+                db.joinedload(Note.indications).joinedload(Indication.procedure),
+                db.joinedload(Note.cosmetic_plans),
+                db.joinedload(Note.hair_transplants).joinedload(HairTransplant.images)
+            )\
+            .order_by(Note.created_at.desc())\
+            .all()
         
-        # Identificar consulta finalizada (tem consultation_duration)
-        finalized_note = next((n for n in appt_notes if n.consultation_duration), None)
-        is_finalized = finalized_note is not None
-        
-        # Usar dados da primeira nota como referência
-        first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
-        
-        # Obter appointment para pegar a data correta
-        appointment = db.session.get(Appointment, appt_id)
-        if appointment:
-            consultation_date = appointment.consultation_date or appointment.start_time
-        else:
-            consultation_date = (finalized_note.created_at if finalized_note else first_note.created_at)
-        
-        consultations.append({
-            'id': appt_id,  # Usar appointment_id como ID único
-            'date': consultation_date,
-            'doctor': first_note.doctor,
-            'duration': finalized_note.consultation_duration if finalized_note else None,
-            'category': finalized_note.category if finalized_note else first_note.category,
-            'notes_by_type': notes_by_type,
-            'all_notes': appt_notes,
-            'cosmetic_plans': all_cosmetic_plans,
-            'is_finalized': is_finalized
-        })
-    
-    # FALLBACK: Agrupar notas SEM appointment_id usando janela de SEGUNDOS (mesma sessão)
-    notes_without_appointment.sort(key=lambda x: x.created_at, reverse=True)
-    
-    for note in notes_without_appointment:
-        if note.id in processed_notes:
-            continue
-        
-        # Agrupar apenas notas criadas com menos de 2 segundos de diferença (mesma transação/sessão)
-        window_start = note.created_at - timedelta(seconds=2)
-        window_end = note.created_at + timedelta(seconds=2)
-        
-        grouped_notes = [n for n in notes_without_appointment
-                        if n.id not in processed_notes
-                        and n.doctor_id == note.doctor_id
-                        and window_start <= n.created_at <= window_end]
-        
-        # Marcar como processadas
-        for gn in grouped_notes:
-            processed_notes.add(gn.id)
-        
-        # Forçar carregamento de dados relacionados ENQUANTO a sessão está ativa
-        all_cosmetic_plans = []
-        for gn in grouped_notes:
-            _ = gn.cosmetic_plans
-            _ = gn.hair_transplants
-            _ = gn.indications
-            # Extrair procedimentos cosméticos enquanto dados estão acessíveis
-            for plan in gn.cosmetic_plans:
-                all_cosmetic_plans.append({
-                    'procedure_name': plan.procedure_name,
-                    'planned_value': plan.planned_value,
-                    'final_budget': plan.final_budget,
-                    'was_performed': plan.was_performed,
-                    'performed_date': plan.performed_date,
-                    'follow_up_months': plan.follow_up_months
-                })
-        
-        # Separar por tipo
-        notes_by_type = {gn.note_type: gn for gn in grouped_notes}
-        
-        # Identificar se foi finalizada
-        finalized_note = next((n for n in grouped_notes if n.consultation_duration), None)
-        
-        consultations.append({
-            'id': note.id,
-            'date': note.created_at,
-            'doctor': note.doctor,
-            'duration': finalized_note.consultation_duration if finalized_note else None,
-            'category': note.category,
-            'notes_by_type': notes_by_type,
-            'all_notes': grouped_notes,
-            'cosmetic_plans': all_cosmetic_plans,
-            'is_finalized': finalized_note is not None
-        })
-    
-    # Incluir agendamentos "atendido" sem notas para que apareçam no Histórico
-    covered_appt_ids = {c['id'] for c in consultations}
-    empty_q = Appointment.query.filter(
-        Appointment.patient_id == patient_id,
-        Appointment.status == 'atendido'
-    )
-    if covered_appt_ids:
-        empty_q = empty_q.filter(~Appointment.id.in_(list(covered_appt_ids)))
-    empty_appts = empty_q.all()
-    for ea in empty_appts:
-        ea_date = ea.consultation_date or ea.start_time
-        consultations.append({
-            'id': ea.id,
-            'date': ea_date,
-            'doctor': ea.doctor,
-            'duration': None,
-            'category': ea.appointment_type or 'Consulta',
-            'notes_by_type': {},
-            'all_notes': [],
-            'cosmetic_plans': [],
-            'is_finalized': False
-        })
-
-    # Reordenar por data (mais recente primeiro)
-    consultations.sort(key=lambda x: x['date'], reverse=True)
-    
-    # Pegar appointment_id da query string (opcional)
-    appointment_id = request.args.get('appointment_id', type=int)
-
-    # Buscar data/hora do agendamento ativo para pré-preencher aba Data
-    appointment_start_iso = None
-    if appointment_id:
-        active_appt = Appointment.query.get(appointment_id)
-        if active_appt:
-            effective_dt = active_appt.consultation_date or active_appt.start_time
-            if effective_dt:
-                appointment_start_iso = effective_dt.strftime('%Y-%m-%dT%H:%M')
-    
-    # Calcular idade do paciente
-    age = None
-    if patient.birth_date:
-        from datetime import date
-        today = date.today()
-        age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
-    
-    # PASSO 1, 2 e 3 — Normalizar eventos para a Timeline (Construída por patient_id e ordenada por data)
-    from models import Evolution, ProcedureRecord, Surgery, CosmeticProcedurePlan, HairTransplant, TransplantSurgeryRecord
-    
-    def build_patient_timeline(p_id):
+        # Agrupar notas por consulta - PRIORIZAR appointment_id quando disponível
+        from datetime import timedelta
         from collections import defaultdict
-        from datetime import date, datetime
-        events_by_day = defaultdict(list)
         
-        def safe_parse_date(s):
-            if not s: return None
-            if isinstance(s, (date, datetime)): return s
-            try:
-                return datetime.strptime(s, '%Y-%m-%d').date()
-            except:
-                try:
-                    return datetime.fromisoformat(s.replace('Z', '')).date()
-                except:
-                    return None
-
-        # A) Consultas
-        appts = Appointment.query.filter_by(patient_id=p_id).all()
-        for apt in appts:
-            dt = apt.consultation_date or apt.start_time
-            if dt:
-                # Normalizar para date para agrupamento (Garantir que d seja date, não datetime)
-                d = dt.date() if isinstance(dt, datetime) else dt
-                events_by_day[d].append({
-                    "type": "consulta",
-                    "dt": dt,
-                    "dt_iso": dt.isoformat() + '-03:00' if isinstance(dt, datetime) else dt.isoformat() + 'T12:00:00-03:00',
-                    "title": f"{apt.appointment_type or 'Consulta'}",
-                    "label": apt.appointment_type or 'Consulta',
-                    "body": apt.notes or "",
-                    "id": apt.id,
-                    "reference_id": apt.id,
-                    "status": apt.status,
-                    "doctor": apt.doctor.name if apt.doctor else 'Médico'
-                })
-
-        # B) Procedimentos FEITO (CosmeticProcedurePlan)
-        # Buscar planos vinculados a notas do paciente
-        cosmetic_plans = CosmeticProcedurePlan.query.join(Note).filter(Note.patient_id == p_id, CosmeticProcedurePlan.was_performed == True).all()
-        for plan in cosmetic_plans:
-            d = safe_parse_date(plan.performed_date)
-            if not d:
-                # Fallback: created_at da nota
-                if plan.note and plan.note.created_at:
-                    d = plan.note.created_at.date()
-                else:
-                    continue # NUNCA usar "hoje"
-            
-            dt_obj = datetime.combine(d, datetime(2000,1,1,12,0,0).time())
-            events_by_day[d].append({
-                "type": "procedimento",
-                "dt": dt_obj,
-                "dt_iso": dt_obj.isoformat() + '-03:00',
-                "title": f"Procedimento: {plan.procedure_name}",
-                "label": plan.procedure_name,
-                "body": f"Realizado em {d.strftime('%d/%m/%Y')}. {plan.observations or ''}",
-                "id": plan.id,
-                "reference_id": plan.id,
-                "appointment_id": plan.note.appointment_id if plan.note else None,
-                "doctor": plan.note.doctor.name if plan.note and plan.note.doctor else 'Médico'
-            })
-
-        # C) Cirurgias (Surgery)
-        surgeries = Surgery.query.filter_by(patient_id=p_id).all()
-        for surg in surgeries:
-            d = surg.date
-            dt = datetime.combine(surg.date, surg.start_time)
-            events_by_day[d].append({
-                "type": "cirurgia",
-                "dt": dt,
-                "dt_iso": dt.isoformat() + '-03:00',
-                "title": f"Cirurgia: {surg.procedure_name}",
-                "label": surg.procedure_name,
-                "body": surg.notes or "",
-                "id": surg.id,
-                "reference_id": surg.id,
-                "status": surg.status,
-                "doctor": surg.doctor.name if surg.doctor else 'Médico'
-            })
-
-        # D) Transplantes Capilares (HairTransplant)
-        # Nota: HairTransplant não tem surgery_date direto no modelo principal pelo que vi no models.py, 
-        # mas existe a tabela TransplantSurgeryRecord ou similar. 
-        # Vou usar TransplantSurgeryRecord se disponível ou HairTransplant se tiver o campo.
-        from models import TransplantSurgeryRecord
-        ts_records = TransplantSurgeryRecord.query.filter_by(patient_id=p_id).all()
-        for ts in ts_records:
-            d = ts.surgery_date
-            dt = datetime.combine(d, datetime(2000,1,1,0,0,0).time())
-            events_by_day[d].append({
-                "type": "cirurgia",
-                "dt": dt,
-                "dt_iso": dt.isoformat() + '-03:00',
-                "title": f"Transplante Capilar: {ts.surgery_type or ''}",
-                "label": "Transplante Capilar",
-                "body": ts.observations or "",
-                "id": ts.id,
-                "reference_id": ts.id,
-                "doctor": ts.doctor.name if ts.doctor else 'Médico'
-            })
-
-        # E) Evoluções
-        evos = Evolution.query.filter_by(patient_id=p_id).all()
-        for evo in evos:
-            dt = evo.evolution_date or evo.created_at
-            if dt:
-                # Normalizar para date para agrupamento (Garantir que d seja date, não datetime)
-                d = dt.date() if isinstance(dt, datetime) else dt
-                events_by_day[d].append({
-                    "type": "evolution",
-                    "dt": dt,
-                    "dt_iso": dt.isoformat() + '-03:00' if isinstance(dt, datetime) else dt.isoformat() + 'T12:00:00-03:00',
-                    "title": "Evolução clínica",
-                    "label": "Evolução",
-                    "body": evo.content or "(Sem conteúdo)",
-                    "id": evo.id,
-                    "reference_id": evo.id,
-                    "doctor": evo.doctor.name if evo.doctor else 'Médico'
-                })
+        consultations = []
+        processed_notes = set()
         
-        # Consolidar timeline ASC (Cronológica)
-        timeline = []
-        # Usar sorted(keys()) sem reverse=True para ordem crescente
-        for d in sorted(events_by_day.keys()):
-            day_events = events_by_day[d]
-            type_order = {"cirurgia": 0, "procedimento": 1, "consulta": 2, "evolution": 3}
-            day_events.sort(key=lambda x: (type_order.get(x["type"], 99), x["dt"]))
+        # Indexar notas por appointment_id (O(n))
+        notes_by_appointment = defaultdict(list)
+        notes_without_appointment = []
+        
+        for note in notes:
+            if note.appointment_id:
+                notes_by_appointment[note.appointment_id].append(note)
+            else:
+                notes_without_appointment.append(note)
+        
+        # Agrupar notas POR APPOINTMENT_ID (determinístico)
+        for appt_id, appt_notes in notes_by_appointment.items():
+            # Marcar como processadas
+            for note in appt_notes:
+                processed_notes.add(note.id)
             
-            main_event = day_events[0]
-            timeline.append({
-                "date": d,
-                "dt": main_event["dt"],
-                "dt_iso": main_event["dt_iso"],
-                "type": main_event["type"],
-                "label": d.strftime('%d/%m/%Y'),
-                "events": day_events
+            # Forçar carregamento de dados relacionados
+            all_cosmetic_plans = []
+            for note in appt_notes:
+                for plan in note.cosmetic_plans:
+                    all_cosmetic_plans.append({
+                        'procedure_name': plan.procedure_name,
+                        'planned_value': plan.planned_value,
+                        'final_budget': plan.final_budget,
+                        'was_performed': plan.was_performed,
+                        'performed_date': plan.performed_date,
+                        'follow_up_months': plan.follow_up_months
+                    })
+            
+            # Separar notas por tipo
+            notes_by_type = {note.note_type: note for note in appt_notes}
+            
+            # Identificar consulta finalizada
+            finalized_note = next((n for n in appt_notes if n.consultation_duration), None)
+            is_finalized = finalized_note is not None
+            
+            # Usar dados da primeira nota como referência
+            first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
+            
+            # Obter appointment para pegar a data correta
+            appointment = db.session.get(Appointment, appt_id)
+            if appointment:
+                consultation_date = appointment.consultation_date or appointment.start_time
+            else:
+                consultation_date = (finalized_note.created_at if finalized_note else first_note.created_at)
+            
+            consultations.append({
+                'id': appt_id,
+                'date': consultation_date,
+                'doctor': first_note.doctor,
+                'duration': finalized_note.consultation_duration if finalized_note else None,
+                'category': finalized_note.category if finalized_note else first_note.category,
+                'notes_by_type': notes_by_type,
+                'all_notes': appt_notes,
+                'cosmetic_plans': all_cosmetic_plans,
+                'is_finalized': is_finalized
             })
+        
+        # FALLBACK: Agrupar notas SEM appointment_id
+        notes_without_appointment.sort(key=lambda x: x.created_at, reverse=True)
+        for note in notes_without_appointment:
+            if note.id in processed_notes:
+                continue
             
-        return timeline
+            window_start = note.created_at - timedelta(seconds=2)
+            window_end = note.created_at + timedelta(seconds=2)
+            
+            grouped_notes = [n for n in notes_without_appointment
+                            if n.id not in processed_notes
+                            and n.doctor_id == note.doctor_id
+                            and window_start <= n.created_at <= window_end]
+            
+            for gn in grouped_notes:
+                processed_notes.add(gn.id)
+            
+            all_cosmetic_plans = []
+            for gn in grouped_notes:
+                for plan in gn.cosmetic_plans:
+                    all_cosmetic_plans.append({
+                        'procedure_name': plan.procedure_name,
+                        'planned_value': plan.planned_value,
+                        'final_budget': plan.final_budget,
+                        'was_performed': plan.was_performed,
+                        'performed_date': plan.performed_date,
+                        'follow_up_months': plan.follow_up_months
+                    })
+            
+            notes_by_type = {gn.note_type: gn for gn in grouped_notes}
+            finalized_note = next((n for n in grouped_notes if n.consultation_duration), None)
+            
+            consultations.append({
+                'id': note.id,
+                'date': note.created_at,
+                'doctor': note.doctor,
+                'duration': finalized_note.consultation_duration if finalized_note else None,
+                'category': note.category,
+                'notes_by_type': notes_by_type,
+                'all_notes': grouped_notes,
+                'cosmetic_plans': all_cosmetic_plans,
+                'is_finalized': finalized_note is not None
+            })
+        
+        # Incluir agendamentos "atendido" sem notas
+        covered_appt_ids = {c['id'] for c in consultations}
+        empty_q = Appointment.query.filter(
+            Appointment.patient_id == patient_id,
+            Appointment.status == 'atendido'
+        )
+        if covered_appt_ids:
+            empty_q = empty_q.filter(~Appointment.id.in_(list(covered_appt_ids)))
+        empty_appts = empty_q.all()
+        for ea in empty_appts:
+            ea_date = ea.consultation_date or ea.start_time
+            consultations.append({
+                'id': ea.id,
+                'date': ea_date,
+                'doctor': ea.doctor,
+                'duration': None,
+                'category': ea.appointment_type or 'Consulta',
+                'notes_by_type': {},
+                'all_notes': [],
+                'cosmetic_plans': [],
+                'is_finalized': False
+            })
 
-    timeline_events = build_patient_timeline(patient_id)
-    
-    # PASSO 6 — DEBUG VISÍVEL
-    debug_info = None
-    if debug_mode:
-        debug_info = {
-            'events_total': len(timeline_events),
-        }
+        consultations.sort(key=lambda x: x['date'], reverse=True)
+        
+        # TRATAMENTO SEGURO DO APPOINTMENT_ID DA URL
+        appointment_id = request.args.get('appointment_id', type=int)
+        appointment_start_iso = None
+        if appointment_id:
+            active_appt = db.session.get(Appointment, appointment_id)
+            if active_appt and active_appt.patient_id == patient_id:
+                effective_dt = active_appt.consultation_date or active_appt.start_time
+                if effective_dt:
+                    appointment_start_iso = effective_dt.strftime('%Y-%m-%dT%H:%M')
+            else:
+                appointment_id = None # Anular se inválido ou de outro paciente
 
-    return render_template('prontuario.html', 
-                         patient=patient, 
-                         procedures=procedures,
-                         tags=tags,
-                         patient_tags=patient_tags,
-                         notes=notes,
-                         consultations=consultations,
-                         appointment_id=appointment_id,
-                         appointment_start_iso=appointment_start_iso,
-                         age=age,
-                         timeline_events=timeline_events,
-                         debug_info=debug_info)
+        age = None
+        if patient.birth_date:
+            from datetime import date as pydate
+            today = pydate.today()
+            age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
+        
+        # TIMELINE REFACTOR
+        debug_mode = request.args.get('debug') == '1'
+        timeline_events = build_patient_timeline(patient_id)
+        
+        debug_info = None
+        if debug_mode:
+            debug_info = {'events_total': len(timeline_events)}
+
+        return render_template('prontuario.html', 
+                             patient=patient, 
+                             procedures=procedures,
+                             tags=tags,
+                             patient_tags=patient_tags,
+                             notes=notes,
+                             consultations=consultations,
+                             appointment_id=appointment_id,
+                             appointment_start_iso=appointment_start_iso,
+                             age=age,
+                             timeline_events=timeline_events,
+                             debug_info=debug_info)
+    except Exception as e:
+        import traceback
+        print(f"ERRO PRONTUARIO (Patient: {patient_id}, Appt: {request.args.get('appointment_id')}): {str(e)}")
+        print(traceback.format_exc())
+        return "Internal Server Error", 500
+
+@app.route('/debug/timeline/<int:patient_id>')
+@login_required
+def debug_timeline(patient_id):
+    events = build_patient_timeline(patient_id)
+    return jsonify({
+        "patient_id": patient_id,
+        "count": len(events),
+        "events": events
+    })
+
+@app.route('/debug/procedures/<int:patient_id>')
+@login_required
+def debug_procedures(patient_id):
+    from models import CosmeticProcedurePlan, Note
+    plans = CosmeticProcedurePlan.query.join(Note).filter(Note.patient_id == patient_id, CosmeticProcedurePlan.was_performed == True).all()
+    results = []
+    for p in plans:
+        results.append({
+            "id": p.id,
+            "title": p.procedure_name,
+            "was_performed": p.was_performed,
+            "performed_date": str(p.performed_date),
+            "created_at": str(p.created_at),
+            "appointment_id": p.note.appointment_id if p.note else None
+        })
+    return jsonify(results)
+
+@app.route('/debug/evolutions/<int:patient_id>')
+@login_required
+def debug_evolutions(patient_id):
+    from models import Evolution
+    evos = Evolution.query.filter_by(patient_id=patient_id).all()
+    results = []
+    for e in evos:
+        results.append({
+            "id": e.id,
+            "created_at": str(e.created_at),
+            "evolution_date": str(e.evolution_date),
+            "appointment_id": e.consultation_id,
+            "preview": (e.content[:100] + '...') if e.content else ""
+        })
+    return jsonify(results)
 
 @app.route('/api/prontuario/<int:patient_id>', methods=['POST'])
 @login_required

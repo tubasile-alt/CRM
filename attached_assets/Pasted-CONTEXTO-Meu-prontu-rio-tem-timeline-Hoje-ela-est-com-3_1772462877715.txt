@@ -1,0 +1,161 @@
+CONTEXTO:
+Meu prontuário tem timeline. Hoje ela está com 3 problemas críticos:
+1) Quando eu faço apenas uma EVOLUÇÃO (sem consulta nova), a timeline cria um ponto como se fosse "consulta nova" no dia (consulta fantasma).
+2) A EVOLUÇÃO do dia não aparece como evento na timeline.
+3) /prontuario/314?appointment_id=358 dá Internal Server Error (500).
+
+OBJETIVO:
+Refatorar a timeline e a rota do prontuário para que:
+- Timeline seja baseada em EVENTOS REAIS com data real:
+  Consulta (appointment), Procedimento FEITO, Evolução, Cirurgia.
+- Evolução nunca cria uma consulta nova.
+- Procedimento FEITO sempre usa data real (performed_date/realizado_em).
+- Cirurgia aparece na data da cirurgia.
+- Não existir pontos "fantasma" (hoje/now) por parse de data.
+- Corrigir o erro 500 da rota com appointment_id.
+- Entregar endpoints de debug para validar.
+
+========================
+A) CORREÇÃO DO ERRO 500 (/prontuario/<id>?appointment_id=)
+========================
+1) Em app.py, na rota /prontuario/<int:patient_id>:
+- Tratar appointment_id com segurança:
+  appointment_id = request.args.get('appointment_id', type=int)
+- Se appointment_id existir:
+  appt = Appointment.query.get(appointment_id)
+  Se appt for None OU appt.patient_id != patient_id: NÃO quebrar.
+    -> setar appt = None e seguir normalmente (ou retornar 404 amigável).
+- Qualquer acesso a appt.start_time / appt.category / appt.id deve checar appt != None.
+
+2) Colocar try/except com logging claro na rota:
+- logar o patient_id e appointment_id quando der erro.
+- garantir que template recebe variáveis mesmo se appt for None.
+
+Critério de aceite:
+- /prontuario/314?appointment_id=358 não pode dar 500.
+- Se appointment_id inválido, página abre normalmente sem quebrar.
+
+========================
+B) TIMELINE: EVENTOS REAIS (SEM CONSULTA FANTASMA)
+========================
+1) Criar função backend única: build_patient_timeline(patient_id)
+- Ela deve retornar lista de dias:
+  [
+    {
+      "day": "2026-03-02",
+      "label": "02/03/2026",
+      "items": [
+        {"type":"evolution", "title":"Evolução", "dt":"2026-03-02 13:15", "appointment_id":358, "ref_id":123, "preview":"..."},
+        {"type":"procedure", "title":"Botox", "dt":"2026-03-02", "appointment_id":..., "ref_id":..., "status":"FEITO"}
+      ]
+    },
+    ...
+  ]
+
+2) Normalização de data (NUNCA usar "hoje"):
+- Implementar helpers:
+  - normalize_day(x): retorna date (YYYY-MM-DD) ou None
+  - parse_date_any(s): aceita "YYYY-MM-DD" e "DD/MM/YYYY" e retorna date ou None
+- Se parse falhar e não houver fallback seguro => IGNORAR evento (não inventar dia atual)
+
+3) Consulta (Appointment) entra na timeline SOMENTE se existir appointment real:
+- Para cada appointment do paciente:
+  day = appointment.start_time.date()
+  adicionar item type="appointment" (consulta real)
+
+4) Evolução (Evolution):
+- Buscar evoluções do paciente:
+  a) se tiver appointment_id -> join/lookup appointment para confirmar patient_id
+  b) se tiver patient_id direto -> filtrar patient_id
+- Definir dt real da evolução:
+  dt = evolution.created_at (ou evolution.date se existir)
+  day = dt.date()
+- Adicionar item type="evolution" naquele day
+- Importante: NÃO criar appointment nem "consulta" a partir de evolução.
+  (A timeline deve mostrar a evolução como item do dia, mesmo se não houver consulta.)
+
+5) Procedimentos FEITO:
+- Identificar a tabela/model real de "Planejamento e Execução" (onde aparece Morpheus/Botox com FEITO e "Realizado em").
+- Garantir que:
+  - status FEITO (ex.: plan.status == 'FEITO' ou plan.was_performed == True)
+  - data real: tentar em ordem:
+      i) plan.performed_date (string) -> parse_date_any
+      ii) plan.realizado_em (date/datetime)
+      iii) se tiver plan.created_at -> plan.created_at.date()
+      iv) senão IGNORAR (não inventar dia)
+- Adicionar item type="procedure" no day encontrado.
+- Guardar title = nome do procedimento.
+
+6) Cirurgias:
+- Se existir model Surgery ou TransplantSurgeryRecord:
+  - pegar data da cirurgia (surgery.date / surgery.surgery_date)
+  - day = date
+  - adicionar item type="surgery" com title apropriado
+
+7) Agrupar e ordenar:
+- events_by_day[day].append(item)
+- Ordenar dias DESC (mais recente primeiro) ou ASC conforme UI.
+- Dentro do dia, ordenar por prioridade:
+  surgery > procedure > appointment > evolution
+
+8) Garantir que o dia 02/03 com apenas evolução apareça:
+- Se só houver evolution nesse day, ainda assim criar o bloco do dia.
+- Não criar bloco de appointment nesse dia se não houver appointment real.
+
+========================
+C) FRONTEND: TIMELINE EXIBE EVOLUÇÃO E NÃO “INVENTA CONSULTA”
+========================
+1) Em templates/prontuario.html:
+- Renderizar timeline a partir de timeline_days (um marcador por dia).
+- Ao clicar no marcador do dia, abrir popover/lista com TODOS os items daquele dia.
+- Cada item mostra ícone + título:
+  - Consulta: "Consulta - {categoria} {hora}"
+  - Evolução: "Evolução - {hora}" + preview (primeiras 120 chars)
+  - Procedimento: "Procedimento - {nome}" + badge FEITO
+  - Cirurgia: "Cirurgia - {nome}"
+
+2) Navegação:
+- Se item tiver appointment_id, botão "Ver" deve rolar para o card daquela consulta no Histórico:
+  document.getElementById(`appointment-${appointment_id}`).scrollIntoView({behavior:'smooth', block:'start'})
+- Para evoluções sem appointment_id, rolar para seção "Evoluções" e destacar pelo ref_id.
+
+3) Remover qualquer lógica do frontend que crie ponto baseado em "hoje" quando não encontra data.
+
+========================
+D) ENDPOINTS DEBUG (OBRIGATÓRIOS)
+========================
+Criar em app.py:
+
+1) GET /debug/timeline/<int:patient_id>
+- Retorna JSON do build_patient_timeline(patient_id)
+- Inclui counts e amostra.
+
+2) GET /debug/procedures/<int:patient_id>
+- Lista procedimentos FEITO com:
+  {id, title, status, performed_date, realizado_em, created_at, appointment_id, note_id}
+- Isso serve para confirmar qual campo existe de verdade.
+
+3) GET /debug/evolutions/<int:patient_id>
+- Lista evoluções:
+  {id, created_at, appointment_id, preview}
+
+========================
+CRITÉRIOS DE ACEITE
+========================
+1) Se no dia 02/03 eu fiz apenas EVOLUÇÃO:
+- Timeline deve mostrar um ponto em 02/03 com item "Evolução" (com horário).
+- NÃO deve aparecer “consulta nova” nesse dia se não houver appointment real.
+
+2) Se existir Morpheus FEITO em 21/01 e Botox FEITO em 02/03:
+- Timeline deve ter pontos em 21/01 (Morpheus) e 02/03 (Botox), independente da data da consulta.
+- Cada ponto deve listar o procedimento correto.
+
+3) /prontuario/314?appointment_id=358 não pode dar 500.
+
+4) /debug/timeline/314 deve mostrar claramente items no dia 2026-03-02 com evolution.
+
+ENTREGAR:
+- Lista de arquivos alterados
+- Trechos principais
+- Passo a passo de teste em 2 minutos (incluindo os endpoints debug)
+Aplique o patch agora.
