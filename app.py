@@ -2341,17 +2341,17 @@ def send_message():
     if not recipient:
         return jsonify({'error': 'Destinatário não encontrado'}), 404
     
-    message = ChatMessage(
+    message_obj = ChatMessage(
         sender_id=current_user.id,
         recipient_id=int(recipient_id),
         message=data.get('message', ''),
         created_at=get_brazil_time().replace(tzinfo=None)
     )
     
-    db.session.add(message)
+    db.session.add(message_obj)
     db.session.commit()
     
-    return jsonify({'success': True, 'id': message.id})
+    return jsonify({'success': True, 'id': message_obj.id})
 
 @app.route('/api/chat/mark_read', methods=['POST'])
 @login_required

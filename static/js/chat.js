@@ -126,7 +126,8 @@ function sendMessage() {
     fetch('/api/chat/send', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
         },
         body: JSON.stringify({
             recipient_id: selectedContactId,
