@@ -99,31 +99,22 @@ function loadMessages() {
             return response.json();
         })
         .then(messages => {
-            console.log('[CHAT] messages payload sample', messages?.slice?.(0, 2));
             const messagesArea = document.getElementById('messagesArea');
             if (!messagesArea) return;
             
-            // 1. Identificar mensagens temporárias (otimistas) que ainda estão na tela
+            // 1. Manter mensagens temporárias que NÃO estão no retorno do servidor
             const tempMessages = Array.from(messagesArea.querySelectorAll('.chat-message[id^="temp-"]')).map(el => ({
                 id: el.id,
                 html: el.innerHTML,
                 text: el.querySelector('.message-text').textContent
             }));
 
-            // 2. Limpar a área
+            // 2. Criar um conjunto de conteúdos já presentes no servidor para evitar duplicatas
+            const serverMessageTexts = new Set(messages.map(m => m.message));
+
+            // 3. Limpar a área e renderizar mensagens do servidor
             messagesArea.innerHTML = '';
             
-            if (messages.length === 0 && tempMessages.length === 0) {
-                messagesArea.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #6c757d;">
-                        <i class="bi bi-chat-left-text" style="font-size: 3rem; margin-bottom: 15px;"></i>
-                        <p>Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>
-                    </div>
-                `;
-                return;
-            }
-            
-            // 3. Renderizar mensagens confirmadas do servidor
             messages.forEach(msg => {
                 appendMessageToUI({
                     senderId: msg.senderId,
@@ -133,12 +124,9 @@ function loadMessages() {
                 }, false);
             });
             
-            // 4. Re-inserir mensagens temporárias que ainda não foram confirmadas pelo servidor
-            // (Evita que a mensagem suma enquanto o servidor processa)
+            // 4. Re-inserir mensagens temporárias apenas se não estiverem no servidor
             tempMessages.forEach(temp => {
-                // Se o texto da mensagem temporária já estiver nas mensagens do servidor, não re-insere
-                const alreadyConfirmed = messages.some(m => m.message === temp.text && m.senderId === currentUserId);
-                if (!alreadyConfirmed) {
+                if (!serverMessageTexts.has(temp.text)) {
                     const msgDiv = document.createElement('div');
                     msgDiv.className = 'chat-message sent';
                     msgDiv.id = temp.id;
@@ -147,7 +135,16 @@ function loadMessages() {
                 }
             });
             
-            // Forçar o scroll após carregar todas
+            if (messages.length === 0 && messagesArea.children.length === 0) {
+                messagesArea.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #6c757d;">
+                        <i class="bi bi-chat-left-text" style="font-size: 3rem; margin-bottom: 15px;"></i>
+                        <p>Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>
+                    </div>
+                `;
+            }
+            
+            // Scroll suave
             setTimeout(() => {
                 messagesArea.scrollTop = messagesArea.scrollHeight;
             }, 50);

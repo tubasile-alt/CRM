@@ -2304,28 +2304,22 @@ def get_messages():
     if not with_user_id:
         return jsonify({'error': 'Parâmetro with_user_id é obrigatório'}), 400
     
-    # Forçar commit e desabilitar cache se necessário, mas o commit já deve ter ocorrido no send_message
+    # Buscar mensagens entre os dois usuários
     messages = ChatMessage.query.filter(
         db.or_(
-            db.and_(
-                ChatMessage.sender_id == current_user.id,
-                ChatMessage.recipient_id == with_user_id
-            ),
-            db.and_(
-                ChatMessage.sender_id == with_user_id,
-                ChatMessage.recipient_id == current_user.id
-            )
+            db.and_(ChatMessage.sender_id == current_user.id, ChatMessage.recipient_id == with_user_id),
+            db.and_(ChatMessage.sender_id == with_user_id, ChatMessage.recipient_id == current_user.id)
         )
     ).order_by(ChatMessage.created_at.asc()).all()
     
-    # Debug: logar quantidade de mensagens encontradas
+    # Log para debug
     print(f"[CHAT] Buscando mensagens entre {current_user.id} e {with_user_id}. Encontradas: {len(messages)}")
+    if messages:
+        print(f"[CHAT] Última mensagem ID: {messages[-1].id}, Conteúdo: {messages[-1].message[:20]}")
     
     return jsonify([{
         'id': msg.id,
-        'sender': msg.sender.name if msg.sender else "Sistema",
         'senderId': msg.sender_id,
-        'recipient': msg.recipient.name if msg.recipient else "Sistema",
         'recipientId': msg.recipient_id,
         'message': msg.message,
         'timestamp': format_brazil_datetime(msg.created_at).split(' ')[1] if msg.created_at else '',
