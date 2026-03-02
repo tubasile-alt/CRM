@@ -78,9 +78,28 @@ function selectContact(contactId, contactName) {
 function loadMessages() {
     if (!selectedContactId) return;
     
-    fetch(`/api/chat/messages?with_user_id=${selectedContactId}`)
-        .then(response => response.json())
+    const withUserId = parseInt(selectedContactId, 10);
+    console.log('[CHAT] loadMessages selectedContactId=', selectedContactId, typeof selectedContactId);
+    
+    fetch(`/api/chat/messages?with_user_id=${withUserId}`)
+        .then(response => {
+            console.log('[CHAT] messages status', response.status);
+            if (!response.ok) {
+                const messagesDiv = document.getElementById('messagesArea');
+                if (messagesDiv && !messagesDiv.querySelector('.chat-message')) {
+                    const errorMsg = document.createElement('div');
+                    errorMsg.style.textAlign = 'center';
+                    errorMsg.style.padding = '10px';
+                    errorMsg.style.color = '#dc3545';
+                    errorMsg.textContent = `Falha ao carregar mensagens (status ${response.status})`;
+                    messagesDiv.appendChild(errorMsg);
+                }
+                throw new Error('Erro ao carregar mensagens');
+            }
+            return response.json();
+        })
         .then(messages => {
+            console.log('[CHAT] messages payload sample', messages?.slice?.(0, 2));
             const messagesDiv = document.getElementById('messagesArea');
             if (!messagesDiv) return;
             
@@ -96,15 +115,16 @@ function loadMessages() {
                 return;
             }
             
+            const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
+            
             messages.forEach(msg => {
-                const isSent = msg.senderId === currentUserId;
-                const msgDiv = document.createElement('div');
-                msgDiv.className = `chat-message ${isSent ? 'sent' : 'received'}`;
-                msgDiv.innerHTML = `
-                    <div class="message-text">${escapeHtml(msg.message)}</div>
-                    <div class="message-time">${msg.timestamp}</div>
-                `;
-                messagesDiv.appendChild(msgDiv);
+                const isSent = parseInt(msg.senderId, 10) === currentUserId;
+                appendMessageToUI({
+                    senderId: msg.senderId,
+                    message: msg.message,
+                    timestamp: msg.timestamp,
+                    id: msg.id
+                }, false);
             });
             
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -112,6 +132,33 @@ function loadMessages() {
         .catch(error => {
             console.error('Erro ao carregar mensagens:', error);
         });
+}
+
+function appendMessageToUI(msg, shouldScroll = true) {
+    const messagesDiv = document.getElementById('messagesArea');
+    if (!messagesDiv) return;
+
+    // Remover placeholder de "Nenhuma mensagem" se existir
+    const placeholder = messagesDiv.querySelector('div[style*="padding: 40px"]');
+    if (placeholder) placeholder.remove();
+
+    const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
+    const isSent = parseInt(msg.senderId, 10) === currentUserId;
+    
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-message ${isSent ? 'sent' : 'received'}`;
+    msgDiv.id = msg.id ? `msg-${msg.id}` : '';
+    
+    msgDiv.innerHTML = `
+        <div class="message-text">${escapeHtml(msg.message)}</div>
+        <div class="message-time">${msg.timestamp || 'agora'}</div>
+    `;
+    
+    messagesDiv.appendChild(msgDiv);
+    
+    if (shouldScroll) {
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
 }
 
 function sendMessage() {
@@ -131,6 +178,8 @@ function sendMessage() {
     };
     console.log("sending chat...", payload);
     
+    const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
+    
     fetch('/api/chat/send', {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -148,7 +197,16 @@ function sendMessage() {
     .then(data => {
         if (data.success) {
             input.value = '';
-            loadMessages();
+            input.focus();
+            // Inserção otimista
+            appendMessageToUI({
+                senderId: currentUserId,
+                message: message,
+                timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                id: data.id
+            });
+            // Sincronizar (opcional, já que inserimos otimista)
+            // loadMessages(); 
         } else {
             showAlert(data.error || 'Erro ao enviar mensagem.', 'danger');
         }

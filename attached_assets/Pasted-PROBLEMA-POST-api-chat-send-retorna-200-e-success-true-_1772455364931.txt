@@ -1,0 +1,58 @@
+PROBLEMA:
+POST /api/chat/send retorna 200 e success true (id 22/23), mas a mensagem não aparece no frontend.
+Logo, o backend está ok; o problema está no loadMessages/render.
+
+OBJETIVO:
+Garantir que após enviar mensagem ela apareça imediatamente, mesmo que o GET falhe.
+E adicionar logs temporários para achar o motivo.
+
+PASSO 1 — Instrumentar loadMessages
+Arquivo: static/js/chat.js
+Dentro de loadMessages():
+- logar:
+  console.log('[CHAT] loadMessages selectedContactId=', selectedContactId, typeof selectedContactId);
+- após fetch /api/chat/messages, logar:
+  console.log('[CHAT] messages status', res.status);
+  console.log('[CHAT] messages payload sample', data?.slice?.(0,2));
+
+PASSO 2 — Garantir URL e tipos corretos
+- Forçar with_user_id como inteiro:
+  const withUserId = parseInt(selectedContactId, 10);
+  fetch(`/api/chat/messages?with_user_id=${withUserId}`)
+
+PASSO 3 — Garantir que as chaves usadas batem com o backend
+O backend retorna senderId, recipientId e message.
+No render, usar EXATAMENTE:
+  msg.senderId
+  msg.message
+  msg.timestamp
+Não usar msg.sender_id ou msg.content.
+
+PASSO 4 — Corrigir cálculo de isSent
+- Recalcular currentUserId na hora do render:
+  const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
+  const isSent = parseInt(msg.senderId, 10) === currentUserId;
+
+PASSO 5 — Inserção otimista (para UX e para não depender do GET)
+No handler do envio, assim que receber success:
+- adicionar a mensagem na UI local imediatamente (optimistic append) antes/sem depender do loadMessages:
+  appendMessageToUI({ senderId: currentUserId, message, timestamp: 'agora', id: data.id })
+
+Depois chamar loadMessages() para sincronizar.
+
+PASSO 6 — Scroll e limpeza
+- Após append, scroll para o fim do container de mensagens.
+- Limpar input e manter foco.
+
+PASSO 7 — Debug do GET
+Se loadMessages receber status != 200:
+- mostrar aviso discreto no chat: “Falha ao carregar mensagens (status X)”
+- manter a mensagem otimista exibida.
+
+CRITÉRIO DE ACEITE:
+1) Enviar mensagem -> aparece imediatamente como “enviada” no chat.
+2) GET /api/chat/messages inclui ids novos.
+3) Mesmo se GET falhar, mensagem enviada permanece na UI.
+ENTREGAR:
+- arquivos alterados
+- trechos principais: loadMessages logs, isSent fix, append otimista
