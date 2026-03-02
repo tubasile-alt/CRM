@@ -1,0 +1,164 @@
+Você é um engenheiro senior trabalhando no meu repo (Flask + Jinja). Quero corrigir a TIMELINE do prontuário para exibir eventos na data real:
+
+Problema atual
+
+A timeline está marcando basicamente a data da consulta, mas quando eu marco procedimentos como FEITO com data retroativa (ex.: Morpheus 21/01 e Botox 02/03), o ponto do Botox em 02/03 não aparece.
+
+Em alguns casos, quando a data retroativa não é parseada, a timeline cria evento “hoje” indevidamente.
+
+Preciso que a timeline também mostre cirurgias na data real da cirurgia.
+
+Objetivo
+
+A timeline deve ter “pontos por dia” (agrupados por data).
+
+Deve incluir como eventos:
+A) Consultas (Appointment) na data/hora do agendamento.
+B) Evoluções (Evolution) na data/hora da evolução ou vinculada à consulta.
+C) Procedimentos FEITO (ex.: CosmeticProcedurePlan.was_performed=True) usando performed_date como data do evento, gerando um ponto na timeline naquele dia.
+D) Cirurgias na data da cirurgia (Surgery.date ou HairTransplant.surgery_date, conforme existir).
+
+Não criar eventos com data “hoje” se performed_date estiver vazio ou inválido. Nesses casos, ou ignora, ou cai para uma data segura (ex.: created_at da nota/plano) — mas NUNCA “agora”.
+
+Implementação (backend)
+
+No app.py, dentro da rota do prontuário que monta timeline_events (onde já existe timeline_events.append({... type:'evolution' ...})), refatore para usar um agregador por dia:
+
+Crie helper local:
+
+def normalize_day(dt_or_date): retorna date (YYYY-MM-DD)
+
+def safe_parse_date_yyyy_mm_dd(s): retorna date ou None (sem exception)
+
+events_by_day = {} (dict date -> list de eventos)
+
+Incluir eventos de procedimentos FEITO vindos de CosmeticProcedurePlan:
+
+Buscar todos planos do paciente:
+
+via join com Note quando existir (CosmeticProcedurePlan.note_id -> Note.patient_id)
+
+fallback: se o modelo tiver patient_id direto, use ele.
+
+Filtrar was_performed == True.
+
+Para cada plano:
+
+d = safe_parse_date_yyyy_mm_dd(plan.performed_date) (performed_date é string AAAA-MM-DD no seu código)
+
+Se d is None: NÃO criar evento com hoje. Use fallback seguro:
+
+se existir plan.note.created_at, então d = plan.note.created_at.date()
+
+senão ignore (continue)
+
+Crie evento:
+
+type: "procedure"
+
+title: nome do procedimento (plan.procedure_name)
+
+body: "Realizado em DD/MM/AAAA" + opcional valor
+
+dt_iso: YYYY-MM-DDT12:00:00-03:00 (meio-dia fixo só para ordenação)
+
+appointment_id: se houver no plan ou no payload do perform, usar.
+
+Adicione em events_by_day[d].
+
+Incluir eventos de consultas:
+
+Para cada Appointment do paciente:
+
+d = appointment.start_time.date()
+
+evento type "appointment".
+
+Incluir cirurgias:
+
+Se existir model Surgery (já importado):
+
+Surgery.query.filter_by(patient_id=patient.id) se tiver patient_id
+
+ou match pelo nome como já faz na agenda (último caso).
+
+Use surgery.date como day.
+
+evento type "surgery" com title = procedimento + paciente.
+
+Se existir HairTransplant com surgery_date:
+
+usar HairTransplant.query.filter_by(patient_id=patient.id) e criar evento naquele day.
+
+Gerar timeline_events final:
+
+Para cada day em ordem DESC:
+
+escolher “dt” do dia para ordenação (ex.: datetime(day.year,day.month,day.day,12,0,0))
+
+montar item consolidado:
+
+{ day:'YYYY-MM-DD', label:'DD/MM/YYYY', items:[...] }
+
+OU manter seu formato atual, mas garantindo que:
+
+timeline_events tenha 1 objeto por dia com events/items dentro.
+
+Importante: se o frontend atual espera timeline_events como lista simples (um evento por item), não quebre. Se necessário, mantenha “um por evento” mas garanta o day certo. (Preferência: “um ponto por dia” com lista interna.)
+
+Implementação (frontend)
+
+No templates/prontuario.html, no bloco da timeline:
+
+Garanta que cada ponto tenha um data-target para uma seção abaixo.
+
+Ao clicar no ponto, deve:
+
+abrir o popover E
+
+rolar (smooth scroll) para uma âncora de conteúdo daquele dia (ou daquela consulta), ex.: #event-{{ event.appointment_id }} quando existir.
+
+Para procedimentos (procedure), rolar para a área “Planejamento e Execução” e destacar o item correspondente (pelo nome).
+
+Se isso ficar complexo agora, faça o mínimo:
+
+Clique no ponto: document.getElementById('history-{{appointment_id}}').scrollIntoView({behavior:'smooth'}) para consultas/evoluções.
+
+Para procedures sem appointment_id: apenas manter popover com lista do dia.
+
+Critérios de aceite
+
+Se eu marcar:
+
+Morpheus FEITO em 21/01/2026
+
+Botox FEITO em 02/03/2026
+A timeline precisa ter dois pontos: 21/01 e 02/03, cada um mostrando o procedimento correto.
+
+Se performed_date vier vazio/errado, NÃO aparece ponto em “hoje”.
+
+Se houver cirurgia em uma data, aparece ponto “Cirurgia” naquela data.
+
+Entregar:
+
+arquivos alterados
+
+trechos principais (diff)
+
+checklist de teste em 2 minutos
+
+Agora aplique o patch.
+
+Observação rápida (por que “não implementou de fato”)
+
+No seu app.py atual, pelo trecho que apareceu aqui, a timeline está apendando evolutions e ordenando, mas não está criando eventos para “procedimentos feitos” por performed_date — então o Botox retroativo fica “preso” dentro do histórico e não vira ponto próprio.
+
+Se você colar o prompt acima, o Replit/Codex vai ter instrução suficiente para:
+
+Buscar o seu CosmeticProcedurePlan
+
+Usar performed_date
+
+Parar de cair em “hoje” quando parse falha
+
+Criar pontos por data

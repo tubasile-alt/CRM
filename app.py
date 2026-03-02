@@ -1628,23 +1628,34 @@ def prontuario(patient_id):
         age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
     
     # PASSO 1, 2 e 3 — Normalizar eventos para a Timeline (Construída por patient_id e ordenada por data)
-    from models import Evolution, ProcedureRecord, Surgery
+    from models import Evolution, ProcedureRecord, Surgery, CosmeticProcedurePlan, HairTransplant
     
     def build_patient_timeline(p_id):
         from collections import defaultdict
-        events_by_date = defaultdict(list)
+        from datetime import date, datetime
+        events_by_day = defaultdict(list)
         
+        def safe_parse_date(s):
+            if not s: return None
+            if isinstance(s, (date, datetime)): return s
+            try:
+                return datetime.strptime(s, '%Y-%m-%d').date()
+            except:
+                try:
+                    return datetime.fromisoformat(s.replace('Z', '')).date()
+                except:
+                    return None
+
         # A) Consultas
         appts = Appointment.query.filter_by(patient_id=p_id).all()
         for apt in appts:
             dt = apt.consultation_date or apt.start_time
             if dt:
-                # Normalizar para date para agrupamento
                 d = dt.date() if isinstance(dt, datetime) else dt
-                events_by_date[d].append({
+                events_by_day[d].append({
                     "type": "consulta",
                     "dt": dt,
-                    "dt_iso": dt.isoformat() + '-03:00' if isinstance(dt, datetime) else dt.isoformat() + 'T00:00:00-03:00',
+                    "dt_iso": dt.isoformat() + '-03:00' if isinstance(dt, datetime) else dt.isoformat() + 'T12:00:00-03:00',
                     "title": f"{apt.appointment_type or 'Consulta'}",
                     "label": apt.appointment_type or 'Consulta',
                     "body": apt.notes or "",
@@ -1654,32 +1665,38 @@ def prontuario(patient_id):
                     "doctor": apt.doctor.name if apt.doctor else 'Médico'
                 })
 
-        # B) Procedimentos executados
-        procs = ProcedureRecord.query.filter_by(patient_id=p_id, status='realizado').all()
-        for pr in procs:
-            dt = pr.performed_date
-            if dt:
-                d = dt if isinstance(dt, date) and not isinstance(dt, datetime) else dt.date()
-                # Converter date para datetime para o template/iso
-                dt_obj = datetime.combine(d, datetime.min.time())
-                events_by_date[d].append({
-                    "type": "procedimento",
-                    "dt": dt_obj,
-                    "dt_iso": dt_obj.isoformat() + '-03:00',
-                    "title": f"Procedimento: {pr.procedure_name}",
-                    "label": pr.procedure_name,
-                    "body": pr.notes or "",
-                    "id": pr.id,
-                    "reference_id": pr.id,
-                    "doctor": pr.doctor.name if pr.doctor else 'Médico'
-                })
+        # B) Procedimentos FEITO (CosmeticProcedurePlan)
+        # Buscar planos vinculados a notas do paciente
+        cosmetic_plans = CosmeticProcedurePlan.query.join(Note).filter(Note.patient_id == p_id, CosmeticProcedurePlan.was_performed == True).all()
+        for plan in cosmetic_plans:
+            d = safe_parse_date(plan.performed_date)
+            if not d:
+                # Fallback: created_at da nota
+                if plan.note and plan.note.created_at:
+                    d = plan.note.created_at.date()
+                else:
+                    continue # NUNCA usar "hoje"
+            
+            dt_obj = datetime.combine(d, datetime(2000,1,1,12,0,0).time())
+            events_by_day[d].append({
+                "type": "procedimento",
+                "dt": dt_obj,
+                "dt_iso": dt_obj.isoformat() + '-03:00',
+                "title": f"Procedimento: {plan.procedure_name}",
+                "label": plan.procedure_name,
+                "body": f"Realizado em {d.strftime('%d/%m/%Y')}. {plan.observations or ''}",
+                "id": plan.id,
+                "reference_id": plan.id,
+                "appointment_id": plan.note.appointment_id if plan.note else None,
+                "doctor": plan.note.doctor.name if plan.note and plan.note.doctor else 'Médico'
+            })
 
-        # C) Cirurgias
+        # C) Cirurgias (Surgery)
         surgeries = Surgery.query.filter_by(patient_id=p_id).all()
         for surg in surgeries:
             d = surg.date
             dt = datetime.combine(surg.date, surg.start_time)
-            events_by_date[d].append({
+            events_by_day[d].append({
                 "type": "cirurgia",
                 "dt": dt,
                 "dt_iso": dt.isoformat() + '-03:00',
@@ -1692,16 +1709,37 @@ def prontuario(patient_id):
                 "doctor": surg.doctor.name if surg.doctor else 'Médico'
             })
 
-        # D) Evoluções
+        # D) Transplantes Capilares (HairTransplant)
+        # Nota: HairTransplant não tem surgery_date direto no modelo principal pelo que vi no models.py, 
+        # mas existe a tabela TransplantSurgeryRecord ou similar. 
+        # Vou usar TransplantSurgeryRecord se disponível ou HairTransplant se tiver o campo.
+        from models import TransplantSurgeryRecord
+        ts_records = TransplantSurgeryRecord.query.filter_by(patient_id=p_id).all()
+        for ts in ts_records:
+            d = ts.surgery_date
+            dt = datetime.combine(d, datetime(2000,1,1,0,0,0).time())
+            events_by_day[d].append({
+                "type": "cirurgia",
+                "dt": dt,
+                "dt_iso": dt.isoformat() + '-03:00',
+                "title": f"Transplante Capilar: {ts.surgery_type or ''}",
+                "label": "Transplante Capilar",
+                "body": ts.observations or "",
+                "id": ts.id,
+                "reference_id": ts.id,
+                "doctor": ts.doctor.name if ts.doctor else 'Médico'
+            })
+
+        # E) Evoluções
         evos = Evolution.query.filter_by(patient_id=p_id).all()
         for evo in evos:
             dt = evo.evolution_date or evo.created_at
             if dt:
                 d = dt.date() if isinstance(dt, datetime) else dt
-                events_by_date[d].append({
+                events_by_day[d].append({
                     "type": "evolution",
                     "dt": dt,
-                    "dt_iso": dt.isoformat() + '-03:00' if isinstance(dt, datetime) else dt.isoformat() + 'T00:00:00-03:00',
+                    "dt_iso": dt.isoformat() + '-03:00' if isinstance(dt, datetime) else dt.isoformat() + 'T12:00:00-03:00',
                     "title": "Evolução clínica",
                     "label": "Evolução",
                     "body": evo.content or "(Sem conteúdo)",
@@ -1710,23 +1748,21 @@ def prontuario(patient_id):
                     "doctor": evo.doctor.name if evo.doctor else 'Médico'
                 })
         
-        # Consolidar timeline
+        # Consolidar timeline DESC
         timeline = []
-        for d in sorted(events_by_date.keys()):
-            day_events = events_by_date[d]
-            # Ordenar eventos dentro do dia: cirurgia > procedimento > consulta > evolution
+        for d in sorted(events_by_day.keys(), reverse=True):
+            day_events = events_by_day[d]
             type_order = {"cirurgia": 0, "procedimento": 1, "consulta": 2, "evolution": 3}
             day_events.sort(key=lambda x: (type_order.get(x["type"], 99), x["dt"]))
             
-            # O evento principal (que define o ponto na timeline) será o primeiro da lista ordenada
             main_event = day_events[0]
             timeline.append({
                 "date": d,
                 "dt": main_event["dt"],
                 "dt_iso": main_event["dt_iso"],
                 "type": main_event["type"],
-                "label": main_event["label"],
-                "events": day_events # Passar todos os eventos do dia
+                "label": d.strftime('%d/%m/%Y'),
+                "events": day_events
             })
             
         return timeline

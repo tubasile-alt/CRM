@@ -334,13 +334,21 @@ function deletePatientPhoto() {
                                                 </button>
                                             </div>
                                             {% endif %}
-                                            {% if sub_event.type == 'consulta' %}
                                             <div class="mt-2 d-grid">
-                                                <button class="btn btn-xs btn-outline-primary py-0" style="font-size: 0.7rem;" onclick="scrollToConsultation('consultation-{{ sub_event.id }}')">
-                                                    Ver Detalhes
+                                                {% if sub_event.type == 'consulta' %}
+                                                <button class="btn btn-xs btn-outline-primary py-0" style="font-size: 0.7rem;" onclick="scrollToEvent('consultation-{{ sub_event.id }}')">
+                                                    Ver Consulta
                                                 </button>
+                                                {% elif sub_event.type == 'procedimento' %}
+                                                <button class="btn btn-xs btn-outline-success py-0" style="font-size: 0.7rem;" onclick="scrollToEvent('procedure-{{ sub_event.id }}', '{{ sub_event.label }}')">
+                                                    Ver Procedimento
+                                                </button>
+                                                {% elif sub_event.type == 'evolution' %}
+                                                <button class="btn btn-xs btn-outline-warning py-0" style="font-size: 0.7rem;" onclick="scrollToEvent('evolution-{{ sub_event.id }}')">
+                                                    Ver Evolução
+                                                </button>
+                                                {% endif %}
                                             </div>
-                                            {% endif %}
                                         </div>
                                         {% endfor %}
                                     </div>
@@ -377,12 +385,23 @@ document.addEventListener('click', function(e) {
     }
 });
 
-function scrollToConsultation(id) {
+function scrollToEvent(id, searchText = null) {
     const element = document.getElementById(id);
     if (element) {
-        element.scrollIntoView({ behavior: 'smooth' });
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
         element.classList.add('highlight-consult');
         setTimeout(() => element.classList.remove('highlight-consult'), 2000);
+    } else if (searchText) {
+        // Fallback para buscar texto (procedimentos cosméticos)
+        const items = document.querySelectorAll('.list-group-item');
+        for (let item of items) {
+            if (item.textContent.includes(searchText)) {
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                item.classList.add('highlight-consult');
+                setTimeout(() => item.classList.remove('highlight-consult'), 2000);
+                break;
+            }
+        }
     }
 }
 
