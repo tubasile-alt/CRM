@@ -1,80 +1,101 @@
 let selectedContactId = null;
-const currentUserId = parseInt(document.body.dataset.userId || '0');
+  const currentUserId = parseInt(document.body.dataset.userId || '0');
 
-function loadContacts() {
-    fetch('/api/chat/contacts')
-        .then(response => response.json())
-        .then(contacts => {
-            const listDiv = document.getElementById('contactsList');
-            
-            if (contacts.length === 0) {
-                listDiv.innerHTML = `
-                    <div style="padding: 20px; text-align: center; color: #6c757d;">
-                        Nenhum contato disponível
-                    </div>
-                `;
-                return;
-            }
-            
-            listDiv.innerHTML = '';
-            
-            contacts.forEach(contact => {
-                const contactItem = document.createElement('div');
-                contactItem.className = `contact-item ${selectedContactId === contact.id ? 'active' : ''}`;
-                contactItem.onclick = () => selectContact(contact.id, contact.name);
-                
-                let roleIcon = contact.role === 'medico' ? '👨‍⚕️' : '👩';
-                let roleText = contact.role === 'medico' ? 'Médico' : 'Secretária';
-                
-                contactItem.innerHTML = `
-                    <div class="contact-name">${roleIcon} ${contact.name}</div>
-                    <div class="contact-role">${roleText}</div>
-                    ${contact.unread_count > 0 ? `<span class="contact-badge">${contact.unread_count}</span>` : ''}
-                `;
-                
-                listDiv.appendChild(contactItem);
-            });
-        })
-        .catch(error => {
-            console.error('Erro ao carregar contatos:', error);
-        });
-}
+  function loadContacts() {
+      fetch('/api/chat/contacts')
+          .then(response => {
+              if (!response.ok) throw new Error('Falha ao carregar contatos (Status: ' + response.status + ')');
+              return response.json();
+          })
+          .then(contacts => {
+              if (typeof contacts === 'string' && contacts.includes('<!DOCTYPE')) {
+                  console.error('[CHAT] Recebeu HTML em vez de JSON em loadContacts. Sessão expirada?');
+                  return;
+              }
+              const listDiv = document.getElementById('contactsList');
+              if (!listDiv) return;
+              
+              if (!Array.isArray(contacts) || contacts.length === 0) {
+                  listDiv.innerHTML = '<div style="padding: 20px; text-align: center; color: #6c757d;">Nenhum contato disponível</div>';
+                  return;
+              }
+              
+              listDiv.innerHTML = '';
+              contacts.forEach(contact => {
+                  const contactItem = document.createElement('div');
+                  contactItem.className = `contact-item ${selectedContactId === contact.id ? 'active' : ''}`;
+                  contactItem.onclick = () => selectContact(contact.id, contact.name);
+                  
+                  let roleIcon = contact.role === 'medico' ? '👨‍⚕️' : '👩';
+                  let roleText = contact.role === 'medico' ? 'Médico' : 'Secretária';
+                  
+                  contactItem.innerHTML = `
+                      <div class="contact-name">${roleIcon} ${contact.name}</div>
+                      <div class="contact-role">${roleText}</div>
+                      ${contact.unread_count > 0 ? `<span class="contact-badge">${contact.unread_count}</span>` : ''}
+                  `;
+                  listDiv.appendChild(contactItem);
+              });
+          })
+          .catch(error => console.error('[CHAT] Erro ao carregar contatos:', error));
+  }
 
-function selectContact(contactId, contactName) {
-    selectedContactId = contactId;
-    
-    const panel = document.getElementById('conversationPanel');
-    panel.innerHTML = `
-        <div class="conversation-header">
-            <div class="conversation-title">${contactName}</div>
-        </div>
-        <div class="messages-area" id="messagesArea">
-            <div style="text-align: center; padding: 20px; color: #6c757d;">
-                Carregando mensagens...
-            </div>
-        </div>
-        <div class="message-input-area">
-            <div class="input-group">
-                <input type="text" id="messageInput" class="form-control" placeholder="Digite sua mensagem...">
-                <button class="btn btn-primary" onclick="sendMessage()">
-                    <i class="bi bi-send"></i> Enviar
-                </button>
-            </div>
-        </div>
-    `;
-    
-    const inputField = document.getElementById('messageInput');
-    inputField.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
-    });
-    
-    loadContacts();
-    loadMessages();
-    markMessagesAsRead();
-}
+  function selectContact(contactId, contactName) {
+      console.log('[CHAT] Selecionando contato:', contactId, contactName);
+      selectedContactId = contactId;
+      const panel = document.getElementById('conversationPanel');
+      if (!panel) return;
 
+      panel.innerHTML = `
+          <div class="conversation-header">
+              <div class="conversation-title">${contactName}</div>
+          </div>
+          <div class="messages-area" id="messagesArea">
+              <div style="text-align: center; padding: 20px; color: #6c757d;">Carregando mensagens...</div>
+          </div>
+          <div class="message-input-area">
+              <div class="input-group">
+                  <input type="text" id="messageInput" class="form-control" placeholder="Digite sua mensagem...">
+                  <button class="btn btn-primary" onclick="sendMessage()">
+                      <i class="bi bi-send"></i> Enviar
+                  </button>
+              </div>
+          </div>
+      `;
+      
+      const inputField = document.getElementById('messageInput');
+      if (inputField) {
+          inputField.focus();
+          inputField.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+      }
+      
+      loadContacts();
+      loadMessages();
+      markMessagesAsRead();
+  }
+
+  function appendMessageToUI(msg, shouldScroll = true) {
+      const messagesArea = document.getElementById('messagesArea');
+      if (!messagesArea) return;
+
+      const placeholder = messagesArea.querySelector('div[style*="padding: 40px"]');
+      if (placeholder) placeholder.remove();
+
+      const isSent = parseInt(msg.senderId, 10) === currentUserId;
+      
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `chat-message ${isSent ? 'sent' : 'received'}`;
+      msgDiv.id = msg.id && !msg.id.toString().startsWith('temp-') ? `msg-${msg.id}` : msg.id;
+      msgDiv.dataset.msgId = msg.id;
+      
+      msgDiv.innerHTML = `
+          <div class="message-text">${escapeHtml(msg.message)}</div>
+          <div class="message-time">${msg.timestamp || 'agora'}</div>
+      `;
+      
+      messagesArea.appendChild(msgDiv);
+      if (shouldScroll) messagesArea.scrollTop = messagesArea.scrollHeight;
+  }
 
   function loadMessages() {
       if (!selectedContactId) return;
@@ -85,71 +106,60 @@ function selectContact(contactId, contactName) {
 
       fetch(`/api/chat/messages?with_user_id=${withUserId}&t=${Date.now()}`)
           .then(response => {
-              if (!response.ok) throw new Error('Erro ao carregar');
+              if (!response.ok) throw new Error('Erro HTTP: ' + response.status);
               return response.json();
           })
           .then(messages => {
-              const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
+              if (typeof messages === 'string' && messages.includes('<!DOCTYPE')) {
+                   console.warn('[CHAT] Erro polling: Resposta HTML recebida.');
+                   return;
+              }
 
-              // 1. Coletar mensagens locais (temporárias)
-              const localMsgs = Array.from(messagesArea.querySelectorAll('.chat-message[id^="temp-"]')).map(el => ({
-                  id: el.id,
-                  html: el.innerHTML,
-                  text: el.querySelector('.message-text').textContent.trim()
-              }));
+              const existingMsgs = Array.from(messagesArea.querySelectorAll('.chat-message'));
+              const tempMsgs = existingMsgs.filter(el => el.id && el.id.startsWith('temp-'));
+              const currentOfficialIds = existingMsgs.filter(el => el.dataset.msgId && !el.dataset.msgId.toString().startsWith('temp-')).map(el => el.dataset.msgId).join(',');
+              const newServerIds = messages.map(m => m.id).join(',');
 
-              // 2. IDs do servidor
-              const serverIds = messages.map(m => m.id.toString());
-              const currentOfficialIds = Array.from(messagesArea.querySelectorAll('.chat-message:not([id^="temp-"])')).map(el => el.dataset.msgId);
-              
-              const serverTexts = new Set(messages.filter(m => parseInt(m.senderId, 10) === currentUserId).map(m => m.message.trim()));
+              // Se nada mudou no servidor e não temos mensagens locais pendentes, não reconstrói o DOM
+              if (currentOfficialIds === newServerIds && tempMsgs.length === 0 && messages.length > 0) return;
 
-              // Se nada mudou no servidor e não temos novas locais, não faz nada
-              if (serverIds.join(',') === currentOfficialIds.join(',') && localMsgs.length === 0 && messages.length > 0) return;
+              // Limpa e reconstrói (estratégia simples para manter a ordem correta)
+              const scrollTop = messagesArea.scrollTop;
+              const isAtBottom = messagesArea.scrollHeight - messagesArea.scrollTop <= messagesArea.clientHeight + 50;
 
-              // 3. Reconstruir
               messagesArea.innerHTML = '';
+              messages.forEach(msg => appendMessageToUI(msg, false));
               
-              // Renderiza oficiais
-              messages.forEach(msg => {
-                  appendMessageToUI({
-                      senderId: msg.senderId,
-                      message: msg.message,
-                      timestamp: msg.timestamp,
-                      id: msg.id
-                  }, false);
-              });
-              
-              // Re-insere locais pendentes
-              localMsgs.forEach(local => {
-                  if (!serverTexts.has(local.text)) {
-                      const msgDiv = document.createElement('div');
-                      msgDiv.className = 'chat-message sent';
-                      msgDiv.id = local.id;
-                      msgDiv.innerHTML = local.html;
-                      messagesArea.appendChild(msgDiv);
+              // Re-insere mensagens locais (otimistas) que ainda não foram confirmadas pelo servidor
+              const serverTexts = new Set(messages.filter(m => parseInt(m.senderId, 10) === currentUserId).map(m => m.message.trim()));
+              tempMsgs.forEach(temp => {
+                  const text = temp.querySelector('.message-text').textContent.trim();
+                  if (!serverTexts.has(text)) {
+                      messagesArea.appendChild(temp);
                   }
               });
               
-              messagesArea.scrollTop = messagesArea.scrollHeight;
+              if (isAtBottom) {
+                  messagesArea.scrollTop = messagesArea.scrollHeight;
+              } else {
+                  messagesArea.scrollTop = scrollTop;
+              }
           })
-          .catch(err => console.error('Erro polling:', err));
+          .catch(err => console.error('[CHAT] Erro polling mensagens:', err));
   }
 
   function sendMessage() {
       if (!selectedContactId) {
-          showAlert('Selecione um contato primeiro.', 'warning');
+          if (typeof window.showAlert === 'function') window.showAlert('Selecione um contato primeiro.', 'warning');
           return;
       }
       
       const input = document.getElementById('messageInput');
+      if (!input) return;
       const message = input.value.trim();
       if (!message) return;
       
-      const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
       const tempId = 'temp-' + Date.now();
-      
-      // Mostra na hora
       appendMessageToUI({
           senderId: currentUserId,
           message: message,
@@ -164,53 +174,61 @@ function selectContact(contactId, contactName) {
           method: 'POST',
           body: JSON.stringify({ recipient_id: selectedContactId, message: message })
       })
-      .then(res => res.json())
+      .then(res => {
+          if (!res.ok) throw new Error('Erro ao enviar: ' + res.status);
+          return res.json();
+      })
       .then(data => {
           if (!data.success) {
               const temp = document.getElementById(tempId);
               if (temp) temp.remove();
-              showAlert(data.error || 'Erro ao enviar', 'danger');
+              if (typeof window.showAlert === 'function') window.showAlert(data.error || 'Erro ao enviar', 'danger');
           }
       })
-      .catch(() => {
+      .catch(err => {
+          console.error('[CHAT] Erro envio:', err);
           const temp = document.getElementById(tempId);
           if (temp) temp.remove();
-          showAlert('Erro de conexão', 'danger');
+          if (typeof window.showAlert === 'function') window.showAlert('Erro de conexão ao enviar mensagem.', 'danger');
       });
   }
+
+  function markMessagesAsRead() {
+      if (!selectedContactId || isNaN(selectedContactId)) return;
+      fetch('/api/chat/mark_read', {
+          method: 'POST',
+          body: JSON.stringify({ from_user_id: selectedContactId })
+      }).then(res => {
+          if (res.ok) {
+              if (typeof window.updateChatBadge === 'function') window.updateChatBadge();
+              loadContacts();
+          }
+      }).catch(err => console.error('[CHAT] Erro marcar como lido:', err));
+  }
+
+  function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+  }
+
+  // Inicialização
+  document.addEventListener('DOMContentLoaded', () => {
+      loadContacts();
+      
+      // Polling global
+      setInterval(() => {
+          if (selectedContactId) {
+              loadMessages();
+              markMessagesAsRead();
+          } else {
+              loadContacts();
+          }
+      }, 5000);
+  });
+
+  // Fallback caso DOMContentLoaded já tenha disparado
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      loadContacts();
+  }
   
-
-function markMessagesAsRead() {
-    if (!selectedContactId) return;
-    
-    fetch('/api/chat/mark_read', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            from_user_id: selectedContactId
-        })
-    }).then(() => {
-        if (typeof updateChatBadge === 'function') {
-            updateChatBadge();
-        }
-        loadContacts();
-    });
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-loadContacts();
-
-setInterval(() => {
-    if (selectedContactId) {
-        loadMessages();
-        markMessagesAsRead();
-    }
-    loadContacts();
-}, 5000);

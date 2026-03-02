@@ -2283,12 +2283,12 @@ def update_patient_tags(patient_id):
     
     PatientTag.query.filter_by(patient_id=patient_id).delete()
     
-    for tag_id in data['tags']:
-        patient_tag = PatientTag(patient_id=patient_id, tag_id=tag_id)
-        db.session.add(patient_tag)
+    if 'tags' in data:
+        for tag_id in data['tags']:
+            patient_tag = PatientTag(patient_id=patient_id, tag_id=tag_id)
+            db.session.add(patient_tag)
     
     db.session.commit()
-    
     return jsonify({'success': True})
 
 @app.route('/chat')
@@ -2300,11 +2300,9 @@ def chat():
 @login_required
 def get_messages():
     with_user_id = request.args.get('with_user_id', type=int)
-    
     if not with_user_id:
         return jsonify({'error': 'Parâmetro with_user_id é obrigatório'}), 400
     
-    # Buscar mensagens entre os dois usuários
     messages = ChatMessage.query.filter(
         db.or_(
             db.and_(ChatMessage.sender_id == current_user.id, ChatMessage.recipient_id == with_user_id),
@@ -2312,25 +2310,23 @@ def get_messages():
         )
     ).order_by(ChatMessage.id.asc()).all()
     
-    # Log para debug
-    print(f"[CHAT] Buscando mensagens entre {current_user.id} e {with_user_id}. Encontradas: {len(messages)}")
-    if messages:
-        print(f"[CHAT] IDs das últimas 3 mensagens: {[m.id for m in messages[-3:]]}")
-    
-    return jsonify([{
-        'id': msg.id,
-        'senderId': msg.sender_id,
-        'recipientId': msg.recipient_id,
-        'message': msg.message,
-        'timestamp': format_brazil_datetime(msg.created_at).split(' ')[1] if msg.created_at else '',
-        'read': msg.read if hasattr(msg, 'read') else False
-    } for msg in messages])
+    try:
+        return jsonify([{
+            'id': msg.id,
+            'senderId': msg.sender_id,
+            'recipientId': msg.recipient_id,
+            'message': msg.message,
+            'timestamp': format_brazil_datetime(msg.created_at).split(' ')[1] if msg.created_at else '',
+            'read': msg.read if hasattr(msg, 'read') else False
+        } for msg in messages])
+    except Exception as e:
+        print(f'[CHAT ERROR] Serialization failed: {e}')
+        return jsonify({'error': 'Internal server error'}), 500
 
 @app.route('/api/chat/send', methods=['POST'])
 @login_required
 def send_message():
     data = request.get_json(silent=True) or request.form
-    
     recipient_id = data.get('recipient_id')
     if not recipient_id:
         return jsonify({'error': 'recipient_id é obrigatório'}), 400
@@ -2349,228 +2345,94 @@ def send_message():
         message=message_text,
         created_at=get_brazil_time().replace(tzinfo=None)
     )
-    
     db.session.add(message_obj)
     db.session.commit()
-    
     return jsonify({'success': True, 'id': message_obj.id})
 
 @app.route('/api/chat/mark_read', methods=['POST'])
 @login_required
 def mark_messages_read():
-    data = request.get_json(silent=True) or request.form
-    from_user_id = data.get('from_user_id')
-    if from_user_id:
-        from_user_id = int(from_user_id)
-    
-    query = db.session.query(ChatMessage.id).filter(
-        ChatMessage.recipient_id == current_user.id
-    )
-    
-    if from_user_id:
-        query = query.filter(ChatMessage.sender_id == from_user_id)
-    
-    unread_message_ids = query.outerjoin(
-        MessageRead,
-        db.and_(
-            MessageRead.message_id == ChatMessage.id,
-            MessageRead.user_id == current_user.id
-        )
-    ).filter(
-        MessageRead.id.is_(None)
-    ).all()
-    
-    if not unread_message_ids:
-        return jsonify({'success': True, 'count': 0})
-    
-    read_records = [
-        MessageRead(
-            message_id=msg_id[0],
-            user_id=current_user.id
-        )
-        for msg_id in unread_message_ids
-    ]
-    
-    try:
-        db.session.bulk_save_objects(read_records)
-        db.session.commit()
-        return jsonify({'success': True, 'count': len(read_records)})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+      data = request.get_json(silent=True) or request.form
+      from_user_id = data.get('from_user_id')
+      if from_user_id:
+          from_user_id = int(from_user_id)
+      
+      query = db.session.query(ChatMessage.id).filter(ChatMessage.recipient_id == current_user.id)
+      if from_user_id:
+          query = query.filter(ChatMessage.sender_id == from_user_id)
+      
+      unread_message_ids = query.outerjoin(
+          MessageRead,
+          db.and_(MessageRead.message_id == ChatMessage.id, MessageRead.user_id == current_user.id)
+      ).filter(MessageRead.id.is_(None)).all()
+      
+      if not unread_message_ids:
+          return jsonify({'success': True, 'count': 0})
+      
+      read_records = [MessageRead(message_id=msg_id[0], user_id=current_user.id) for msg_id in unread_message_ids]
+      try:
+          db.session.bulk_save_objects(read_records)
+          db.session.commit()
+          return jsonify({'success': True, 'count': len(read_records)})
+      except Exception as e:
+          db.session.rollback()
+          return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/chat/latest_unread')
 @login_required
 def get_latest_unread():
-    from models import ChatMessage, MessageRead
-    # Buscar mensagens onde o usuário atual é o destinatário e não há registro de leitura
-    subquery = db.session.query(MessageRead.message_id).filter(MessageRead.user_id == current_user.id)
-    latest = ChatMessage.query.filter(
-        ChatMessage.recipient_id == current_user.id,
-        ~ChatMessage.id.in_(subquery)
-    ).order_by(ChatMessage.created_at.desc()).first()
-    
-    if latest:
-        return jsonify({
-            'id': latest.id,
-            'from_user_id': latest.sender_id,
-            'from_name': latest.sender.name if latest.sender else "Sistema",
-            'message': (latest.message[:80] + ('...' if len(latest.message) > 80 else '')) if latest.message else "",
-            'created_at': latest.created_at.isoformat()
-        })
-    return jsonify({'id': None})
-
-@app.route('/api/chat/mark_read/<int:message_id>', methods=['POST'])
-@login_required
-def mark_message_read(message_id):
-    from models import MessageRead
-    read_record = MessageRead.query.filter_by(user_id=current_user.id, message_id=message_id).first()
-    if not read_record:
-        read_record = MessageRead(user_id=current_user.id, message_id=message_id)
-        db.session.add(read_record)
-        db.session.commit()
-    return jsonify({'success': True})
+      subquery = db.session.query(MessageRead.message_id).filter(MessageRead.user_id == current_user.id)
+      latest = ChatMessage.query.filter(
+          ChatMessage.recipient_id == current_user.id,
+          ~ChatMessage.id.in_(subquery)
+      ).order_by(ChatMessage.created_at.desc()).first()
+      
+      if latest:
+          return jsonify({
+              'id': latest.id,
+              'from_user_id': latest.sender_id,
+              'from_name': latest.sender.name if latest.sender else "Sistema",
+              'message': (latest.message[:80] + ('...' if len(latest.message) > 80 else '')) if latest.message else "",
+              'created_at': latest.created_at.isoformat()
+          })
+      return jsonify({'id': None})
 
 @app.route('/api/chat/unread_count')
 @login_required
 def get_unread_count():
-    from_user_id = request.args.get('from_user_id', type=int)
-    
-    query = db.session.query(ChatMessage).filter(
-        ChatMessage.recipient_id == current_user.id
-    )
-    
-    if from_user_id:
-        query = query.filter(ChatMessage.sender_id == from_user_id)
-    
-    count = query.outerjoin(
-        MessageRead,
-        db.and_(
-            MessageRead.message_id == ChatMessage.id,
-            MessageRead.user_id == current_user.id
-        )
-    ).filter(
-        MessageRead.id.is_(None)
-    ).count()
-    
-    return jsonify({'count': count})
+      from_user_id = request.args.get('from_user_id', type=int)
+      query = db.session.query(ChatMessage).filter(ChatMessage.recipient_id == current_user.id)
+      if from_user_id:
+          query = query.filter(ChatMessage.sender_id == from_user_id)
+      
+      count = query.outerjoin(
+          MessageRead,
+          db.and_(MessageRead.message_id == ChatMessage.id, MessageRead.user_id == current_user.id)
+      ).filter(MessageRead.id.is_(None)).count()
+      return jsonify({'count': count})
 
 @app.route('/api/chat/contacts')
 @login_required
 def get_chat_contacts():
-    users = User.query.filter(User.id != current_user.id).all()
-    
-    contacts = []
-    for user in users:
-        unread_count = db.session.query(ChatMessage).filter(
-            ChatMessage.recipient_id == current_user.id,
-            ChatMessage.sender_id == user.id
-        ).outerjoin(
-            MessageRead,
-            db.and_(
-                MessageRead.message_id == ChatMessage.id,
-                MessageRead.user_id == current_user.id
-            )
-        ).filter(
-            MessageRead.id.is_(None)
-        ).count()
-        
-        contacts.append({
-            'id': user.id,
-            'name': user.name,
-            'role': user.role,
-            'unread_count': unread_count
-        })
-    
-    return jsonify(contacts)
-
-@app.cli.command('init-db')
-def init_db():
-    """Inicializa o banco de dados com dados de demonstração."""
-    with app.app_context():
-        db.create_all()
-        
-        if User.query.count() == 0:
-            doctor = User(
-                email='arthur@clinicabasiledemo.com',
-                name='Dr. Arthur Basile',
-                role='medico'
-            )
-            doctor.set_password('123456')
-            db.session.add(doctor)
-            
-            secretary = User(
-                email='secretaria@clinicabasiledemo.com',
-                name='Secretária',
-                role='secretaria'
-            )
-            secretary.set_password('123456')
-            db.session.add(secretary)
-            
-            procedures = [
-                Procedure(name='Ulthera', description='Ultrassom microfocado'),
-                Procedure(name='Morpheus8', description='Microagulhamento com radiofrequência'),
-                Procedure(name='Sculptra', description='Bioestimulador de colágeno'),
-                Procedure(name='Exilis', description='Radiofrequência'),
-                Procedure(name='Neo', description='Tratamento combinado'),
-                Procedure(name='Entone', description='Tonificação muscular')
-            ]
-            for proc in procedures:
-                db.session.add(proc)
-            
-            tags = [
-                Tag(name='Pré-operatório', color='#ffc107'),
-                Tag(name='VIP', color='#6f42c1'),
-                Tag(name='Potencial Sculptra', color='#20c997'),
-                Tag(name='Retorno', color='#0dcaf0'),
-                Tag(name='Primeira Consulta', color='#fd7e14')
-            ]
-            for tag in tags:
-                db.session.add(tag)
-            
-            patient1 = Patient(
-                name='Maria Silva',
-                phone='(11) 98765-4321',
-                email='maria@example.com'
-            )
-            db.session.add(patient1)
-            
-            patient2 = Patient(
-                name='João Santos',
-                phone='(11) 91234-5678',
-                email='joao@example.com'
-            )
-            db.session.add(patient2)
-            
-            db.session.flush()
-            
-            today = get_brazil_time()
-            apt1 = Appointment(
-                patient_id=patient1.id,
-                doctor_id=doctor.id,
-                start_time=today.replace(hour=9, minute=0, second=0, microsecond=0),
-                end_time=today.replace(hour=10, minute=0, second=0, microsecond=0),
-                status='agendado',
-                notes='Consulta de retorno'
-            )
-            db.session.add(apt1)
-            
-            apt2 = Appointment(
-                patient_id=patient2.id,
-                doctor_id=doctor.id,
-                start_time=today.replace(hour=14, minute=0, second=0, microsecond=0),
-                end_time=today.replace(hour=15, minute=0, second=0, microsecond=0),
-                status='confirmado',
-                notes='Primeira consulta'
-            )
-            db.session.add(apt2)
-            
-            db.session.commit()
-            
-            click.echo('Banco de dados inicializado com sucesso!')
-            click.echo('Usuários criados:')
-            click.echo('  Médico: arthur@clinicabasiledemo.com / 123456')
-            click.echo('  Secretária: secretaria@clinicabasiledemo.com / 123456')
+      users = User.query.filter(User.id != current_user.id).all()
+      contacts = []
+      for user in users:
+          unread_count = db.session.query(ChatMessage).filter(
+              ChatMessage.recipient_id == current_user.id,
+              ChatMessage.sender_id == user.id
+          ).outerjoin(
+              MessageRead,
+              db.and_(MessageRead.message_id == ChatMessage.id, MessageRead.user_id == current_user.id)
+          ).filter(MessageRead.id.is_(None)).count()
+          
+          contacts.append({
+              'id': user.id,
+              'name': user.name,
+              'role': user.role,
+              'unread_count': unread_count
+          })
+      return jsonify(contacts)
+  
 
 @app.route('/api/prontuario/<int:patient_id>/cosmetic-plans', methods=['GET'])
 @login_required
