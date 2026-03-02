@@ -306,6 +306,26 @@ function updateTimer() {
         `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
+function showAlert(message, type = 'success') {
+    const alertPlaceholder = document.getElementById('alertPlaceholder');
+    if (!alertPlaceholder) {
+        alert(message);
+        return;
+    }
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = [
+        `<div class="alert alert-${type} alert-dismissible fade show shadow-sm" role="alert">`,
+        `   <div>${message}</div>`,
+        '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+        '</div>'
+    ].join('');
+    alertPlaceholder.append(wrapper);
+    setTimeout(() => {
+        const alert = bootstrap.Alert.getOrCreateInstance(wrapper.firstElementChild);
+        alert.close();
+    }, 5000);
+}
+
 function getConsultationDuration() {
     if (timerStartTime) {
         return Math.floor((Date.now() - timerStartTime) / 60000);

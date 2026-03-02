@@ -2080,15 +2080,25 @@ def finalizar_atendimento(patient_id):
             
             if checkout_procedures:  # Se tem procedimentos, criar checkout
                 # Adicionar valor da consulta conforme tipo
-                procedures_list = [{
-                    'name': proc.get('name', 'Procedimento'),
-                    'value': float(proc.get('budget', proc.get('value', 0)))
-                } for proc in checkout_procedures]
+                # Convert values to float safely
+                procedures_list = []
+                for proc in checkout_procedures:
+                    try:
+                        val = float(proc.get('budget', proc.get('value', 0)))
+                    except (ValueError, TypeError):
+                        val = 0.0
+                    procedures_list.append({
+                        'name': proc.get('name', 'Procedimento'),
+                        'value': val
+                    })
                 
-                # Adicionar taxa de consulta conforme tipo de consulta (não baseado em tipo de paciente)
-                # O tipo de consulta determina se cobra: Particular, Transplante Capilar = R$400
-                # Retorno, UNIMED, Cortesia = sem cobrança
-                total_amount = checkout_amount
+                # Adicionar taxa de consulta conforme tipo de consulta
+                total_amount = 0.0
+                try:
+                    total_amount = float(checkout_amount)
+                except (ValueError, TypeError):
+                    total_amount = 0.0
+                
                 consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
                 if consultation_fee > 0:
                     procedures_list.insert(0, {
