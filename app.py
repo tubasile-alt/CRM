@@ -2191,6 +2191,7 @@ def finalizar_atendimento(patient_id):
         try:
             from services.google_sheets import append_procedures_batch
             from dateutil.relativedelta import relativedelta
+            
             patient = Patient.query.get(patient_id)
             patient_name = patient.name if patient else f"Paciente #{patient_id}"
             patient_phone = patient.phone if patient else ''
@@ -2201,12 +2202,18 @@ def finalizar_atendimento(patient_id):
                 for proc in data.get('cosmetic_procedures', []):
                     if proc.get('performed', False):
                         performed_date = now.date()
-                        follow_up_months = proc.get('follow_up_months')
-                        if follow_up_months and int(follow_up_months) > 0:
-                            return_date = performed_date + relativedelta(months=int(follow_up_months))
+                        # Use get to handle potential missing keys or non-integer values
+                        try:
+                            follow_up_months = int(proc.get('months', proc.get('follow_up_months', 0)))
+                        except (ValueError, TypeError):
+                            follow_up_months = 0
+                            
+                        if follow_up_months > 0:
+                            return_date = performed_date + relativedelta(months=follow_up_months)
                             return_date_str = return_date.strftime('%d/%m/%Y')
                         else:
                             return_date_str = ''
+                        
                         gs_rows.append({
                             'patient_name': patient_name,
                             'procedure_name': proc.get('name', 'Procedimento'),
