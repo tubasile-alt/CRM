@@ -2073,14 +2073,14 @@ def finalizar_atendimento(patient_id):
                         )
                         db.session.add(reminder)
             
-            # CRIAR CHECKOUT AUTOMATICAMENTE para procedimentos realizados
-            checkout_amount = data.get('checkout_amount', 0)
-            checkout_procedures = data.get('checkout_procedures', [])
-            consultation_type = data.get('consultation_type', 'Particular')  # Get from data
-            
-            if checkout_procedures:  # Se tem procedimentos, criar checkout
+        # CRIAR CHECKOUT AUTOMATICAMENTE para procedimentos realizados
+        checkout_amount = data.get('checkout_amount', 0)
+        checkout_procedures = data.get('checkout_procedures', [])
+        consultation_type = data.get('consultation_type', 'Particular')
+        
+        if checkout_procedures:
+            try:
                 # Adicionar valor da consulta conforme tipo
-                # Convert values to float safely
                 procedures_list = []
                 for proc in checkout_procedures:
                     try:
@@ -2099,7 +2099,12 @@ def finalizar_atendimento(patient_id):
                 except (ValueError, TypeError):
                     total_amount = 0.0
                 
-                consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
+                # Use a default empty dict if CONSULTATION_PRICES is not defined or other issue
+                try:
+                    consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
+                except:
+                    consultation_fee = 0.0
+
                 if consultation_fee > 0:
                     procedures_list.insert(0, {
                         'name': f'Consulta {consultation_type}',
@@ -2107,6 +2112,7 @@ def finalizar_atendimento(patient_id):
                     })
                     total_amount += consultation_fee
                 
+                from models import Payment
                 payment = Payment(
                     appointment_id=appointment_id if appointment_id else None,
                     patient_id=patient_id,
@@ -2117,7 +2123,10 @@ def finalizar_atendimento(patient_id):
                     procedures=procedures_list
                 )
                 db.session.add(payment)
-                print(f"✓✓✓ PAYMENT CRIADO: R${total_amount} - {consultation_type} - Paciente {patient_id} - Procedures: {len(procedures_list)}")
+                print(f"✓✓✓ PAYMENT CRIADO: R${total_amount} - {consultation_type} - Paciente {patient_id}")
+            except Exception as pay_err:
+                print(f"Erro ao criar pagamento: {pay_err}")
+                # Não interrompe o fluxo principal se o pagamento falhar
         
         # Salvar dados de transplante capilar (Transplante Capilar)
         if category == 'transplante_capilar':
@@ -2192,9 +2201,9 @@ def finalizar_atendimento(patient_id):
             from services.google_sheets import append_procedures_batch
             from dateutil.relativedelta import relativedelta
             
-            patient = Patient.query.get(patient_id)
-            patient_name = patient.name if patient else f"Paciente #{patient_id}"
-            patient_phone = patient.phone if patient else ''
+            patient_obj = db.session.get(Patient, patient_id)
+            patient_name = patient_obj.name if patient_obj else f"Paciente #{patient_id}"
+            patient_phone = patient_obj.phone if patient_obj else ''
             now = get_brazil_time()
 
             gs_rows = []
@@ -2204,15 +2213,19 @@ def finalizar_atendimento(patient_id):
                         performed_date = now.date()
                         # Use get to handle potential missing keys or non-integer values
                         try:
-                            follow_up_months = int(proc.get('months', proc.get('follow_up_months', 0)))
+                            # Tentar pegar de 'months' ou 'follow_up_months'
+                            m_val = proc.get('months') or proc.get('follow_up_months') or 0
+                            follow_up_months = int(m_val)
                         except (ValueError, TypeError):
                             follow_up_months = 0
                             
+                        return_date_str = ''
                         if follow_up_months > 0:
-                            return_date = performed_date + relativedelta(months=follow_up_months)
-                            return_date_str = return_date.strftime('%d/%m/%Y')
-                        else:
-                            return_date_str = ''
+                            try:
+                                return_date = performed_date + relativedelta(months=follow_up_months)
+                                return_date_str = return_date.strftime('%d/%m/%Y')
+                            except:
+                                return_date_str = ''
                         
                         gs_rows.append({
                             'patient_name': patient_name,
@@ -2221,24 +2234,22 @@ def finalizar_atendimento(patient_id):
                             'return_date': return_date_str,
                             'phone': patient_phone or '',
                         })
+                
+                if gs_rows:
+                    append_procedures_batch(gs_rows)
+                    print(f"DEBUG: {len(gs_rows)} procedimentos enviados para Google Sheets")
+        except Exception as gs_err:
+            print(f"Erro ao integrar com Google Sheets (não-crítico): {gs_err}")
 
-            if gs_rows:
-                append_procedures_batch(gs_rows)
-        except Exception as gs_error:
-            print(f"⚠ Google Sheets (não-crítico): {gs_error}")
-        
-        return jsonify({
-            'success': True,
-            'message': 'Atendimento finalizado com sucesso',
-            'note_ids': note_ids
-        })
-        
+        # === RESPOSTA FINAL ===
+        return jsonify({'success': True})
+
     except Exception as e:
+        import traceback
+        print(f"ERRO CRÍTICO EM finalizar_atendimento (Patient: {patient_id}): {str(e)}")
+        print(traceback.format_exc())
         db.session.rollback()
-        return jsonify({
-            'success': False,
-            'error': f'Erro ao finalizar atendimento: {str(e)}'
-        }), 500
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 @app.route('/api/prontuario/<int:patient_id>/cosmetic-plan', methods=['POST'])
 @login_required
