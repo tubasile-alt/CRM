@@ -292,7 +292,7 @@ window.addEventListener('load', startChatNotifier);
 
 
   // --- CHAT NOTIFIER SYSTEM ---
-  let lastUnreadCount = parseInt(localStorage.getItem('chatLastUnreadCount') || '0');
+  lastUnreadCount = parseInt(localStorage.getItem('chatLastUnreadCount') || '0');
   let lastNotifiedAt = parseInt(localStorage.getItem('chatLastNotifiedAt') || '0');
   let lastLatestMessageId = localStorage.getItem('chatLastLatestMessageId') || '';
 

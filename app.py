@@ -1899,9 +1899,10 @@ def finalizar_atendimento(patient_id):
     if not current_user.is_doctor():
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
-    data = request.get_json(silent=True)
+    data = request.get_json(force=True, silent=True)
     if data is None:
-        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+        print(f"[finalizar_atendimento] ERRO: request.data={request.data!r}, content_type={request.content_type!r}")
+        return jsonify({'success': False, 'error': 'Dados inválidos - body vazio ou malformado'}), 400
     
     # consultation_started não é mais obrigatório (permite salvar consultas retroativas)
     
