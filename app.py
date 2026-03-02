@@ -1449,6 +1449,7 @@ def prontuario(patient_id):
     patient_tags = [pt.tag_id for pt in patient.tags]
     
     # Carregar notas com todos os dados relacionados (eager loading)
+    from models import Note, Indication, CosmeticProcedurePlan, HairTransplant, TransplantImage
     notes = Note.query.filter_by(patient_id=patient_id)\
         .options(
             db.joinedload(Note.indications).joinedload(Indication.procedure),
@@ -1628,7 +1629,7 @@ def prontuario(patient_id):
         age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
     
     # PASSO 1, 2 e 3 — Normalizar eventos para a Timeline (Construída por patient_id e ordenada por data)
-    from models import Evolution, ProcedureRecord, Surgery, CosmeticProcedurePlan, HairTransplant
+    from models import Evolution, ProcedureRecord, Surgery, CosmeticProcedurePlan, HairTransplant, TransplantSurgeryRecord
     
     def build_patient_timeline(p_id):
         from collections import defaultdict
