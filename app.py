@@ -1628,77 +1628,94 @@ def prontuario(patient_id):
         age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
     
     # PASSO 1, 2 e 3 — Normalizar eventos para a Timeline (Construída por patient_id e ordenada por data)
-    from models import Evolution
-    all_appointments = Appointment.query.filter_by(patient_id=patient_id).order_by(Appointment.start_time.desc()).all()
+    from models import Evolution, ProcedureRecord, Surgery
     
-    # Buscar evolutions diretamente pelo patient_id (PASSO 2)
-    all_evolutions = Evolution.query.filter_by(patient_id=patient_id).all()
-    
-    timeline_events = []
-    debug_mode = request.args.get('debug') == '1'
-    
-    # Normalizar appointments (PASSO 3-A)
-    for apt in all_appointments:
-        dt = apt.start_time
-        if dt:
-            # Garantir que temos um objeto datetime e adicionar info de timezone se necessário
-            # No banco é naive (São Paulo), então tratamos como tal
-            timeline_events.append({
-                "type": "appointment",
-                "dt": dt,
-                "dt_iso": apt.start_time.isoformat() + '-03:00' if apt.start_time else None,
-                "title": f"{apt.appointment_type or 'Consulta'} ({apt.doctor.name if apt.doctor else 'Médico'})",
-                "body": apt.notes or "",
-                "id": apt.id,
-                "status": apt.status,
-                "doctor": apt.doctor.name if apt.doctor else 'Médico'
-            })
+    def build_patient_timeline(p_id):
+        events = []
         
-    # Normalizar evolutions (PASSO 3-B)
-    for evo in all_evolutions:
-        dt = None
-        appointment_id = evo.consultation_id
-        
-        # TENTAR ANCORAR NA DATA DA CONSULTA (Requisito 1)
-        if appointment_id:
-            appt = db.session.get(Appointment, appointment_id)
-            if appt:
-                dt = appt.start_time
-        
-        # FALLBACK PARA DATA DE CRIAÇÃO (Requisito 1)
-        if not dt:
-            dt = evo.created_at or evo.evolution_date
-            
-        if not dt:
-            print(f"AVISO: Evolution {evo.id} sem data válida. Ignorando.")
-            continue
+        # A) Consultas
+        appts = Appointment.query.filter_by(patient_id=p_id).all()
+        for apt in appts:
+            dt = apt.consultation_date or apt.start_time
+            if dt:
+                events.append({
+                    "type": "consulta",
+                    "dt": dt,
+                    "dt_iso": dt.isoformat() + '-03:00',
+                    "title": f"{apt.appointment_type or 'Consulta'}",
+                    "label": apt.appointment_type or 'Consulta',
+                    "body": apt.notes or "",
+                    "id": apt.id,
+                    "reference_id": apt.id,
+                    "status": apt.status,
+                    "doctor": apt.doctor.name if apt.doctor else 'Médico'
+                })
 
-        # PASSO 4 — Evitar evolutions vazias
-        content = (evo.content or "").strip()
-        body_text = content if content else "(Evolução sem texto — recuperar/gerar)"
+        # B) Procedimentos executados
+        procs = ProcedureRecord.query.filter_by(patient_id=p_id, status='realizado').all()
+        for pr in procs:
+            dt = pr.performed_date
+            if dt:
+                # Converter date para datetime se necessário para ordenação
+                if isinstance(dt, date) and not isinstance(dt, datetime):
+                    dt = datetime.combine(dt, datetime.min.time())
+                events.append({
+                    "type": "procedimento",
+                    "dt": dt,
+                    "dt_iso": dt.isoformat() + '-03:00',
+                    "title": f"Procedimento: {pr.procedure_name}",
+                    "label": pr.procedure_name,
+                    "body": pr.notes or "",
+                    "id": pr.id,
+                    "reference_id": pr.id,
+                    "doctor": pr.doctor.name if pr.doctor else 'Médico'
+                })
+
+        # C) Cirurgias
+        surgeries = Surgery.query.filter_by(patient_id=p_id).all()
+        for surg in surgeries:
+            dt = datetime.combine(surg.date, surg.start_time)
+            events.append({
+                "type": "cirurgia",
+                "dt": dt,
+                "dt_iso": dt.isoformat() + '-03:00',
+                "title": f"Cirurgia: {surg.procedure_name}",
+                "label": surg.procedure_name,
+                "body": surg.notes or "",
+                "id": surg.id,
+                "reference_id": surg.id,
+                "status": surg.status,
+                "doctor": surg.doctor.name if surg.doctor else 'Médico'
+            })
+
+        # D) Evoluções
+        evos = Evolution.query.filter_by(patient_id=p_id).all()
+        for evo in evos:
+            dt = evo.evolution_date or evo.created_at
+            if dt:
+                events.append({
+                    "type": "evolution",
+                    "dt": dt,
+                    "dt_iso": dt.isoformat() + '-03:00',
+                    "title": "Evolução clínica",
+                    "label": "Evolução",
+                    "body": evo.content or "(Sem conteúdo)",
+                    "id": evo.id,
+                    "reference_id": evo.id,
+                    "doctor": evo.doctor.name if evo.doctor else 'Médico'
+                })
         
-        timeline_events.append({
-            "type": "evolution",
-            "dt": dt,
-            "dt_iso": dt.isoformat() + '-03:00' if dt else None,
-            "title": "Evolução clínica",
-            "body": body_text,
-            "appointment_id": appointment_id,
-            "doctor": evo.doctor.name if evo.doctor else 'Médico'
-        })
-        
-    # PASSO 5 — Ordenar events por dt DESC
-    timeline_events.sort(key=lambda x: x['dt'] if x['dt'] else datetime.min, reverse=True)
+        # Ordenar por data ASC (conforme pedido: date ASC)
+        events.sort(key=lambda x: x['dt'])
+        return events
+
+    timeline_events = build_patient_timeline(patient_id)
     
     # PASSO 6 — DEBUG VISÍVEL
     debug_info = None
     if debug_mode:
-        first_evo = next((e for e in timeline_events if e['type'] == 'evolution'), None)
         debug_info = {
-            'appointments_count': len(all_appointments),
-            'evolutions_count': len(all_evolutions),
             'events_total': len(timeline_events),
-            'first_evolution_sample': first_evo['body'][:60] if first_evo else "Nenhuma evolução"
         }
 
     return render_template('prontuario.html', 

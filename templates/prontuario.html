@@ -288,15 +288,19 @@ function deletePatientPhoto() {
                             
                             <div class="timeline-dot-wrapper d-flex justify-content-center">
                                 <div class="timeline-dot rounded-circle shadow-sm 
-                                    {% if event.type == 'evolution' %}
+                                    {% if event.type == 'consulta' %}
                                         bg-primary
-                                    {% elif event.status == 'atendido' or loop.first %}
+                                    {% elif event.type == 'procedimento' %}
                                         bg-success
+                                    {% elif event.type == 'cirurgia' %}
+                                        bg-danger
+                                    {% elif event.type == 'evolution' %}
+                                        bg-warning
                                     {% else %}
                                         bg-secondary
                                     {% endif %}" 
                                      style="width: 24px; height: 24px; border: 4px solid #fff; cursor: pointer; transition: all 0.2s;"
-                                     data-appointment-id="{{ event.appointment_id or event.id }}"
+                                     data-id="{{ event.reference_id }}"
                                      data-event-type="{{ event.type }}"
                                      data-dt-iso="{{ event.dt_iso }}"
                                      onclick="handleTimelineClick(this)">
@@ -305,10 +309,11 @@ function deletePatientPhoto() {
                                 <div class="timeline-popover position-absolute bg-white p-3 rounded shadow-sm border text-start" 
                                      style="width: 280px; top: 40px; left: 50%; transform: translateX(-50%); display: none; z-index: 1000;">
                                     <div class="fw-bold mb-2 border-bottom pb-1 d-flex justify-content-between">
-                                        <span>{{ event.title }}</span>
-                                        {% if event.type == 'evolution' %}
-                                            <span class="badge bg-primary">Evolução</span>
-                                        {% endif %}
+                                        <span>{{ event.label }}</span>
+                                        <span class="badge 
+                                            {% if event.type == 'consulta' %}bg-primary{% elif event.type == 'procedimento' %}bg-success{% elif event.type == 'cirurgia' %}bg-danger{% elif event.type == 'evolution' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                            {{ event.type|capitalize }}
+                                        </span>
                                     </div>
                                     <div class="small text-muted mb-2">
                                         <i class="bi bi-clock me-1"></i> {{ event.dt.strftime('%d/%m/%Y %H:%M') }}
@@ -317,7 +322,7 @@ function deletePatientPhoto() {
                                     <div class="timeline-body small text-dark" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">
                                         {{ event.body|default("(Sem observações)", true) }}
                                     </div>
-                                    {% if event.type == 'appointment' %}
+                                    {% if event.type == 'consulta' %}
                                     <div class="mt-2 border-top pt-2 d-grid">
                                         <button class="btn btn-sm btn-outline-primary" onclick="scrollToConsultation('consultation-{{ event.id }}')">
                                             Ver Consulta
@@ -326,7 +331,7 @@ function deletePatientPhoto() {
                                     {% endif %}
                                     {% if event.type == 'evolution' and "(Evolução sem texto" in event.body %}
                                     <div class="mt-2 border-top pt-2 d-grid">
-                                        <button class="btn btn-sm btn-warning" onclick="recalculateEvolution({{ event.appointment_id }})">
+                                        <button class="btn btn-sm btn-warning" onclick="recalculateEvolution({{ event.id }})">
                                             <i class="bi bi-arrow-clockwise"></i> Regerar Evolução
                                         </button>
                                     </div>
@@ -341,6 +346,53 @@ function deletePatientPhoto() {
         </div>
     </div>
 </div>
+
+
+<script>
+// Funções da Timeline
+function handleTimelineClick(element) {
+    const popover = element.nextElementSibling;
+    const isVisible = popover.style.display === 'block';
+    
+    // Fechar todos os outros popovers
+    document.querySelectorAll('.timeline-popover').forEach(p => p.style.display = 'none');
+    
+    if (!isVisible) {
+        popover.style.display = 'block';
+    }
+}
+
+// Fechar popover ao clicar fora
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.timeline-dot-wrapper')) {
+        document.querySelectorAll('.timeline-popover').forEach(p => p.style.display = 'none');
+    }
+});
+
+function scrollToConsultation(id) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+        element.classList.add('highlight-consult');
+        setTimeout(() => element.classList.remove('highlight-consult'), 2000);
+    }
+}
+
+function recalculateEvolution(evolutionId) {
+    if (!confirm('Deseja regerar o texto desta evolução com base nas notas?')) return;
+    
+    fetch(`/api/evolution/recalculate/${evolutionId}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showAlert('Evolução regerada! Recarregando...', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert(res.error || 'Erro ao regerar', 'danger');
+        }
+    });
+}
+</script>
 
 
 <style>
