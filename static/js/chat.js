@@ -134,7 +134,14 @@ function sendMessage() {
             message: message
         })
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error('Erro no servidor: ' + response.status + ' - ' + text.substring(0, 100));
+            });
+        }
+        return response.json();
+    })
     .then(data => {
         if (data.success) {
             input.value = '';
@@ -145,7 +152,7 @@ function sendMessage() {
     })
     .catch(error => {
         console.error('Erro ao enviar mensagem:', error);
-        showAlert('Erro ao enviar mensagem.', 'danger');
+        showAlert('Erro ao enviar mensagem: ' + error.message, 'danger');
     });
 }
 
