@@ -2304,6 +2304,7 @@ def get_messages():
     if not with_user_id:
         return jsonify({'error': 'Parâmetro with_user_id é obrigatório'}), 400
     
+    # Forçar commit e desabilitar cache se necessário, mas o commit já deve ter ocorrido no send_message
     messages = ChatMessage.query.filter(
         db.or_(
             db.and_(
@@ -2315,17 +2316,20 @@ def get_messages():
                 ChatMessage.recipient_id == current_user.id
             )
         )
-    ).order_by(ChatMessage.created_at.asc()).limit(100).all()
+    ).order_by(ChatMessage.created_at.asc()).all()
+    
+    # Debug: logar quantidade de mensagens encontradas
+    print(f"[CHAT] Buscando mensagens entre {current_user.id} e {with_user_id}. Encontradas: {len(messages)}")
     
     return jsonify([{
         'id': msg.id,
-        'sender': msg.sender.name,
+        'sender': msg.sender.name if msg.sender else "Sistema",
         'senderId': msg.sender_id,
-        'recipient': msg.recipient.name,
+        'recipient': msg.recipient.name if msg.recipient else "Sistema",
         'recipientId': msg.recipient_id,
         'message': msg.message,
         'timestamp': format_brazil_datetime(msg.created_at).split(' ')[1] if msg.created_at else '',
-        'read': msg.read
+        'read': msg.read if hasattr(msg, 'read') else False
     } for msg in messages])
 
 @app.route('/api/chat/send', methods=['POST'])
