@@ -2413,7 +2413,7 @@ def get_latest_unread():
             'id': latest.id,
             'from_user_id': latest.sender_id,
             'from_name': latest.sender.name if latest.sender else "Sistema",
-            'message': latest.content[:80] + ('...' if len(latest.content) > 80 else ''),
+            'message': (latest.message[:80] + ('...' if len(latest.message) > 80 else '')) if latest.message else "",
             'created_at': latest.created_at.isoformat()
         })
     return jsonify({'id': None})

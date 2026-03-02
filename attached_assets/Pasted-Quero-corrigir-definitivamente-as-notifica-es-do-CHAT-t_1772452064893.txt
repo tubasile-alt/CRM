@@ -1,0 +1,97 @@
+Quero corrigir definitivamente as notificações do CHAT (toast + som) em TODAS as páginas.
+Hoje o badge de unread funciona, mas não aparece pop-up nem toca som.
+
+CAUSAS:
+1) static/js/main.js só tem updateChatBadge() e NÃO tem ChatNotifier.
+2) templates/base.html não tem toast container nem toggle de som.
+3) /api/chat/latest_unread retorna latest.content mas o campo certo é latest.message.
+
+OBJETIVO:
+- Mostrar toast discreto (não modal) no canto superior direito quando chegar mensagem nova.
+- Tocar beep curto SOMENTE se o usuário habilitar o som.
+- Funcionar em qualquer página (agenda, prontuário, CRM etc).
+- Não depender da aba do chat estar aberta.
+- Não repetir notificações em loop (throttle + comparar lastSeenMessageId).
+- Corrigir endpoint /api/chat/latest_unread para retornar preview correto.
+
+IMPLEMENTAÇÃO:
+
+(1) BACKEND — corrigir latest_unread
+Arquivo: app.py
+Na rota /api/chat/latest_unread:
+- Trocar latest.content por latest.message
+- Retornar:
+  { id, from_user_id, from_name, message (80 chars), created_at }
+Garantir que nunca quebra se message for None.
+
+(2) BASE TEMPLATE — infraestrutura global
+Arquivo: templates/base.html
+- Inserir SEMPRE antes de </body>:
+  <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 99999;"></div>
+
+- Adicionar um toggle simples no menu (ao lado de Chat):
+  🔔 (clicável) para ligar/desligar som.
+  Persistir em localStorage: chatSoundEnabled = "1" ou "0".
+  Ao clicar, mostrar um toast “Som do chat: ON/OFF”.
+
+- Garantir que os scripts estejam carregados nesta ordem (no final do body):
+  1) bootstrap.bundle.min.js (necessário para toast)
+  2) /static/js/main.js
+
+(3) FRONTEND — implementar ChatNotifier no main.js
+Arquivo: static/js/main.js
+- Manter o updateChatBadge existente.
+- Adicionar:
+
+A) Estado persistido:
+  lastUnreadCount (localStorage)
+  lastNotifiedAt (localStorage)
+  lastLatestMessageId (localStorage)
+
+B) Função fetchUnread():
+  GET /api/chat/unread_count
+
+C) Quando count aumentar:
+  - chamar GET /api/chat/latest_unread
+  - mostrar toast com:
+    Título: "Nova mensagem — {from_name}"
+    Corpo: "{message}"
+    Ao clicar: ir para /chat
+  - tocar beep com WebAudio APENAS se chatSoundEnabled == "1"
+  - throttle: não notificar mais que 1 vez a cada 4 segundos
+  - não notificar se latest.id == lastLatestMessageId
+  - atualizar lastLatestMessageId
+
+D) beep via WebAudio:
+  função playBeep() com oscillator 660Hz 0.12s (volume baixo)
+  Se autoplay bloqueado:
+   - só permitir beep após usuário clicar no toggle 🔔 uma vez (isso “desbloqueia” áudio).
+   - no clique do toggle, tocar um beep de teste.
+
+E) Inicialização robusta:
+  criar startChatNotifier() e chamar:
+    startChatNotifier()
+    window.addEventListener('load', startChatNotifier)
+  (evitar depender só de DOMContentLoaded)
+
+F) Loop:
+  setInterval(checkNewMessages, 5000) em qualquer página (se user autenticado).
+
+(4) DEBUG (temporário)
+- Adicionar console.log em:
+  "ChatNotifier started"
+  "Unread count:", count
+  "Latest unread:", latest.id
+- Se quiser, adicionar badge pequeno no canto: "Notifier ON" por 10s e depois remover.
+
+TESTE EM 1 MINUTO:
+1) Abrir sistema em 2 navegadores: médico e secretária.
+2) Garantir que 🔔 está ON no navegador que vai receber.
+3) Enviar mensagem.
+4) Deve aparecer toast no canto e tocar beep.
+5) Clicar no toast deve abrir /chat.
+
+ENTREGAR:
+- Lista de arquivos alterados
+- Trechos principais adicionados em base.html e main.js
+- Confirmar que /api/chat/latest_unread retorna message corretamente

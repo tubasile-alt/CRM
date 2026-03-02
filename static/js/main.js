@@ -154,7 +154,7 @@ function handleChatNotification(currentCount) {
             lastSeenMessageId = data.id;
             localStorage.setItem('chatLastSeenMessageId', lastSeenMessageId);
 
-            showMiniChatPopup(data);
+            showToastNotification(data);
 
             if (document.hidden || window.location.pathname !== '/chat') {
                 if (Notification.permission === "granted") {
@@ -167,82 +167,33 @@ function handleChatNotification(currentCount) {
         });
 }
 
-function showMiniChatPopup(data) {
-    let dock = document.getElementById('miniChatDock');
-    if (!dock) {
-        document.head.insertAdjacentHTML('beforeend', miniChatDockStyles);
-        dock = document.createElement('div');
-        dock.id = 'miniChatDock';
-        dock.className = 'mini-chat-dock';
-        document.body.appendChild(dock);
-    }
+function showToastNotification(data) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
 
-    if (dock.children.length >= 3) {
-        dock.lastElementChild.remove();
-    }
-
-    const cardId = 'mini-chat-' + data.id;
-    if (document.getElementById(cardId)) return;
-
-    const card = document.createElement('div');
-    card.id = cardId;
-    card.className = 'mini-chat-card';
-    card.innerHTML = `
-        <div class="mini-chat-header" onclick="window.location.href='/chat'">
-            <span><i class="bi bi-person-circle"></i> ${data.from_name}</span>
-            <button class="btn-close btn-close-white" style="font-size: 0.7rem;"></button>
+    const toastId = 'toast-' + Date.now();
+    const toastHtml = `
+        <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-primary text-white">
+                <i class="bi bi-chat-dots me-2"></i>
+                <strong class="me-auto">Nova mensagem — ${data.from_name}</strong>
+                <small>Agora</small>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" style="cursor: pointer;" onclick="window.location.href='/chat'">
+                ${data.message}
+            </div>
         </div>
-        <div class="mini-chat-body">${data.message}</div>
-        <div class="mini-chat-footer">
-            <textarea class="mini-chat-input" placeholder="Responder..." rows="1"></textarea>
-            <button class="btn btn-sm btn-primary btn-send">Enviar</button>
-        </div>
-        <div class="send-status text-success px-2 pb-1 small" style="display:none;">Enviado ✓</div>
     `;
 
-    dock.prepend(card);
+    container.insertAdjacentHTML('beforeend', toastHtml);
+    const toastElement = document.getElementById(toastId);
+    const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
+    toast.show();
 
-    const closeBtn = card.querySelector('.btn-close');
-    closeBtn.onclick = (e) => { e.stopPropagation(); card.remove(); };
-
-    const input = card.querySelector('.mini-chat-input');
-    const sendBtn = card.querySelector('.btn-send');
-    const status = card.querySelector('.send-status');
-
-    let autoHideTimer = setTimeout(() => card.remove(), 20000);
-
-    const resetTimer = () => {
-        clearTimeout(autoHideTimer);
-        autoHideTimer = setTimeout(() => card.remove(), 20000);
-    };
-
-    card.onmouseenter = () => clearTimeout(autoHideTimer);
-    card.onmouseleave = resetTimer;
-    input.onfocus = () => clearTimeout(autoHideTimer);
-
-    sendBtn.onclick = () => {
-        const text = input.value.trim();
-        if (!text) return;
-
-        sendBtn.disabled = true;
-        fetch('/api/chat/send', {
-            method: 'POST',
-            body: JSON.stringify({ recipient_id: data.from_user_id, message: text })
-        })
-        .then(res => res.json())
-        .then(resData => {
-            if (resData.success) {
-                status.style.display = 'block';
-                input.value = '';
-                setTimeout(() => card.remove(), 2000);
-                // Marcar como lida ao responder
-                fetch(`/api/chat/mark_read/${data.id}`, { method: 'POST' });
-            } else {
-                alert('Erro ao enviar');
-                sendBtn.disabled = false;
-            }
-        });
-    };
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
 }
 
 function playChatBeep() {
@@ -283,6 +234,13 @@ function initChatNotifier() {
             enabled = !enabled;
             localStorage.setItem('chatSoundEnabled', enabled);
             updateIcon(enabled);
+            
+            // Mostrar toast de confirmação
+            showToastNotification({
+                from_name: 'Sistema',
+                message: 'Som do chat: ' + (enabled ? 'ATIVADO' : 'DESATIVADO')
+            });
+            
             if (enabled) playChatBeep();
         };
     }
