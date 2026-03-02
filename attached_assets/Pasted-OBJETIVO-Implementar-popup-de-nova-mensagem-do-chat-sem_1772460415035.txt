@@ -1,0 +1,133 @@
+OBJETIVO:
+Implementar popup de nova mensagem do chat (sem modal) que funcione 100%:
+- Toast próprio (sem depender de Bootstrap)
+- Som opcional (só depois do usuário habilitar)
+- Disparar quando unread_count aumentar
+- Não spammar (throttle + lastMessageId)
+
+1) BASE TEMPLATE — garantir container global
+Arquivo: templates/base.html
+ANTES de </body>, adicionar:
+<div id="chat-toast-root"></div>
+
+E adicionar CSS global (no base.html ou css):
+<style>
+#chat-toast-root{
+  position:fixed; top:16px; right:16px; z-index:99999;
+  display:flex; flex-direction:column; gap:10px;
+  pointer-events:none;
+}
+.chat-toast{
+  width:320px; max-width:90vw;
+  background:#111; color:#fff;
+  border-radius:12px; padding:12px 14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  pointer-events:auto;
+  cursor:pointer;
+  opacity:0; transform:translateY(-8px);
+  transition:all .18s ease;
+}
+.chat-toast.show{ opacity:1; transform:translateY(0); }
+.chat-toast .t{ font-weight:700; font-size:14px; margin-bottom:6px; }
+.chat-toast .b{ font-size:13px; opacity:.92; }
+.chat-toast .x{ position:absolute; top:8px; right:10px; opacity:.7; }
+</style>
+
+2) MAIN.JS — notifier robusto
+Arquivo: static/js/main.js
+
+A) Estado:
+let lastUnreadCount = parseInt(localStorage.getItem('chatLastUnreadCount') || '0');
+let lastNotifiedAt = parseInt(localStorage.getItem('chatLastNotifiedAt') || '0');
+let lastLatestMessageId = localStorage.getItem('chatLastLatestMessageId') || '';
+
+B) Função showToast(data):
+- criar elemento .chat-toast dentro #chat-toast-root
+- texto:
+  título: `Nova mensagem — ${data.from_name || 'Chat'}`
+  corpo: data.message || 'Você recebeu uma nova mensagem.'
+- clique: window.location = '/chat'
+- auto-remove: 6s
+- máximo 3 toasts (remover o mais antigo)
+
+C) Beep (som):
+- Implementar playBeep() com WebAudio
+- Só tocar se localStorage.chatSoundEnabled == "1"
+- Criar toggle no menu (🔔) ou checkbox simples em base.html:
+  ao clicar, set localStorage.chatSoundEnabled e tocar beep de teste (isso desbloqueia autoplay)
+
+D) Loop principal:
+async function checkChat() {
+  try {
+    const r = await fetch('/api/chat/unread_count', { credentials:'same-origin' });
+    if(!r.ok) return;
+    const {count} = await r.json();
+
+    // badge (se já existe)
+    const badge = document.getElementById('chat-badge');
+    if (badge){
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'inline-block':'none';
+    }
+
+    if (count > lastUnreadCount) {
+      const now = Date.now();
+      if (now - lastNotifiedAt < 4000) { 
+        lastUnreadCount = count;
+        localStorage.setItem('chatLastUnreadCount', String(count));
+        return;
+      }
+
+      const lr = await fetch('/api/chat/latest_unread', { credentials:'same-origin' });
+      if(!lr.ok) return;
+      const latest = await lr.json();
+
+      if (latest && latest.id && String(latest.id) !== String(lastLatestMessageId)) {
+        showToast(latest);
+        if (document.hidden) {
+          // Notification API opcional (não obrigatória)
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Nova mensagem — ' + (latest.from_name||'Chat'), { body: latest.message||'' });
+          }
+        }
+        if (localStorage.getItem('chatSoundEnabled') === '1') playBeep();
+
+        lastLatestMessageId = String(latest.id);
+        localStorage.setItem('chatLastLatestMessageId', lastLatestMessageId);
+        lastNotifiedAt = now;
+        localStorage.setItem('chatLastNotifiedAt', String(now));
+      }
+    }
+
+    lastUnreadCount = count;
+    localStorage.setItem('chatLastUnreadCount', String(count));
+  } catch(e){
+    console.error('[CHAT NOTIFIER]', e);
+  }
+}
+
+E) Inicialização:
+- Rodar checkChat a cada 5s em todas as páginas:
+setInterval(checkChat, 5000);
+checkChat();
+
+IMPORTANTE:
+- Envolver toda init em try/catch para nunca quebrar o sistema.
+
+3) BACKEND — garantir latest_unread correto
+Arquivo: app.py
+Confirmar que /api/chat/latest_unread retorna:
+{id, from_name, message, created_at}
+e que message vem de ChatMessage.message (não content).
+
+ACEITE:
+- Em duas contas diferentes, enviar mensagem:
+  -> toast aparece no canto superior direito
+  -> clique abre /chat
+  -> som só toca se 🔔 estiver habilitado
+- Sem travar outras telas
+- Não repetir toast sem mensagem nova
+ENTREGAR:
+- arquivos alterados
+- trechos principais (toast html/css, checkChat, showToast, playBeep)
+- como testar em 1 minuto

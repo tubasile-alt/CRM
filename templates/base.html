@@ -11,7 +11,30 @@
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     
     {% block extra_css %}{% endblock %}
-</head>
+
+  <style>
+  #chat-toast-root{
+    position:fixed; top:16px; right:16px; z-index:99999;
+    display:flex; flex-direction:column; gap:10px;
+    pointer-events:none;
+  }
+  .chat-toast{
+    width:320px; max-width:90vw;
+    background:#111; color:#fff;
+    border-radius:12px; padding:12px 14px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+    pointer-events:auto;
+    cursor:pointer;
+    opacity:0; transform:translateY(-8px);
+    transition:all .18s ease;
+    position: relative;
+  }
+  .chat-toast.show{ opacity:1; transform:translateY(0); }
+  .chat-toast .t{ font-weight:700; font-size:14px; margin-bottom:6px; }
+  .chat-toast .b{ font-size:13px; opacity:.92; }
+  .chat-toast .x{ position:absolute; top:8px; right:10px; opacity:.7; cursor:pointer; }
+  </style>
+  </head>
 <body data-user-id="{{ current_user.id if current_user.is_authenticated else 0 }}">
     {% if current_user.is_authenticated %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -106,5 +129,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block extra_js %}{% endblock %}
+<div id="chat-toast-root"></div>
 </body>
 </html>
