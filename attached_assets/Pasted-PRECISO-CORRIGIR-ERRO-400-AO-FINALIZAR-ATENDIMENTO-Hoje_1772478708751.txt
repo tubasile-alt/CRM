@@ -1,0 +1,102 @@
+PRECISO CORRIGIR ERRO 400 AO FINALIZAR ATENDIMENTO.
+Hoje, PUT /api/appointments/<id> retorna 400 porque request.get_json(silent=True) vem None.
+Não quero usar get_json(force=True).
+Quero corrigir corretamente frontend + backend e remover duplicidades que quebram o fluxo.
+
+========================================
+1) FRONTEND — garantir envio JSON correto
+========================================
+Arquivos: static/js/prontuario.js (ou o JS onde está finalizarAtendimento() ~linha 1152), e qualquer outro arquivo com função duplicada.
+
+A) Localizar TODAS as funções de finalizar:
+- finalizarAtendimento()
+- finalizarAtendimentoV2() (se existir)
+- qualquer handler do botão "Finalizar Atendimento"
+REMOVER duplicidade: deve existir UM ÚNICO caminho de execução.
+
+B) No handler oficial (o que o botão chama), ao fazer PUT /api/appointments/<id>:
+- Garantir:
+  - method: 'PUT'
+  - headers:
+      'Content-Type': 'application/json'
+      'X-CSRFToken': getCSRFToken() (ou deixar o fetchWithCSRF adicionar, mas NÃO duplicar)
+  - body: JSON.stringify(payload)
+
+C) Antes do fetch, logar:
+console.log('[FINALIZAR] PUT payload', payload)
+
+D) Depois do fetch, logar:
+console.log('[FINALIZAR] status', res.status)
+console.log('[FINALIZAR] body', await res.clone().text())
+
+E) Se usar fetchWithCSRF wrapper global, não pode existir erro JS que impeça o carregamento do arquivo.
+Corrigir qualquer SyntaxError.
+
+========================================
+2) MAIN.JS — corrigir erro JS que para o sistema
+========================================
+Arquivo: static/js/main.js
+- Encontrar declaração duplicada: let lastUnreadCount = ...
+- Manter apenas UMA declaração.
+- Garantir que o arquivo não gera SyntaxError no console.
+- Adicionar um console.log('[main.js] loaded') no final temporariamente para testar.
+
+========================================
+3) BACKEND — aceitar JSON ou form SEM force=True
+========================================
+Arquivo: app.py
+Em TODOS endpoints que recebem JSON (ex.: PUT /api/appointments/<id>, /api/appointments/<id>/finalize, etc):
+
+Substituir:
+data = request.get_json(silent=True)
+
+Por:
+data = request.get_json(silent=True)
+if data is None:
+    # fallback para form-urlencoded
+    data = request.form.to_dict() if request.form else {}
+
+Se mesmo assim data for {} e Content-Length > 0:
+- logar:
+app.logger.warning("EMPTY BODY: content_type=%s len=%s raw=%s",
+    request.content_type, request.content_length, request.get_data(as_text=True)[:200])
+
+Não retornar 400 genérico sem mensagem.
+Se faltar campo obrigatório:
+return jsonify({"error":"missing field X"}), 400
+
+========================================
+4) ENDPOINT PUT /api/appointments/<id> — validação amigável
+========================================
+- Se appointment não existir: 404 json
+- Se data vazio: 400 json com {"error":"empty body"} (mas com logging acima)
+- Se sucesso: 200 json com {"success":true}
+
+========================================
+5) GARANTIR QUE O MODAL "Deseja finalizar" NÃO DISPARA DUAS VEZES
+========================================
+No JS do botão finalizar:
+- Usar um lock:
+if (window.__finalizing) return;
+window.__finalizing = true;
+No finally do fetch: window.__finalizing = false;
+
+Isso impede duplo clique / duplo handler.
+
+========================================
+6) CHECKLIST DE TESTE (2 MIN)
+========================================
+1) Abrir console (F12) e recarregar a página:
+- não pode aparecer SyntaxError
+- deve aparecer "[main.js] loaded"
+2) Clicar Finalizar Atendimento:
+- console deve mostrar "[FINALIZAR] PUT payload ..."
+- deve mostrar status 200 (ou erro claro)
+3) Se der erro:
+- backend deve logar raw body e content-type
+- resposta deve conter {"error": "..."} e não HTML.
+
+ENTREGAR:
+- arquivos alterados
+- trechos principais
+- como testar

@@ -1150,10 +1150,13 @@ function saveHairTransplant() {
 
 // ========== FINALIZAR ATENDIMENTO ==========
 function finalizarAtendimento() {
-    // Confirmar finalização
+    if (window.__finalizing) return;
+
     if (!confirm('Deseja finalizar o atendimento? Todos os dados serão salvos.')) {
         return;
     }
+
+    window.__finalizing = true;
     
     // Calcular duração em minutos (0 se timer não foi iniciado — consulta retroativa)
     const duration = timerStartTime ? Math.floor((Date.now() - timerStartTime) / 60000) : 0;
@@ -1261,48 +1264,55 @@ function finalizarAtendimento() {
         };
     }
     
-    // Mostrar loading
+    // Mostrar loading no botão
     const btn = document.querySelector('button[onclick="finalizarAtendimento()"]');
+    const originalText = btn ? btn.innerHTML : '';
     if (btn) {
-        const originalText = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Finalizando...';
-        
-        // Enviar para o backend
-        fetch(`/api/prontuario/${patientId}/finalizar`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                // Parar cronômetro
-                if (timerInterval) {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
-                }
-                timerStartTime = null;
-                
-                alert('Atendimento finalizado com sucesso!');
-                
-                // Redirecionar de volta para a agenda
-                window.location.href = '/agenda';
-            } else {
-                alert(result.error || 'Erro ao finalizar atendimento');
-                btn.disabled = false;
-                btn.innerHTML = originalText;
-            }
-        })
-        .catch(error => {
-            console.error('Erro:', error);
-            alert('Erro ao finalizar atendimento. Por favor, tente novamente.');
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-        });
     }
+
+    // Enviar para o backend
+    console.log('[FINALIZAR] POST payload', payload);
+    fetch(`/api/prontuario/${patientId}/finalizar`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(async response => {
+        console.log('[FINALIZAR] status', response.status);
+        const text = await response.text();
+        console.log('[FINALIZAR] body', text);
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            throw new Error('Resposta inválida do servidor (não-JSON): ' + text.substring(0, 100));
+        }
+    })
+    .then(result => {
+        if (result.success) {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            timerStartTime = null;
+            alert('Atendimento finalizado com sucesso!');
+            window.location.href = '/agenda';
+        } else {
+            alert(result.error || 'Erro ao finalizar atendimento');
+            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+        }
+    })
+    .catch(error => {
+        console.error('[FINALIZAR] Erro:', error);
+        alert('Erro ao finalizar atendimento: ' + error.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+    })
+    .finally(() => {
+        window.__finalizing = false;
+    });
 }
 
 // Auto-open attention modal if there's content when page loads
