@@ -1,28 +1,29 @@
 const originalFetch = window.fetch;
 
 function getCsrfToken() {
-    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return meta ? meta.getAttribute('content') : '';
 }
 
 window.getCSRFToken = getCsrfToken;
 
-function fetchWithCsrf(url, options = {}) {
-    if (!options.headers) {
-        options.headers = {};
+async function fetchWithCSRF(url, options = {}) {
+    const opts = { credentials: 'same-origin', ...options };
+    const method = (opts.method || 'GET').toUpperCase();
+    opts.headers = { ...(opts.headers || {}) };
+
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        opts.headers['X-CSRFToken'] = getCsrfToken();
+        if (!opts.headers['Content-Type'] && !(opts.body instanceof FormData)) {
+            opts.headers['Content-Type'] = 'application/json';
+        }
     }
     
-    if (options.method && options.method !== 'GET') {
-        options.headers['X-CSRFToken'] = getCsrfToken();
-    }
-    
-    if (options.body && typeof options.body === 'object' && !(options.body instanceof FormData)) {
-        options.headers['Content-Type'] = 'application/json';
-    }
-    
-    return originalFetch(url, options);
+    return originalFetch(url, opts);
 }
 
-window.fetch = fetchWithCsrf;
+window.fetchWithCSRF = fetchWithCSRF;
+window.fetch = fetchWithCSRF;
 
 function showAlert(message, type = 'success') {
     const alertDiv = document.createElement('div');
@@ -171,6 +172,11 @@ function showToastNotification(data) {
     const container = document.getElementById('toast-container');
     if (!container) return;
 
+    if (!(window.bootstrap && bootstrap.Toast)) {
+        console.warn("[ChatNotifier] Bootstrap Toast não disponível");
+        return;
+    }
+
     const toastId = 'toast-' + Date.now();
     const toastHtml = `
         <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
@@ -198,6 +204,10 @@ function showToastNotification(data) {
 
 function playChatBeep() {
     try {
+        if (!(window.AudioContext || window.webkitAudioContext)) {
+            console.warn("[ChatNotifier] WebAudio não disponível");
+            return;
+        }
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const oscillator = audioCtx.createOscillator();
         const gainNode = audioCtx.createGain();
@@ -268,11 +278,14 @@ function initChatNotifier() {
 function startChatNotifier() {
     if (window.__chatNotifierStarted) return;
     window.__chatNotifierStarted = true;
-    initChatNotifier();
+    try {
+        initChatNotifier();
+    } catch (e) {
+        console.error('[ChatNotifier] Erro de inicialização:', e);
+    }
 }
 
-// Iniciar imediatamente (script já está no final do body)
+// Iniciar com segurança
 startChatNotifier();
 
-// Fallback: garantir init após window.onload (caso haja race condition)
 window.addEventListener('load', startChatNotifier);

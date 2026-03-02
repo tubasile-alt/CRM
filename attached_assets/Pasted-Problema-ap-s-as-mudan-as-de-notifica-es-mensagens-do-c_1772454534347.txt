@@ -1,0 +1,61 @@
+Problema: após as mudanças de notificações, mensagens do chat não estão sendo enviadas.
+
+Objetivo: restaurar envio de mensagens e manter notificações sem quebrar o chat.
+
+1) GARANTIR QUE O FETCH COM CSRF CONTINUA IGUAL
+Arquivo: static/js/main.js
+- Verifique se existe a função fetchWithCSRF(url, options)
+- Ela deve SEMPRE:
+  a) Ler token do meta: <meta name="csrf-token" content="...">
+  b) Setar header "X-CSRFToken" em TODA requisição com method POST/PUT/PATCH/DELETE
+  c) Usar credentials: "same-origin"
+
+Exemplo correto:
+function getCSRFToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.getAttribute('content') : '';
+}
+
+async function fetchWithCSRF(url, options = {}) {
+  const opts = { credentials: 'same-origin', ...options };
+  const method = (opts.method || 'GET').toUpperCase();
+  opts.headers = { ...(opts.headers || {}) };
+
+  if (['POST','PUT','PATCH','DELETE'].includes(method)) {
+    opts.headers['X-CSRFToken'] = getCSRFToken();
+    if (!opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
+  }
+  return fetch(url, opts);
+}
+
+2) ISOLAR O CHATNOTIFIER PARA NÃO QUEBRAR O RESTO
+No mesmo main.js:
+- Envolver TODA a inicialização do notifier em try/catch:
+try { startChatNotifier(); } catch(e) { console.error('ChatNotifier error', e); }
+
+- E em cada função do notifier, checar dependências:
+  - Toast só se window.bootstrap && bootstrap.Toast existirem
+  - WebAudio só se window.AudioContext existir
+Se não existir, apenas não notifica (mas não quebra o resto do JS).
+
+3) CONFIRMAR QUE O CHAT USA fetchWithCSRF
+Localize o JS do chat (handler do botão enviar).
+- Se ele usa fetch(), trocar para fetchWithCSRF() SEM mudar payload.
+- Confirmar que o payload continua com o campo "message" (não "content") e "recipient_id".
+
+4) BACKEND: CONFERIR CAMPOS DO CHAT
+Arquivo: app.py
+- Confirmar que a rota de envio espera JSON com "recipient_id" e "message".
+- Se alguém alterou para "content", reverta para "message" (compatível com o model ChatMessage.message).
+
+5) DEBUG TEMPORÁRIO (para provar)
+- Adicionar no handler de envio:
+  console.log("sending chat...", payload)
+- E logar resposta:
+  const res = await fetchWithCSRF(...); console.log(res.status, await res.text());
+
+ENTREGA:
+- arquivos alterados
+- trecho do fetchWithCSRF
+- trecho do handler do envio usando fetchWithCSRF
+- confirmação que main.js não quebra mais (try/catch)

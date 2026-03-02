@@ -125,26 +125,25 @@ function sendMessage() {
     
     if (!message) return;
     
-    console.log('Enviando mensagem para:', selectedContactId, 'Texto:', message);
+    const payload = {
+        recipient_id: selectedContactId,
+        message: message
+    };
+    console.log("sending chat...", payload);
     
     fetch('/api/chat/send', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-        },
-        body: JSON.stringify({
-            recipient_id: selectedContactId,
-            message: message
-        })
+        body: JSON.stringify(payload)
     })
-    .then(response => {
+    .then(async response => {
+        console.log("Chat response status:", response.status);
+        const text = await response.text();
+        console.log("Chat response body:", text);
+        
         if (!response.ok) {
-            return response.text().then(text => {
-                throw new Error('Erro no servidor: ' + response.status + ' - ' + text.substring(0, 100));
-            });
+            throw new Error('Erro no servidor: ' + response.status + ' - ' + text.substring(0, 100));
         }
-        return response.json();
+        return JSON.parse(text);
     })
     .then(data => {
         if (data.success) {
