@@ -1,0 +1,215 @@
+OBJETIVO:
+Substituir completamente o modelo atual de prescrição do DermaScribe por um layout profissional igual ao modelo enviado (Anexo 1), mantendo formato A4, sem rodapé (pois o papel já é timbrado), e remover definitivamente qualquer texto do tipo “[cite: 34]”, “[cite:36]”, etc.
+
+---
+
+ETAPA 1 — LIMPEZA DEFINITIVA DE “[cite: XX]”
+
+Arquivo: routes/dermascribe.py
+
+1) Importar re no topo:
+
+import re
+
+2) Criar função global de sanitização:
+
+CITE_RE = re.compile(r"\[cite:\s*\d+\]", re.IGNORECASE)
+
+def strip_citations(value: str) -> str:
+    if not value:
+        return value
+    cleaned = CITE_RE.sub("", value)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+([,.;:])", r"\1", cleaned)
+    return cleaned.strip()
+
+---
+
+3) Na rota api_save_prescription():
+
+ANTES de salvar no banco, limpar todos os medicamentos:
+
+for med in oral_medications:
+    med["medication"] = strip_citations(med.get("medication", ""))
+    med["instructions"] = strip_citations(med.get("instructions", ""))
+
+for med in topical_medications:
+    med["medication"] = strip_citations(med.get("medication", ""))
+    med["instructions"] = strip_citations(med.get("instructions", ""))
+
+Isso impede que novos registros salvem “[cite: xx]”.
+
+---
+
+4) Na rota print_prescription() e prescription_pdf():
+
+ANTES de renderizar o template, criar listas limpas:
+
+oral_clean = []
+for med in (prescription.medications_oral or []):
+    oral_clean.append({
+        **med,
+        "medication": strip_citations(med.get("medication", "")),
+        "instructions": strip_citations(med.get("instructions", "")),
+    })
+
+topical_clean = []
+for med in (prescription.medications_topical or []):
+    topical_clean.append({
+        **med,
+        "medication": strip_citations(med.get("medication", "")),
+        "instructions": strip_citations(med.get("instructions", "")),
+    })
+
+Passar para o template:
+
+return render_template(
+    "dermascribe/print.html",
+    prescription=prescription,
+    patient=patient,
+    doctor=prescription.doctor,
+    oral_medications=oral_clean,
+    topical_medications=topical_clean,
+)
+
+---
+
+ETAPA 2 — SUBSTITUIR COMPLETAMENTE O TEMPLATE
+
+Arquivo: templates/dermascribe/print.html
+
+Substituir TODO o conteúdo pelo seguinte:
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Prescrição Médica</title>
+
+<style>
+@page {
+  size: A4;
+  margin: 20mm 20mm 25mm 20mm;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13pt;
+  color: #111;
+  line-height: 1.5;
+}
+
+.title {
+  text-align: center;
+  font-size: 20pt;
+  font-weight: 700;
+  margin-bottom: 15mm;
+}
+
+.patient {
+  font-size: 14pt;
+  margin-bottom: 12mm;
+}
+
+.patient strong {
+  font-weight: 700;
+}
+
+.section {
+  margin-top: 8mm;
+  margin-bottom: 6mm;
+}
+
+.section-title {
+  font-weight: 700;
+  font-size: 15pt;
+  margin-bottom: 4mm;
+}
+
+.medication-name {
+  font-weight: 700;
+  font-size: 14pt;
+  margin-bottom: 2mm;
+}
+
+.instructions {
+  margin-bottom: 6mm;
+}
+
+.signature-space {
+  height: 35mm;
+}
+
+.date {
+  text-align: right;
+  margin-top: 15mm;
+}
+</style>
+</head>
+
+<body>
+
+<div class="title">Prescrição Médica</div>
+
+<div class="patient">
+  <strong>Paciente:</strong> {{ patient.name }}
+</div>
+
+{% if oral_medications %}
+<div class="section">
+  <div class="section-title">Uso Oral</div>
+  {% for med in oral_medications %}
+    <div class="medication-name">{{ med.medication }}</div>
+    {% if med.instructions %}
+      <div class="instructions">{{ med.instructions }}</div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if topical_medications %}
+<div class="section">
+  <div class="section-title">Uso Tópico</div>
+  {% for med in topical_medications %}
+    <div class="medication-name">{{ med.medication }}</div>
+    {% if med.instructions %}
+      <div class="instructions">{{ med.instructions }}</div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="signature-space"></div>
+
+<div class="date">
+  Data: {{ prescription.created_at.strftime('%d/%m/%Y') }}
+</div>
+
+</body>
+</html>
+
+---
+
+REGRAS IMPORTANTES:
+
+• NÃO incluir rodapé com endereço/site/instagram.
+• NÃO incluir CRM no rodapé (já está no timbrado).
+• Layout limpo, centralizado, profissional.
+• Compatível com WeasyPrint.
+• A4 respeitado.
+• Nenhum “[cite: xx]” pode aparecer no PDF.
+
+---
+
+CRITÉRIOS DE ACEITE:
+
+1) Criar uma prescrição com “[cite: 36]” no texto.
+2) Gerar PDF.
+3) O PDF NÃO deve conter a palavra “cite”.
+4) Layout deve estar limpo, centralizado e profissional.
+5) Nenhum rodapé duplicado deve aparecer.

@@ -1,3 +1,4 @@
+import re
 from flask import Blueprint, render_template, request, jsonify, send_file, make_response
 from flask_login import login_required, current_user
 from models import db, Medication, MedicationUsage, Prescription, Patient
@@ -9,6 +10,16 @@ import csv
 from datetime import datetime
 
 dermascribe_bp = Blueprint('dermascribe', __name__, url_prefix='/dermascribe')
+
+CITE_RE = re.compile(r"\[cite:\s*\d+\]", re.IGNORECASE)
+
+def strip_citations(value: str) -> str:
+    if not value:
+        return value
+    cleaned = CITE_RE.sub("", value)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    cleaned = re.sub(r"\s+([,.;:])", r"\1", cleaned)
+    return cleaned.strip()
 
 @dermascribe_bp.route('/')
 @login_required
@@ -143,6 +154,15 @@ def api_save_prescription():
     if not patient_id:
         return jsonify({'status': 'error', 'message': 'ID do paciente é obrigatório'})
     
+    # Limpeza de citações
+    for med in oral_medications:
+        med["medication"] = strip_citations(med.get("medication", ""))
+        med["instructions"] = strip_citations(med.get("instructions", ""))
+
+    for med in topical_medications:
+        med["medication"] = strip_citations(med.get("medication", ""))
+        med["instructions"] = strip_citations(med.get("instructions", ""))
+    
     patient = Patient.query.get(patient_id)
     if not patient:
         return jsonify({'status': 'error', 'message': 'Paciente não encontrado'})
@@ -217,11 +237,29 @@ def print_prescription(prescription_id):
     if not getattr(prescription, "created_at", None):
         prescription.created_at = datetime.now()
 
+    oral_clean = []
+    for med in (prescription.medications_oral or []):
+        oral_clean.append({
+            **med,
+            "medication": strip_citations(med.get("medication", "")),
+            "instructions": strip_citations(med.get("instructions", "")),
+        })
+
+    topical_clean = []
+    for med in (prescription.medications_topical or []):
+        topical_clean.append({
+            **med,
+            "medication": strip_citations(med.get("medication", "")),
+            "instructions": strip_citations(med.get("instructions", "")),
+        })
+
     return render_template(
         'dermascribe/print.html',
         prescription=prescription,
         patient=patient,
-        doctor=prescription.doctor
+        doctor=prescription.doctor,
+        oral_medications=oral_clean,
+        topical_medications=topical_clean,
     )
 
 @dermascribe_bp.route('/prescription/<int:prescription_id>/pdf')
@@ -238,11 +276,29 @@ def prescription_pdf(prescription_id):
     if not getattr(prescription, "created_at", None):
         prescription.created_at = datetime.now()
 
+    oral_clean = []
+    for med in (prescription.medications_oral or []):
+        oral_clean.append({
+            **med,
+            "medication": strip_citations(med.get("medication", "")),
+            "instructions": strip_citations(med.get("instructions", "")),
+        })
+
+    topical_clean = []
+    for med in (prescription.medications_topical or []):
+        topical_clean.append({
+            **med,
+            "medication": strip_citations(med.get("medication", "")),
+            "instructions": strip_citations(med.get("instructions", "")),
+        })
+
     html_str = render_template(
         'dermascribe/print.html',
         prescription=prescription,
         patient=patient,
-        doctor=prescription.doctor
+        doctor=prescription.doctor,
+        oral_medications=oral_clean,
+        topical_medications=topical_clean,
     )
 
     pdf = HTML(string=html_str, base_url=request.host_url).write_pdf()
