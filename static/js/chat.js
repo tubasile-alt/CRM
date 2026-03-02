@@ -82,6 +82,8 @@ function loadMessages() {
         .then(response => response.json())
         .then(messages => {
             const messagesDiv = document.getElementById('messagesArea');
+            if (!messagesDiv) return;
+            
             messagesDiv.innerHTML = '';
             
             if (messages.length === 0) {
