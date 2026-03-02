@@ -1631,17 +1631,20 @@ def prontuario(patient_id):
     from models import Evolution, ProcedureRecord, Surgery
     
     def build_patient_timeline(p_id):
-        events = []
+        from collections import defaultdict
+        events_by_date = defaultdict(list)
         
         # A) Consultas
         appts = Appointment.query.filter_by(patient_id=p_id).all()
         for apt in appts:
             dt = apt.consultation_date or apt.start_time
             if dt:
-                events.append({
+                # Normalizar para date para agrupamento
+                d = dt.date() if isinstance(dt, datetime) else dt
+                events_by_date[d].append({
                     "type": "consulta",
                     "dt": dt,
-                    "dt_iso": dt.isoformat() + '-03:00',
+                    "dt_iso": dt.isoformat() + '-03:00' if isinstance(dt, datetime) else dt.isoformat() + 'T00:00:00-03:00',
                     "title": f"{apt.appointment_type or 'Consulta'}",
                     "label": apt.appointment_type or 'Consulta',
                     "body": apt.notes or "",
@@ -1656,13 +1659,13 @@ def prontuario(patient_id):
         for pr in procs:
             dt = pr.performed_date
             if dt:
-                # Converter date para datetime se necessário para ordenação
-                if isinstance(dt, date) and not isinstance(dt, datetime):
-                    dt = datetime.combine(dt, datetime.min.time())
-                events.append({
+                d = dt if isinstance(dt, date) and not isinstance(dt, datetime) else dt.date()
+                # Converter date para datetime para o template/iso
+                dt_obj = datetime.combine(d, datetime.min.time())
+                events_by_date[d].append({
                     "type": "procedimento",
-                    "dt": dt,
-                    "dt_iso": dt.isoformat() + '-03:00',
+                    "dt": dt_obj,
+                    "dt_iso": dt_obj.isoformat() + '-03:00',
                     "title": f"Procedimento: {pr.procedure_name}",
                     "label": pr.procedure_name,
                     "body": pr.notes or "",
@@ -1674,8 +1677,9 @@ def prontuario(patient_id):
         # C) Cirurgias
         surgeries = Surgery.query.filter_by(patient_id=p_id).all()
         for surg in surgeries:
+            d = surg.date
             dt = datetime.combine(surg.date, surg.start_time)
-            events.append({
+            events_by_date[d].append({
                 "type": "cirurgia",
                 "dt": dt,
                 "dt_iso": dt.isoformat() + '-03:00',
@@ -1693,10 +1697,11 @@ def prontuario(patient_id):
         for evo in evos:
             dt = evo.evolution_date or evo.created_at
             if dt:
-                events.append({
+                d = dt.date() if isinstance(dt, datetime) else dt
+                events_by_date[d].append({
                     "type": "evolution",
                     "dt": dt,
-                    "dt_iso": dt.isoformat() + '-03:00',
+                    "dt_iso": dt.isoformat() + '-03:00' if isinstance(dt, datetime) else dt.isoformat() + 'T00:00:00-03:00',
                     "title": "Evolução clínica",
                     "label": "Evolução",
                     "body": evo.content or "(Sem conteúdo)",
@@ -1705,9 +1710,26 @@ def prontuario(patient_id):
                     "doctor": evo.doctor.name if evo.doctor else 'Médico'
                 })
         
-        # Ordenar por data ASC (conforme pedido: date ASC)
-        events.sort(key=lambda x: x['dt'])
-        return events
+        # Consolidar timeline
+        timeline = []
+        for d in sorted(events_by_date.keys()):
+            day_events = events_by_date[d]
+            # Ordenar eventos dentro do dia: cirurgia > procedimento > consulta > evolution
+            type_order = {"cirurgia": 0, "procedimento": 1, "consulta": 2, "evolution": 3}
+            day_events.sort(key=lambda x: (type_order.get(x["type"], 99), x["dt"]))
+            
+            # O evento principal (que define o ponto na timeline) será o primeiro da lista ordenada
+            main_event = day_events[0]
+            timeline.append({
+                "date": d,
+                "dt": main_event["dt"],
+                "dt_iso": main_event["dt_iso"],
+                "type": main_event["type"],
+                "label": main_event["label"],
+                "events": day_events # Passar todos os eventos do dia
+            })
+            
+        return timeline
 
     timeline_events = build_patient_timeline(patient_id)
     

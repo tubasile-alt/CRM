@@ -1,0 +1,52 @@
+BUG:
+Timeline está mostrando o ponto em 21/01/2026 (ok), mas NÃO cria um ponto separado em 02/03/2026 para o Botox FEITO (realizado_em: 02/03/2026).
+Além disso, no ponto do dia 21 deveria aparecer o “box” do procedimento Morpheus (e não só o marcador da consulta).
+
+CAUSA:
+A timeline está agrupando procedimentos por appointment.date (data da consulta) ao invés de usar item.realizado_em (data real de execução).
+Ou está usando fallback mesmo quando realizado_em existe.
+
+CORREÇÃO:
+
+1) Localizar a função que monta timeline (ex: build_patient_timeline / get_timeline_events) no backend.
+
+2) Para cada item planejado com status "FEITO":
+- Definir a data do evento assim:
+  event_date = item.realizado_em if item.realizado_em else appointment.date
+
+- Criar evento do tipo "procedimento" com:
+  {
+    "type": "procedimento",
+    "date": event_date,
+    "label": item.nome_procedimento (ex: Morpheus, Botox),
+    "status": "FEITO",
+    "amount": item.valor,
+    "appointment_id": item.appointment_id,
+    "ref_id": item.id
+  }
+
+3) Agrupar por data:
+- events_by_date[event_date].append(event)
+
+4) Garantir que eventos por data sejam ordenados:
+- ordenar datas (ASC)
+- dentro do dia, ordenar procedimentos antes de “consulta” ou vice-versa (definir)
+
+5) Template timeline:
+- Para cada data, renderizar:
+  - marcador na linha
+  - abaixo do marcador, renderizar cards/boxes:
+    - se event.type == 'procedimento' -> box com nome (Morpheus/Botox) + badge FEITO
+    - se event.type == 'cirurgia' -> box especial
+    - consulta opcional
+
+6) Critérios de aceite:
+- Morpheus (FEITO, realizado_em 21/01) aparece na timeline em 21/01 com box “Morpheus”
+- Botox (FEITO, realizado_em 02/03) aparece na timeline em 02/03 com box “Botox”
+- Consulta pode permanecer no dia original, mas procedimento deve seguir a data real
+- Se existir cirurgia, criar evento no dia da cirurgia
+
+ENTREGAR:
+- função backend alterada
+- trecho do template atualizado
+- como testar com esse mesmo paciente
