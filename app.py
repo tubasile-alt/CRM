@@ -2247,8 +2247,11 @@ def finalizar_atendimento(patient_id):
         import traceback
         print(f"ERRO CRÍTICO EM finalizar_atendimento (Patient: {patient_id}): {str(e)}")
         print(traceback.format_exc())
-        db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 400
+        try:
+            db.session.rollback()
+        except:
+            pass
+        return jsonify({'success': False, 'error': f'Erro interno: {str(e)}'}), 500
 
 @app.route('/api/prontuario/<int:patient_id>/cosmetic-plan', methods=['POST'])
 @login_required
