@@ -2310,12 +2310,12 @@ def get_messages():
             db.and_(ChatMessage.sender_id == current_user.id, ChatMessage.recipient_id == with_user_id),
             db.and_(ChatMessage.sender_id == with_user_id, ChatMessage.recipient_id == current_user.id)
         )
-    ).order_by(ChatMessage.created_at.asc()).all()
+    ).order_by(ChatMessage.id.asc()).all()
     
     # Log para debug
     print(f"[CHAT] Buscando mensagens entre {current_user.id} e {with_user_id}. Encontradas: {len(messages)}")
     if messages:
-        print(f"[CHAT] Última mensagem ID: {messages[-1].id}, Conteúdo: {messages[-1].message[:20]}")
+        print(f"[CHAT] IDs das últimas 3 mensagens: {[m.id for m in messages[-3:]]}")
     
     return jsonify([{
         'id': msg.id,

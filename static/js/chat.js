@@ -75,167 +75,110 @@ function selectContact(contactId, contactName) {
     markMessagesAsRead();
 }
 
-function loadMessages() {
-    if (!selectedContactId) return;
-    
-    const withUserId = parseInt(selectedContactId, 10);
-    console.log('[CHAT] loadMessages selectedContactId=', selectedContactId, typeof selectedContactId);
-    
-    fetch(`/api/chat/messages?with_user_id=${withUserId}`)
-        .then(response => {
-            console.log('[CHAT] messages status', response.status);
-            if (!response.ok) {
-                const messagesDiv = document.getElementById('messagesArea');
-                if (messagesDiv && !messagesDiv.querySelector('.chat-message')) {
-                    const errorMsg = document.createElement('div');
-                    errorMsg.style.textAlign = 'center';
-                    errorMsg.style.padding = '10px';
-                    errorMsg.style.color = '#dc3545';
-                    errorMsg.textContent = `Falha ao carregar mensagens (status ${response.status})`;
-                    messagesDiv.appendChild(errorMsg);
-                }
-                throw new Error('Erro ao carregar mensagens');
-            }
-            return response.json();
-        })
-        .then(messages => {
-            const messagesArea = document.getElementById('messagesArea');
-            if (!messagesArea) return;
-            
-            // 1. Manter mensagens temporárias que NÃO estão no retorno do servidor
-            const tempMessages = Array.from(messagesArea.querySelectorAll('.chat-message[id^="temp-"]')).map(el => ({
-                id: el.id,
-                html: el.innerHTML,
-                text: el.querySelector('.message-text').textContent
-            }));
 
-            // 2. Criar um conjunto de conteúdos já presentes no servidor para evitar duplicatas
-            const serverMessageTexts = new Set(messages.map(m => m.message));
+  function loadMessages() {
+      if (!selectedContactId) return;
+      
+      const withUserId = parseInt(selectedContactId, 10);
+      const messagesArea = document.getElementById('messagesArea');
+      if (!messagesArea) return;
 
-            // 3. Limpar a área e renderizar mensagens do servidor
-            messagesArea.innerHTML = '';
-            
-            messages.forEach(msg => {
-                appendMessageToUI({
-                    senderId: msg.senderId,
-                    message: msg.message,
-                    timestamp: msg.timestamp,
-                    id: msg.id
-                }, false);
-            });
-            
-            // 4. Re-inserir mensagens temporárias apenas se não estiverem no servidor
-            tempMessages.forEach(temp => {
-                if (!serverMessageTexts.has(temp.text)) {
-                    const msgDiv = document.createElement('div');
-                    msgDiv.className = 'chat-message sent';
-                    msgDiv.id = temp.id;
-                    msgDiv.innerHTML = temp.html;
-                    messagesArea.appendChild(msgDiv);
-                }
-            });
-            
-            if (messages.length === 0 && messagesArea.children.length === 0) {
-                messagesArea.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #6c757d;">
-                        <i class="bi bi-chat-left-text" style="font-size: 3rem; margin-bottom: 15px;"></i>
-                        <p>Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>
-                    </div>
-                `;
-            }
-            
-            // Scroll suave
-            setTimeout(() => {
-                messagesArea.scrollTop = messagesArea.scrollHeight;
-            }, 50);
-        })
-        .catch(error => {
-            console.error('Erro ao carregar mensagens:', error);
-        });
-}
+      fetch(`/api/chat/messages?with_user_id=${withUserId}&t=${Date.now()}`)
+          .then(response => {
+              if (!response.ok) throw new Error('Erro ao carregar');
+              return response.json();
+          })
+          .then(messages => {
+              const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
 
-function appendMessageToUI(msg, shouldScroll = true) {
-    const messagesDiv = document.getElementById('messagesArea');
-    if (!messagesDiv) return;
+              // 1. Coletar mensagens locais (temporárias)
+              const localMsgs = Array.from(messagesArea.querySelectorAll('.chat-message[id^="temp-"]')).map(el => ({
+                  id: el.id,
+                  html: el.innerHTML,
+                  text: el.querySelector('.message-text').textContent.trim()
+              }));
 
-    // Remover placeholder de "Nenhuma mensagem" se existir
-    const placeholder = messagesDiv.querySelector('div[style*="padding: 40px"]');
-    if (placeholder) placeholder.remove();
+              // 2. IDs do servidor
+              const serverIds = messages.map(m => m.id.toString());
+              const currentOfficialIds = Array.from(messagesArea.querySelectorAll('.chat-message:not([id^="temp-"])')).map(el => el.dataset.msgId);
+              
+              const serverTexts = new Set(messages.filter(m => parseInt(m.senderId, 10) === currentUserId).map(m => m.message.trim()));
 
-    const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
-    const isSent = parseInt(msg.senderId, 10) === currentUserId;
-    
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `chat-message ${isSent ? 'sent' : 'received'}`;
-    msgDiv.id = msg.id ? `msg-${msg.id}` : '';
-    
-    msgDiv.innerHTML = `
-        <div class="message-text">${escapeHtml(msg.message)}</div>
-        <div class="message-time">${msg.timestamp || 'agora'}</div>
-    `;
-    
-    messagesDiv.appendChild(msgDiv);
-    
-    if (shouldScroll) {
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-}
+              // Se nada mudou no servidor e não temos novas locais, não faz nada
+              if (serverIds.join(',') === currentOfficialIds.join(',') && localMsgs.length === 0 && messages.length > 0) return;
 
-function sendMessage() {
-    if (!selectedContactId) {
-        showAlert('Selecione um contato primeiro.', 'warning');
-        return;
-    }
-    
-    const input = document.getElementById('messageInput');
-    const message = input.value.trim();
-    
-    if (!message) return;
-    
-    const payload = {
-        recipient_id: selectedContactId,
-        message: message
-    };
-    console.log("sending chat...", payload);
-    
-    const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
-    
-    fetch('/api/chat/send', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-    })
-    .then(async response => {
-        console.log("Chat response status:", response.status);
-        const text = await response.text();
-        console.log("Chat response body:", text);
-        
-        if (!response.ok) {
-            throw new Error('Erro no servidor: ' + response.status + ' - ' + text.substring(0, 100));
-        }
-        return JSON.parse(text);
-    })
-    .then(data => {
-        if (data.success) {
-            input.value = '';
-            input.focus();
-            // Inserção otimista
-            appendMessageToUI({
-                senderId: currentUserId,
-                message: message,
-                timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                id: data.id
-            });
-            // Sincronizar (opcional, já que inserimos otimista)
-            // loadMessages(); 
-        } else {
-            showAlert(data.error || 'Erro ao enviar mensagem.', 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Erro ao enviar mensagem:', error);
-        showAlert('Erro ao enviar mensagem: ' + error.message, 'danger');
-    });
-}
+              // 3. Reconstruir
+              messagesArea.innerHTML = '';
+              
+              // Renderiza oficiais
+              messages.forEach(msg => {
+                  appendMessageToUI({
+                      senderId: msg.senderId,
+                      message: msg.message,
+                      timestamp: msg.timestamp,
+                      id: msg.id
+                  }, false);
+              });
+              
+              // Re-insere locais pendentes
+              localMsgs.forEach(local => {
+                  if (!serverTexts.has(local.text)) {
+                      const msgDiv = document.createElement('div');
+                      msgDiv.className = 'chat-message sent';
+                      msgDiv.id = local.id;
+                      msgDiv.innerHTML = local.html;
+                      messagesArea.appendChild(msgDiv);
+                  }
+              });
+              
+              messagesArea.scrollTop = messagesArea.scrollHeight;
+          })
+          .catch(err => console.error('Erro polling:', err));
+  }
+
+  function sendMessage() {
+      if (!selectedContactId) {
+          showAlert('Selecione um contato primeiro.', 'warning');
+          return;
+      }
+      
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      if (!message) return;
+      
+      const currentUserId = parseInt(document.body.dataset.userId || '0', 10);
+      const tempId = 'temp-' + Date.now();
+      
+      // Mostra na hora
+      appendMessageToUI({
+          senderId: currentUserId,
+          message: message,
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          id: tempId
+      });
+      
+      input.value = '';
+      input.focus();
+      
+      fetch('/api/chat/send', {
+          method: 'POST',
+          body: JSON.stringify({ recipient_id: selectedContactId, message: message })
+      })
+      .then(res => res.json())
+      .then(data => {
+          if (!data.success) {
+              const temp = document.getElementById(tempId);
+              if (temp) temp.remove();
+              showAlert(data.error || 'Erro ao enviar', 'danger');
+          }
+      })
+      .catch(() => {
+          const temp = document.getElementById(tempId);
+          if (temp) temp.remove();
+          showAlert('Erro de conexão', 'danger');
+      });
+  }
+  
 
 function markMessagesAsRead() {
     if (!selectedContactId) return;
