@@ -2341,10 +2341,14 @@ def send_message():
     if not recipient:
         return jsonify({'error': 'Destinatário não encontrado'}), 404
     
+    message_text = data.get('message', '')
+    if not message_text:
+        return jsonify({'error': 'Mensagem vazia'}), 400
+
     message_obj = ChatMessage(
         sender_id=current_user.id,
         recipient_id=int(recipient_id),
-        message=data.get('message', ''),
+        message=message_text,
         created_at=get_brazil_time().replace(tzinfo=None)
     )
     

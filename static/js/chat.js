@@ -125,6 +125,8 @@ function sendMessage() {
     
     if (!message) return;
     
+    console.log('Enviando mensagem para:', selectedContactId, 'Texto:', message);
+    
     fetch('/api/chat/send', {
         method: 'POST',
         headers: {
