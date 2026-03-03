@@ -214,6 +214,52 @@
     <div class="crm-header">
         <h2><i class="bi bi-graph-up"></i> CRM - Gestão de Procedimentos</h2>
     </div>
+
+    <!-- Dashboard Transplante -->
+    <div class="row mb-5">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-bar-chart-line"></i> Atendimentos de Transplante / Mês</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="transplantChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold text-danger"><i class="bi bi-person-exclamation"></i> Pendentes de Cirurgia</h5>
+                    <span class="badge bg-danger" id="pendingCount">0</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 250px;">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Paciente</th>
+                                    <th>Consulta</th>
+                                    <th class="text-center">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingSurgeriesTable">
+                                <tr>
+                                    <td colspan="3" class="text-center py-4">Carregando...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <hr class="my-5">
+    
+    <div class="crm-header">
+        <h3><i class="bi bi-magic"></i> CRM Cosmiatria</h3>
+    </div>
     
     <div class="crm-stats" id="crmStats">
         <div class="stat-card success">
@@ -270,10 +316,67 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadCRMData();
+    loadTransplantDashboard();
 });
+
+async function loadTransplantDashboard() {
+    try {
+        // Stats do Gráfico
+        const statsResp = await fetch('/api/crm/transplant-stats');
+        const statsData = await statsResp.json();
+        
+        const ctx = document.getElementById('transplantChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: statsData.map(d => d.month),
+                datasets: [{
+                    label: 'Atendimentos',
+                    data: statsData.map(d => d.count),
+                    backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    borderWidth: 2,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+
+        // Tabela de Pendentes
+        const pendingResp = await fetch('/api/crm/pending-surgeries');
+        const pendingData = await pendingResp.json();
+        
+        const tbody = document.getElementById('pendingSurgeriesTable');
+        document.getElementById('pendingCount').textContent = pendingData.length;
+        
+        if (pendingData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Nenhum pendente.</td></tr>';
+        } else {
+            tbody.innerHTML = pendingData.map(p => `
+                <tr>
+                    <td class="fw-bold">
+                        ${p.name}
+                        ${p.phone ? `<br><a href="https://wa.me/55${p.phone.replace(/\D/g, '')}" target="_blank" class="small text-success text-decoration-none"><i class="bi bi-whatsapp"></i> Contato</a>` : ''}
+                    </td>
+                    <td>${p.last_consultation}</td>
+                    <td class="text-center">
+                        <a href="/prontuario/${p.id}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;">Ver</a>
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) {
+        console.error("Erro ao carregar dashboard de transplante", e);
+    }
+}
 
 function loadCRMData() {
     loadStats();

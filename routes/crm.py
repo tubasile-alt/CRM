@@ -1,8 +1,9 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
-from models import db, Patient, CosmeticProcedurePlan, Note, User
+from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import func, extract
 import pytz
 
 crm_bp = Blueprint('crm', __name__)
@@ -11,6 +12,58 @@ crm_bp = Blueprint('crm', __name__)
 @login_required
 def crm_page():
     return render_template('crm.html')
+
+@crm_bp.route('/api/crm/transplant-stats')
+@login_required
+def get_transplant_stats():
+    # Atendimentos de transplante por mês (últimos 12 meses)
+    today = date.today()
+    start_date = today - relativedelta(months=11)
+    start_date = start_date.replace(day=1)
+    
+    stats = db.session.query(
+        extract('year', Appointment.start_time).label('year'),
+        extract('month', Appointment.start_time).label('month'),
+        func.count(Appointment.id).label('count')
+    ).filter(
+        Appointment.appointment_type == 'Transplante Capilar',
+        Appointment.start_time >= start_date
+    ).group_by('year', 'month').order_by('year', 'month').all()
+    
+    result = []
+    for s in stats:
+        result.append({
+            'month': f"{int(s.month):02d}/{int(s.year)}",
+            'count': s.count
+        })
+    
+    return jsonify(result)
+
+@crm_bp.route('/api/crm/pending-surgeries')
+@login_required
+def get_pending_surgeries():
+    # Pacientes que tiveram consulta de transplante mas não tem cirurgia agendada/realizada
+    # 1. Pegar pacientes com indicação de transplante ou consulta de transplante
+    subquery = db.session.query(TransplantSurgeryRecord.patient_id).distinct()
+    
+    patients = db.session.query(Patient).join(
+        Appointment, Patient.id == Appointment.patient_id
+    ).filter(
+        Appointment.appointment_type == 'Transplante Capilar',
+        ~Patient.id.in_(subquery)
+    ).distinct().all()
+    
+    result = []
+    for p in patients:
+        last_app = db.session.query(Appointment).filter_by(patient_id=p.id, appointment_type='Transplante Capilar').order_by(Appointment.start_time.desc()).first()
+        result.append({
+            'id': p.id,
+            'name': p.name,
+            'phone': p.phone,
+            'last_consultation': last_app.start_time.strftime('%d/%m/%Y') if last_app else 'N/A'
+        })
+    
+    return jsonify(result)
 
 @crm_bp.route('/api/crm/performed')
 @login_required
