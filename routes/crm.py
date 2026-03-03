@@ -42,20 +42,32 @@ def get_transplant_stats():
 @crm_bp.route('/api/crm/pending-surgeries')
 @login_required
 def get_pending_surgeries():
-    # Pacientes que tiveram consulta de transplante mas não tem cirurgia agendada/realizada
-    # 1. Pegar pacientes com indicação de transplante ou consulta de transplante
+    # Pacientes que tem planejamento cirúrgico mas não tem registro de cirurgia
+    from models import HairTransplant, Note
+    
+    # Subconsulta: pacientes que JÁ POSSUEM registro de cirurgia
     subquery = db.session.query(TransplantSurgeryRecord.patient_id).distinct()
     
+    # Busca pacientes que possuem a nota de planejamento preenchida
+    # mas não estão na subconsulta de cirurgias já agendadas/realizadas
     patients = db.session.query(Patient).join(
-        Appointment, Patient.id == Appointment.patient_id
+        Note, Patient.id == Note.patient_id
+    ).join(
+        HairTransplant, Note.id == HairTransplant.note_id
     ).filter(
-        Appointment.appointment_type == 'Transplante Capilar',
+        HairTransplant.surgical_planning != None,
+        HairTransplant.surgical_planning != '',
         ~Patient.id.in_(subquery)
     ).distinct().all()
     
     result = []
     for p in patients:
-        last_app = db.session.query(Appointment).filter_by(patient_id=p.id, appointment_type='Transplante Capilar').order_by(Appointment.start_time.desc()).first()
+        # Pega a última consulta de transplante para exibir a data
+        last_app = db.session.query(Appointment).filter_by(
+            patient_id=p.id, 
+            appointment_type='Transplante Capilar'
+        ).order_by(Appointment.start_time.desc()).first()
+        
         result.append({
             'id': p.id,
             'name': p.name,

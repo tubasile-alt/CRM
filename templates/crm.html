@@ -257,6 +257,7 @@
     
     <hr class="my-5">
     
+    {% if current_user.is_doctor() %}
     <div class="crm-header">
         <h3><i class="bi bi-magic"></i> CRM Cosmiatria</h3>
     </div>
@@ -311,6 +312,11 @@
             </div>
         </div>
     </div>
+    {% else %}
+    <div class="alert alert-info border-0 shadow-sm">
+        <i class="bi bi-info-circle-fill"></i> O acesso à gestão de cosmiatria é restrito aos médicos.
+    </div>
+    {% endif %}
 </div>
 
 {% endblock %}
@@ -368,7 +374,11 @@ async function loadTransplantDashboard() {
                     </td>
                     <td>${p.last_consultation}</td>
                     <td class="text-center">
+                        {% if current_user.is_doctor() %}
                         <a href="/prontuario/${p.id}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;">Ver</a>
+                        {% else %}
+                        <span class="text-muted small">Acesso Restrito</span>
+                        {% endif %}
                     </td>
                 </tr>
             `).join('');
@@ -379,10 +389,12 @@ async function loadTransplantDashboard() {
 }
 
 function loadCRMData() {
+    {% if current_user.is_doctor() %}
     loadStats();
     loadFollowups();
     loadPlanned();
     loadPerformed();
+    {% endif %}
 }
 
 function loadStats() {
