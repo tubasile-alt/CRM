@@ -153,3 +153,54 @@ def delete_surgery_evolution(evolution_id):
     
     return jsonify({'success': True})
 
+# --- Transplante capilar: resumo do planejamento (para visualização rápida em Evolução / secretária) ---
+@patient_bp.route('/<int:patient_id>/transplant/planning-summary', methods=['GET'])
+@login_required
+def get_transplant_planning_summary(patient_id):
+    """
+    Retorna:
+      - último planejamento cirúrgico preenchido (HairTransplant.surgical_planning)
+      - última data de cirurgia registrada (TransplantSurgeryRecord.surgery_date)
+    O front decide exibir/ocultar o card.
+    """
+    try:
+        from flask import jsonify
+        from models import HairTransplant, Note, TransplantSurgeryRecord
+
+        # 1) Último planejamento preenchido
+        planning_text = ""
+        planning_note_id = None
+
+        items = (HairTransplant.query
+                 .join(Note, HairTransplant.note_id == Note.id)
+                 .filter(Note.patient_id == patient_id)
+                 .order_by(HairTransplant.id.desc())
+                 .all())
+
+        for item in items:
+            txt = (getattr(item, "surgical_planning", "") or "").strip()
+            if txt:
+                planning_text = txt
+                planning_note_id = getattr(item, "note_id", None)
+                break
+
+        # 2) Última cirurgia (se existir)
+        last_surgery = (TransplantSurgeryRecord.query
+                        .filter_by(patient_id=patient_id)
+                        .order_by(TransplantSurgeryRecord.surgery_date.desc())
+                        .first())
+
+        last_surgery_str = last_surgery.surgery_date.strftime('%d/%m/%Y') if last_surgery and last_surgery.surgery_date else None
+        last_surgery_iso = last_surgery.surgery_date.isoformat() if last_surgery and last_surgery.surgery_date else None
+
+        return jsonify({
+            "success": True,
+            "has_planning": bool(planning_text),
+            "planning": planning_text,
+            "planning_note_id": planning_note_id,
+            "last_surgery_date": last_surgery_str,
+            "last_surgery_date_iso": last_surgery_iso
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+

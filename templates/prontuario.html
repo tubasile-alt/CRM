@@ -738,6 +738,20 @@ function recalculateEvolution(evolutionId) {
                         </div>
                         
                             <div id="evolutionHistorySection" class="p-3 mb-3 bg-light rounded border border-success" style="min-height: 100px;">
+                                <!-- === Resumo do Transplante Capilar (Planejamento + Data de Cirurgia) === -->
+                                <div id="transplantPlanningSummaryInEvolution" class="card mb-3 border-warning shadow-sm" style="display:none; background-color: #fffcf5;">
+                                  <div class="card-header bg-warning text-dark py-2">
+                                    <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle-fill me-2"></i>Resumo do Transplante Capilar</h6>
+                                  </div>
+                                  <div class="card-body py-3">
+                                    <div class="mb-2">
+                                      <span class="text-muted small">Última cirurgia registrada:</span>
+                                      <span id="transplantLastSurgeryDateInEvolution" class="fw-bold text-danger ms-1">—</span>
+                                    </div>
+                                    <div class="text-muted small mb-1">Planejamento cirúrgico (último preenchido):</div>
+                                    <div id="transplantPlanningTextInEvolution" class="p-2 bg-white rounded border" style="white-space:pre-wrap; line-height:1.35; font-size: 0.9rem;"></div>
+                                  </div>
+                                </div>
                                 <h6 class="text-success mb-3 fw-bold">
                                     <i class="bi bi-stickies-fill"></i> EVOLUÇÕES DESTE ATENDIMENTO (19/02)
                                 </h6>
@@ -1788,6 +1802,30 @@ function recalculateEvolution(evolutionId) {
 {% endblock %}
 
 {% block extra_js %}
+<script>
+(function () {
+  // Card ficará dentro da aba Evolução; só aparece se houver planejamento.
+  const card = document.getElementById('transplantPlanningSummaryInEvolution');
+  if (!card) return;
+
+  const patientId = {{ patient.id }};
+  fetch(`/api/patient/${patientId}/transplant/planning-summary`, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+      if (!data || !data.success) return;
+      if (!data.has_planning) return;
+
+      const planningEl = document.getElementById('transplantPlanningTextInEvolution');
+      const surgEl = document.getElementById('transplantLastSurgeryDateInEvolution');
+
+      if (planningEl) planningEl.textContent = data.planning || '';
+      if (surgEl) surgEl.textContent = data.last_surgery_date || '—';
+
+      card.style.display = '';
+    })
+    .catch(() => {});
+})();
+</script>
 <script>
 /**
  * PATCH DEFINITIVO - Evolução Cirúrgica com checkboxes (somente em cirurgia)
