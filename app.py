@@ -227,10 +227,10 @@ def login():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        email = request.form.get('email')
+        email = request.form.get('email', '').strip()
         password = request.form.get('password')
         
-        user = User.query.filter_by(email=email).first()
+        user = User.query.filter(User.email.ilike(email)).first()
         
         if user and user.check_password(password):
             login_user(user, remember=True)
