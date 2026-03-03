@@ -184,12 +184,17 @@ def schedule_transplant_surgery(patient_id):
     planning_text = planning.surgical_planning if planning else "Nenhum planejamento encontrado."
     
     # Criar ou atualizar registro de cirurgia
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Scheduling surgery for patient {patient_id} on {surgery_date}")
+    
     surgery = TransplantSurgeryRecord.query.filter_by(
         patient_id=patient_id, 
         surgery_date=surgery_date
     ).first()
     
     if not surgery:
+        logger.info("Creating new surgery record")
         surgery = TransplantSurgeryRecord(
             patient_id=patient_id,
             doctor_id=current_user.id,
@@ -199,12 +204,14 @@ def schedule_transplant_surgery(patient_id):
         )
         db.session.add(surgery)
     else:
+        logger.info("Updating existing surgery record")
         surgery.status = "scheduled"
         surgery.planning_snapshot = planning_text
     
     db.session.commit()
     
     # Criar evento no Google Calendar
+    logger.info("Creating Google Calendar event")
     cal_ok, cal_result = create_transplant_surgery_event(
         patient_name=patient.name,
         surgery_date=surgery_date,
@@ -214,8 +221,11 @@ def schedule_transplant_surgery(patient_id):
     )
     
     if cal_ok:
+        logger.info(f"Calendar event created: {cal_result}")
         surgery.calendar_event_id = cal_result
         db.session.commit()
+    else:
+        logger.error(f"Failed to create calendar event: {cal_result}")
     
     return jsonify({
         'success': True, 

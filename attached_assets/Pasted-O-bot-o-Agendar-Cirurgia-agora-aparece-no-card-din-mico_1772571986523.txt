@@ -1,0 +1,121 @@
+O botão "📅 Agendar Cirurgia" agora aparece no card dinâmico, mas NÃO FUNCIONA ao clicar.
+
+Quero que você faça diagnóstico real (com Network/Console) e corrija até ficar 100% funcional.
+
+### 1) Diagnóstico obrigatório (não chute)
+1. Abra o arquivo onde está o JS do card em templates/prontuario.html.
+2. Localize:
+   - o HTML do botão (id btnScheduleTransplantSurgery)
+   - o handler com event delegation (document.addEventListener('click', ...))
+3. Garanta que o handler roda:
+   - adicione temporariamente console.log("schedule handler loaded");
+   - adicione console.log("clicked schedule", e.target) ao detectar o botão
+4. Teste e use o DevTools:
+   - Console: verificar se aparece o log ao carregar a página e ao clicar
+   - Network: ver se há request POST ao clicar
+   - Se não há request, o handler não está disparando (corrigir selector/escopo)
+
+### 2) Consertar o clique (event delegation robusta)
+Troque o handler por este (mais robusto):
+
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("#btnScheduleTransplantSurgery");
+  if (!btn) return;
+  e.preventDefault();
+
+  console.log("clicked schedule button");
+
+  const date = prompt("Data da cirurgia (YYYY-MM-DD):");
+  if (!date) return;
+
+  const patientId = btn.getAttribute("data-patient-id") || window.__patientId;
+  if (!patientId) {
+    alert("Erro: patientId não encontrado.");
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/api/patient/${patientId}/transplant/schedule-surgery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ surgery_date: date })
+    });
+
+    const text = await resp.text();
+    let out = null;
+    try { out = JSON.parse(text); } catch {}
+
+    if (!resp.ok) {
+      console.error("HTTP error", resp.status, text);
+      alert(`Falha ao agendar (HTTP ${resp.status}). Veja console.`);
+      return;
+    }
+
+    if (!out || !out.success) {
+      alert((out && out.error) ? out.error : "Erro ao agendar.");
+      return;
+    }
+
+    if (out.calendar_event_created === false) {
+      alert("Cirurgia agendada, mas falhou criar evento no Google Calendar. Veja logs.");
+    } else {
+      alert("Cirurgia agendada e evento criado no Google Calendar.");
+    }
+
+    location.reload();
+  } catch (err) {
+    console.error(err);
+    alert("Erro inesperado ao agendar. Veja console.");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+### 3) Garantir patientId (isso costuma quebrar)
+Como o card é montado por JS, o template Jinja {{ patient.id }} pode não existir nesse trecho.
+Então:
+- injete no HTML do botão um data attribute:
+  <button id="btnScheduleTransplantSurgery" data-patient-id="...">
+- Se o card é montado em JS, pegue o patientId de uma fonte real já existente na página:
+  - variável global definida por Jinja no HTML principal:
+    <script>window.__patientId = {{ patient.id }};</script>
+  - OU atributo data em algum container (ex: <div id="patient-root" data-patient-id="...">)
+
+Implementar pelo menos UM desses métodos para o handler nunca ficar sem patientId.
+
+### 4) Corrigir CSRF (possível causa #1 em Flask)
+Se o projeto usa CSRF token em POST:
+- Certifique que o fetch inclui o header X-CSRFToken (ou o que o projeto usa)
+- Reutilize a função fetchWithCSRF existente (se já existe no main.js)
+- Se existir um meta tag:
+  <meta name="csrf-token" content="...">
+  então mandar:
+  headers: { "X-CSRFToken": token, "Content-Type": "application/json" }
+
+Diagnóstico:
+- no Network, se a resposta do POST é HTML/403/400 com página, é CSRF.
+
+### 5) Backend logging (para confirmar fluxo)
+No endpoint POST /api/patient/<id>/transplant/schedule-surgery:
+- logar no server:
+  - patient_id
+  - surgery_date recebida
+  - se planning_snapshot foi encontrado
+  - resultado da criação de evento (event_id)
+- retornar sempre JSON com:
+  { success, calendar_event_created, calendar_event_id, error }
+
+### 6) Garantir que rota está correta
+Confirme a rota real no Flask:
+- Se a API prefix é /api, o front deve chamar /api/patient/...
+- Se estiver em blueprint diferente, ajuste.
+
+### 7) Só finalize quando:
+- clique gera log no console
+- existe request POST no Network
+- endpoint responde JSON success
+- evento aparece no Google Calendar
+- calendar_event_id salva no banco
+Mostre o diff dos arquivos alterados e descreva a causa raiz encontrada.

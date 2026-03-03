@@ -1,59 +1,84 @@
 {% extends "base.html" %}
 
-{% block title %}Prontuário - {{ patient.name }}
+{% block title %}Prontuário - {{ patient.name }}{% endblock %}
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  // Usamos delegação de evento pois o botão pode estar dentro de múltiplos colapsáveis
-  document.addEventListener("click", async function (e) {
-    if (e.target && e.target.id === "btnScheduleTransplantSurgery") {
-      const btn = e.target;
-      const date = prompt("Data da cirurgia (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
-      if (!date) return;
+  console.log("[SurgerySchedule] Handler initialized");
+  
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("#btnScheduleTransplantSurgery");
+    if (!btn) return;
+    
+    e.preventDefault();
+    console.log("[SurgerySchedule] Button clicked", btn);
 
-      const patientId = {{ patient.id }};
-      btn.disabled = true;
+    const date = prompt("Data da cirurgia (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+    if (!date) return;
 
-      try {
-        const resp = await fetch(`/api/patient/${patientId}/transplant/schedule-surgery`, {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "X-CSRFToken": "{{ csrf_token() }}"
-          },
-          credentials: "same-origin",
-          body: JSON.stringify({ surgery_date: date })
-        });
+    const patientId = btn.getAttribute("data-patient-id") || window.__patientId;
+    console.log("[SurgerySchedule] Patient ID:", patientId);
+    
+    if (!patientId) {
+      alert("Erro crítico: ID do paciente não localizado.");
+      return;
+    }
 
-        const out = await resp.json();
+    btn.disabled = true;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
 
-        if (!out.success) {
-          alert(out.error || "Erro ao agendar cirurgia.");
-          return;
-        }
+    try {
+      const resp = await fetch(`/api/patient/${patientId}/transplant/schedule-surgery`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "X-CSRFToken": document.querySelector('meta[name="csrf-token"]')?.content || "{{ csrf_token() }}"
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ surgery_date: date })
+      });
 
-        if (out.calendar_event_created === false) {
-          alert("Cirurgia agendada, mas o evento no Google Calendar NÃO foi criado.");
-        } else {
-          alert("Cirurgia agendada e evento criado no Google Calendar.");
-        }
-        }
+      const text = await resp.text();
+      let out = null;
+      try { out = JSON.parse(text); } catch {}
 
-        location.reload();
-
-      } catch (e) {
-        alert("Falha ao agendar cirurgia.");
-        console.error(e);
-      } finally {
-        btn.disabled = false;
+      if (!resp.ok) {
+        console.error("[SurgerySchedule] Server error:", resp.status, text);
+        alert(`Erro na requisição (Status ${resp.status}).`);
+        return;
       }
+
+      if (!out || !out.success) {
+        alert(out?.error || "Erro ao processar agendamento.");
+        return;
+      }
+
+      if (out.calendar_event_created === false) {
+        alert("Sucesso: Cirurgia agendada no sistema.
+
+Aviso: Não foi possível criar o evento no Google Calendar automática. Erro: " + (out.calendar_error || "desconhecido"));
+      } else {
+        alert("Sucesso: Cirurgia agendada e evento criado no Google Calendar!");
+      }
+
+      location.reload();
+    } catch (err) {
+      console.error("[SurgerySchedule] Exception:", err);
+      alert("Erro inesperado ao conectar com o servidor.");
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalText;
     }
   });
 });
 </script>
 
-{% endblock %}
+
+
 
 {% block content %}
+<script>window.__patientId = {{ patient.id }};</script>
 <script>
 function calculateAge(birthDate) {
     if (!birthDate) return null;
@@ -1617,7 +1642,7 @@ function recalculateEvolution(evolutionId) {
                                         </h6>
                                         <div class="card card-body bg-light-subtle border-start border-4 border-info" id="surgicalPlanDisplay{{ consultation.id }}">
                                             <div class="mt-3 d-flex justify-content-end">
-                                              <button id="btnScheduleTransplantSurgery" type="button" class="btn btn-primary btn-sm">
+                                              <button id="btnScheduleTransplantSurgery" data-patient-id="{{ patient.id }}" type="button" class="btn btn-primary btn-sm">
                                                 📅 Agendar Cirurgia
                                               </button>
                                             </div>
@@ -1664,7 +1689,7 @@ function recalculateEvolution(evolutionId) {
                                                                 }
                                                             }
                                                             html += '</dl>';
-                                                            html += '<div class=\"mt-3 d-flex justify-content-end\"><button id=\"btnScheduleTransplantSurgery\" type=\"button\" class=\"btn btn-primary btn-sm\">📅 Agendar Cirurgia</button></div>';
+                                                            html += '<div class=\"mt-3 d-flex justify-content-end\"><button id=\"btnScheduleTransplantSurgery\" data-patient-id=\"{{ patient.id }}\" type=\"button\" class=\"btn btn-primary btn-sm\">📅 Agendar Cirurgia</button></div>';
                                                             if (hasContent) {
                                                                 container.innerHTML = html;
                                                             } else {
