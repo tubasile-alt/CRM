@@ -1,0 +1,211 @@
+python - <<'PY'
+from pathlib import Path
+import re
+from datetime import datetime
+
+# =========================
+# CONFIG (ajuste se necessário)
+# =========================
+PATIENT_ROUTES = Path("routes/patient.py")
+PRONTUARIO_HTML = Path("templates/prontuario.html")  # se o seu prontuário tiver outro nome, troque aqui
+
+def backup_file(p: Path):
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    bkp = p.with_suffix(p.suffix + f".bak_{ts}")
+    bkp.write_text(p.read_text(encoding="utf-8", errors="ignore"), encoding="utf-8")
+    return bkp
+
+def read(p: Path) -> str:
+    if not p.exists():
+        raise SystemExit(f"❌ Arquivo não encontrado: {p}")
+    return p.read_text(encoding="utf-8", errors="ignore")
+
+def write(p: Path, s: str):
+    p.write_text(s, encoding="utf-8")
+
+# =========================
+# 1) ENDPOINT (planning-summary)
+# =========================
+routes_src = read(PATIENT_ROUTES)
+
+if "/transplant/planning-summary" not in routes_src:
+    bkp = backup_file(PATIENT_ROUTES)
+
+    endpoint = r"""
+
+# --- Transplante capilar: resumo do planejamento (para visualização rápida em Evolução / secretária) ---
+@patient_bp.route('/<int:patient_id>/transplant/planning-summary', methods=['GET'])
+@login_required
+def get_transplant_planning_summary(patient_id):
+    """
+    Retorna:
+      - último planejamento cirúrgico preenchido (HairTransplant.surgical_planning)
+      - última data de cirurgia registrada (TransplantSurgeryRecord.surgery_date)
+    O front decide exibir/ocultar o card.
+    """
+    try:
+        from flask import jsonify
+        from models import HairTransplant, Note, TransplantSurgeryRecord
+
+        # 1) Último planejamento preenchido
+        planning_text = ""
+        planning_note_id = None
+
+        items = (HairTransplant.query
+                 .join(Note, HairTransplant.note_id == Note.id)
+                 .filter(Note.patient_id == patient_id)
+                 .order_by(HairTransplant.id.desc())
+                 .all())
+
+        for item in items:
+            txt = (getattr(item, "surgical_planning", "") or "").strip()
+            if txt:
+                planning_text = txt
+                planning_note_id = getattr(item, "note_id", None)
+                break
+
+        # 2) Última cirurgia (se existir)
+        last_surgery = (TransplantSurgeryRecord.query
+                        .filter_by(patient_id=patient_id)
+                        .order_by(TransplantSurgeryRecord.surgery_date.desc())
+                        .first())
+
+        last_surgery_str = last_surgery.surgery_date.strftime('%d/%m/%Y') if last_surgery and last_surgery.surgery_date else None
+        last_surgery_iso = last_surgery.surgery_date.isoformat() if last_surgery and last_surgery.surgery_date else None
+
+        return jsonify({
+            "success": True,
+            "has_planning": bool(planning_text),
+            "planning": planning_text,
+            "planning_note_id": planning_note_id,
+            "last_surgery_date": last_surgery_str,
+            "last_surgery_date_iso": last_surgery_iso
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+"""
+    routes_src = routes_src.rstrip() + "\n" + endpoint + "\n"
+    write(PATIENT_ROUTES, routes_src)
+    print(f"✅ Endpoint adicionado em {PATIENT_ROUTES} (backup: {bkp.name})")
+else:
+    print("ℹ️ Endpoint já existe. OK.")
+
+# =========================
+# 2) CARD DENTRO DA ABA EVOLUÇÃO (UI)
+# =========================
+html = read(PRONTUARIO_HTML)
+
+if "transplantPlanningSummaryInEvolution" in html:
+    print("ℹ️ Card na Evolução já existe. OK.")
+    raise SystemExit("✅ Nada mais a fazer.")
+
+bkp = backup_file(PRONTUARIO_HTML)
+
+card_html = r"""
+<!-- === Resumo do Transplante Capilar (Planejamento + Data de Cirurgia) === -->
+<div id="transplantPlanningSummaryInEvolution" class="card mb-3" style="display:none;">
+  <div class="card-header"><strong>Transplante Capilar — Resumo do Planejamento</strong></div>
+  <div class="card-body">
+    <div class="mb-2">
+      <span class="text-muted">Última cirurgia registrada:</span>
+      <span id="transplantLastSurgeryDateInEvolution">—</span>
+    </div>
+    <div class="text-muted mb-1">Planejamento cirúrgico (último preenchido):</div>
+    <div id="transplantPlanningTextInEvolution" style="white-space:pre-wrap; line-height:1.35;"></div>
+  </div>
+</div>
+"""
+
+js_block = r"""
+<script>
+(function () {
+  // Card ficará dentro da aba Evolução; só aparece se houver planejamento.
+  const card = document.getElementById('transplantPlanningSummaryInEvolution');
+  if (!card) return;
+
+  const patientId = {{ patient.id }};
+  fetch(`/api/patient/${patientId}/transplant/planning-summary`, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(data => {
+      if (!data || !data.success) return;
+      if (!data.has_planning) return;
+
+      const planningEl = document.getElementById('transplantPlanningTextInEvolution');
+      const surgEl = document.getElementById('transplantLastSurgeryDateInEvolution');
+
+      if (planningEl) planningEl.textContent = data.planning || '';
+      if (surgEl) surgEl.textContent = data.last_surgery_date || '—';
+
+      card.style.display = '';
+    })
+    .catch(() => {});
+})();
+</script>
+"""
+
+# --- insertion strategies (anchors) ---
+# A) Dentro de um container de "Evolução" com id/class comum
+anchors = [
+    (r'(<div[^>]+id="[^"]*evolu[^"]*"[^>]*>)', "after_open_div"),         # id contém evolu
+    (r'(<div[^>]+class="[^"]*evolu[^"]*"[^>]*>)', "after_open_div"),      # class contém evolu
+    (r'(>\\s*Evolu[cç][aã]o\\s*<)', "after_title")                        # título/label "Evolução"
+]
+
+inserted = False
+
+# Strategy 1: if there is a specific tab-pane for evolution
+m = re.search(r'(<div[^>]+class="[^"]*(tab-pane|tabpanel)[^"]*"[^>]*(id="[^"]*evolu[^"]*"|data-tab="[^"]*evolu[^"]*")[^>]*>)', html, flags=re.I)
+if m:
+    pos = m.end()
+    html = html[:pos] + "\n" + card_html + "\n" + html[pos:]
+    inserted = True
+    print("✅ Card inserido dentro do container tab-pane da Evolução (anchor: tab-pane).")
+
+# Strategy 2: generic anchors
+if not inserted:
+    for pat, mode in anchors:
+        m = re.search(pat, html, flags=re.I)
+        if not m:
+            continue
+        if mode == "after_open_div":
+            pos = m.end()
+            html = html[:pos] + "\n" + card_html + "\n" + html[pos:]
+            inserted = True
+            print(f"✅ Card inserido após abertura do container de Evolução (anchor: {pat}).")
+            break
+        elif mode == "after_title":
+            pos = m.end()
+            html = html[:pos] + "\n" + card_html + "\n" + html[pos:]
+            inserted = True
+            print("✅ Card inserido após título/label 'Evolução' (anchor: texto).")
+            break
+
+if not inserted:
+    raise SystemExit(
+        "❌ Não consegui localizar automaticamente a seção/aba 'Evolução' em templates/prontuario.html.\n"
+        "Me mande o arquivo do template do prontuário (ou o nome correto) que eu ajusto o anchor certinho."
+    )
+
+# Inject JS near end of body or in extra_js block if exists
+extra_js_pat = r"{% block extra_js %}.*?{% endblock %}"
+m = re.search(extra_js_pat, html, flags=re.S)
+if m:
+    # Append JS before endblock
+    block = m.group(0)
+    if js_block.strip() not in block:
+        block_new = block.replace("{% endblock %}", js_block + "\n{% endblock %}")
+        html = html[:m.start()] + block_new + html[m.end():]
+        print("✅ JS injetado dentro do bloco extra_js.")
+else:
+    # Fallback: before </body>
+    if "</body>" in html:
+        html = html.replace("</body>", js_block + "\n</body>", 1)
+        print("✅ JS injetado antes de </body>.")
+    else:
+        html = html.rstrip() + "\n" + js_block + "\n"
+        print("⚠️ JS anexado ao final (não achei </body> nem extra_js).")
+
+write(PRONTUARIO_HTML, html)
+print(f"✅ templates atualizado: {PRONTUARIO_HTML} (backup: {bkp.name})")
+print("\n🎯 Pronto. Reinicie o servidor no Replit para ver o card dentro da aba Evolução.")
+PY
