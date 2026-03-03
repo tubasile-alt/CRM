@@ -159,7 +159,7 @@ def delete_surgery_evolution(evolution_id):
 def schedule_transplant_surgery(patient_id):
     """Agenda uma cirurgia baseada no último planejamento"""
     from models import Patient, HairTransplant, TransplantSurgeryRecord, Note
-    from services.email_service import send_gmail_replit
+    from services.email_service import EmailService
     
     data = request.get_json()
     surgery_date_str = data.get('surgery_date')
@@ -208,7 +208,7 @@ PLANEJAMENTO CIRÚRGICO (snapshot):
 {planning_text}
 """
     
-    email_sent, email_error = send_gmail_replit(subject, body)
+    email_sent, email_error = EmailService.send_gmail_replit(subject, body)
     
     return jsonify({
         'success': True, 
