@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>Prescrição Médica</title>
+  <style>
+    /* ====== AJUSTE AQUI PARA CABER NO SEU PAPEL TIMBRADO ====== */
+    :root{
+      --SAFE_TOP: 42mm;     /* desce o conteúdo para não pegar no logo */
+      --SAFE_BOTTOM: 18mm;  /* folga inferior */
+      --SAFE_SIDE: 18mm;    /* folga lateral (borda do timbre) */
+    }
+
+    @page { size: A4; margin: 0; } /* sem margem do PDF: a gente controla no wrapper */
+    html, body { height: 100%; }
+    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111; }
+
+    .page{
+      box-sizing: border-box;
+      padding: var(--SAFE_TOP) var(--SAFE_SIDE) var(--SAFE_BOTTOM) var(--SAFE_SIDE);
+    }
+
+    .title{
+      text-align:center;
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0 0 10mm 0;
+    }
+
+    .meta{
+      display:flex;
+      justify-content: space-between;
+      gap: 12mm;
+      font-size: 12.5px;
+      margin-bottom: 8mm;
+    }
+    .meta b{ font-weight: 700; }
+
+    .section-title{
+      font-size: 13.5px;
+      font-weight: 700;
+      margin: 8mm 0 4mm;
+    }
+
+    .item{ margin: 0 0 6mm 0; }
+    .name{ font-weight: 700; font-size: 13px; margin-bottom: 2mm; text-transform: none; }
+    .inst{ font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; }
+
+    .date{
+      position: fixed;
+      right: var(--SAFE_SIDE);
+      bottom: 12mm; /* fica “dentro” do timbrado */
+      font-size: 12.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="title">Prescrição Médica</div>
+
+    <div class="meta">
+      <div><b>Paciente:</b> {{ patient.name }}</div>
+      <div><b>Data:</b> {{ prescription.created_at.strftime('%d/%m/%Y') }}</div>
+    </div>
+
+    {% if prescription.medications_topical and prescription.medications_topical|length > 0 %}
+      <div class="section-title">Uso Tópico</div>
+      {% for med in prescription.medications_topical %}
+        <div class="item">
+          <div class="name">{{ med.medication }}</div>
+          <div class="inst">{{ med.instructions }}</div>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if prescription.medications_oral and prescription.medications_oral|length > 0 %}
+      <div class="section-title">Uso Oral</div>
+      {% for med in prescription.medications_oral %}
+        <div class="item">
+          <div class="name">{{ med.medication }}</div>
+          <div class="inst">{{ med.instructions }}</div>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+  </div>
+</body>
+</html>
