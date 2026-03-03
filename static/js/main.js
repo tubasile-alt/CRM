@@ -123,7 +123,12 @@ function updateChatBadge() {
     if (!badge) return;
     
     fetch('/api/chat/unread_count')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+                throw new Error('Sessão expirada ou erro no servidor');
+            }
+            return response.json();
+        })
         .then(data => {
             const count = data.count;
             badge.textContent = count;
