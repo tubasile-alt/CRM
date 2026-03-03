@@ -1,93 +1,157 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-  <meta charset="utf-8" />
-  <title>Prescrição Médica</title>
-  <style>
-    /* ====== AJUSTE AQUI PARA CABER NO SEU PAPEL TIMBRADO ====== */
-    :root{
-      --SAFE_TOP: 42mm;     /* desce o conteúdo para não pegar no logo */
-      --SAFE_BOTTOM: 18mm;  /* folga inferior */
-      --SAFE_SIDE: 18mm;    /* folga lateral (borda do timbre) */
-    }
+<meta charset="utf-8">
+<title>Prescrição Médica</title>
+<style>
+:root{
+  --SAFE_TOP: 55mm;
+  --SAFE_SIDE: 22mm;
+  --SAFE_BOTTOM: 28mm;
+}
 
-    @page { size: A4; margin: 0; } /* sem margem do PDF: a gente controla no wrapper */
-    html, body { height: 100%; }
-    body { margin: 0; font-family: Arial, Helvetica, sans-serif; color:#111; }
+@page { size: A4; margin: 0; }
 
-    .page{
-      box-sizing: border-box;
-      padding: var(--SAFE_TOP) var(--SAFE_SIDE) var(--SAFE_BOTTOM) var(--SAFE_SIDE);
-    }
+body{
+  margin:0;
+  font-family: Arial, Helvetica, sans-serif;
+  color:#111;
+}
 
-    .title{
-      text-align:center;
-      font-size: 18px;
-      font-weight: 700;
-      margin: 0 0 10mm 0;
-    }
+.page{
+  box-sizing: border-box;
+  padding: var(--SAFE_TOP) var(--SAFE_SIDE) var(--SAFE_BOTTOM);
+  min-height: 100vh;
+  position: relative;
+}
 
-    .meta{
-      display:flex;
-      justify-content: space-between;
-      gap: 12mm;
-      font-size: 12.5px;
-      margin-bottom: 8mm;
-    }
-    .meta b{ font-weight: 700; }
+/* TÍTULO */
+.title{
+  text-align:center;
+  font-size:17px;
+  font-weight:700;
+  margin-bottom:8mm;
+}
 
-    .section-title{
-      font-size: 13.5px;
-      font-weight: 700;
-      margin: 8mm 0 4mm;
-    }
+/* PACIENTE */
+.patient{
+  font-size:13px;
+  margin-bottom:6mm;
+  border-bottom:1px solid #000;
+  padding-bottom:3mm;
+}
 
-    .item{ margin: 0 0 6mm 0; }
-    .name{ font-weight: 700; font-size: 13px; margin-bottom: 2mm; text-transform: none; }
-    .inst{ font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; }
+/* SEÇÕES */
+.section{
+  margin-top:6mm;
+}
 
-    .date{
-      position: fixed;
-      right: var(--SAFE_SIDE);
-      bottom: 12mm; /* fica “dentro” do timbrado */
-      font-size: 12.5px;
-    }
-  </style>
+.section-title{
+  font-weight:700;
+  font-size:13px;
+  margin-bottom:3mm;
+}
+
+.med{
+  margin-bottom:5mm;
+}
+
+.med-name{
+  font-weight:700;
+  font-size:13px;
+}
+
+.med-inst{
+  font-size:12.5px;
+  line-height:1.4;
+  white-space: pre-wrap;
+}
+
+/* RODAPÉ MÉDICO */
+.footer{
+  position: fixed;
+  left: var(--SAFE_SIDE);
+  right: var(--SAFE_SIDE);
+  bottom: 18mm;
+  font-size:11.5px;
+}
+
+.signature-line{
+  border-top:1px solid #000;
+  width:260px;
+  margin-bottom:4mm;
+}
+
+.footer-content{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+}
+
+.footer-left{
+  line-height:1.3;
+}
+
+.footer-right{
+  text-align:right;
+}
+</style>
 </head>
+
 <body>
-  <div class="page">
+<div class="page">
 
-    <div class="title">Prescrição Médica</div>
+<div class="title">Prescrição Médica</div>
 
-    <div class="meta">
-      <div><b>Paciente:</b> {{ patient.name }}</div>
-      <div><b>Data:</b> {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}</div>
-    </div>
+<div class="patient">
+<strong>Paciente:</strong> {{ patient.name }}
+</div>
 
-    {% if oral_medications and oral_medications|length > 0 %}
-      <div class="section-title">Uso Oral</div>
-      {% for med in oral_medications %}
-        <div class="item">
-          <div class="name">{{ med.medication }}</div>
-          <div class="inst">{{ med.instructions }}</div>
-        </div>
-      {% endfor %}
-    {% endif %}
-
-    {% if topical_medications and topical_medications|length > 0 %}
-      <div class="section-title">Uso Tópico</div>
-      {% for med in topical_medications %}
-        <div class="item">
-          <div class="name">{{ med.medication }}</div>
-          <div class="inst">{{ med.instructions }}</div>
-        </div>
-      {% endfor %}
-    {% endif %}
-
-    <div class="date">
-      {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
-    </div>
-
+{% if oral_medications %}
+<div class="section">
+<div class="section-title">Uso Oral</div>
+{% for med in oral_medications %}
+  <div class="med">
+    <div class="med-name">{{ med.medication }}</div>
+    <div class="med-inst">{{ med.instructions }}</div>
   </div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if topical_medications %}
+<div class="section">
+<div class="section-title">Uso Tópico</div>
+{% for med in topical_medications %}
+  <div class="med">
+    <div class="med-name">{{ med.medication }}</div>
+    <div class="med-inst">{{ med.instructions }}</div>
+  </div>
+{% endfor %}
+</div>
+{% endif %}
+
+<div class="footer">
+  <div class="signature-line"></div>
+
+  <div class="footer-content">
+    <div class="footer-left">
+      <strong>Dr. Arthur Basile</strong><br>
+      CRM 125.217<br>
+      Dermatologista | RQE 125.217
+    </div>
+
+    <div class="footer-right">
+      Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
+    </div>
+  </div>
+
+  <div style="margin-top:4mm; font-size: 10px; line-height: 1.2; color: #444;">
+    Especialista em Dermatologia SBD | Av. Prof. João Fiúsa, 2300, Ribeirão Preto, SP<br>
+    www.clinicabasile.com.br | Instagram: @clinicabasilemed
+  </div>
+</div>
+
+</div>
 </body>
 </html>
