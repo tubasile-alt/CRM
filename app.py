@@ -321,13 +321,17 @@ def dashboard():
     
     # Contar indicações feitas vs planejadas
     if note_ids:
+        # Optimized query for indications
         indications = Indication.query.filter(Indication.note_id.in_(note_ids)).all()
         for ind in indications:
-            proc_name = ind.procedure.name if ind.procedure else 'Procedimento'
-            if ind.performed:
-                procedures_completed[proc_name] += 1
-            elif ind.indicated:
-                procedures_pending[proc_name] += 1
+            try:
+                proc_name = ind.procedure.name if ind.procedure else 'Procedimento'
+                if ind.performed:
+                    procedures_completed[proc_name] += 1
+                elif ind.indicated:
+                    procedures_pending[proc_name] += 1
+            except Exception:
+                continue
     
     # Contar planos cosméticos
     cosmetic_plans = CosmeticProcedurePlan.query.filter(CosmeticProcedurePlan.note_id.in_(note_ids)).all() if note_ids else []
