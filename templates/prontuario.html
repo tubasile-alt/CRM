@@ -1,6 +1,56 @@
 {% extends "base.html" %}
 
-{% block title %}Prontuário - {{ patient.name }}{% endblock %}
+{% block title %}Prontuário - {{ patient.name }}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // Usamos delegação de evento pois o botão pode estar dentro de múltiplos colapsáveis
+  document.addEventListener("click", async function (e) {
+    if (e.target && e.target.id === "btnScheduleTransplantSurgery") {
+      const btn = e.target;
+      const date = prompt("Data da cirurgia (YYYY-MM-DD):", new Date().toISOString().split('T')[0]);
+      if (!date) return;
+
+      const patientId = {{ patient.id }};
+      btn.disabled = true;
+
+      try {
+        const resp = await fetch(`/api/patient/${patientId}/transplant/schedule-surgery`, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "X-CSRFToken": "{{ csrf_token() }}"
+          },
+          credentials: "same-origin",
+          body: JSON.stringify({ surgery_date: date })
+        });
+
+        const out = await resp.json();
+
+        if (!out.success) {
+          alert(out.error || "Erro ao agendar cirurgia.");
+          return;
+        }
+
+        if (out.email_sent === false) {
+          alert("Cirurgia agendada, mas o e-mail NÃO foi enviado.");
+        } else {
+          alert("Cirurgia agendada e e-mail enviado.");
+        }
+
+        location.reload();
+
+      } catch (e) {
+        alert("Falha ao agendar cirurgia.");
+        console.error(e);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  });
+});
+</script>
+
+{% endblock %}
 
 {% block content %}
 <script>
@@ -1565,6 +1615,11 @@ function recalculateEvolution(evolutionId) {
                                             <i class="bi bi-clipboard-check"></i> Detalhes do Planejamento
                                         </h6>
                                         <div class="card card-body bg-light-subtle border-start border-4 border-info" id="surgicalPlanDisplay{{ consultation.id }}">
+                                            <div class="mt-3 d-flex justify-content-end">
+                                              <button id="btnScheduleTransplantSurgery" type="button" class="btn btn-primary btn-sm">
+                                                📅 Agendar Cirurgia
+                                              </button>
+                                            </div>
                                             <script>
                                                 (function() {
                                                     const container = document.getElementById('surgicalPlanDisplay{{ consultation.id }}');
