@@ -159,7 +159,7 @@ def delete_surgery_evolution(evolution_id):
 def schedule_transplant_surgery(patient_id):
     """Agenda uma cirurgia baseada no último planejamento"""
     from models import Patient, HairTransplant, TransplantSurgeryRecord, Note
-    from services.email_service import EmailService
+    from services.calendar_service import create_transplant_surgery_event
     
     data = request.get_json()
     surgery_date_str = data.get('surgery_date')
@@ -183,38 +183,46 @@ def schedule_transplant_surgery(patient_id):
                
     planning_text = planning.surgical_planning if planning else "Nenhum planejamento encontrado."
     
-    # Criar registro de cirurgia
-    surgery = TransplantSurgeryRecord(
-        patient_id=patient_id,
-        doctor_id=current_user.id,
-        surgery_date=surgery_date,
-        status="scheduled",
-        planning_snapshot=planning_text
-    )
+    # Criar ou atualizar registro de cirurgia
+    surgery = TransplantSurgeryRecord.query.filter_by(
+        patient_id=patient_id, 
+        surgery_date=surgery_date
+    ).first()
     
-    db.session.add(surgery)
+    if not surgery:
+        surgery = TransplantSurgeryRecord(
+            patient_id=patient_id,
+            doctor_id=current_user.id,
+            surgery_date=surgery_date,
+            status="scheduled",
+            planning_snapshot=planning_text
+        )
+        db.session.add(surgery)
+    else:
+        surgery.status = "scheduled"
+        surgery.planning_snapshot = planning_text
+    
     db.session.commit()
     
-    # Disparar email
-    subject = f"[MAPA CIRÚRGICO] Transplante agendado — {patient.name} — {surgery_date.strftime('%d/%m/%Y')}"
-    body = f"""
-Nome do paciente: {patient.name}
-Data da cirurgia: {surgery_date.strftime('%d/%m/%Y')}
-CPF: {patient.cpf or 'Não informado'}
-Telefone: {patient.phone or 'Não informado'}
-
---------------------------------------------------
-PLANEJAMENTO CIRÚRGICO (snapshot):
-{planning_text}
-"""
+    # Criar evento no Google Calendar
+    cal_ok, cal_result = create_transplant_surgery_event(
+        patient_name=patient.name,
+        surgery_date=surgery_date,
+        planning_snapshot=planning_text,
+        phone=patient.phone,
+        cpf=patient.cpf
+    )
     
-    email_sent, email_error = EmailService.send_gmail_replit(subject, body)
+    if cal_ok:
+        surgery.calendar_event_id = cal_result
+        db.session.commit()
     
     return jsonify({
         'success': True, 
         'id': surgery.id,
-        'email_sent': email_sent,
-        'email_error': email_error if not email_sent else None
+        'calendar_event_created': cal_ok,
+        'calendar_event_id': cal_result if cal_ok else None,
+        'calendar_error': cal_result if not cal_ok else None
     })
 
 @patient_bp.route('/<int:patient_id>/transplant/planning-summary', methods=['GET'])

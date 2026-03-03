@@ -31,10 +31,11 @@ document.addEventListener("DOMContentLoaded", function () {
           return;
         }
 
-        if (out.email_sent === false) {
-          alert("Cirurgia agendada, mas o e-mail NÃO foi enviado.");
+        if (out.calendar_event_created === false) {
+          alert("Cirurgia agendada, mas o evento no Google Calendar NÃO foi criado.");
         } else {
-          alert("Cirurgia agendada e e-mail enviado.");
+          alert("Cirurgia agendada e evento criado no Google Calendar.");
+        }
         }
 
         location.reload();
@@ -1663,6 +1664,7 @@ function recalculateEvolution(evolutionId) {
                                                                 }
                                                             }
                                                             html += '</dl>';
+                                                            html += '<div class=\"mt-3 d-flex justify-content-end\"><button id=\"btnScheduleTransplantSurgery\" type=\"button\" class=\"btn btn-primary btn-sm\">📅 Agendar Cirurgia</button></div>';
                                                             if (hasContent) {
                                                                 container.innerHTML = html;
                                                             } else {

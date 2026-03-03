@@ -1,0 +1,102 @@
+Tenho dois problemas na feature "Agendar cirurgia" do Transplante Capilar:
+
+(1) NÃO é para enviar e-mail.
+É para criar um EVENTO no GOOGLE CALENDAR usando o conector do Replit (Google Calendar connector).
+O calendário deve receber um evento com título e descrição contendo todo o snapshot do planejamento.
+Se possível, salvar o event_id retornado no banco.
+
+(2) Eu ainda NÃO VEJO o botão "📅 Agendar Cirurgia" dentro do card azul "Detalhes do Planejamento" na aba Evolução.
+Portanto, o botão NÃO está sendo inserido no lugar correto.
+
+IMPORTANTE: Esse card é renderizado dinamicamente por JavaScript (não apenas por Jinja/HTML estático).
+Então o botão precisa ser inserido no template/string HTML que o JS usa para montar o card,
+ou no DOM logo após o card ser injetado.
+
+### OBJETIVO FINAL
+A) Botão deve aparecer VISÍVEL dentro do card azul "Detalhes do Planejamento" na aba Evolução:
+- texto: "📅 Agendar Cirurgia"
+- id: btnScheduleTransplantSurgery
+- deve aparecer para secretária e médico
+
+B) Ao clicar:
+- pedir uma data (YYYY-MM-DD) (pode ser prompt simples)
+- chamar: POST /api/patient/<id>/transplant/schedule-surgery
+- backend cria/atualiza TransplantSurgeryRecord (status=scheduled, planning_snapshot, surgery_date)
+- backend cria evento no Google Calendar (via conector do Replit)
+- retorna JSON: success, calendar_event_created true/false, calendar_event_id (se houver)
+
+C) O card deve atualizar exibindo:
+- "Cirurgia agendada em: DD/MM/AAAA" (se houver)
+- e opcionalmente: link/id do evento (apenas interno)
+
+### PASSO 1 — Diagnóstico obrigatório do botão
+1) Procure no repo pelos textos do card:
+   - "Detalhes do Planejamento"
+   - "Transplante Anterior"
+   - "Tipo de Caso"
+   - "Frontal"
+   - "Observações"
+2) Identifique a função JS que monta esse card (provavelmente em templates/prontuario.html ou em algum main.js).
+3) Encontre o ponto exato onde o HTML do card é construído (template string / innerHTML / insertAdjacentHTML).
+4) Me diga exatamente qual arquivo e quais linhas.
+
+### PASSO 2 — Corrigir o botão (obrigatório)
+Insira este HTML DENTRO do card (no template string que gera o card), antes de fechar o container:
+
+<div class="mt-3 d-flex justify-content-end">
+  <button id="btnScheduleTransplantSurgery" type="button" class="btn btn-primary btn-sm">
+    📅 Agendar Cirurgia
+  </button>
+</div>
+
+Se o card é gerado dinamicamente, NÃO adianta inserir no HTML estático fora do template string.
+Tem que estar no HTML que o JS injeta.
+
+### PASSO 3 — Garantir o clique (delegação)
+Como o card é dinâmico, use delegação:
+
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest("#btnScheduleTransplantSurgery");
+  if (!btn) return;
+  ...
+});
+
+Coloque o handler no JS que realmente roda nessa tela.
+
+### PASSO 4 — Backend: schedule-surgery
+Verifique/ajuste endpoint:
+POST /api/patient/<id>/transplant/schedule-surgery
+- valida date YYYY-MM-DD
+- busca último HairTransplant.surgical_planning preenchido
+- grava TransplantSurgeryRecord:
+   patient_id, surgery_date, status="scheduled", planning_snapshot
+- em vez de email, criar evento no Google Calendar via Replit connector
+- se calendar falhar, NÃO desfazer o agendamento no banco
+- retorno:
+  { success: true, calendar_event_created: true/false, calendar_event_id: "...", error_if_any }
+
+### PASSO 5 — Google Calendar Event (Replit Connector)
+Implementar service: services/calendar_service.py (ou equivalente)
+Função: create_transplant_surgery_event(patient, surgery_date, planning_snapshot)
+
+Evento:
+- summary: "Transplante Capilar — <NOME DO PACIENTE>"
+- date/time: usar surgery_date (dia inteiro ou horário padrão 08:00–12:00 se o sistema exigir)
+- description: incluir telefone/CPF se existir + planning_snapshot completo
+- calendar: usar o calendário padrão conectado no Replit
+
+Salvar event_id no banco (criar coluna calendar_event_id em TransplantSurgeryRecord se não existir).
+
+### PASSO 6 — UI update
+Após sucesso:
+- mostrar alert "Cirurgia agendada e evento criado no Google Calendar" (ou "agendada, mas falhou criar evento")
+- reload/refetch do summary para mostrar data.
+
+### PASSO 7 — Entregáveis finais
+Ao terminar, me entregue:
+- lista dos arquivos alterados
+- onde (arquivo/linhas) o botão foi inserido (no template string do card)
+- onde está o handler de clique (delegação)
+- onde está a chamada do Google Calendar Connector
+- passos de teste manual
+NÃO finalize enquanto o botão não estiver visível na tela do prontuário.
