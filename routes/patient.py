@@ -154,6 +154,69 @@ def delete_surgery_evolution(evolution_id):
     return jsonify({'success': True})
 
 # --- Transplante capilar: resumo do planejamento (para visualização rápida em Evolução / secretária) ---
+@patient_bp.route('/<int:patient_id>/transplant/schedule-surgery', methods=['POST'])
+@login_required
+def schedule_transplant_surgery(patient_id):
+    """Agenda uma cirurgia baseada no último planejamento"""
+    from models import Patient, HairTransplant, TransplantSurgeryRecord, Note
+    from services.email_service import send_gmail_replit
+    
+    data = request.get_json()
+    surgery_date_str = data.get('surgery_date')
+    
+    if not surgery_date_str:
+        return jsonify({'success': False, 'error': 'Data da cirurgia é obrigatória'}), 400
+        
+    try:
+        surgery_date = datetime.strptime(surgery_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Formato de data inválido (YYYY-MM-DD)'}), 400
+    
+    patient = Patient.query.get_or_404(patient_id)
+    
+    # Buscar último planejamento
+    planning = (HairTransplant.query
+               .join(Note, HairTransplant.note_id == Note.id)
+               .filter(Note.patient_id == patient_id)
+               .order_by(HairTransplant.id.desc())
+               .first())
+               
+    planning_text = planning.surgical_planning if planning else "Nenhum planejamento encontrado."
+    
+    # Criar registro de cirurgia
+    surgery = TransplantSurgeryRecord(
+        patient_id=patient_id,
+        doctor_id=current_user.id,
+        surgery_date=surgery_date,
+        status="scheduled",
+        planning_snapshot=planning_text
+    )
+    
+    db.session.add(surgery)
+    db.session.commit()
+    
+    # Disparar email
+    subject = f"[MAPA CIRÚRGICO] Transplante agendado — {patient.name} — {surgery_date.strftime('%d/%m/%Y')}"
+    body = f"""
+Nome do paciente: {patient.name}
+Data da cirurgia: {surgery_date.strftime('%d/%m/%Y')}
+CPF: {patient.cpf or 'Não informado'}
+Telefone: {patient.phone or 'Não informado'}
+
+--------------------------------------------------
+PLANEJAMENTO CIRÚRGICO (snapshot):
+{planning_text}
+"""
+    
+    email_sent, email_error = send_gmail_replit(subject, body)
+    
+    return jsonify({
+        'success': True, 
+        'id': surgery.id,
+        'email_sent': email_sent,
+        'email_error': email_error if not email_sent else None
+    })
+
 @patient_bp.route('/<int:patient_id>/transplant/planning-summary', methods=['GET'])
 @login_required
 def get_transplant_planning_summary(patient_id):

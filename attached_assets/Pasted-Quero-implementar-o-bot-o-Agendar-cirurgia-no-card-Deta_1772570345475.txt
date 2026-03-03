@@ -1,0 +1,111 @@
+Quero implementar o botão “Agendar cirurgia” no card “Detalhes do Planejamento” que aparece dentro da aba Evolução do prontuário no meu projeto Flask.
+
+Contexto atual
+
+Já existe o endpoint GET /api/patient/<id>/transplant/planning-summary que retorna:
+
+has_planning
+
+planning (texto do último planejamento preenchido)
+
+last_surgery_date (última data de cirurgia, se existir)
+
+Já existe um card na aba Evolução que mostra esse resumo quando has_planning == true.
+
+Objetivo
+
+Quando a secretária clicar em “Agendar cirurgia”:
+
+abrir um input de data (preferência: modal com datepicker; se não der, usar prompt() com formato YYYY-MM-DD);
+
+fazer POST para um novo endpoint:
+
+POST /api/patient/<id>/transplant/schedule-surgery
+
+body JSON: { "surgery_date": "YYYY-MM-DD" }
+
+Backend deve:
+
+validar data;
+
+buscar automaticamente o último planejamento preenchido (HairTransplant.surgical_planning) desse paciente;
+
+criar ou atualizar um registro de cirurgia (TransplantSurgeryRecord) com:
+
+patient_id
+
+surgery_date
+
+status = "scheduled" (se existir campo)
+
+planning_snapshot (se existir campo; se não existir, criar migration simples adicionando planning_snapshot TEXT)
+
+garantir que esse registro apareça no Mapa Cirúrgico (usar a mesma tabela/consulta já usada no mapa; se o mapa já lista TransplantSurgeryRecord, então só salvar já resolve).
+
+Após salvar no banco, o backend deve disparar um e-mail usando Gmail Connector do Replit (NÃO usar SMTP).
+
+destino fixo: implantecapilaremrp@gmail.com
+
+assunto: [MAPA CIRÚRGICO] Transplante agendado — <NOME DO PACIENTE> — <DD/MM/AAAA>
+
+corpo do email (texto simples ou HTML):
+
+Nome do paciente
+
+Data da cirurgia
+
+Telefone e CPF se existirem no model
+
+Separador
+
+“PLANEJAMENTO CIRÚRGICO (snapshot)” + o texto do planejamento
+
+se o envio de email falhar, não deve cancelar o agendamento; apenas retornar email_sent: false com o erro.
+
+Frontend deve:
+
+adicionar no card um botão Agendar cirurgia;
+
+após sucesso, atualizar o card (recarregar ou refetch do summary);
+
+se last_surgery_date existir, mostrar no card.
+
+Regras de permissão
+
+A secretária deve conseguir ver o card e clicar para agendar.
+
+O endpoint de agendamento deve exigir login (@login_required).
+
+Se houver controle de roles, permitir secretaria, admin e doctor. Se não houver role, apenas manter login obrigatório.
+
+Entregáveis
+
+Modificar os arquivos necessários (rotas Flask, models/migration se necessário, template/JS do card).
+
+Garantir que o botão funcione no UI atual.
+
+Garantir que o Mapa Cirúrgico enxergue os registros.
+
+Implementar envio via Gmail Connector do Replit (usar a API/função correta já disponível no projeto para Gmail integration; se não existir wrapper, criar um módulo integrations/gmail.py que chame o conector do Replit conforme documentação do ambiente).
+
+Importante
+
+Não usar SMTP nem app password.
+
+Usar o Gmail Connector do Replit para enviar o email.
+
+Destinatário sempre: implantecapilaremrp@gmail.com.
+
+Antes de finalizar:
+
+me mostre quais arquivos foram alterados e onde.
+
+me dê passos rápidos de teste manual:
+
+abrir paciente com planejamento preenchido
+
+clicar agendar
+
+ver no mapa cirúrgico
+
+confirmar email enviado
