@@ -437,9 +437,9 @@ def get_appointments():
         try:
             from datetime import datetime, date
             target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-            # Filtrar agendamentos do dia específico ignorando fuso horário no filtro de data
+            # Forçar comparação direta de data no SQL para evitar problemas de fuso horário do servidor
             query = query.filter(
-                db.func.date(Appointment.start_time) == target_date
+                db.cast(Appointment.start_time, db.Date) == target_date
             )
         except ValueError:
             pass  # Se data inválida, ignora o filtro
