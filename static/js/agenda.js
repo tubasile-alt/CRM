@@ -58,30 +58,54 @@
                 suggestionsDiv.style.display = 'none';
                 return;
             }
-            let doctorId = '';
-            if (window.isSecretary && document.getElementById('appointmentDoctor')) {
-                doctorId = document.getElementById('appointmentDoctor').value || '';
-            }
-            const url = doctorId 
-                ? `/api/patients/search?q=${encodeURIComponent(query)}&doctor_id=${doctorId}`
-                : `/api/patients/search?q=${encodeURIComponent(query)}`;
-            
-            fetch(url)
+
+            fetch(`/api/doctor-patients/search?q=${encodeURIComponent(query)}`)
                 .then(r => r.json())
-                .then(patients => {
+                .then(results => {
                     suggestionsDiv.innerHTML = '';
-                    if (!Array.isArray(patients) || patients.length === 0) {
-                        suggestionsDiv.style.display = 'none';
-                        return;
+                    if (!Array.isArray(results) || results.length === 0) {
+                        // Fallback para busca simples se não houver vínculo dp
+                        return fetch(`/api/patients/search?q=${encodeURIComponent(query)}`)
+                            .then(r2 => r2.json())
+                            .then(patients => {
+                                if (!Array.isArray(patients) || patients.length === 0) {
+                                    suggestionsDiv.style.display = 'none';
+                                    return;
+                                }
+                                patients.forEach(patient => {
+                                    const div = document.createElement('div');
+                                    div.className = 'p-2 border-bottom cursor-pointer hover-bg-light';
+                                    div.style.cursor = 'pointer';
+                                    div.textContent = patient.name;
+                                    div.onclick = () => selectPatient({
+                                        id: patient.id, name: patient.name,
+                                        dp_id: null, patient_code: null,
+                                        cpf: patient.cpf, birth_date: patient.birth_date,
+                                        phone: patient.phone, address: patient.address,
+                                        city: patient.city, mother_name: patient.mother_name,
+                                        indication_source: patient.indication_source,
+                                        occupation: patient.occupation,
+                                        patient_type: patient.patient_type
+                                    });
+                                    suggestionsDiv.appendChild(div);
+                                });
+                                suggestionsDiv.style.display = 'block';
+                            });
                     }
-                    patients.forEach(patient => {
+                    results.forEach(item => {
                         const div = document.createElement('div');
                         div.className = 'p-2 border-bottom cursor-pointer hover-bg-light';
                         div.style.cursor = 'pointer';
-                        const code = patient.patient_code ? `(${patient.patient_code})` : '';
-                        const stars = patient.ivp_stars ? ' ⭐'.repeat(patient.ivp_stars) : '';
-                        div.textContent = `${patient.name} ${code}${stars}`;
-                        div.onclick = () => selectPatient(patient);
+                        const roleLabel = item.doctor_role === 'CP' ? 'CP' : 'DERM';
+                        div.innerHTML = `<span class="fw-semibold">${item.patient_name}</span> <span class="text-muted small">— Dr(a). ${item.doctor_name} (${roleLabel}) — Cód. ${item.patient_code}</span>`;
+                        div.onclick = () => selectPatient({
+                            id: item.patient_id,
+                            name: item.patient_name,
+                            dp_id: item.dp_id,
+                            patient_code: item.patient_code,
+                            phone: item.patient_phone,
+                            doctor_role: item.doctor_role
+                        });
                         suggestionsDiv.appendChild(div);
                     });
                     suggestionsDiv.style.display = 'block';
@@ -100,15 +124,19 @@
         document.getElementById('selectedPatientId').value = patient.id;
         document.getElementById('patientName').value = patient.name;
         document.getElementById('patientCode').value = patient.patient_code || '';
-        document.getElementById('patientCPF').value = patient.cpf || '';
-        document.getElementById('patientBirthDate').value = patient.birth_date || '';
-        document.getElementById('patientPhone').value = patient.phone || '';
-        document.getElementById('patientAddress').value = patient.address || '';
-        document.getElementById('patientCity').value = patient.city || '';
-        document.getElementById('patientMotherName').value = patient.mother_name || '';
-        document.getElementById('patientIndicationSource').value = patient.indication_source || '';
-        document.getElementById('patientOccupation').value = patient.occupation || '';
-        document.getElementById('patientType').value = patient.patient_type || 'particular';
+        if (document.getElementById('patientCPF')) document.getElementById('patientCPF').value = patient.cpf || '';
+        if (document.getElementById('patientBirthDate')) document.getElementById('patientBirthDate').value = patient.birth_date || '';
+        if (document.getElementById('patientPhone')) document.getElementById('patientPhone').value = patient.phone || '';
+        if (document.getElementById('patientAddress')) document.getElementById('patientAddress').value = patient.address || '';
+        if (document.getElementById('patientCity')) document.getElementById('patientCity').value = patient.city || '';
+        if (document.getElementById('patientMotherName')) document.getElementById('patientMotherName').value = patient.mother_name || '';
+        if (document.getElementById('patientIndicationSource')) document.getElementById('patientIndicationSource').value = patient.indication_source || '';
+        if (document.getElementById('patientOccupation')) document.getElementById('patientOccupation').value = patient.occupation || '';
+        if (document.getElementById('patientType')) document.getElementById('patientType').value = patient.patient_type || 'particular';
+        if (patient.dp_id) {
+            const dpInput = document.getElementById('selectedDpId');
+            if (dpInput) dpInput.value = patient.dp_id;
+        }
         document.getElementById('patientSuggestions').style.display = 'none';
     };
 
@@ -430,8 +458,10 @@
         });
     };
 
-    window.goToPatientChart = function(patientId, appointmentId) {
-        if (patientId) {
+    window.goToPatientChart = function(patientId, appointmentId, dpId) {
+        if (dpId) {
+            window.location.href = `/prontuario/dp/${dpId}`;
+        } else if (patientId) {
             window.location.href = `/prontuario/${patientId}?appointment_id=${appointmentId}`;
         }
     };

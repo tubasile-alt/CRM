@@ -19,6 +19,7 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(20), nullable=False)
     specialty = db.Column(db.String(50))  # 'dermatologista' ou 'cirurgiao_plastico'
+    role_clinico = db.Column(db.String(20), default='DERM')  # 'CP', 'DERM', 'SECRETARY', 'ADMIN'
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     def set_password(self, password):
@@ -32,6 +33,9 @@ class User(UserMixin, db.Model):
     
     def is_secretary(self):
         return self.role == 'secretaria'
+    
+    def is_cp(self):
+        return self.role_clinico == 'CP'
 
 class Patient(db.Model):
     __tablename__ = 'patient'
@@ -52,6 +56,11 @@ class Patient(db.Model):
     attention_note = db.Column(db.Text)
     has_transplant_indication = db.Column(db.Boolean, default=False)
     photo_url = db.Column(db.String(255))  # Foto 3x4 do paciente
+    weight = db.Column(db.Float)  # Peso em kg
+    height = db.Column(db.Float)  # Altura em cm
+    blood_type = db.Column(db.String(5))  # O+, A-, etc.
+    allergies = db.Column(db.Text)  # Alergias conhecidas
+    smoker = db.Column(db.String(20))  # 'nao', 'sim', 'ex-tabagista'
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     # Índice de Valor do Paciente (IVP) - Estrelas 0-3
@@ -489,3 +498,65 @@ class MedicationUsage(db.Model):
     prescribed_at = db.Column(db.DateTime, default=get_brazil_time)
     
     medication = db.relationship('Medication', backref='usage_records')
+
+
+class PlasticSurgeryEncounter(db.Model):
+    __tablename__ = 'encounter_cp'
+    id = db.Column(db.Integer, primary_key=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    doctor_patient_id = db.Column(db.Integer, db.ForeignKey('patient_doctor.id'), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time)
+    category = db.Column(db.String(20))  # FACE, MAMA, CORPORAL
+    complaint_text = db.Column(db.Text)
+    plan_summary_text = db.Column(db.Text)
+    consultation_seconds = db.Column(db.Integer)
+    status = db.Column(db.String(10), default='DRAFT')  # DRAFT, FINAL
+
+    doctor = db.relationship('User', backref='cp_encounters')
+    doctor_patient = db.relationship('PatientDoctor', backref='cp_encounters')
+    plan = db.relationship('PlasticSurgeryPlan', backref='encounter', uselist=False, cascade='all, delete-orphan')
+    budget = db.relationship('PlasticSurgeryBudget', backref='encounter', uselist=False, cascade='all, delete-orphan')
+
+
+class PlasticSurgeryPlan(db.Model):
+    __tablename__ = 'plan_cp'
+    id = db.Column(db.Integer, primary_key=True)
+    encounter_id = db.Column(db.Integer, db.ForeignKey('encounter_cp.id'), nullable=False, unique=True)
+    indication_status = db.Column(db.String(5))  # YES, NO
+    case_type = db.Column(db.String(20))  # PRIMARY, SECONDARY, TERTIARY
+    selected_procedures = db.Column(db.JSON)
+    lipo_areas = db.Column(db.JSON)
+    implant_plane = db.Column(db.String(50))
+    implant_profile = db.Column(db.String(50))
+    implant_volume_min = db.Column(db.Integer)
+    implant_volume_max = db.Column(db.Integer)
+    technologies = db.Column(db.JSON)
+    internacao = db.Column(db.String(20))  # DAY_HOSPITAL, OVERNIGHT
+    estimated_time = db.Column(db.String(50))
+    follow_up_deadline = db.Column(db.String(20))  # 7d, 14d, 30d, 3m, 6m, anual
+    reception_obs = db.Column(db.Text)
+
+
+class PlasticSurgeryBudget(db.Model):
+    __tablename__ = 'budget_cp'
+    id = db.Column(db.Integer, primary_key=True)
+    encounter_id = db.Column(db.Integer, db.ForeignKey('encounter_cp.id'), nullable=False, unique=True)
+    items = db.Column(db.JSON)  # {procedimento: valor}
+    all_in_price = db.Column(db.Float)
+    currency = db.Column(db.String(5), default='BRL')
+
+
+class Attachment(db.Model):
+    __tablename__ = 'attachment'
+    id = db.Column(db.Integer, primary_key=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
+    doctor_patient_id = db.Column(db.Integer, db.ForeignKey('patient_doctor.id'), nullable=True, index=True)
+    owner_type = db.Column(db.String(30))  # ENCOUNTER_CP, ENCOUNTER_DERM
+    owner_id = db.Column(db.Integer)
+    file_path = db.Column(db.String(500))
+    label = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+
+    doctor = db.relationship('User', backref='attachments')
+    doctor_patient = db.relationship('PatientDoctor', backref='attachments')

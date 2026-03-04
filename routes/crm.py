@@ -1,10 +1,17 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
-from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord
+from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, extract
 import pytz
+
+
+def _get_dp_id(patient_id, doctor_id):
+    if not doctor_id:
+        return None
+    dp = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=doctor_id).first()
+    return dp.id if dp else None
 
 crm_bp = Blueprint('crm', __name__)
 
@@ -62,17 +69,18 @@ def get_pending_surgeries():
     
     result = []
     for p in patients:
-        # Pega a última consulta de transplante para exibir a data
         last_app = db.session.query(Appointment).filter_by(
-            patient_id=p.id, 
+            patient_id=p.id,
             appointment_type='Transplante Capilar'
         ).order_by(Appointment.start_time.desc()).first()
-        
+        doctor_id = last_app.doctor_id if last_app else None
+        dp_id = _get_dp_id(p.id, doctor_id)
         result.append({
             'id': p.id,
             'name': p.name,
             'phone': p.phone,
-            'last_consultation': last_app.start_time.strftime('%d/%m/%Y') if last_app else 'N/A'
+            'last_consultation': last_app.start_time.strftime('%d/%m/%Y') if last_app else 'N/A',
+            'dp_id': dp_id
         })
     
     return jsonify(result)
@@ -97,7 +105,7 @@ def get_performed_procedures():
         follow_up_due_at = None
         if plan.performed_date and plan.follow_up_months:
             follow_up_due_at = (plan.performed_date + relativedelta(months=plan.follow_up_months)).date()
-        
+        dp_id = _get_dp_id(patient.id, note.doctor_id)
         result.append({
             'id': plan.id,
             'patient_id': patient.id,
@@ -106,7 +114,8 @@ def get_performed_procedures():
             'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_due_at': follow_up_due_at.isoformat() if follow_up_due_at else None,
             'follow_up_months': plan.follow_up_months or 6,
-            'observations': plan.observations
+            'observations': plan.observations,
+            'dp_id': dp_id
         })
     
     return jsonify(result)
@@ -138,6 +147,7 @@ def get_followups():
         
         status_label = 'Vencido' if days_until < 0 else ('Próximo' if days_until <= 30 else 'Futuro')
         
+        dp_id = _get_dp_id(patient.id, note.doctor_id)
         result.append({
             'id': plan.id,
             'patient_id': patient.id,
@@ -147,7 +157,8 @@ def get_followups():
             'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_due_at': follow_up_due_at.isoformat(),
             'days_until': days_until,
-            'urgency': status_label
+            'urgency': status_label,
+            'dp_id': dp_id
         })
     
     result.sort(key=lambda x: x['follow_up_due_at'])
@@ -170,6 +181,7 @@ def get_planned_procedures():
     
     result = []
     for plan, note, patient in plans:
+        dp_id = _get_dp_id(patient.id, note.doctor_id)
         result.append({
             'id': plan.id,
             'patient_id': patient.id,
@@ -178,7 +190,8 @@ def get_planned_procedures():
             'procedure_name': plan.procedure_name,
             'planned_value': float(plan.planned_value) if plan.planned_value else None,
             'observations': plan.observations,
-            'created_at': plan.created_at.isoformat() if plan.created_at else None
+            'created_at': plan.created_at.isoformat() if plan.created_at else None,
+            'dp_id': dp_id
         })
     
     return jsonify(result)

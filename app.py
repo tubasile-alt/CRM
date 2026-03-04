@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, make_response
+from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_file, make_response, abort
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
@@ -50,12 +50,14 @@ from routes.settings import settings_bp
 from routes.patient import patient_bp
 from routes.crm import crm_bp
 from routes.dermascribe import dermascribe_bp
+from routes.cp import cp_bp
 
 app.register_blueprint(surgical_map_bp)
 app.register_blueprint(waiting_room_bp)
 app.register_blueprint(settings_bp)
 app.register_blueprint(crm_bp)
 app.register_blueprint(dermascribe_bp)
+app.register_blueprint(cp_bp)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -1584,9 +1586,24 @@ def build_patient_timeline(p_id):
 def prontuario(patient_id):
     if not current_user.is_doctor() and not current_user.is_secretary():
         return redirect(url_for('agenda'))
-    
+
+    # Secretárias: redirecionar para uso da busca por dp
+    if current_user.is_secretary():
+        return render_template('select_dp.html', patient_id=patient_id), 400
+
+    # Médicos CP: criar/obter dp e redirecionar para rota dp
+    if current_user.role_clinico == 'CP':
+        from models import PatientDoctor as _PD
+        _dp = _PD.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
+        if not _dp:
+            _max = db.session.query(db.func.max(_PD.patient_code)).filter(_PD.doctor_id == current_user.id).scalar() or 0
+            _dp = _PD(patient_id=patient_id, doctor_id=current_user.id, patient_code=_max + 1)
+            db.session.add(_dp)
+            db.session.commit()
+        return redirect(url_for('prontuario_dp', dp_id=_dp.id))
+
     try:
-        # Verificar acesso: Médicos veem apenas seus próprios pacientes, secretárias veem todos
+        # DERM: Verificar acesso: Médicos veem apenas seus próprios pacientes
         if current_user.is_doctor():
             from models import PatientDoctor
             pd = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
@@ -1787,6 +1804,244 @@ def prontuario(patient_id):
         print(f"ERRO PRONTUARIO (Patient: {patient_id}, Appt: {request.args.get('appointment_id')}): {str(e)}")
         print(traceback.format_exc())
         return "Internal Server Error", 500
+
+@app.route('/prontuario/dp/<int:dp_id>')
+@login_required
+def prontuario_dp(dp_id):
+    from services.authz import require_dp_view, can_edit_dp
+    from models import PlasticSurgeryEncounter
+
+    dp = require_dp_view(dp_id)
+    patient = Patient.query.get_or_404(dp.patient_id)
+    read_only = not can_edit_dp(dp)
+
+    doctor = db.session.get(User, dp.doctor_id)
+
+    use_cp = False
+    if doctor and doctor.role_clinico == 'CP':
+        use_cp = True
+    elif not current_user.is_secretary() and current_user.role_clinico == 'CP':
+        use_cp = True
+
+    age = None
+    if patient.birth_date:
+        from datetime import date as pydate
+        today = pydate.today()
+        age = today.year - patient.birth_date.year - (
+            (today.month, today.day) < (patient.birth_date.month, patient.birth_date.day)
+        )
+
+    imc = None
+    imc_status = None
+    if patient.weight and patient.height and patient.height > 0:
+        h_m = patient.height / 100.0
+        imc = round(patient.weight / (h_m * h_m), 1)
+        if imc < 18.5:
+            imc_status = 'Abaixo do peso'
+        elif imc < 25:
+            imc_status = 'Normal'
+        elif imc < 30:
+            imc_status = 'Sobrepeso'
+        else:
+            imc_status = 'Obesidade'
+
+    if use_cp:
+        last_encounter = PlasticSurgeryEncounter.query\
+            .filter_by(doctor_patient_id=dp.id)\
+            .order_by(PlasticSurgeryEncounter.updated_at.desc())\
+            .first()
+        return render_template(
+            'prontuario_cp.html',
+            dp=dp,
+            patient=patient,
+            doctor=doctor,
+            read_only=read_only,
+            age=age,
+            imc=imc,
+            imc_status=imc_status,
+            last_encounter=last_encounter,
+            current_user=current_user
+        )
+    else:
+        from datetime import timedelta
+        from collections import defaultdict
+        procedures = Procedure.query.all()
+        tags = Tag.query.all()
+        patient_tags = [pt.tag_id for pt in patient.tags]
+        notes = Note.query.filter_by(patient_id=patient.id)\
+            .options(
+                db.joinedload(Note.indications).joinedload(Indication.procedure),
+                db.joinedload(Note.cosmetic_plans),
+                db.joinedload(Note.hair_transplants).joinedload(HairTransplant.images)
+            )\
+            .order_by(Note.created_at.desc())\
+            .all()
+
+        consultations = []
+        processed_notes = set()
+        notes_by_appointment = defaultdict(list)
+        notes_without_appointment = []
+        for note in notes:
+            if note.appointment_id:
+                notes_by_appointment[note.appointment_id].append(note)
+            else:
+                notes_without_appointment.append(note)
+
+        for appt_id, appt_notes in notes_by_appointment.items():
+            for note in appt_notes:
+                processed_notes.add(note.id)
+            all_cosmetic_plans = []
+            for note in appt_notes:
+                for plan in note.cosmetic_plans:
+                    all_cosmetic_plans.append({
+                        'procedure_name': plan.procedure_name,
+                        'planned_value': plan.planned_value,
+                        'final_budget': plan.final_budget,
+                        'was_performed': plan.was_performed,
+                        'performed_date': plan.performed_date,
+                        'follow_up_months': plan.follow_up_months
+                    })
+            notes_by_type = {note.note_type: note for note in appt_notes}
+            finalized_note = next((n for n in appt_notes if n.consultation_duration), None)
+            first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
+            appointment = db.session.get(Appointment, appt_id)
+            if appointment:
+                consultation_date = appointment.consultation_date or appointment.start_time
+            else:
+                consultation_date = finalized_note.created_at if finalized_note else first_note.created_at
+            consultations.append({
+                'id': appt_id,
+                'date': consultation_date,
+                'doctor': first_note.doctor,
+                'duration': finalized_note.consultation_duration if finalized_note else None,
+                'category': finalized_note.category if finalized_note else first_note.category,
+                'notes_by_type': notes_by_type,
+                'all_notes': appt_notes,
+                'cosmetic_plans': all_cosmetic_plans,
+                'is_finalized': finalized_note is not None
+            })
+
+        notes_without_appointment.sort(key=lambda x: x.created_at, reverse=True)
+        for note in notes_without_appointment:
+            if note.id in processed_notes:
+                continue
+            window_start = note.created_at - timedelta(seconds=2)
+            window_end = note.created_at + timedelta(seconds=2)
+            grouped_notes = [n for n in notes_without_appointment
+                            if n.id not in processed_notes
+                            and n.doctor_id == note.doctor_id
+                            and window_start <= n.created_at <= window_end]
+            for gn in grouped_notes:
+                processed_notes.add(gn.id)
+            all_cosmetic_plans = []
+            for gn in grouped_notes:
+                for plan in gn.cosmetic_plans:
+                    all_cosmetic_plans.append({
+                        'procedure_name': plan.procedure_name,
+                        'planned_value': plan.planned_value,
+                        'final_budget': plan.final_budget,
+                        'was_performed': plan.was_performed,
+                        'performed_date': plan.performed_date,
+                        'follow_up_months': plan.follow_up_months
+                    })
+            notes_by_type = {gn.note_type: gn for gn in grouped_notes}
+            finalized_note = next((n for n in grouped_notes if n.consultation_duration), None)
+            consultations.append({
+                'id': note.id,
+                'date': note.created_at,
+                'doctor': note.doctor,
+                'duration': finalized_note.consultation_duration if finalized_note else None,
+                'category': note.category,
+                'notes_by_type': notes_by_type,
+                'all_notes': grouped_notes,
+                'cosmetic_plans': all_cosmetic_plans,
+                'is_finalized': finalized_note is not None
+            })
+
+        consultations.sort(key=lambda x: x['date'], reverse=True)
+        timeline_events = build_patient_timeline(patient.id)
+        return render_template(
+            'prontuario.html',
+            patient=patient,
+            procedures=procedures,
+            tags=tags,
+            patient_tags=patient_tags,
+            notes=notes,
+            consultations=consultations,
+            appointment_id=None,
+            appointment_start_iso=None,
+            age=age,
+            timeline_events=timeline_events,
+            debug_info=None,
+            read_only=read_only,
+            dp=dp
+        )
+
+
+@app.route('/api/doctor-patients/search')
+@login_required
+def search_doctor_patients():
+    q = request.args.get('q', '').strip()
+    if not q or len(q) < 2:
+        return jsonify([])
+
+    from models import PatientDoctor
+
+    base_q = db.session.query(PatientDoctor, Patient, User)\
+        .join(Patient, PatientDoctor.patient_id == Patient.id)\
+        .join(User, PatientDoctor.doctor_id == User.id)\
+        .filter(Patient.name.ilike(f'%{q}%'))
+
+    if not (current_user.is_secretary() or current_user.role_clinico in ('SECRETARY', 'ADMIN')):
+        base_q = base_q.filter(PatientDoctor.doctor_id == current_user.id)
+
+    rows = base_q.limit(20).all()
+
+    result = []
+    for dp, patient, doctor in rows:
+        result.append({
+            'dp_id': dp.id,
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'patient_phone': patient.phone or '',
+            'patient_code': dp.patient_code,
+            'doctor_id': doctor.id,
+            'doctor_name': doctor.name,
+            'doctor_role': doctor.role_clinico or 'DERM',
+        })
+
+    return jsonify(result)
+
+
+@app.route('/api/doctor-patients/link', methods=['POST'])
+@login_required
+def link_doctor_patient():
+    if not (current_user.is_secretary() or current_user.role_clinico in ('SECRETARY', 'ADMIN')):
+        abort(403)
+
+    data = request.get_json() or {}
+    patient_id = data.get('patient_id')
+    doctor_id = data.get('doctor_id')
+
+    if not patient_id or not doctor_id:
+        return jsonify({'error': 'patient_id e doctor_id obrigatórios'}), 400
+
+    from models import PatientDoctor
+
+    dp = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=doctor_id).first()
+    if not dp:
+        max_code = db.session.query(db.func.max(PatientDoctor.patient_code))\
+            .filter(PatientDoctor.doctor_id == doctor_id).scalar() or 0
+        dp = PatientDoctor(
+            patient_id=patient_id,
+            doctor_id=doctor_id,
+            patient_code=max_code + 1
+        )
+        db.session.add(dp)
+        db.session.commit()
+
+    return jsonify({'dp_id': dp.id, 'patient_code': dp.patient_code})
+
 
 @app.route('/debug/timeline/<int:patient_id>')
 @login_required

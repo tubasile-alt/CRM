@@ -49,6 +49,11 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **WeasyPrint PDF** - Rota /pdf para geração de PDF real de receitas (sem depender do browser)
 - ✅ **Google Sheets Integration** - Procedimentos realizados são enviados automaticamente para planilha Google (webhook n8n)
 - ✅ **Google Calendar Integration** - Cirurgias agendadas criam evento automático no Google Calendar com nome do paciente e descrição
+- ✅ **Módulo CP (Cirurgia Plástica)** - Prontuário dedicado com tabs Queixa/Planejamento/Orçamento/Retorno/Histórico, timer, chips de procedimento/técnica, áreas de lipo, módulo de implante e cálculo de orçamento
+- ✅ **Controle de Acesso DP** - Modelo PatientDoctor para vínculo médico-paciente; `role_clinico` (CP/DERM/SECRETARY/ADMIN) no User; service `authz.py` com `can_view_dp`/`can_edit_dp`
+- ✅ **APIs CP** - Blueprint `cp.py`: start/save/get/finalize encounter, histórico por dp_id; autosave a cada 30s
+- ✅ **Rotas DP** - `/prontuario/dp/<dp_id>` renderiza `prontuario_cp.html` (CP) ou `prontuario.html` (DERM read-only); secretárias veem `select_dp.html`; médicos CP são redirecionados automaticamente da rota padrão
+- ✅ **CRM integrado com dp_id** - Painel de agendados/planejados/realizados usa dp_id para abrir o prontuário CP correto
 
 ## 🛡️ SISTEMA DE BACKUP (CRÍTICO)
 

@@ -375,9 +375,9 @@ async function loadTransplantDashboard() {
                     <td>${p.last_consultation}</td>
                     <td class="text-center">
                         {% if current_user.is_doctor() %}
-                        <a href="/prontuario/${p.id}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;">Ver</a>
+                        <a href="${p.dp_id ? '/prontuario/dp/' + p.dp_id : '/prontuario/' + p.id}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;">Ver</a>
                         {% else %}
-                        <span class="text-muted small">Acesso Restrito</span>
+                        ${p.dp_id ? `<a href="/prontuario/dp/${p.dp_id}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;">Ver</a>` : '<span class="text-muted small">—</span>'}
                         {% endif %}
                     </td>
                 </tr>
@@ -423,7 +423,7 @@ function loadFollowups() {
             panel.innerHTML = data.map(item => `
                 <div class="procedure-item ${item.urgency === 'Vencido' ? 'overdue' : item.urgency === 'Próximo' ? 'due-soon' : ''}" 
                      style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
-                     onclick="openPatient(${item.patient_id})">
+                     onclick="openPatient(${item.patient_id}, ${item.dp_id || null})">
                     <div class="patient-name">${item.patient_name}</div>
                     <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
                     <div class="date-info">
@@ -455,7 +455,7 @@ function loadPlanned() {
             panel.innerHTML = data.map(item => `
                 <div class="procedure-item" 
                      style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
-                     onclick="openPatient(${item.patient_id})">
+                     onclick="openPatient(${item.patient_id}, ${item.dp_id || null})">
                     <div class="patient-name">${item.patient_name}</div>
                     <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
                     <div class="date-info">Planejado: ${item.planned_date ? formatDate(item.planned_date) : 'Sem data'}</div>
@@ -483,7 +483,7 @@ function loadPerformed() {
             panel.innerHTML = data.map(item => `
                 <div class="procedure-item" 
                      style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
-                     onclick="openPatient(${item.patient_id})">
+                     onclick="openPatient(${item.patient_id}, ${item.dp_id || null})">
                     <div class="patient-name">${item.patient_name}</div>
                     <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
                     <div class="date-info">Realizado: ${formatDate(item.performed_date)}</div>
@@ -521,8 +521,12 @@ function formatDate(dateStr) {
     return date.toLocaleDateString('pt-BR');
 }
 
-function openPatient(patientId) {
-    window.location.href = `/prontuario/${patientId}`;
+function openPatient(patientId, dpId) {
+    if (dpId) {
+        window.location.href = `/prontuario/dp/${dpId}`;
+    } else {
+        window.location.href = `/prontuario/${patientId}`;
+    }
 }
 
 function markAsDone(planId) {
