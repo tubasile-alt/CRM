@@ -1813,6 +1813,7 @@ def prontuario_dp(dp_id):
 
     dp = require_dp_view(dp_id)
     patient = Patient.query.get_or_404(dp.patient_id)
+    # Secretárias agora podem editar para preencher triagem/orçamento
     read_only = not can_edit_dp(dp)
 
     doctor = db.session.get(User, dp.doctor_id)

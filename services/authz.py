@@ -10,7 +10,8 @@ def _get_dp(dp_id):
 def can_view_dp(dp):
     if not current_user.is_authenticated:
         return False
-    if current_user.role_clinico in ('SECRETARY', 'ADMIN'):
+    # Secretárias e Admins podem ver tudo
+    if current_user.role_clinico in ('SECRETARY', 'ADMIN') or current_user.is_secretary():
         return True
     return dp.doctor_id == current_user.id
 

@@ -10,8 +10,7 @@ cp_bp = Blueprint('cp', __name__)
 @cp_bp.route('/api/cp/encounter/start', methods=['POST'])
 @login_required
 def start_encounter():
-    if current_user.is_secretary() or current_user.role_clinico == 'SECRETARY':
-        abort(403)
+    # Removido bloqueio de secretária para permitir triagem
     data = request.get_json() or {}
     dp_id = data.get('dp_id')
     if not dp_id:
@@ -22,9 +21,12 @@ def start_encounter():
         abort(403)
 
     category = data.get('category', 'FACE')
+    
+    # O médico do atendimento é o médico vinculado ao paciente (dp.doctor_id)
+    encounter_doctor_id = dp.doctor_id
 
     encounter = PlasticSurgeryEncounter(
-        doctor_id=current_user.id,
+        doctor_id=encounter_doctor_id,
         doctor_patient_id=dp.id,
         category=category,
         status='DRAFT'
@@ -92,6 +94,7 @@ def save_encounter(encounter_id):
     if not dp or not can_edit_dp(dp):
         abort(403)
 
+    # Permitir que secretárias salvem o atendimento
     data = request.get_json() or {}
 
     if 'category' in data:
