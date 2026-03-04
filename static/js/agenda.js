@@ -384,10 +384,17 @@
         appointmentsGrid.innerHTML = '';
         
         const dayAppointments = appointmentsList.filter(app => {
-            const appDateStr = app.start.split('T')[0];
+            const start = parseLocalDateTime(app.start);
+            if (!start) return false;
+            
+            const appDateStr = start.getFullYear() + '-' + 
+                               String(start.getMonth() + 1).padStart(2, '0') + '-' + 
+                               String(start.getDate()).padStart(2, '0');
+                               
             const selectedDateStr = selectedDate.getFullYear() + '-' + 
                                    String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
                                    String(selectedDate.getDate()).padStart(2, '0');
+            
             const doctorMatch = !currentDoctorFilter || app.extendedProps?.doctorId == currentDoctorFilter;
             return appDateStr === selectedDateStr && doctorMatch;
         });
