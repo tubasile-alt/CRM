@@ -978,6 +978,16 @@
     };
 
     window.saveAppointment = function() {
+        const saveBtn = document.querySelector('#appointmentForm button[type="submit"]') || 
+                        document.querySelector('#newAppointmentModal .btn-primary:last-child');
+        
+        if (saveBtn && saveBtn.disabled) return;
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Salvando...';
+        }
+
         const patientId = document.getElementById('selectedPatientId')?.value || '';
         const patientName = document.getElementById('patientName')?.value || '';
         const patientCode = document.getElementById('patientCode')?.value || '';
@@ -1076,6 +1086,12 @@
         .catch(err => {
             console.error('Erro:', err);
             showAlert('Erro ao salvar agendamento', 'danger');
+        })
+        .finally(() => {
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = 'Salvar Agendamento';
+            }
         });
     };
 
