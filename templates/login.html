@@ -32,8 +32,8 @@
                         <form method="POST" action="{{ url_for('login') }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="mb-3">
-                                <label for="email" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email" name="email" required autofocus>
+                                <label for="email" class="form-label">Usuário ou Email</label>
+                                <input type="text" class="form-control" id="email" name="email" required autofocus>
                             </div>
                             <div class="mb-3">
                                 <label for="password" class="form-label">Senha</label>
@@ -43,9 +43,11 @@
                         </form>
 
                         <div class="mt-4 small text-muted">
-                            <p class="mb-1"><strong>Credenciais de demonstração:</strong></p>
-                            <p class="mb-1">Médico: arthur@clinicabasiledemo.com / 123456</p>
-                            <p class="mb-0">Secretária: secretaria@clinicabasiledemo.com / 123456</p>
+                            <p class="mb-1"><strong>Médicos Cadastrados:</strong></p>
+                            <p class="mb-1">Dr Filipe: fibasile / 2708</p>
+                            <p class="mb-1">Dr Vinicius: vinibasile / 0203</p>
+                            <p class="mb-1">Dr Roberto: rbasile / theboss</p>
+                            <p class="mb-0">Secretária: Implantecapilaremrp@gmail.com / icb@rp</p>
                         </div>
                     </div>
                 </div>

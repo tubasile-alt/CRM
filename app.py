@@ -227,10 +227,11 @@ def login():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        email = request.form.get('email', '').strip()
+        login_input = request.form.get('email', '').strip() # Mantendo o nome do campo como 'email' no form por enquanto
         password = request.form.get('password')
         
-        user = User.query.filter(User.email.ilike(email)).first()
+        # Busca por email ou usuário
+        user = User.query.filter((User.email.ilike(login_input)) | (User.username == login_input)).first()
         
         if user and user.check_password(password):
             login_user(user, remember=True)
