@@ -1,0 +1,43 @@
+========================
+✅ REQUISITOS EXATOS DE UI (OBRIGATÓRIO NO prontuario_cp.html)
+========================
+1) Cabeçalho do paciente deve conter:
+   - Painel de ALERTAS CLÍNICOS com visual destacado por cor:
+     a) Alergias (ex.: “Alérgica a Dipirona”) em cor de alerta (amarelo/laranja)
+     b) Tabagismo (ex.: “Ex-tabagista”) em cor de alerta (vermelho)
+     c) IMC calculado automaticamente a partir de peso e altura do cadastro (exibir valor e status: Normal/Sobrepeso)
+     d) Tipo sanguíneo (ex.: O+)
+   - Sistema de TAGS: exibir tags atuais e botão “Adicionar Tag” (pode abrir modal simples ou input inline).
+   - Esses elementos devem aparecer também para SECRETARY (read-only, sem editar).
+
+2) Navegação e dinâmica:
+   - Cronômetro de consulta visível no topo e contador em tempo real.
+   - Tabs fixas (Queixa, Planejamento, Orçamento, Retorno) com scroll suave para seção.
+   - Página responsiva (tablet).
+
+3) Planejamento dinâmico (obrigatório):
+   - Categoria (Face/Mama/Contorno) altera automaticamente lista de procedimentos disponíveis.
+   - Se selecionar “Lipoaspiração” em Contorno: mostrar seleção de áreas (chips/botões).
+   - Se selecionar procedimento com prótese em Mama: mostrar módulo de implantes (Plano, Perfil, Volume min/max).
+   - Tecnologias adjuvantes com chips/botões (Renuvion, Morpheus, Fita Prineo, Tela).
+
+4) Orçamento e finanças (obrigatório):
+   - Ao marcar procedimentos, gerar automaticamente linhas de orçamento com input de R$ para cada procedimento.
+   - Linha fixa “Tudo” (hospital, anestesista, materiais).
+   - Soma dinâmica em tempo real mostrando “Valor Total Estimado”.
+   - Botões de ação visíveis:
+     a) “Imprimir Pedidos de Exame (Risco Cirúrgico)”
+     b) “Termo de Consentimento (TCLE)”
+     (Se não existir PDF real, criar endpoints stub que retornam 501 com mensagem.)
+
+5) Retorno e logística:
+   - Campo internação (sem pernoite/com pernoite) e tempo estimado de cirurgia.
+   - Campo prazo de retorno (7d, 14d, 30d, 3m, 6m, anual) + observações para recepção.
+
+6) Histórico e autosave:
+   - Rodapé com painel de histórico (consultas CP anteriores e cirurgias realizadas) com cards por data e resumo curto.
+   - Auto-save com indicador visual “Salvo automaticamente há X minutos”.
+   - Botão “Salvar rascunho” (secretária não pode clicar; médicos podem).
+
+7) Ditado de voz (mock):
+   - Botão “Ditado de voz” que alterna estado visual (gravando/não gravando). Não precisa implementar STT na V1, apenas UI.

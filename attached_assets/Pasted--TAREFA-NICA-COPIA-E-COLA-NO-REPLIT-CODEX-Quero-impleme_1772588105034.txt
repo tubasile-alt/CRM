@@ -1,0 +1,291 @@
+🚀 TAREFA ÚNICA (COPIA E COLA NO REPLIT / CODEX):
+Quero implementar um NOVO PRONTUÁRIO DE CIRURGIA PLÁSTICA (CP) no meu app Flask (repo tubasile-alt/CRM), com regras de acesso e busca por vínculo Médico↔Paciente (DoctorPatient). Faça as alterações abaixo COMPLETAS (models + migração + rotas + templates + JS + busca + CRM + permissões). Não remova o prontuário derm existente.
+
+========================
+✅ REGRAS DE NEGÓCIO
+========================
+1) Médicos CP só usam prontuário CP. Médicos DERM só usam prontuário derm.
+2) Uma mesma paciente pode aparecer 3x na busca (um item por médico), porque o vínculo é DoctorPatient (dp).
+3) O “código do paciente” é por médico: a paciente pode ser código 1 para um médico e 20 para outro.
+4) Conteúdo clínico do prontuário é independente por médico (amarrado ao dp). Um médico não enxerga o conteúdo do outro.
+5) SECRETÁRIA pode VER (read-only) qualquer prontuário (CP e derm), mas NÃO pode editar nada (backend bloqueia POST/PUT/DELETE).
+6) Agenda/autocomplete deve mostrar o médico vinculado no resultado (ex.: “Maria Silva — Dr João (CP) — Cód. 12”). Ao clicar, abre o prontuário correto pelo dp_id.
+7) CRM (templates/crm.html) deve abrir o prontuário correto usando dp_id (não patient_id).
+
+========================
+✅ STACK ATUAL
+========================
+- Backend: Flask + Jinja templates + static/js
+- Prontuário derm atual: rota /prontuario/<patient_id> em app.py (linha ~1581) renderiza templates/prontuario.html
+- Busca agenda: static/js/agenda.js usa /api/patients/search e abre /prontuario/<patient_id>
+- CRM: templates/crm.html tem botões que abrem /prontuario/<id>
+- Há CSRF no app (window.fetch wrapper em static/js/main.js). Garanta que as novas rotas aceitem JSON com CSRF.
+
+========================
+✅ OBJETIVO TÉCNICO
+========================
+- Criar novo template: templates/prontuario_cp.html (layout inspirado no React fornecido: tabs, categoria Face/Mama/Contorno, procedimentos, implante, lipo áreas, tecnologias, orçamento, retorno, anexos, timer; pode ser versão 1 simplificada mas com campos essenciais).
+- Criar novo JS: static/js/prontuario_cp.js com:
+  - tabs com scrollToSection
+  - seleção de categoria e procedimentos
+  - cálculo de total do orçamento
+  - autosave com debounce (ex.: salva a cada 2s após digitar)
+  - modo read-only: se read_only=true, desabilitar inputs e esconder botões de salvar/finalizar
+- Criar endpoints CP para carregar e salvar.
+
+========================
+✅ ALTERAÇÕES OBRIGATÓRIAS (PASSO A PASSO)
+========================
+
+---------------------------------------
+A) MODELS / BANCO
+---------------------------------------
+1) Adicionar no User um campo role_clinico:
+   - valores: 'CP', 'DERM', 'SECRETARY', 'ADMIN'
+   - default: 'DERM' para médicos existentes se necessário
+
+2) Criar tabela DoctorPatient (dp):
+   - id (PK)
+   - doctor_id (FK user.id) INDEX
+   - patient_id (FK patient.id) INDEX
+   - patient_code (int) NOT NULL
+   - created_at
+   - constraints:
+     - UNIQUE(doctor_id, patient_code)  [código único por médico]
+     - UNIQUE(doctor_id, patient_id)    [não duplica vínculo]
+
+3) Criar tabelas do prontuário CP:
+   a) PlasticSurgeryEncounter (encounter_cp):
+      - id
+      - doctor_id (FK user.id) INDEX
+      - doctor_patient_id (FK doctor_patient.id) INDEX
+      - created_at, updated_at
+      - category (FACE/MAMA/CORPORAL)
+      - complaint_text (Text)
+      - plan_summary_text (Text)
+      - consultation_seconds (int, opcional)
+      - status (DRAFT/FINAL, opcional)
+
+   b) PlasticSurgeryPlan (plan_cp):
+      - id
+      - encounter_id (FK encounter_cp.id) UNIQUE (1:1)
+      - indication_status (YES/NO)
+      - case_type (PRIMARY/SECONDARY/TERTIARY)
+      - selected_procedures (JSON)
+      - lipo_areas (JSON)
+      - implant_plane (string)
+      - implant_profile (string)
+      - implant_volume_min (int)
+      - implant_volume_max (int)
+      - technologies (JSON)
+      - internacao (DAY_HOSPITAL/OVERNIGHT)
+      - estimated_time (string)
+
+   c) PlasticSurgeryBudget (budget_cp):
+      - id
+      - encounter_id (FK encounter_cp.id) UNIQUE (1:1)
+      - items (JSON: {procedimento: valor})
+      - all_in_price (float)  [campo "Tudo"]
+      - currency (default 'BRL')
+
+4) Se não existir tabela genérica de anexos, crie Attachment:
+   - id, doctor_id, doctor_patient_id (opcional), owner_type, owner_id, file_path/url, label, created_at
+   - owner_type suportar: 'ENCOUNTER_CP', 'ENCOUNTER_DERM'
+   - anexos CP devem ficar vinculados ao encounter_cp e respeitar ACL
+
+5) Criar migração (se não usa Alembic, faça script simples de db.create_all + instruções). Preferencial usar Alembic se já existir.
+
+---------------------------------------
+B) HELPERS DE ACL (PERMISSÕES)
+---------------------------------------
+Criar helpers em services/authz.py (ou similar):
+
+- can_view_dp(dp):
+   - SECRETARY e ADMIN: True
+   - médico: True apenas se dp.doctor_id == current_user.id
+
+- can_edit_dp(dp):
+   - apenas CP/DERM e dp.doctor_id == current_user.id
+   - SECRETARY sempre False
+
+- require_dp_view(dp_id): carrega dp e abort(403) se sem permissão
+- require_dp_edit(dp_id): carrega dp e abort(403) se sem permissão de edição
+
+---------------------------------------
+C) ROTAS DO PRONTUÁRIO (app.py + novos blueprints)
+---------------------------------------
+1) Criar rota principal por dp_id:
+   GET /prontuario/dp/<int:dp_id>
+   - dp = require_dp_view(dp_id)
+   - patient = Patient(dp.patient_id)
+   - read_only = not can_edit_dp(dp)
+   - Se dp.doctor.role_clinico == 'CP' (ou se quiser: se current_user.role_clinico == 'CP' quando não for secretária):
+       render templates/prontuario_cp.html
+     Senão:
+       render templates/prontuario.html (derm atual)
+   - Passar dp, patient, read_only para o template
+
+2) Manter rota antiga /prontuario/<patient_id> como ponte:
+   - Se current_user.role_clinico == 'SECRETARY':
+       Não pode abrir por patient_id (ambíguo); redirecione para uma tela de seleção de médico OU retorne 400 com mensagem "Selecione o médico (dp) pela busca"
+   - Senão:
+       dp = get_or_create_doctor_patient(current_user.id, patient_id)
+       redirect /prontuario/dp/<dp.id>
+
+3) Criar endpoint para obter/criar dp para secretária quando ela seleciona um médico específico (se necessário):
+   POST /api/doctor-patients/link
+   body: {patient_id, doctor_id}
+   - somente SECRETARY/ADMIN
+   - cria dp se não existir e retorna dp_id
+
+---------------------------------------
+D) ENDPOINTS CP (API)
+---------------------------------------
+Criar blueprint routes/cp.py (prefixo /api/cp) com:
+
+1) POST /api/cp/encounter/start
+   body: {dp_id, category?}
+   - dp = require_dp_view(dp_id)
+   - se current_user.role_clinico == SECRETARY: pode criar? (sugestão: NÃO; secretária só lê. Então bloqueie.)
+   - cria encounter_cp com doctor_id = dp.doctor_id (dono real) OU doctor_id = current_user.id (se médico logado). Como secretária não cria, isso fica simples:
+       doctor_id = current_user.id
+   - cria plan_cp e budget_cp vazios (opcional)
+   - retorna {encounter_id}
+
+2) GET /api/cp/encounter/<int:encounter_id>
+   - carregar encounter+plan+budget
+   - regra de view: SECRETARY vê tudo; médico só se encounter.doctor_id == current_user.id
+   - retorna JSON com todos os campos para preencher UI
+
+3) POST /api/cp/encounter/<int:encounter_id>/save
+   body JSON:
+   {
+     category,
+     complaint_text,
+     plan_summary_text,
+     consultation_seconds,
+     plan: {...},
+     budget: {...}
+   }
+   - regra: somente can_edit_dp(dp) (médico dono)
+   - atualizar encounter, plan, budget
+   - retornar {ok:true, saved_at: ISO}
+
+4) GET /api/cp/patient/<int:dp_id>/history
+   - retorna lista de encounters CP desse dp (ou do patient global filtrado por dp)
+   - SECRETARY vê; médico dono vê
+
+---------------------------------------
+E) BUSCA / AUTOCOMPLETE (Agenda)
+---------------------------------------
+1) Criar novo endpoint:
+   GET /api/doctor-patients/search?q=...
+   - Se user é SECRETARY/ADMIN:
+       buscar todos dp que combinam com nome/telefone/CPF do Patient (join)
+   - Se user é CP/DERM:
+       buscar somente dp.doctor_id == current_user.id
+   - Retornar lista:
+     [
+       {
+         dp_id,
+         patient_id,
+         patient_name,
+         patient_phone,
+         patient_code,
+         doctor_id,
+         doctor_name,
+         doctor_role
+       }, ...
+     ]
+
+2) Alterar static/js/agenda.js:
+   - trocar API /api/patients/search por /api/doctor-patients/search
+   - no autocomplete, exibir "Nome — Dr X (CP/DERM) — Cód. Y"
+   - ao selecionar, redirecionar:
+     window.location.href = `/prontuario/dp/${dp_id}`
+
+---------------------------------------
+F) CRM (templates/crm.html)
+---------------------------------------
+- Onde hoje existe link/botão `/prontuario/<patient_id>`, trocar para `/prontuario/dp/<dp_id>`
+- Ajustar a query do backend que monta "Pendentes de Cirurgia" para incluir dp_id correto (o dp do médico responsável)
+
+---------------------------------------
+G) TEMPLATE CP (prontuario_cp.html)
+---------------------------------------
+Criar templates/prontuario_cp.html replicando o layout do React fornecido (Tailwind-like classes se já usa; se não, usar o CSS atual).
+Campos mínimos que devem existir (com name/id para JS salvar):
+- category: Face/Mama/Contorno
+- complaint_text (textarea)
+- plan:
+  - indication_status
+  - case_type
+  - selected_procedures (checkbox list por categoria)
+  - lipo_areas (chips se lipo selecionada)
+  - implant_plane, implant_profile, implant_volume_min/max (quando categoria Mama e prótese/mastopexia com prótese)
+  - technologies (chips)
+  - internacao, estimated_time
+- plan_summary_text (textarea grande)
+- budget:
+  - input para cada procedimento selecionado
+  - input "Tudo"
+  - total calculado
+- retorno:
+  - prazo retorno
+  - observações recepção
+- anexos:
+  - upload (pode ser placeholder na V1, mas deve existir área)
+
+Também:
+- passar variáveis do backend:
+  - dp_id, patient info, read_only
+  - current_user.role_clinico
+
+---------------------------------------
+H) JS CP (static/js/prontuario_cp.js)
+---------------------------------------
+- Ao carregar:
+  - pegar dp_id do HTML (data attribute)
+  - se existir encounter_id (data attribute), carregar /api/cp/encounter/<id>
+  - se não existir e user pode editar, chamar /api/cp/encounter/start e guardar encounter_id
+- Implementar autosave debounce:
+  - sempre que mudar um campo, esperar 1500-2000ms e POST /save
+- Implementar cálculo de total do orçamento e render no DOM
+- Implementar read_only:
+  - se read_only=true: desabilitar inputs/select/checkbox e esconder botões de salvar/finalizar
+- Implementar tabs scrollToSection
+
+---------------------------------------
+I) BACKEND: BLOQUEIO REAL DE EDIÇÃO
+---------------------------------------
+Todo endpoint POST/PUT/DELETE deve impedir SECRETARY:
+- salvar CP: 403 se SECRETARY
+- editar derm (existente): aplicar o mesmo bloqueio (se hoje secretária consegue editar, bloquear)
+
+---------------------------------------
+J) COMPATIBILIDADE / NÃO QUEBRAR
+---------------------------------------
+- Não apagar /prontuario/<patient_id>, apenas transformar em ponte (exceto para secretária)
+- Se houver chamadas existentes para /api/patients/search, pode manter para outros módulos, mas agenda deve migrar para dp search.
+
+---------------------------------------
+K) CORRIGIR ROTAS COM DOUBLE SLASH (OPCIONAL MAS RECOMENDADO)
+---------------------------------------
+Se existirem rotas em routes/patient.py com '//' e sem <patient_id>, corrigir para padrão /api/patient/<patient_id>/... (isso evita “Carregando...” infinito). Fazer apenas se não for muito arriscado.
+
+========================
+✅ ENTREGA ESPERADA
+========================
+1) Código compilando e rodando no Replit.
+2) Médicos CP ao abrir prontuário veem prontuário_cp.html.
+3) Médicos derm ao abrir prontuário veem prontuario.html.
+4) Secretária vê ambos mas tudo read-only (frontend + backend).
+5) Busca na agenda retorna entradas repetidas para mesma paciente (uma por médico), com label do médico e patient_code, e abre /prontuario/dp/<dp_id>.
+6) CRM abre prontuário por dp_id.
+
+✅ Ao final, me entregue:
+- Lista de arquivos alterados/criados
+- Trechos principais de rota + model + JS
+- Qualquer instrução de migração (ex.: rodar alembic upgrade head ou recriar db)
+
+FIM DA TAREFA.
