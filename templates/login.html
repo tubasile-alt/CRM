@@ -33,7 +33,16 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Usuário ou Email</label>
-                                <input type="text" class="form-control" id="email" name="email" required autofocus>
+                                <input type="text" class="form-control" id="email" name="email" list="userSuggestions" required autofocus>
+                                <datalist id="userSuggestions">
+                                    <option value="tubasile">Dr. Arthur</option>
+                                    <option value="fibasile">Dr. Filipe</option>
+                                    <option value="vinibasile">Dr. Vinicius</option>
+                                    <option value="rbasile">Dr. Basile</option>
+                                    <option value="gisele">Gisele</option>
+                                    <option value="erica">Erica</option>
+                                    <option value="Implantecapilaremrp@gmail.com">Recepção</option>
+                                </datalist>
                             </div>
                             <div class="mb-3">
                                 <label for="password" class="form-label">Senha</label>
