@@ -10,12 +10,19 @@
 
     window.parseLocalDateTime = function(isoString) {
         if (!isoString) return null;
+        // Se já for um objeto Date, retorna ele mesmo
+        if (isoString instanceof Date) return isoString;
+        
+        // Remove fuso horário para tratar como hora local literal do banco
         const cleanString = isoString.replace(/[+-]\d{2}:\d{2}$/, '').replace('Z', '');
-        const [datePart, timePart] = cleanString.split('T');
+        const parts = cleanString.split('T');
+        if (parts.length < 2) return new Date(cleanString);
+        
+        const [datePart, timePart] = parts;
         const [year, month, day] = datePart.split('-').map(Number);
-        const timeParts = timePart ? timePart.split(':') : ['00', '00', '00'];
-        const [hours, minutes, seconds] = timeParts.map(s => parseFloat(s));
-        return new Date(year, month - 1, day, hours, Math.floor(minutes), Math.floor(seconds));
+        const [hours, minutes, seconds] = timePart.split(':').map(Number);
+        
+        return new Date(year, month - 1, day, hours, minutes || 0, seconds || 0);
     };
 
     window.getCSRFToken = function() {
