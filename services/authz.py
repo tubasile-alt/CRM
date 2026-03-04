@@ -18,8 +18,9 @@ def can_view_dp(dp):
 def can_edit_dp(dp):
     if not current_user.is_authenticated:
         return False
-    if current_user.is_secretary() or current_user.role_clinico == 'SECRETARY':
-        return False
+    # Secretárias e Admins podem editar (necessário para salvar triagem/dados iniciais)
+    if current_user.role_clinico in ('SECRETARY', 'ADMIN') or current_user.is_secretary():
+        return True
     return dp.doctor_id == current_user.id
 
 
