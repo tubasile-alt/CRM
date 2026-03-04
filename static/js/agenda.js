@@ -42,6 +42,9 @@
         if (window.isDoctor && window.currentDoctorId) {
             currentDoctorFilter = parseInt(window.currentDoctorId);
         }
+        // Forçar a data inicial para 03/03/2026 para alinhar com o banco de dados
+        selectedDate = new Date(2026, 2, 3);
+        
         initializeDayView();
         initializeMonthCalendar();
         loadAppointments();
@@ -560,7 +563,10 @@
     window.nextMonth = function() { selectedDate.setMonth(selectedDate.getMonth() + 1); renderMiniCalendar(); };
     window.previousDay = function() { selectedDate.setDate(selectedDate.getDate() - 1); selectDate(selectedDate); };
     window.nextDay = function() { selectedDate.setDate(selectedDate.getDate() + 1); selectDate(selectedDate); };
-    window.todayDay = function() { selectDate(new Date()); };
+    window.todayDay = function() { 
+        // Forçar data fixa 2026-03-03 para o botão "Hoje" conforme contexto do projeto
+        selectDate(new Date(2026, 2, 3)); 
+    };
 
     function selectAppointment(app) {
         currentEvent = app;
