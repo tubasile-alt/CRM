@@ -205,12 +205,13 @@ def _do_append_transplant(data):
             if name.lower() in existing_names:
                 continue
                 
+            phone = item.get('phone', '')
             status = item.get('status', 'pendente')
             surgery_date = item.get('surgery_date', '')
             
             rows_to_append.append([
                 name,
-                item.get('phone', ''),
+                phone,
                 item.get('consult_date', ''),
                 status,
                 surgery_date
