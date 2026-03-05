@@ -934,12 +934,16 @@ function updateCosmeticTotal() {
 
 // ========== COSMIATRIA: ABA CONDUTA - EXECUÇÃO ==========
 function renderCosmeticConduct() {
+    console.log("Renderizando Conduta Cosmética...");
     const tbody = document.getElementById('cosmeticConductBody');
-    if (!tbody) return;
+    if (!tbody) {
+        console.error("Elemento cosmeticConductBody não encontrado!");
+        return;
+    }
     
     tbody.innerHTML = '';
     
-    if (cosmeticProcedures.length === 0) {
+    if (typeof cosmeticProcedures === 'undefined' || cosmeticProcedures.length === 0) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
         return;
     }
@@ -958,8 +962,8 @@ function renderCosmeticConduct() {
         if (proc.performed) row.className = 'table-success opacity-75';
         
         const statusBadge = proc.performed 
-            ? '<span class="badge bg-success"><i class="bi bi-check-lg"></i> REALIZADO</span>' 
-            : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex}); return false;" style="position: relative; z-index: 10;">PENDENTE</button>`;
+            ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex})"><i class="bi bi-check-lg"></i> REALIZADO</button>` 
+            : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex})">PENDENTE</button>`;
 
         row.innerHTML = `
             <td>
@@ -1010,31 +1014,61 @@ function updateProcedureDate(index, dateValue) {
 
 window.toggleProcedurePerformed = function(index) {
     console.log("Toggle procedure index:", index);
-    if (!cosmeticProcedures[index]) {
+    
+    if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
         console.error("Procedimento não encontrado no índice:", index);
         return;
     }
     
-    // Se estiver pendente, marcar como realizado
-    if (!cosmeticProcedures[index].performed) {
-        cosmeticProcedures[index].performed = true;
-        // Definir data de hoje se não tiver data
-        if (!cosmeticProcedures[index].performedDate) {
-            cosmeticProcedures[index].performedDate = new Date().toISOString().split('T')[0];
+    const proc = cosmeticProcedures[index];
+    proc.performed = !proc.performed;
+    
+    if (proc.performed) {
+        if (!proc.performedDate) {
+            proc.performedDate = new Date().toLocaleDateString('en-CA');
         }
         if (typeof showAlert === 'function') {
-            showAlert(`${cosmeticProcedures[index].name} marcado como REALIZADO`, 'success');
+            showAlert(`${proc.name} marcado como REALIZADO`, 'success');
         }
     } else {
-        // Se já estiver realizado, permitir desmarcar
-        cosmeticProcedures[index].performed = false;
-        cosmeticProcedures[index].performedDate = null;
+        proc.performedDate = null;
     }
     
-    if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
-    if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
-    if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
+    // Atualizar visualizações
+    renderCosmeticProcedures();
+    renderCosmeticConduct();
+    updateCosmeticTotal();
+    
+    // Feedback visual imediato forçando a classe e texto
+    setTimeout(() => {
+        const btns = document.querySelectorAll(`.btn-toggle-proc[data-index="${index}"]`);
+        btns.forEach(btn => {
+            if (proc.performed) {
+                btn.className = 'btn btn-success btn-sm w-100 fw-bold btn-toggle-proc';
+                btn.innerHTML = '<i class="bi bi-check-lg"></i> REALIZADO';
+                btn.style.zIndex = '10000';
+                btn.style.pointerEvents = 'auto';
+            } else {
+                btn.className = 'btn btn-danger btn-sm w-100 fw-bold btn-toggle-proc';
+                btn.innerHTML = 'PENDENTE';
+                btn.style.zIndex = '10000';
+                btn.style.pointerEvents = 'auto';
+            }
+        });
+    }, 0);
 };
+
+// Delegar eventos para os botões de toggle
+/* document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.btn-toggle-proc');
+    if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = parseInt(btn.getAttribute('data-index'));
+        console.log("Clique detectado no botão de toggle, index:", index);
+        window.toggleProcedurePerformed(index);
+    }
+}, true); */
 
 function saveCosmeticPlan() {
     // DEPRECATED: Não salvar mais - dados são salvos ao finalizar
