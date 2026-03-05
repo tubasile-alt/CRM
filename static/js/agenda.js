@@ -41,6 +41,17 @@
     document.addEventListener('DOMContentLoaded', function() {
         if (window.isDoctor && window.currentDoctorId) {
             currentDoctorFilter = parseInt(window.currentDoctorId);
+        } else {
+            // Se for secretária, tenta recuperar o último médico filtrado
+            const savedFilter = localStorage.getItem('agenda_doctor_filter');
+            if (savedFilter) {
+                currentDoctorFilter = parseInt(savedFilter);
+                // Aguarda um pouco para os botões renderizarem e marca o ativo
+                setTimeout(() => {
+                    const btn = document.getElementById(`btn-doc-${currentDoctorFilter}`);
+                    if (btn) filterByDoctor(currentDoctorFilter, btn);
+                }, 100);
+            }
         }
         
         initializeDayView();
@@ -928,6 +939,14 @@
 
     window.filterByDoctor = function(doctorId, btn) {
         currentDoctorFilter = doctorId === 'all' ? null : parseInt(doctorId);
+        
+        // Armazenar preferência de filtro no localStorage para não perder ao navegar
+        if (currentDoctorFilter) {
+            localStorage.setItem('agenda_doctor_filter', currentDoctorFilter);
+        } else {
+            localStorage.removeItem('agenda_doctor_filter');
+        }
+
         loadAppointments();
         if (calendar) calendar.refetchEvents();
         

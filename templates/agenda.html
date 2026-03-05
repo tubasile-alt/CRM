@@ -565,7 +565,7 @@
         <div class="btn-group w-100 mb-3 doctor-filter-btns" style="display: flex; flex-wrap: wrap;">
             <button class="btn btn-sm btn-outline-primary active" onclick="filterByDoctor('all', this)">Todos</button>
             {% for doctor in doctors %}
-            <button class="btn btn-sm btn-outline-primary" onclick="filterByDoctor({{ doctor.id }}, this)">{{ doctor.name }}</button>
+            <button class="btn btn-sm btn-outline-primary" id="btn-doc-{{ doctor.id }}" onclick="filterByDoctor({{ doctor.id }}, this)">{{ doctor.name }}</button>
             {% endfor %}
         </div>
         {% endif %}
