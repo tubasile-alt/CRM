@@ -775,6 +775,8 @@ function highlightConsultationGroup(consultationKey) {
     }, 300);
 }
 
+console.log("✅ prontuario.js carregado v=20260305-1");
+
 function renderCosmeticProcedures() {
     const tbody = document.getElementById('cosmeticPlanBody');
     if (!tbody) return;
@@ -962,8 +964,8 @@ function renderCosmeticConduct() {
         if (proc.performed) row.className = 'table-success opacity-75';
         
         const statusBadge = proc.performed 
-            ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex}); return false;"><i class="bi bi-check-lg"></i> REALIZADO</button>` 
-            : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex}); return false;">PENDENTE</button>`;
+            ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold" data-action="toggle-proc" data-index="${realIndex}"><i class="bi bi-check-lg"></i> REALIZADO</button>` 
+            : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold" data-action="toggle-proc" data-index="${realIndex}">PENDENTE</button>`;
 
         row.innerHTML = `
             <td>
@@ -1028,14 +1030,15 @@ window.updateProcedureDate = updateProcedureDate;
 window.updateProcedureObservation = updateProcedureObservation;
 
 window.toggleProcedurePerformed = function(index) {
-    console.log("Toggle procedure index:", index);
-    
+    console.log("🖱️ Toggling procedure index:", index);
     if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
         console.error("Procedimento não encontrado no índice:", index);
         return;
     }
     
     const proc = cosmeticProcedures[index];
+    console.log("before:", JSON.parse(JSON.stringify(proc)));
+    
     proc.performed = !proc.performed;
     
     if (proc.performed) {
@@ -1045,33 +1048,14 @@ window.toggleProcedurePerformed = function(index) {
         if (typeof showAlert === 'function') {
             showAlert(`${proc.name} marcado como REALIZADO`, 'success');
         }
-    } else {
-        // Mantenha a data ou limpe, conforme preferência. A tarefa sugere limpar ou manter.
-        // Vamos manter a data preenchida mas o campo ficará desabilitado pelo render.
     }
+    
+    console.log("after:", JSON.parse(JSON.stringify(proc)));
     
     // Atualizar visualizações
     renderCosmeticProcedures();
     renderCosmeticConduct();
     updateCosmeticTotal();
-    
-    // Feedback visual imediato forçando a classe e texto
-    setTimeout(() => {
-        const btns = document.querySelectorAll(`.btn-toggle-proc[data-index="${index}"]`);
-        btns.forEach(btn => {
-            if (proc.performed) {
-                btn.className = 'btn btn-success btn-sm w-100 fw-bold btn-toggle-proc';
-                btn.innerHTML = '<i class="bi bi-check-lg"></i> REALIZADO';
-                btn.style.zIndex = '10000';
-                btn.style.pointerEvents = 'auto';
-            } else {
-                btn.className = 'btn btn-danger btn-sm w-100 fw-bold btn-toggle-proc';
-                btn.innerHTML = 'PENDENTE';
-                btn.style.zIndex = '10000';
-                btn.style.pointerEvents = 'auto';
-            }
-        });
-    }, 0);
 };
 
 // Delegar eventos para os botões de toggle
@@ -2305,3 +2289,21 @@ function printPrescription(prescriptionId) {
 function viewPrescription(prescriptionId) {
     window.open(`/prescription/${prescriptionId}/print`, '_blank');
 }
+
+// Delegação de evento para o botão de toggle de procedimento
+document.addEventListener("click", (e) => {
+    const btn = e.target.closest('[data-action="toggle-proc"]');
+    if (!btn) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const index = parseInt(btn.getAttribute("data-index"), 10);
+    console.log("✅ Toggling index via delegation:", index);
+    
+    if (typeof window.toggleProcedurePerformed === 'function') {
+        window.toggleProcedurePerformed(index);
+    } else {
+        console.error("window.toggleProcedurePerformed não encontrada!");
+    }
+}, true);

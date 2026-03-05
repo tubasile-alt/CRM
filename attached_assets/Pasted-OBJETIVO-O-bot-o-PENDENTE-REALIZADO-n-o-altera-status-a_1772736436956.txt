@@ -1,0 +1,91 @@
+OBJETIVO
+O botão PENDENTE/REALIZADO não altera status ao clicar. Vamos:
+(1) Confirmar que o arquivo correto está sendo carregado (sem cache / sem arquivo errado).
+(2) Confirmar que o clique chega (debug).
+(3) Aplicar correção robusta: delegação de clique por data-attribute + funções globais (window.*).
+
+PASSO 1 — PROVAR QUE O JS CORRETO ESTÁ CARREGANDO (isso resolve 50% dos “não funcionou”)
+1) Abra templates/prontuario.html (ou o template que carrega o prontuário).
+2) Localize a tag do script que carrega o prontuario.js, ex:
+   <script src="/static/js/prontuario.js"></script>
+3) Troque para versionar (forçar refresh sempre que mudar):
+   <script src="/static/js/prontuario.js?v=20260305-1"></script>
+   (mude o sufixo a cada deploy)
+4) No topo de static/js/prontuario.js, adicione:
+   console.log("✅ prontuario.js carregado v=20260305-1");
+
+RESULTADO ESPERADO:
+Ao abrir o prontuário, o console deve mostrar:
+✅ prontuario.js carregado v=20260305-1
+Se NÃO aparecer, você NÃO está rodando o arquivo que editou (ou cache/CDN/arquivo diferente).
+
+PASSO 2 — PROVAR QUE O CLIQUE CHEGA NO BOTÃO
+No final de static/js/prontuario.js, adicione um listener TEMPORÁRIO:
+document.addEventListener("click", (e) => {
+  const b = e.target.closest('[data-action="toggle-proc"]');
+  if (b) console.log("🖱️ clique toggle capturado", b.getAttribute("data-index"));
+}, true);
+
+Se isso não logar ao clicar, existe overlay/elemento por cima ou o botão não tem esse data-action.
+
+PASSO 3 — A CORREÇÃO ROBUSTA (NÃO USAR onclick inline)
+Motivo: onclick inline falha quando:
+- função não está no escopo global (window)
+- script está como module
+- re-render substitui nós e “some” com handlers
+Delegação resolve tudo isso.
+
+(A) Em renderCosmeticConduct(), renderize o botão assim (SEM onclick):
+<button type="button"
+        class="btn btn-sm ${proc.performed ? 'btn-success' : 'btn-outline-secondary'}"
+        data-action="toggle-proc"
+        data-index="${index}">
+  ${proc.performed ? 'REALIZADO' : 'PENDENTE'}
+</button>
+
+(B) Garanta que toggleProcedurePerformed e updateProcedureObservation estão em window (global):
+window.toggleProcedurePerformed = function(index) { ... }
+window.updateProcedureObservation = function(index, value) { ... }
+window.updateProcedurePerformedDate = function(index, dateValue) { ... }
+
+(C) Crie UM ÚNICO event listener (delegação) para toggle:
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest('[data-action="toggle-proc"]');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const index = parseInt(btn.getAttribute("data-index"), 10);
+  console.log("✅ toggling index", index);
+  window.toggleProcedurePerformed(index);
+}, true);
+
+IMPORTANTE:
+- Se você usar delegação, REMOVA onclick inline (senão pode togglar 2x).
+- Se já existia listener global duplicado, REMOVA o outro (apenas 1).
+
+PASSO 4 — VALIDAR TOGGLE + DATA
+Dentro de window.toggleProcedurePerformed, inclua logs:
+console.log("before:", cosmeticProcedures[index]);
+(proc.performed = !proc.performed)
+if (proc.performed && !proc.performedDate) proc.performedDate = new Date().toLocaleDateString('en-CA');
+console.log("after:", cosmeticProcedures[index]);
+renderCosmeticConduct();
+
+PASSO 5 — CASO AINDA “NÃO FUNCIONE”: O clique não chega (overlay)
+Se o listener do PASSO 2 não logar:
+- adicione style no botão: style="position:relative; z-index:9999; pointer-events:auto;"
+- e também no container da tabela: style="position:relative; z-index:1;"
+- procure no CSS/HTML por algum elemento absoluto por cima (ex: div transparente) e remova.
+
+CHECKLIST FINAL (tem que acontecer):
+1) Console mostra: ✅ prontuario.js carregado v=...
+2) Clicar loga: 🖱️ clique toggle capturado ...
+3) Clicar loga: ✅ toggling index ...
+4) Status muda e re-renderiza.
+5) Ao marcar REALIZADO: data preenche e input habilita.
+
+APLIQUE AGORA:
+- Implementar versionamento do script + console.log no topo
+- Migrar para data-action/data-index + delegação
+- Garantir funções em window.*
+- Remover duplicações de handlers
