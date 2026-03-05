@@ -1,0 +1,61 @@
+FAÇA AGORA (SEM DISCUTIR): Corrigir SyntaxError no static/js/prontuario.js que impede o arquivo de carregar.
+O erro atual é: showAlert(${proc.name} marcado como REALIZADO, 'success'); (isso quebra o JS).
+Quero aplicar um patch seguro:
+
+1) Em static/js/prontuario.js, localize QUALQUER ocorrência de:
+   showAlert(${proc.name} marcado como REALIZADO, 'success');
+   e substitua por:
+   showAlert(`${proc.name} marcado como REALIZADO`, 'success');
+
+2) Garanta que EXISTE APENAS 1 listener de delegação para .btn-toggle-proc no arquivo inteiro.
+   Remova duplicatas (deixe só um).
+
+3) Substitua o bloco inteiro de window.toggleProcedurePerformed por este (exatamente):
+
+```js
+console.log("✅ prontuario.js carregado v=20260305-3");
+
+window.toggleProcedurePerformed = function(index) {
+  console.log('🖱️ Toggling procedure index:', index);
+
+  if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
+    console.error('Procedimento não encontrado no índice:', index);
+    return;
+  }
+
+  const proc = cosmeticProcedures[index];
+  console.log('before:', JSON.parse(JSON.stringify(proc)));
+
+  proc.performed = !proc.performed;
+
+  if (proc.performed) {
+    if (!proc.performedDate) {
+      proc.performedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    }
+    if (typeof showAlert === 'function') {
+      showAlert(`${proc.name} marcado como REALIZADO`, 'success');
+    }
+  } else {
+    proc.performedDate = null;
+  }
+
+  console.log('after:', JSON.parse(JSON.stringify(proc)));
+
+  if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
+  if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
+  if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
+};
+
+// listener ÚNICO (não duplicar)
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-toggle-proc');
+  if (!btn) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const idx = parseInt(btn.getAttribute('data-index'), 10);
+  console.log('✅ Clique detectado no botão toggle, index:', idx);
+
+  window.toggleProcedurePerformed(idx);
+}, true);
