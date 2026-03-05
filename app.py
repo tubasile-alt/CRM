@@ -665,9 +665,16 @@ def create_appointment():
     if not doctor_id:
         return jsonify({'success': False, 'error': 'Médico não especificado'}), 400
     
-    # Buscar por nome normalizado (case-insensitive) para evitar duplicatas
-    patient_name_input = data['patientName'].strip()
-    patient = Patient.query.filter(db.func.lower(Patient.name) == db.func.lower(patient_name_input)).first()
+    # Priorizar busca por ID se fornecido
+    patient_id_input = data.get('patient_id')
+    patient = None
+    if patient_id_input:
+        patient = Patient.query.get(patient_id_input)
+    
+    if not patient:
+        # Fallback: Buscar por nome normalizado (case-insensitive) para evitar duplicatas
+        patient_name_input = data['patientName'].strip()
+        patient = Patient.query.filter(db.func.lower(Patient.name) == db.func.lower(patient_name_input)).first()
     if not patient:
         # Converter strings vazias para None para campos opcionais
         birth_date_val = data.get('birth_date') or None

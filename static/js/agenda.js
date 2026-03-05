@@ -1098,7 +1098,7 @@
         }
 
         const payload = {
-            patient_id: patientId || null,
+            patient_id: patientId && patientId !== "" ? parseInt(patientId) : null,
             patientName: patientName,
             patient_code: patientCode,
             cpf: patientCPF,
@@ -1145,7 +1145,7 @@
                 const form = document.getElementById('appointmentForm');
                 if (form) form.reset();
                 
-                const idsToClear = ['selectedPatientId', 'patientPhotoData'];
+                const idsToClear = ['selectedPatientId', 'patientPhotoData', 'patientCode', 'patientCPF', 'patientBirthDate', 'patientPhone', 'patientAddress', 'patientCity', 'patientMotherName', 'patientIndicationSource', 'patientOccupation'];
                 idsToClear.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.value = '';
