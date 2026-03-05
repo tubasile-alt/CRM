@@ -962,8 +962,8 @@ function renderCosmeticConduct() {
         if (proc.performed) row.className = 'table-success opacity-75';
         
         const statusBadge = proc.performed 
-            ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex})"><i class="bi bi-check-lg"></i> REALIZADO</button>` 
-            : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex})">PENDENTE</button>`;
+            ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex}); return false;"><i class="bi bi-check-lg"></i> REALIZADO</button>` 
+            : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex}); return false;">PENDENTE</button>`;
 
         row.innerHTML = `
             <td>
@@ -985,7 +985,11 @@ function renderCosmeticConduct() {
                        class="form-control form-control-sm" 
                        value="${procedureDate}"
                        onchange="updateProcedureDate(${realIndex}, this.value)"
-                       ${proc.performed ? 'disabled' : ''}>
+                       ${proc.performed ? '' : 'disabled'}>
+            </td>
+            <td>
+                <textarea class="form-control form-control-sm" rows="1" placeholder="Obs..."
+                          onchange="updateProcedureObservation(${realIndex}, this.value)">${proc.observation || ''}</textarea>
             </td>
             <td class="text-center align-middle">
                 ${statusBadge}
@@ -1009,8 +1013,19 @@ function updateProcedureBudget(index, value) {
 }
 
 function updateProcedureDate(index, dateValue) {
-    cosmeticProcedures[index].performedDate = dateValue;
+    if (cosmeticProcedures[index]) {
+        cosmeticProcedures[index].performedDate = dateValue;
+    }
 }
+
+function updateProcedureObservation(index, value) {
+    if (cosmeticProcedures[index]) {
+        cosmeticProcedures[index].observation = value;
+    }
+}
+
+window.updateProcedureDate = updateProcedureDate;
+window.updateProcedureObservation = updateProcedureObservation;
 
 window.toggleProcedurePerformed = function(index) {
     console.log("Toggle procedure index:", index);
@@ -1031,7 +1046,8 @@ window.toggleProcedurePerformed = function(index) {
             showAlert(`${proc.name} marcado como REALIZADO`, 'success');
         }
     } else {
-        proc.performedDate = null;
+        // Mantenha a data ou limpe, conforme preferência. A tarefa sugere limpar ou manter.
+        // Vamos manter a data preenchida mas o campo ficará desabilitado pelo render.
     }
     
     // Atualizar visualizações

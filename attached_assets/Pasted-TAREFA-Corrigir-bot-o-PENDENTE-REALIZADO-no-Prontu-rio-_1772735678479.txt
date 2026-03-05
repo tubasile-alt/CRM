@@ -1,0 +1,117 @@
+TAREFA: Corrigir botão “PENDENTE/REALIZADO” no Prontuário Derm (CRM) para permitir clicar e atualizar status + data + observações.
+
+PROBLEMA RAIZ (quase certo):
+- O botão do status está dentro de um <form>. Em HTML, <button> SEM type vira type="submit" por padrão.
+- Resultado: ao clicar, o form submete/recarrega e o toggle “parece” não funcionar.
+- Solução: forçar type="button" e bloquear submit (return false), garantindo que o onclick rode.
+
+ARQUIVO:
+static/js/prontuario.js
+
+LOCAL (função):
+renderCosmeticConduct() -> onde monta a tabela “Condutas/Procedimentos” e renderiza o botão de status.
+
+PATCH 1 (OBRIGATÓRIO): garantir que o botão NÃO SUBMETA FORM
+Procure o trecho que renderiza o botão de status dentro do renderCosmeticConduct(), algo como:
+
+<button class="btn btn-sm ${proc.performed ? 'btn-success' : 'btn-outline-secondary'}"
+        onclick="toggleProcedurePerformed(${index})">
+
+SUBSTITUA por:
+
+<button type="button"
+        class="btn btn-sm ${proc.performed ? 'btn-success' : 'btn-outline-secondary'}"
+        onclick="toggleProcedurePerformed(${index}); return false;">
+
+Se houver ícone/texto dentro, mantenha igual. O essencial é:
+- type="button"
+- onclick="...; return false;"
+
+PATCH 2 (RECOMENDADO): impedir submit mesmo se clique “vazar” no DOM
+Na função toggleProcedurePerformed(index), no início, adicione uma proteção opcional:
+- Se estiver usando onclick direto, o return false já resolve.
+- Se também tiver listener global, use preventDefault/stopPropagation no listener (mas NÃO use os dois ao mesmo tempo).
+
+IMPORTANTE (evitar “toggle duplo”):
+- NÃO deixe ao mesmo tempo:
+  A) onclick chamando toggleProcedurePerformed
+  E
+  B) document.addEventListener('click', ...) delegando para o mesmo botão
+Isso causa “duplo toggle” (marca e desmarca instantaneamente). Escolha 1.
+
+CONFIGURAÇÃO RECOMENDADA (simples e robusta):
+- MANTER onclick no botão.
+- NÃO usar listener global de delegação.
+- Portanto: não criar .btn-toggle-proc listener extra.
+(Se você já tem listener global, então REMOVA o onclick do botão e deixe só o listener. Mas use apenas um.)
+
+PATCH 3 (DATA DO PROCEDIMENTO + EDIÇÃO):
+Garanta que toggleProcedurePerformed:
+- Inverte proc.performed
+- Se marcou como realizado e não tem data, seta data padrão (hoje) no formato YYYY-MM-DD
+- Se voltou para pendente, limpa data (ou mantém, se você preferir)
+
+Exemplo de lógica (ajuste mantendo o seu padrão atual):
+function toggleProcedurePerformed(index) {
+  const proc = cosmeticProcedures[index];
+  if (!proc) return;
+
+  proc.performed = !proc.performed;
+
+  if (proc.performed) {
+    if (!proc.performedDate) {
+      proc.performedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    }
+  } else {
+    proc.performedDate = null;
+  }
+
+  // Re-render para refletir mudança e habilitar campo de data
+  renderCosmeticConduct();
+  renderCosmeticProcedures?.();
+  updateCosmeticTotal?.();
+}
+
+PATCH 4 (HABILITAR INPUT DE DATA QUANDO REALIZADO):
+No renderCosmeticConduct(), o input date deve ficar:
+- disabled quando pendente
+- enabled quando realizado
+
+Exemplo:
+<input type="date"
+       value="${proc.performedDate || ''}"
+       ${proc.performed ? '' : 'disabled'}
+       onchange="updateProcedurePerformedDate(${index}, this.value)">
+
+E a função:
+function updateProcedurePerformedDate(index, dateValue) {
+  const proc = cosmeticProcedures[index];
+  if (!proc) return;
+  proc.performedDate = dateValue;
+  // opcional: renderCosmeticConduct();
+}
+
+PATCH 5 (OBSERVAÇÃO / “houve alteração”):
+Se você quer registrar alteração, adicione um campo observação no mesmo row:
+<textarea onchange="updateProcedureObservation(${index}, this.value)">${proc.observation || ''}</textarea>
+
+function updateProcedureObservation(index, value) {
+  const proc = cosmeticProcedures[index];
+  if (!proc) return;
+  proc.observation = value;
+}
+
+E inclua proc.observation no payload quando salvar/finalizar atendimento (se seu fluxo já envia cosmeticProcedures no finalize).
+
+VALIDAÇÃO FINAL:
+1) Abrir prontuário
+2) Clicar em PENDENTE -> vira REALIZADO sem reload
+3) Campo data habilita -> alterar data -> permanece
+4) Salvar/finalizar -> backend recebe status e data
+
+RESUMO DO QUE O AGENTE DO REPLIT DEVE FAZER:
+- Editar static/js/prontuario.js
+- No botão do status dentro do renderCosmeticConduct(): adicionar type="button" e return false
+- Garantir que NÃO exista dupla captura de evento (onclick + listener delegado). Usar apenas 1.
+- Confirmar que toggleProcedurePerformed re-renderiza e define data default quando marcar como realizado
+- Manter input date habilitado somente quando realizado e salvar alterações no objeto cosmeticProcedures.
