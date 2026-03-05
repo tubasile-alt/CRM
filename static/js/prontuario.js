@@ -959,7 +959,7 @@ function renderCosmeticConduct() {
         
         const statusBadge = proc.performed 
             ? '<span class="badge bg-success"><i class="bi bi-check-lg"></i> REALIZADO</span>' 
-            : '<button class="btn btn-danger btn-sm w-100 fw-bold" onclick="toggleProcedurePerformed(' + index + ')">PENDENTE</button>';
+            : `<button class="btn btn-danger btn-sm w-100 fw-bold" onclick="toggleProcedurePerformed(${index})">PENDENTE</button>`;
 
         row.innerHTML = `
             <td>
