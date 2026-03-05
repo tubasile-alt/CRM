@@ -1094,6 +1094,9 @@ document.addEventListener('click', function(e) {
   const btn = e.target.closest('.btn-toggle-proc');
   if (!btn) return;
 
+  // ==== DEBUG CLICK (REMOVER DEPOIS) ====
+  alert('CLIQUE CAPTURADO NO BOTÃO! index=' + btn.getAttribute('data-index'));
+
   e.preventDefault();
   e.stopPropagation();
 
