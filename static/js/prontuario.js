@@ -1,3 +1,4 @@
+console.log('✅ prontuario.js carregado v=20260305-4');
 let timerInterval = null;
 let timerStartTime = null;
 let recognition = null;
@@ -963,9 +964,13 @@ function renderCosmeticConduct() {
         const row = tbody.insertRow();
         if (proc.performed) row.className = 'table-success opacity-75';
         
-        const statusBadge = proc.performed 
-            ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}"><i class="bi bi-check-lg"></i> REALIZADO</button>` 
-            : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}"><i class="bi bi-exclamation-triangle"></i> PENDENTE</button>`;
+        const statusBadge = proc.performed
+          ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}">
+               <i class="bi bi-check-lg"></i> REALIZADO
+             </button>`
+          : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}">
+               <i class="bi bi-exclamation-triangle"></i> PENDENTE
+             </button>`;
 
         row.innerHTML = `
             <td>
@@ -1029,50 +1034,51 @@ function updateProcedureObservation(index, value) {
 window.updateProcedureDate = updateProcedureDate;
 window.updateProcedureObservation = updateProcedureObservation;
 
+// ===== TOGGLE STATUS (SEM HTML ESCAPADO) =====
 window.toggleProcedurePerformed = function(index) {
-    console.log('🖱️ Toggling procedure index:', index);
+  console.log('🖱️ Toggling procedure index:', index);
 
-    if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
-        console.error('Procedimento não encontrado no índice:', index);
-        return;
+  if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
+    console.error('Procedimento não encontrado no índice:', index);
+    return;
+  }
+
+  const proc = cosmeticProcedures[index];
+  console.log('before:', JSON.parse(JSON.stringify(proc)));
+
+  proc.performed = !proc.performed;
+
+  if (proc.performed) {
+    if (!proc.performedDate) {
+      proc.performedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
     }
-
-    const proc = cosmeticProcedures[index];
-    console.log('before:', JSON.parse(JSON.stringify(proc)));
-
-    proc.performed = !proc.performed;
-
-    if (proc.performed) {
-        if (!proc.performedDate) {
-            proc.performedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
-        }
-        if (typeof showAlert === 'function') {
-            showAlert(`${proc.name} marcado como REALIZADO`, 'success');
-        }
-    } else {
-        // Se você quiser manter a data mesmo voltando para pendente, remova esta linha:
-        proc.performedDate = null;
+    if (typeof showAlert === 'function') {
+      showAlert(`${proc.name} marcado como REALIZADO`, 'success');
     }
+  } else {
+    proc.performedDate = null;
+  }
 
-    console.log('after:', JSON.parse(JSON.stringify(proc)));
+  console.log('after:', JSON.parse(JSON.stringify(proc)));
 
-    // Atualizar UI
-    if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
-    if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
-    if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
+  if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
+  if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
+  if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
 };
 
-// Delegar eventos para os botões de toggle
-/* document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.btn-toggle-proc');
-    if (btn) {
-        e.preventDefault();
-        e.stopPropagation();
-        const index = parseInt(btn.getAttribute('data-index'));
-        console.log("Clique detectado no botão de toggle, index:", index);
-        window.toggleProcedurePerformed(index);
-    }
-}, true); */
+// listener ÚNICO (não duplicar)
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-toggle-proc');
+  if (!btn) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const idx = parseInt(btn.getAttribute('data-index'), 10);
+  console.log('✅ Clique detectado no botão toggle, index:', idx);
+
+  window.toggleProcedurePerformed(idx);
+}, true);
 
 function saveCosmeticPlan() {
     // DEPRECATED: Não salvar mais - dados são salvos ao finalizar
@@ -2293,17 +2299,3 @@ function printPrescription(prescriptionId) {
 function viewPrescription(prescriptionId) {
     window.open(`/prescription/${prescriptionId}/print`, '_blank');
 }
-
-// Delegação de evento para o botão de toggle de procedimento
-document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.btn-toggle-proc');
-    if (!btn) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const idx = parseInt(btn.getAttribute('data-index'), 10);
-    console.log('✅ Clique detectado no botão toggle, index:', idx);
-
-    window.toggleProcedurePerformed(idx);
-}, true);
