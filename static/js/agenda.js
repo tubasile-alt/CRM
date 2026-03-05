@@ -287,7 +287,9 @@
         const now = new Date();
         const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
         const brOffset = -3;
-        return new Date(utc + (3600000 * brOffset));
+        const brDate = new Date(utc + (3600000 * brOffset));
+        console.log("DEBUG: Data Brasília calculada:", brDate.toDateString(), brDate.getHours() + ":" + brDate.getMinutes());
+        return brDate;
     };
 
     window.selectToday = function() {
