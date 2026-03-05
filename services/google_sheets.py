@@ -170,6 +170,55 @@ def _do_append_batch(procedures_data):
         return False
 
 
-def append_procedures_batch(procedures_data):
-    t = threading.Thread(target=_do_append_batch, args=(procedures_data,), daemon=True)
+def _do_append_transplant(data):
+    try:
+        spreadsheet_id = get_or_create_spreadsheet()
+        sheets = _get_sheets_service()
+        
+        # Garantir que a aba existe
+        sheet_metadata = sheets.get(spreadsheetId=spreadsheet_id).execute()
+        sheets_list = sheet_metadata.get('sheets', [])
+        exists = any(s.get('properties', {}).get('title') == 'Transplante Capilar' for s in sheets_list)
+        
+        if not exists:
+            sheets.batchUpdate(spreadsheetId=spreadsheet_id, body={
+                'requests': [{'addSheet': {'properties': {'title': 'Transplante Capilar'}}}]
+            }).execute()
+            # Adicionar cabeçalho
+            sheets.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range='Transplante Capilar!A1',
+                valueInputOption='USER_ENTERED',
+                body={'values': [["Nome do Paciente", "Telefone", "Data da Consulta", "Status", "Data da Cirurgia"]]}
+            ).execute()
+
+        rows = []
+        for item in data:
+            # Garante que status seja 'pendente' se não for 'agendado'
+            status = item.get('status', 'pendente')
+            surgery_date = item.get('surgery_date', '')
+            
+            rows.append([
+                item.get('patient_name', ''),
+                item.get('phone', ''),
+                item.get('consult_date', ''),
+                status,
+                surgery_date
+            ])
+
+        if rows:
+            sheets.spreadsheets().values().append(
+                spreadsheetId=spreadsheet_id,
+                range='Transplante Capilar!A:E',
+                valueInputOption='USER_ENTERED',
+                insertDataOption='INSERT_ROWS',
+                body={'values': rows}
+            ).execute()
+        return True
+    except Exception as e:
+        print(f"✗ Erro Google Sheets Transplante: {e}")
+        return False
+
+def append_transplant_data(data):
+    t = threading.Thread(target=_do_append_transplant, args=(data,), daemon=True)
     t.start()

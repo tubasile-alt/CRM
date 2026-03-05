@@ -16,6 +16,9 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ Blocos de agendamento com 3 colunas: Nome | Tipo Paciente | Tipo Consulta
 - ✅ Sistema de backup automático implementado
 - ✅ **Aba Cirurgias** implementada e funcional para Transplante Capilar
+- ✅ **Aba Transplante Capilar (Google Sheets)** - Criada automaticamente com colunas: Nome, Telefone, Data Consulta, Status, Data Cirurgia.
+- ✅ **Sincronização Automática** - Consultas de Transplante Capilar entram como "pendente"; Agendamentos de "Transplante Capilar" atualizam para "agendado" com a data da cirurgia.
+- ✅ **Secretárias** - Acesso total aos prontuários CP/Dermato restaurado.
 - ✅ **Idade do paciente** exibida ao lado do nome no prontuário
 - ✅ **Botão Editar Cadastro** - Permite edição de dados do paciente (médicos e secretárias)
 - ✅ **Checkout corrigido** - Modal de pagamento funcionando na aba Checkout

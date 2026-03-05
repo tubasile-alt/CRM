@@ -804,6 +804,43 @@ def create_appointment():
     
     db.session.commit()
     
+    # === GOOGLE SHEETS: Agendamento de Cirurgia (Transplante Capilar) ===
+    if data.get('appointmentType') == 'Transplante Capilar' and data.get('status', 'agendado') == 'agendado':
+        try:
+            from services.google_sheets import get_or_create_spreadsheet, _get_sheets_service
+            import threading
+
+            def _update_gs_surgery_date_thread(p_name, s_time):
+                try:
+                    spreadsheet_id = get_or_create_spreadsheet()
+                    sheets = _get_sheets_service()
+                    sheet_name = 'Transplante Capilar'
+                    result = sheets.spreadsheets().values().get(
+                        spreadsheetId=spreadsheet_id,
+                        range=f'{sheet_name}!A:E'
+                    ).execute()
+                    values = result.get('values', [])
+                    if not values: return
+                    found_row_idx = -1
+                    for i, row in enumerate(values):
+                        if len(row) > 0 and row[0].strip().lower() == p_name.strip().lower():
+                            found_row_idx = i + 1
+                            break
+                    if found_row_idx > 0:
+                        update_range = f'{sheet_name}!D{found_row_idx}:E{found_row_idx}'
+                        sheets.spreadsheets().values().update(
+                            spreadsheetId=spreadsheet_id,
+                            range=update_range,
+                            valueInputOption='USER_ENTERED',
+                            body={'values': [['agendado', s_time.strftime('%d/%m/%Y')]]}
+                        ).execute()
+                except Exception as e:
+                    print(f"✗ Erro GS Surgery Update: {e}")
+
+            threading.Thread(target=_update_gs_surgery_date_thread, args=(patient.name, appointment.start_time), daemon=True).start()
+        except Exception as e:
+            print(f"Erro ao iniciar thread GS: {e}")
+
     if surgery_created:
         try:
             from services.google_calendar import create_surgery_event
@@ -842,6 +879,32 @@ def update_appointment(id):
         appointment.appointment_type = data['appointment_type']
     if 'appointmentType' in data:
         appointment.appointment_type = data['appointmentType']
+    
+    # === GOOGLE SHEETS: Atualização de Status/Data (Transplante Capilar) ===
+    if appointment.appointment_type == 'Transplante Capilar' and appointment.status == 'agendado':
+        try:
+            from services.google_sheets import get_or_create_spreadsheet, _get_sheets_service
+            import threading
+            def _update_gs_status_thread(p_name, s_time):
+                try:
+                    spreadsheet_id = get_or_create_spreadsheet()
+                    sheets = _get_sheets_service()
+                    sheet_name = 'Transplante Capilar'
+                    result = sheets.spreadsheets().values().get(spreadsheetId=spreadsheet_id, range=f'{sheet_name}!A:E').execute()
+                    values = result.get('values', [])
+                    if not values: return
+                    for i, row in enumerate(values):
+                        if len(row) > 0 and row[0].strip().lower() == p_name.strip().lower():
+                            sheets.spreadsheets().values().update(
+                                spreadsheetId=spreadsheet_id,
+                                range=f'{sheet_name}!D{i+1}:E{i+1}',
+                                valueInputOption='USER_ENTERED',
+                                body={'values': [['agendado', s_time.strftime('%d/%m/%Y')]]}
+                            ).execute()
+                            break
+                except Exception as e: print(f"✗ Erro GS Update: {e}")
+            threading.Thread(target=_update_gs_status_thread, args=(appointment.patient.name, appointment.start_time), daemon=True).start()
+        except Exception as e: print(f"Erro thread GS: {e}")
     if 'patient_type' in data:
         appointment.patient.patient_type = data['patient_type']
     if 'patientType' in data:
@@ -2511,6 +2574,16 @@ def finalizar_atendimento(patient_id):
                 if gs_rows:
                     append_procedures_batch(gs_rows)
                     print(f"DEBUG: {len(gs_rows)} procedimentos enviados para Google Sheets")
+            
+            elif category == 'transplante_capilar':
+                from services.google_sheets import append_transplant_data
+                append_transplant_data([{
+                    'patient_name': patient_name,
+                    'phone': patient_phone or '',
+                    'consult_date': now.strftime('%d/%m/%Y'),
+                    'status': 'pendente',
+                    'surgery_date': ''
+                }])
         except Exception as gs_err:
             print(f"Erro ao integrar com Google Sheets (não-crítico): {gs_err}")
 
