@@ -1,0 +1,64 @@
+Você é um agente no Replit. Corrija o botão “PENDENTE/REALIZADO” no prontuário derm. Hoje NÃO funciona. A causa mais provável é que o arquivo JS quebrou (SyntaxError) porque entrou HTML escapado (&quot;) dentro do JavaScript, fazendo o prontuario.js parar de carregar. Faça a correção definitiva com delegação de clique (sem onclick inline), garantindo que o botão não submeta form e que o toggle atualize status, data (YYYY-MM-DD) e re-render.
+
+✅ REQUISITOS
+1) Remover QUALQUER ocorrência de &quot; dentro do static/js/prontuario.js (isso quebra o JS).
+2) Garantir que o botão do status tenha: type="button", classe .btn-toggle-proc e atributo data-index.
+3) NÃO usar onclick inline (ou então REMOVER listener global). Use APENAS 1 método. Preferência: delegação global ativa.
+4) Garantir que window.toggleProcedurePerformed exista e funcione.
+5) Ao marcar REALIZADO: se não tiver data, setar hoje em YYYY-MM-DD (toLocaleDateString('en-CA')).
+6) Ao voltar para PENDENTE: opcional limpar performedDate (padrão: limpar).
+7) Re-render: renderCosmeticProcedures(), renderCosmeticConduct(), updateCosmeticTotal() (se existirem).
+8) Incluir logs no console para validar clique e toggle.
+9) (Opcional mas recomendado) Bust cache no template: prontuario.js?v=YYYYMMDD-1
+
+🛠️ APLIQUE AS EDIÇÕES ABAIXO:
+
+A) Em static/js/prontuario.js — SUBSTITUA o bloco inteiro de toggle + listener por este (exatamente):
+
+```js
+// ===== TOGGLE STATUS (SEM HTML ESCAPADO) =====
+window.toggleProcedurePerformed = function(index) {
+  console.log('🖱️ Toggling procedure index:', index);
+
+  if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
+    console.error('Procedimento não encontrado no índice:', index);
+    return;
+  }
+
+  const proc = cosmeticProcedures[index];
+  console.log('before:', JSON.parse(JSON.stringify(proc)));
+
+  proc.performed = !proc.performed;
+
+  if (proc.performed) {
+    if (!proc.performedDate) {
+      proc.performedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    }
+    if (typeof showAlert === 'function') {
+      showAlert(`${proc.name} marcado como REALIZADO`, 'success');
+    }
+  } else {
+    proc.performedDate = null;
+  }
+
+  console.log('after:', JSON.parse(JSON.stringify(proc)));
+
+  if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
+  if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
+  if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
+};
+
+// ===== DELEGAÇÃO DE CLICK (ATIVA, NÃO COMENTADA) =====
+// IMPORTANTE: isso depende de .btn-toggle-proc + data-index no botão
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-toggle-proc');
+  if (!btn) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const idx = parseInt(btn.getAttribute('data-index'), 10);
+  console.log('✅ Clique detectado no botão toggle, index:', idx);
+
+  window.toggleProcedurePerformed(idx);
+}, true);
