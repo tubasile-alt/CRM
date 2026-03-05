@@ -189,7 +189,7 @@ def _do_append_transplant(data):
                 spreadsheetId=spreadsheet_id,
                 range=f'\'{sheet_name}\'!A1',
                 valueInputOption='USER_ENTERED',
-                body={'values': [["Nome do Paciente", "Telefone", "Data da Consulta", "Status", "Data da Cirurgia"]]}
+                body={'values': [["Nome do Paciente", "Celular", "Data da Consulta", "Status", "Data da Cirurgia"]]}
             ).execute()
 
         # Buscar dados existentes para evitar duplicados
