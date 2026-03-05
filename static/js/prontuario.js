@@ -944,40 +944,50 @@ function renderCosmeticConduct() {
         return;
     }
     
-    cosmeticProcedures.forEach((proc, index) => {
-        // Apenas usar data se o procedimento foi realizado E tem data definida
+    // Ordenar: primeiro os pendentes (novos ou antigos), depois os realizados
+    const sortedProcs = [...cosmeticProcedures].sort((a, b) => {
+        if (a.performed === b.performed) return 0;
+        return a.performed ? 1 : -1;
+    });
+
+    sortedProcs.forEach((proc) => {
+        const index = cosmeticProcedures.indexOf(proc);
         const procedureDate = proc.performedDate || '';
         
         const row = tbody.insertRow();
-        if (proc.performed) row.className = 'table-success';
+        if (proc.performed) row.className = 'table-success opacity-75';
+        
+        const statusBadge = proc.performed 
+            ? '<span class="badge bg-success"><i class="bi bi-check-lg"></i> REALIZADO</span>' 
+            : '<button class="btn btn-danger btn-sm w-100 fw-bold" onclick="toggleProcedurePerformed(' + index + ')">PENDENTE</button>';
+
         row.innerHTML = `
             <td>
-                <div class="fw-bold text-primary">${proc.name}</div>
-                <div class="text-xs text-muted">${proc.consultationDate || 'Novo'}</div>
+                <div class="fw-bold ${proc.performed ? 'text-muted text-decoration-line-through' : 'text-primary'}">${proc.name}</div>
+                <div class="text-xs text-muted small">${proc.consultationDate || 'Novo Planejamento'}</div>
             </td>
             <td>
-                <input type="number" 
-                       class="form-control form-control-sm" 
-                       value="${proc.budget || proc.value}" 
-                       onchange="updateProcedureBudget(${index}, this.value)"
-                       step="any" min="0">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">R$</span>
+                    <input type="number" 
+                           class="form-control form-control-sm fw-bold" 
+                           value="${proc.budget || proc.value}" 
+                           onchange="updateProcedureBudget(${index}, this.value)"
+                           step="any" min="0" ${proc.performed ? 'disabled' : ''}>
+                </div>
             </td>
             <td>
                 <input type="date" 
                        class="form-control form-control-sm" 
                        value="${procedureDate}"
                        onchange="updateProcedureDate(${index}, this.value)"
-                       placeholder="${proc.performed ? 'Selecione a data' : ''}">
+                       ${proc.performed ? 'disabled' : ''}>
             </td>
             <td class="text-center align-middle">
-                <div class="form-check d-flex justify-content-center">
-                    <input class="form-check-input" type="checkbox" 
-                           ${proc.performed ? 'checked' : ''} 
-                           onchange="toggleProcedurePerformed(${index})">
-                </div>
+                ${statusBadge}
             </td>
             <td class="text-center">
-                <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${index})">
+                <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${index})" ${proc.performed ? 'disabled' : ''}>
                     <i class="bi bi-trash"></i>
                 </button>
             </td>
@@ -986,7 +996,12 @@ function renderCosmeticConduct() {
 }
 
 function updateProcedureBudget(index, value) {
-    cosmeticProcedures[index].budget = parseFloat(value) || 0;
+    if (cosmeticProcedures[index]) {
+        const val = parseFloat(value) || 0;
+        cosmeticProcedures[index].budget = val;
+        cosmeticProcedures[index].value = val; // Manter sincronizado para o total
+        updateCosmeticTotal();
+    }
 }
 
 function updateProcedureDate(index, dateValue) {
@@ -996,20 +1011,23 @@ function updateProcedureDate(index, dateValue) {
 function toggleProcedurePerformed(index) {
     if (!cosmeticProcedures[index]) return;
     
-    cosmeticProcedures[index].performed = !cosmeticProcedures[index].performed;
-    
-    // Se marcou como "Feito" e não tem data, definir hoje como padrão
-    if (cosmeticProcedures[index].performed && !cosmeticProcedures[index].performedDate) {
-        cosmeticProcedures[index].performedDate = new Date().toISOString().split('T')[0];
-    }
-    
-    // Se desmarcou como "Feito", limpar a data
+    // Se estiver pendente, marcar como realizado
     if (!cosmeticProcedures[index].performed) {
+        cosmeticProcedures[index].performed = true;
+        // Definir data de hoje se não tiver data
+        if (!cosmeticProcedures[index].performedDate) {
+            cosmeticProcedures[index].performedDate = new Date().toISOString().split('T')[0];
+        }
+        showAlert(`${cosmeticProcedures[index].name} marcado como REALIZADO`, 'success');
+    } else {
+        // Se já estiver realizado, permitir desmarcar
+        cosmeticProcedures[index].performed = false;
         cosmeticProcedures[index].performedDate = null;
     }
     
+    renderCosmeticProcedures();
     renderCosmeticConduct();
-    if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
+    updateCosmeticTotal();
 }
 
 function saveCosmeticPlan() {
