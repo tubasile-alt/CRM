@@ -1,0 +1,88 @@
+AJA COMO DEV FULL-STACK E CORRIJA DEFINITIVAMENTE o toggle PENDENTE/REALIZADO no prontuário.
+O problema atual é SyntaxError/JS não carregando por: (a) uso de &quot; dentro do JS, (b) showAlert sem string/template literal, (c) HTML fora de backticks.
+
+FAÇA EXATAMENTE:
+
+1) Em static/js/prontuario.js:
+   - Remova TODAS as ocorrências de &quot; (isso é entidade HTML e NÃO deve ficar em JS).
+   - Garanta que todo HTML gerado em JS esteja dentro de string com backticks (`...`).
+
+2) No início do arquivo (logo após imports/variáveis globais), adicione:
+   console.log('✅ prontuario.js carregado v=20260305-5');
+
+3) Em renderCosmeticConduct(), localize a linha/bloco "const statusBadge = ..." e substitua por ESTE BLOCO (exatamente):
+
+const statusBadge = proc.performed
+  ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}">
+       <i class="bi bi-check-lg"></i> REALIZADO
+     </button>`
+  : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}">
+       <i class="bi bi-exclamation-triangle"></i> PENDENTE
+     </button>`;
+
+IMPORTANTE:
+- NÃO use onclick inline aqui.
+- O botão precisa ter: type="button", classe btn-toggle-proc, data-index.
+
+4) Substitua a função inteira window.toggleProcedurePerformed pela versão abaixo (exatamente):
+   (E ATENÇÃO: showAlert TEM que estar entre crases `...`)
+
+window.toggleProcedurePerformed = function(index) {
+  console.log('🖱️ Toggling procedure index:', index);
+
+  if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
+    console.error('Procedimento não encontrado no índice:', index);
+    return;
+  }
+
+  const proc = cosmeticProcedures[index];
+  console.log('before:', JSON.parse(JSON.stringify(proc)));
+
+  proc.performed = !proc.performed;
+
+  if (proc.performed) {
+    if (!proc.performedDate) {
+      proc.performedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    }
+    if (typeof showAlert === 'function') {
+      showAlert(`${proc.name} marcado como REALIZADO`, 'success');
+    }
+  } else {
+    proc.performedDate = null;
+  }
+
+  console.log('after:', JSON.parse(JSON.stringify(proc)));
+
+  if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
+  if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
+  if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
+};
+
+5) Garanta que exista APENAS 1 listener de delegação no arquivo inteiro.
+   - Apague/remova quaisquer listeners duplicados (inclusive comentados antigos).
+   - Deixe somente este (exatamente):
+
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-toggle-proc');
+  if (!btn) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const idx = parseInt(btn.getAttribute('data-index'), 10);
+  console.log('✅ Clique detectado no botão toggle, index:', idx);
+
+  window.toggleProcedurePerformed(idx);
+}, true);
+
+6) Em templates/prontuario.html:
+   troque o script por UMA LINHA (sem quebras estranhas):
+   <script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260305-5"></script>
+
+7) Reinicie o workflow flask-app.
+
+VALIDAÇÃO OBRIGATÓRIA (NÃO FINALIZE SEM ISSO):
+- Abrir prontuário e ver no Console: "✅ prontuario.js carregado v=20260305-5"
+- Clicar no botão e ver:
+  "✅ Clique detectado..." e "🖱️ Toggling..."
+- Status muda PENDENTE <-> REALIZADO e a data é setada quando marcar como realizado.
