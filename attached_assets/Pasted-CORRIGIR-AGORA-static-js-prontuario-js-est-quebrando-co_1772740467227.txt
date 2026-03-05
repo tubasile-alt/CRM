@@ -1,0 +1,60 @@
+CORRIGIR AGORA: static/js/prontuario.js está quebrando com SyntaxError. Reverta e aplique exatamente estes trechos:
+
+1) No topo do arquivo (ou perto do final), usar log com aspas simples:
+console.log('✅ prontuario.js carregado v=20260305-4');
+
+2) Substituir a função inteira toggleProcedurePerformed por:
+
+window.toggleProcedurePerformed = function(index) {
+  console.log('🖱️ Toggling procedure index:', index);
+
+  if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
+    console.error('Procedimento não encontrado no índice:', index);
+    return;
+  }
+
+  const proc = cosmeticProcedures[index];
+  console.log('before:', JSON.parse(JSON.stringify(proc)));
+
+  proc.performed = !proc.performed;
+
+  if (proc.performed) {
+    if (!proc.performedDate) {
+      proc.performedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
+    }
+    if (typeof showAlert === 'function') {
+      showAlert(`${proc.name} marcado como REALIZADO`, 'success');
+    }
+  } else {
+    proc.performedDate = null;
+  }
+
+  console.log('after:', JSON.parse(JSON.stringify(proc)));
+
+  if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
+  if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
+  if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
+};
+
+3) Garantir APENAS 1 listener de click (não duplicar em nenhum lugar do arquivo):
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.btn-toggle-proc');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const idx = parseInt(btn.getAttribute('data-index'), 10);
+  console.log('✅ Clique detectado no botão toggle, index:', idx);
+  window.toggleProcedurePerformed(idx);
+}, true);
+
+4) Em renderCosmeticConduct(), garantir que statusBadge é STRING com crases (NÃO HTML cru):
+const statusBadge = proc.performed
+  ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}"><i class="bi bi-check-lg"></i> REALIZADO</button>`
+  : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}"><i class="bi bi-exclamation-triangle"></i> PENDENTE</button>`;
+
+5) Remover &quot; do JS. Não usar entidades HTML no arquivo JS.
+6) Reiniciar workflow flask-app.
+
+VALIDAÇÃO:
+- Abrir prontuário e ver no Console: ✅ prontuario.js carregado v=20260305-4
+- Clicar no botão e ver logs: ✅ Clique detectado... e 🖱️ Toggling...
