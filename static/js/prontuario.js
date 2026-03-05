@@ -1,4 +1,4 @@
-console.log('✅ prontuario.js carregado v=20260305-4');
+console.log('prontuario.js carregado v=20260305-5');
 let timerInterval = null;
 let timerStartTime = null;
 let recognition = null;
@@ -776,7 +776,7 @@ function highlightConsultationGroup(consultationKey) {
     }, 300);
 }
 
-console.log("✅ prontuario.js carregado v=20260305-1");
+
 
 function renderCosmeticProcedures() {
     const tbody = document.getElementById('cosmeticPlanBody');
@@ -901,9 +901,10 @@ function togglePlanPerformed(index, checked) {
     if (cosmeticProcedures[index]) {
         cosmeticProcedures[index].performed = checked;
         if (checked && !cosmeticProcedures[index].performedDate) {
-            cosmeticProcedures[index].performedDate = new Date().toISOString().split('T')[0];
+            cosmeticProcedures[index].performedDate = new Date().toLocaleDateString('en-CA');
         }
         renderCosmeticProcedures();
+        renderCosmeticConduct();
         updateCosmeticTotal();
     }
 }
@@ -1034,36 +1035,58 @@ function updateProcedureObservation(index, value) {
 window.updateProcedureDate = updateProcedureDate;
 window.updateProcedureObservation = updateProcedureObservation;
 
-// ===== TOGGLE STATUS (SEM HTML ESCAPADO) =====
+// ===== TOGGLE STATUS =====
 window.toggleProcedurePerformed = function(index) {
-  console.log('🖱️ Toggling procedure index:', index);
+  console.log('toggleProcedurePerformed index:', index);
 
-  if (typeof cosmeticProcedures === 'undefined' || !cosmeticProcedures[index]) {
-    console.error('Procedimento não encontrado no índice:', index);
+  const proc = cosmeticProcedures && cosmeticProcedures[index];
+  if (!proc) {
+    console.error('Procedimento nao encontrado no indice:', index);
     return;
   }
 
-  const proc = cosmeticProcedures[index];
-  console.log('before:', JSON.parse(JSON.stringify(proc)));
+  if (proc.id) {
+    const today = new Date().toLocaleDateString('en-CA');
+    const dateInput = prompt('Marcar "' + proc.name + '" como realizado em qual data? (AAAA-MM-DD)', proc.performedDate || today);
+    if (!dateInput) return;
+
+    fetch('/api/cosmetic-plans/' + proc.id + '/perform', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+      body: JSON.stringify({
+        appointment_id: window.appointmentId,
+        performed_date: dateInput
+      })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(result) {
+      if (result.success) {
+        showAlert('Procedimento marcado como realizado!', 'success');
+        loadExistingPlans();
+      } else {
+        showAlert(result.error || 'Erro ao marcar como realizado', 'danger');
+      }
+    })
+    .catch(function(err) {
+      console.error(err);
+      showAlert('Erro de conexao ao salvar procedimento', 'danger');
+    });
+
+    return;
+  }
 
   proc.performed = !proc.performed;
 
   if (proc.performed) {
-    if (!proc.performedDate) {
-      proc.performedDate = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
-    }
-    if (typeof showAlert === 'function') {
-      showAlert(`${proc.name} marcado como REALIZADO`, 'success');
-    }
+    if (!proc.performedDate) proc.performedDate = new Date().toLocaleDateString('en-CA');
+    showAlert(proc.name + ' marcado como REALIZADO (ainda nao salvo)', 'info');
   } else {
     proc.performedDate = null;
   }
 
-  console.log('after:', JSON.parse(JSON.stringify(proc)));
-
-  if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
-  if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
-  if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
+  renderCosmeticProcedures();
+  renderCosmeticConduct();
+  updateCosmeticTotal();
 };
 
 // listener ÚNICO (não duplicar)
