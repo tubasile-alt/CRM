@@ -281,16 +281,18 @@
         });
     }
 
-    // Função para obter data de hoje no fuso de Brasília
     window.todayISO_BR = function() {
+        // Retorna um objeto Date que representa "agora" no fuso de Brasília (UTC-3)
+        // Independentemente de onde o servidor ou o navegador estejam
         const now = new Date();
-        const brOffset = -3; // Brasília é UTC-3
         const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        const brOffset = -3;
         return new Date(utc + (3600000 * brOffset));
     };
 
     window.selectToday = function() {
         selectedDate = todayISO_BR();
+        console.log("Botão Hoje clicado. Nova data selecionada:", selectedDate.toISOString());
         const scheduleDate = document.getElementById('scheduleDate');
         if (scheduleDate) scheduleDate.textContent = formatDateBR(selectedDate);
         renderMiniCalendar();
@@ -298,8 +300,11 @@
     };
 
     window.initializeDayView = function() {
-        // Força inicialização com a data de Brasília
-        selectedDate = todayISO_BR();
+        // Se a data já foi definida (ex: navegação), não reseta
+        if (!selectedDate || isNaN(selectedDate.getTime())) {
+            selectedDate = todayISO_BR();
+        }
+        console.log("Inicializando Agenda. Data Atual:", selectedDate.toISOString());
         const scheduleDate = document.getElementById('scheduleDate');
         if (scheduleDate) scheduleDate.textContent = formatDateBR(selectedDate);
         renderTimeColumn();
@@ -588,27 +593,51 @@
     };
 
     window.loadAppointments = function() {
-        let url = `/api/appointments?date=${selectedDate.toISOString().split('T')[0]}`;
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        
+        let url = `/api/appointments?date=${dateStr}`;
         if (currentDoctorFilter) url += `&doctor_id=${currentDoctorFilter}`;
-        fetch(url).then(r => r.json()).then(events => {
-            appointmentsList = events;
-            renderDayView();
-            if (calendar) calendar.refetchEvents();
-        });
+
+        console.log("Carregando agendamentos. URL:", url, "Data Selecionada:", dateStr);
+
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                appointmentsList = data;
+                console.log("Agendamentos recebidos do servidor:", appointmentsList.length);
+                renderDayView();
+                if (calendar && currentView === 'month') calendar.refetchEvents();
+            })
+            .catch(err => {
+                console.error('Erro ao carregar agendamentos:', err);
+            });
     };
 
     window.selectDate = function(date) {
         selectedDate = new Date(date);
+        console.log("Data selecionada:", selectedDate.toDateString());
+        const scheduleDate = document.getElementById('scheduleDate');
+        if (scheduleDate) scheduleDate.textContent = formatDateBR(selectedDate);
         renderMiniCalendar();
-        initializeDayView();
         loadAppointments();
     };
 
     window.previousMonth = function() { selectedDate.setMonth(selectedDate.getMonth() - 1); renderMiniCalendar(); };
     window.nextMonth = function() { selectedDate.setMonth(selectedDate.getMonth() + 1); renderMiniCalendar(); };
-    window.previousDay = function() { selectedDate.setDate(selectedDate.getDate() - 1); selectDate(selectedDate); };
-    window.nextDay = function() { selectedDate.setDate(selectedDate.getDate() + 1); selectDate(selectedDate); };
-    window.todayDay = function() { selectDate(new Date()); };
+    window.previousDay = function() { 
+        selectedDate.setDate(selectedDate.getDate() - 1); 
+        window.selectDate(selectedDate); 
+    };
+    window.nextDay = function() { 
+        selectedDate.setDate(selectedDate.getDate() + 1); 
+        window.selectDate(selectedDate); 
+    };
+    window.todayDay = function() { 
+        window.selectToday();
+    };
 
     function selectAppointment(app) {
         currentEvent = app;
