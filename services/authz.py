@@ -10,18 +10,43 @@ def _get_dp(dp_id):
 def can_view_dp(dp):
     if not current_user.is_authenticated:
         return False
+    
+    # Verificação de papel (role)
+    user_role = getattr(current_user, 'role', '').upper()
+    user_role_clinico = getattr(current_user, 'role_clinico', '').upper()
+    
     # Secretárias e Admins podem ver tudo
-    if current_user.role_clinico in ('SECRETARY', 'ADMIN') or current_user.is_secretary():
+    is_sec = (
+        user_role == 'SECRETARY' or 
+        user_role_clinico == 'SECRETARY' or
+        getattr(current_user, 'username', '') in ('erica', 'gisele', 'recepcao') or
+        (hasattr(current_user, 'is_secretary') and current_user.is_secretary())
+    )
+    
+    if is_sec or user_role == 'ADMIN' or user_role_clinico == 'ADMIN':
         return True
+        
     return dp.doctor_id == current_user.id
 
 
 def can_edit_dp(dp):
     if not current_user.is_authenticated:
         return False
+        
+    user_role = getattr(current_user, 'role', '').upper()
+    user_role_clinico = getattr(current_user, 'role_clinico', '').upper()
+    
     # Secretárias e Admins podem editar (necessário para salvar triagem/dados iniciais)
-    if current_user.role_clinico in ('SECRETARY', 'ADMIN') or current_user.is_secretary():
+    is_sec = (
+        user_role == 'SECRETARY' or 
+        user_role_clinico == 'SECRETARY' or
+        getattr(current_user, 'username', '') in ('erica', 'gisele', 'recepcao') or
+        (hasattr(current_user, 'is_secretary') and current_user.is_secretary())
+    )
+    
+    if is_sec or user_role == 'ADMIN' or user_role_clinico == 'ADMIN':
         return True
+        
     return dp.doctor_id == current_user.id
 
 

@@ -1587,8 +1587,14 @@ def prontuario(patient_id):
     if not current_user.is_doctor() and not current_user.is_secretary():
         return redirect(url_for('agenda'))
 
-    # Secretárias: redirecionar para uso da busca por dp
+    # Secretárias: permitir visualizar se houver vínculo PatientDoctor
     if current_user.is_secretary():
+        from models import PatientDoctor
+        pd = PatientDoctor.query.filter_by(patient_id=patient_id).first()
+        if pd:
+            from services.authz import can_view_dp
+            if can_view_dp(pd):
+                return redirect(url_for('prontuario_dp', dp_id=pd.id))
         return render_template('select_dp.html', patient_id=patient_id), 400
 
     # Médicos CP: criar/obter dp e redirecionar para rota dp
