@@ -395,7 +395,9 @@
         if (!appointmentsGrid) return;
         appointmentsGrid.innerHTML = '';
         
-        console.log("Rendering Day View. Filter:", currentDoctorFilter, "Appointments:", appointmentsList.length);
+        // Log para depuração no console do navegador
+        console.log("Renderizando Agenda. Filtro Médico ID:", currentDoctorFilter);
+        console.log("Total de agendamentos carregados:", appointmentsList.length);
 
         const dayAppointments = appointmentsList.filter(app => {
             const start = parseLocalDateTime(app.start);
@@ -410,11 +412,16 @@
                                    String(selectedDate.getDate()).padStart(2, '0');
             
             const isSameDate = appDateStr === selectedDateStr;
-            const doctorId = parseInt(app.extendedProps?.doctorId || app.doctorId);
+            
+            // Verifica o ID do médico tanto no objeto extendido quanto no principal
+            const doctorId = parseInt(app.extendedProps?.doctorId || app.doctorId || app.doctor_id);
             const isDoctorMatch = !currentDoctorFilter || doctorId === currentDoctorFilter;
             
             return isSameDate && isDoctorMatch;
         });
+
+        console.log("Agendamentos filtrados para exibição:", dayAppointments.length);
+
         if (dayAppointments.length === 0) {
             appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
             return;
