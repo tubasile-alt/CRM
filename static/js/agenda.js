@@ -394,11 +394,13 @@
         const appointmentsGrid = document.getElementById('appointmentsGrid');
         if (!appointmentsGrid) return;
         appointmentsGrid.innerHTML = '';
+        
+        console.log("Rendering Day View. Filter:", currentDoctorFilter, "Appointments:", appointmentsList.length);
+
         const dayAppointments = appointmentsList.filter(app => {
             const start = parseLocalDateTime(app.start);
             if (!start) return false;
             
-            // Comparação de data usando strings YYYY-MM-DD para evitar fuso horário
             const appDateStr = start.getFullYear() + '-' + 
                                String(start.getMonth() + 1).padStart(2, '0') + '-' + 
                                String(start.getDate()).padStart(2, '0');
@@ -407,8 +409,11 @@
                                    String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
                                    String(selectedDate.getDate()).padStart(2, '0');
             
-            const doctorMatch = !currentDoctorFilter || parseInt(app.extendedProps?.doctorId) === currentDoctorFilter;
-            return appDateStr === selectedDateStr && doctorMatch;
+            const isSameDate = appDateStr === selectedDateStr;
+            const doctorId = parseInt(app.extendedProps?.doctorId || app.doctorId);
+            const isDoctorMatch = !currentDoctorFilter || doctorId === currentDoctorFilter;
+            
+            return isSameDate && isDoctorMatch;
         });
         if (dayAppointments.length === 0) {
             appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
