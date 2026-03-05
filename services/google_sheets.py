@@ -174,45 +174,55 @@ def _do_append_transplant(data):
     try:
         spreadsheet_id = get_or_create_spreadsheet()
         sheets = _get_sheets_service()
+        sheet_name = 'Transplante Capilar'
         
         # Garantir que a aba existe
         sheet_metadata = sheets.get(spreadsheetId=spreadsheet_id).execute()
         sheets_list = sheet_metadata.get('sheets', [])
-        exists = any(s.get('properties', {}).get('title') == 'Transplante Capilar' for s in sheets_list)
+        exists = any(s.get('properties', {}).get('title') == sheet_name for s in sheets_list)
         
         if not exists:
             sheets.batchUpdate(spreadsheetId=spreadsheet_id, body={
-                'requests': [{'addSheet': {'properties': {'title': 'Transplante Capilar'}}}]
+                'requests': [{'addSheet': {'properties': {'title': sheet_name}}}]
             }).execute()
-            # Adicionar cabeçalho
             sheets.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range='Transplante Capilar!A1',
+                range=f'\'{sheet_name}\'!A1',
                 valueInputOption='USER_ENTERED',
                 body={'values': [["Nome do Paciente", "Telefone", "Data da Consulta", "Status", "Data da Cirurgia"]]}
             ).execute()
 
-        rows = []
+        # Buscar dados existentes para evitar duplicados
+        result = sheets.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=f'\'{sheet_name}\'!A:A'
+        ).execute()
+        existing_names = {row[0].strip().lower() for row in result.get('values', []) if row}
+
+        rows_to_append = []
         for item in data:
-            # Garante que status seja 'pendente' se não for 'agendado'
+            name = item.get('patient_name', '').strip()
+            if name.lower() in existing_names:
+                continue
+                
             status = item.get('status', 'pendente')
             surgery_date = item.get('surgery_date', '')
             
-            rows.append([
-                item.get('patient_name', ''),
+            rows_to_append.append([
+                name,
                 item.get('phone', ''),
                 item.get('consult_date', ''),
                 status,
                 surgery_date
             ])
 
-        if rows:
+        if rows_to_append:
             sheets.spreadsheets().values().append(
                 spreadsheetId=spreadsheet_id,
-                range='Transplante Capilar!A:E',
+                range=f'\'{sheet_name}\'!A:E',
                 valueInputOption='USER_ENTERED',
                 insertDataOption='INSERT_ROWS',
-                body={'values': rows}
+                body={'values': rows_to_append}
             ).execute()
         return True
     except Exception as e:
