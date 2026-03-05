@@ -281,7 +281,25 @@
         });
     }
 
+    // Função para obter data de hoje no fuso de Brasília
+    window.todayISO_BR = function() {
+        const now = new Date();
+        const brOffset = -3; // Brasília é UTC-3
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        return new Date(utc + (3600000 * brOffset));
+    };
+
+    window.selectToday = function() {
+        selectedDate = todayISO_BR();
+        const scheduleDate = document.getElementById('scheduleDate');
+        if (scheduleDate) scheduleDate.textContent = formatDateBR(selectedDate);
+        renderMiniCalendar();
+        loadAppointments();
+    };
+
     window.initializeDayView = function() {
+        // Força inicialização com a data de Brasília
+        selectedDate = todayISO_BR();
         const scheduleDate = document.getElementById('scheduleDate');
         if (scheduleDate) scheduleDate.textContent = formatDateBR(selectedDate);
         renderTimeColumn();
@@ -421,6 +439,13 @@
         });
 
         console.log("Agendamentos filtrados para exibição:", dayAppointments.length);
+        
+        // Se a lista estiver vazia mas existirem agendamentos no total, logar as datas para debug
+        if (dayAppointments.length === 0 && appointmentsList.length > 0) {
+            console.log("DEBUG: Datas dos agendamentos carregados:", appointmentsList.map(a => a.start));
+            console.log("DEBUG: Data selecionada para filtro:", selectedDateStr);
+            console.log("DEBUG: Fuso horário local:", new Date().toString());
+        }
 
         if (dayAppointments.length === 0) {
             appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
