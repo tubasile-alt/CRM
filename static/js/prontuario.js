@@ -951,7 +951,7 @@ function renderCosmeticConduct() {
     });
 
     sortedProcs.forEach((proc) => {
-        const index = cosmeticProcedures.indexOf(proc);
+        const realIndex = cosmeticProcedures.indexOf(proc);
         const procedureDate = proc.performedDate || '';
         
         const row = tbody.insertRow();
@@ -959,7 +959,7 @@ function renderCosmeticConduct() {
         
         const statusBadge = proc.performed 
             ? '<span class="badge bg-success"><i class="bi bi-check-lg"></i> REALIZADO</span>' 
-            : `<button class="btn btn-danger btn-sm w-100 fw-bold" onclick="toggleProcedurePerformed(${index})">PENDENTE</button>`;
+            : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold" onclick="window.toggleProcedurePerformed(${realIndex}); return false;" style="position: relative; z-index: 10;">PENDENTE</button>`;
 
         row.innerHTML = `
             <td>
@@ -972,7 +972,7 @@ function renderCosmeticConduct() {
                     <input type="number" 
                            class="form-control form-control-sm fw-bold" 
                            value="${proc.budget || proc.value}" 
-                           onchange="updateProcedureBudget(${index}, this.value)"
+                           onchange="updateProcedureBudget(${realIndex}, this.value)"
                            step="any" min="0" ${proc.performed ? 'disabled' : ''}>
                 </div>
             </td>
@@ -980,14 +980,14 @@ function renderCosmeticConduct() {
                 <input type="date" 
                        class="form-control form-control-sm" 
                        value="${procedureDate}"
-                       onchange="updateProcedureDate(${index}, this.value)"
+                       onchange="updateProcedureDate(${realIndex}, this.value)"
                        ${proc.performed ? 'disabled' : ''}>
             </td>
             <td class="text-center align-middle">
                 ${statusBadge}
             </td>
             <td class="text-center">
-                <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${index})" ${proc.performed ? 'disabled' : ''}>
+                <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${realIndex})" ${proc.performed ? 'disabled' : ''}>
                     <i class="bi bi-trash"></i>
                 </button>
             </td>
@@ -1008,8 +1008,12 @@ function updateProcedureDate(index, dateValue) {
     cosmeticProcedures[index].performedDate = dateValue;
 }
 
-function toggleProcedurePerformed(index) {
-    if (!cosmeticProcedures[index]) return;
+window.toggleProcedurePerformed = function(index) {
+    console.log("Toggle procedure index:", index);
+    if (!cosmeticProcedures[index]) {
+        console.error("Procedimento não encontrado no índice:", index);
+        return;
+    }
     
     // Se estiver pendente, marcar como realizado
     if (!cosmeticProcedures[index].performed) {
@@ -1018,17 +1022,19 @@ function toggleProcedurePerformed(index) {
         if (!cosmeticProcedures[index].performedDate) {
             cosmeticProcedures[index].performedDate = new Date().toISOString().split('T')[0];
         }
-        showAlert(`${cosmeticProcedures[index].name} marcado como REALIZADO`, 'success');
+        if (typeof showAlert === 'function') {
+            showAlert(`${cosmeticProcedures[index].name} marcado como REALIZADO`, 'success');
+        }
     } else {
         // Se já estiver realizado, permitir desmarcar
         cosmeticProcedures[index].performed = false;
         cosmeticProcedures[index].performedDate = null;
     }
     
-    renderCosmeticProcedures();
-    renderCosmeticConduct();
-    updateCosmeticTotal();
-}
+    if (typeof renderCosmeticProcedures === 'function') renderCosmeticProcedures();
+    if (typeof renderCosmeticConduct === 'function') renderCosmeticConduct();
+    if (typeof updateCosmeticTotal === 'function') updateCosmeticTotal();
+};
 
 function saveCosmeticPlan() {
     // DEPRECATED: Não salvar mais - dados são salvos ao finalizar
