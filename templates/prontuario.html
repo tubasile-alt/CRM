@@ -285,6 +285,9 @@ function saveConsultationDate() {
     <li class="nav-item">
         <a class="nav-link rounded-pill px-4" data-bs-toggle="pill" href="#exames">Exames</a>
     </li>
+    <li class="nav-item">
+        <a class="nav-link rounded-pill px-4" data-bs-toggle="pill" href="#data-consulta">Data</a>
+    </li>
     <li class="nav-item ms-auto">
         <button class="btn btn-outline-danger rounded-pill px-4" onclick="finishConsultation()">
             <i class="bi bi-check2-circle me-2"></i>Finalizar Consulta
@@ -311,26 +314,155 @@ function saveConsultationDate() {
                         </div>
                     </div>
                     <div class="card-body p-4">
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Queixa Principal / Motivo da Consulta</label>
-                            <div class="position-relative">
-                                <textarea id="queixaText" class="form-control" rows="3" placeholder="O que o paciente relata?"></textarea>
-                                <button class="btn btn-sm btn-outline-secondary position-absolute bottom-0 end-0 m-2" onclick="startDictation('queixaText', event)">
-                                    <i class="bi bi-mic"></i> Ditado
-                                </button>
+                        {# --- Seção Patologia / Geral --- #}
+                        <div id="section_geral">
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Queixa Principal</label>
+                                <div class="position-relative">
+                                    <textarea id="queixaText" class="form-control" rows="3" placeholder="O que o paciente relata?"></textarea>
+                                    <button class="btn btn-sm btn-outline-secondary position-absolute bottom-0 end-0 m-2" onclick="startDictation('queixaText', event)">
+                                        <i class="bi bi-mic"></i> Ditado
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">Anamnese / História Clínica</label>
+                                <div class="position-relative">
+                                    <textarea id="anamneseText" class="form-control" rows="5" placeholder="Histórico da doença atual, antecedentes..."></textarea>
+                                    <button class="btn btn-sm btn-outline-secondary position-absolute bottom-0 end-0 m-2" onclick="startDictation('anamneseText', event)">
+                                        <i class="bi bi-mic"></i> Ditado
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="mb-4">
-                            <label class="form-label fw-bold">Anamnese / História Clínica</label>
-                            <div class="position-relative">
-                                <textarea id="anamneseText" class="form-control" rows="5" placeholder="Histórico da doença atual, antecedentes..."></textarea>
-                                <button class="btn btn-sm btn-outline-secondary position-absolute bottom-0 end-0 m-2" onclick="startDictation('anamneseText', event)">
-                                    <i class="bi bi-mic"></i> Ditado
-                                </button>
+                        {# --- Seção Específica: Transplante Capilar --- #}
+                        <div id="section_transplante" style="display:none;" class="mb-4 p-3 bg-light rounded shadow-sm border">
+                            <h5 class="fw-bold text-primary mb-3"><i class="bi bi-scissors me-2"></i>Planejamento de Transplante</h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Classificação Norwood</label>
+                                    <select id="norwood_class" class="form-select">
+                                        <option value="">Selecione...</option>
+                                        <option value="I">Grau I</option>
+                                        <option value="II">Grau II</option>
+                                        <option value="IIa">Grau IIa</option>
+                                        <option value="III">Grau III</option>
+                                        <option value="IIIa">Grau IIIa</option>
+                                        <option value="III Vertex">Grau III Vertex</option>
+                                        <option value="IV">Grau IV</option>
+                                        <option value="IVa">Grau IVa</option>
+                                        <option value="V">Grau V</option>
+                                        <option value="Va">Grau Va</option>
+                                        <option value="VI">Grau VI</option>
+                                        <option value="VII">Grau VII</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small fw-bold">Já fez transplante?</label>
+                                    <div class="d-flex gap-3 pt-1">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="previous_transplant" id="prev_sim" value="sim">
+                                            <label class="form-check-label" for="prev_sim">Sim</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="previous_transplant" id="prev_nao" value="nao" checked>
+                                            <label class="form-check-label" for="prev_nao">Não</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small fw-bold">Locais do Transplante (Planejamento)</label>
+                                    <div class="d-flex flex-wrap gap-3 p-2 bg-white rounded border">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="frontal_transplant">
+                                            <label class="form-check-label" for="frontal_transplant">Frontal</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="crown_transplant">
+                                            <label class="form-check-label" for="crown_transplant">Coroa (Crown)</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="complete_transplant">
+                                            <label class="form-check-label" for="complete_transplant">Completo</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="complete_body_hair">
+                                            <label class="form-check-label" for="complete_body_hair">Completo + Body Hair</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="dense_packing">
+                                            <label class="form-check-label" for="dense_packing">Dense Packing</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12 mt-3">
+                                    <label class="form-label small fw-bold">Descrição do Planejamento Cirúrgico</label>
+                                    <textarea id="surgical_planning_text" class="form-control" rows="3" placeholder="Detalhes técnicos, número de folículos estimado..."></textarea>
+                                </div>
                             </div>
                         </div>
 
+                        {# --- Seção Específica: Cosmiatria --- #}
+                        <div id="section_cosmiatria" style="display:none;" class="mb-4">
+                            <div class="card border-primary-subtle shadow-sm mb-4">
+                                <div class="card-header bg-primary-subtle fw-bold text-primary d-flex justify-content-between align-items-center">
+                                    <span><i class="bi bi-calendar-plus me-2"></i>Planejamento de Procedimentos</span>
+                                    <button class="btn btn-sm btn-primary rounded-pill px-3" data-bs-toggle="collapse" data-bs-target="#cosmeticPlanCollapse">
+                                        <i class="bi bi-plus-lg me-1"></i>Adicionar
+                                    </button>
+                                </div>
+                                <div class="collapse" id="cosmeticPlanCollapse">
+                                    <div class="card-body bg-light-subtle p-3">
+                                        <div class="row g-2">
+                                            <div class="col-md-5">
+                                                <input type="text" id="newProcedureName" class="form-control form-control-sm" placeholder="Nome do Procedimento">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text">R$</span>
+                                                    <input type="number" id="newProcedureValue" class="form-control" placeholder="Valor">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <input type="number" id="newProcedureMonths" class="form-control form-control-sm" placeholder="Meses" value="6">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <button class="btn btn-sm btn-success w-100" onclick="addCosmeticProcedure()">
+                                                    <i class="bi bi-plus-circle"></i>
+                                                </button>
+                                            </div>
+                                            <div class="col-12 mt-2">
+                                                <textarea id="newProcedureObservations" class="form-control form-control-sm" rows="1" placeholder="Observações do planejamento..."></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0 align-middle">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th class="ps-3">Procedimento</th>
+                                                <th>Valor (R$)</th>
+                                                <th>Frequência</th>
+                                                <th class="text-center">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="cosmeticPlanBody">
+                                            <tr><td colspan="4" class="text-center text-muted py-3 small">Nenhum procedimento planejado ainda</td></tr>
+                                        </tbody>
+                                        <tfoot class="table-light">
+                                            <tr>
+                                                <th class="ps-3">TOTAL PLANEJADO</th>
+                                                <th colspan="3" class="text-primary">R$ <span id="cosmeticTotal">0,00</span></th>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {# --- Diagnóstico e Conduta (Sempre visíveis) --- #}
                         <div class="mb-4">
                             <label class="form-label fw-bold">Diagnóstico / HD</label>
                             <div class="position-relative">
@@ -342,7 +474,12 @@ function saveConsultationDate() {
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label fw-bold">Conduta / Plano Terapêutico</label>
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label fw-bold mb-0">Conduta / Plano Terapêutico</label>
+                                <div id="cosmeticConductLabel" class="badge bg-primary-subtle text-primary border border-primary-subtle" style="display:none;">
+                                    <i class="bi bi-clipboard2-pulse me-1"></i>Acompanhamento Cosmiátrico Ativo
+                                </div>
+                            </div>
                             <div class="position-relative">
                                 <textarea id="condutaText" class="form-control" rows="5" placeholder="Prescrições, orientações, próximos passos..."></textarea>
                                 <button class="btn btn-sm btn-outline-secondary position-absolute bottom-0 end-0 m-2" onclick="startDictation('condutaText', event)">
@@ -359,6 +496,49 @@ function saveConsultationDate() {
             </div>
 
             <div class="col-md-4">
+                {# --- Painel de Procedimentos (Apenas para Patologia) --- #}
+                <div id="indicatedProceduresSection" class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white fw-bold d-flex align-items-center">
+                        <i class="bi bi-clipboard-plus me-2 text-primary"></i>Procedimentos Sugeridos
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush" id="suggestedProceduresList">
+                            {% for proc in procedures %}
+                            <label class="list-group-item d-flex align-items-center gap-3 py-2 cursor-pointer">
+                                <input class="form-check-input me-1 indicated-proc" type="checkbox" value="{{ proc.id }}">
+                                <div>
+                                    <div class="fw-bold small">{{ proc.name }}</div>
+                                    <div class="text-xs text-muted">Sugira para o paciente</div>
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                {# --- Painel de Execução (Cosmiatria) --- #}
+                <div id="cosmeticConductSection" class="card border-0 shadow-sm mb-4" style="display:none;">
+                    <div class="card-header bg-white fw-bold d-flex align-items-center text-primary">
+                        <i class="bi bi-play-circle-fill me-2"></i>Execução de Planejamento
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0 small">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-3">Item</th>
+                                        <th>Orçamento</th>
+                                        <th class="text-center">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cosmeticConductBody">
+                                    <tr><td colspan="3" class="text-center text-muted py-3">Nenhum item pendente</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-header bg-white fw-bold">Ações Rápidas</div>
                     <div class="card-body">
@@ -379,18 +559,18 @@ function saveConsultationDate() {
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white fw-bold">Tags do Paciente</div>
                     <div class="card-body">
-                        <div id="patientTags">
+                        <div id="patientTags" class="d-flex flex-wrap gap-2">
                             {% for tag in all_tags %}
-                            <div class="form-check">
-                                <input class="form-check-input tag-checkbox" type="checkbox" value="{{ tag.id }}" id="tag{{ tag.id }}"
+                            <div class="form-check tag-badge p-0">
+                                <input class="btn-check tag-checkbox" type="checkbox" value="{{ tag.id }}" id="tag{{ tag.id }}"
                                        {% if tag.id in patient_tags %}checked{% endif %}>
-                                <label class="form-check-label" for="tag{{ tag.id }}">
+                                <label class="btn btn-sm btn-outline-secondary rounded-pill px-3" for="tag{{ tag.id }}">
                                     {{ tag.name }}
                                 </label>
                             </div>
                             {% endfor %}
                         </div>
-                        <button class="btn btn-sm btn-primary mt-3 w-100" onclick="savePatientTags()">Salvar Tags</button>
+                        <button class="btn btn-sm btn-primary mt-3 w-100 rounded-pill" onclick="savePatientTags()">Atualizar Tags</button>
                     </div>
                 </div>
             </div>
@@ -427,6 +607,28 @@ function saveConsultationDate() {
         <div class="text-center py-5 text-muted">
             <i class="bi bi-folder2-open display-1"></i>
             <p class="mt-3">Nenhum exame anexado.</p>
+        </div>
+    </div>
+
+    {# ── ABA DATA ────────────────────────────────────────────────────────── #}
+    <div class="tab-pane fade" id="data-consulta">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-3">Data e Hora da Consulta</h5>
+                <p class="text-muted small">Ajuste a data e hora em que este atendimento está sendo realizado para organização do histórico.</p>
+                <div class="row align-items-end g-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Data/Hora Selecionada</label>
+                        <input type="datetime-local" id="consultationDateInput" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary w-100" onclick="saveConsultationDate()">Salvar Alteração</button>
+                    </div>
+                    <div class="col-md-5">
+                        <div id="consultationDateStatus" class="small pt-2"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
