@@ -509,6 +509,11 @@ function savePatientTags() {
 let currentCategory = 'patologia';
 let cosmeticProcedures = [];
 let groupedCosmeticPlans = [];
+let editingCosmeticProcedureIndex = null;
+
+function getCSRFToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
 
 async function loadExistingPlans() {
     if (!patientId) return;
@@ -531,10 +536,12 @@ async function loadExistingPlans() {
                         value: parseFloat(plan.planned_value) || 0,
                         months: plan.follow_up_months || 6,
                         budget: parseFloat(plan.final_budget || plan.planned_value) || 0,
-                        performed: plan.was_performed || false,
+                        performed: !!plan.was_performed,
                         performedDate: plan.performed_date || null,
-                        consultationKey: group.consultation_key,
-                        consultationDate: group.consultation_info.display_date
+                        observations: plan.observations || '',
+                        consultationKey: group.consultation_key || null,
+                        consultationDate: group.consultation_info?.display_date || '',
+                        appointmentId: group.appointment_id || plan.appointment_id || null
                     });
                 });
             });
@@ -657,94 +664,138 @@ function toggleCategoryTabs() {
 }
 
 // ========== COSMIATRIA: PLANEJAMENTO CLÍNICO ==========
-function performCosmeticProcedure(planId, procedureName) {
-    console.log('performCosmeticProcedure called:', planId, procedureName);
-    const today = new Date().toISOString().split('T')[0];
-    const dateInput = prompt('Marcar "' + procedureName + '" como realizado em qual data? (AAAA-MM-DD)', today);
-    
-    if (!dateInput) return;
+async function performCosmeticProcedure(planId, procedureName) {
+  console.log('performCosmeticProcedure called:', planId, procedureName);
 
-    fetch('/api/cosmetic-plans/' + planId + '/perform', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            appointment_id: window.appointmentId,
-            performed_date: dateInput
-        })
-    })
-    .then(function(r) {
-        console.log('Response status:', r.status);
-        return r.json();
-    })
-    .then(function(result) {
-        console.log('Result:', result);
-        if (result.success) {
-            if (typeof showAlert === 'function') {
-                showAlert('Procedimento marcado como realizado e evolução criada!', 'success');
-            } else {
-                alert('Procedimento marcado como realizado e evolução criada!');
-            }
-            setTimeout(function() { location.reload(); }, 1000);
-        } else {
-            var msg = result.error || 'Erro ao processar';
-            if (typeof showAlert === 'function') {
-                showAlert(msg, 'danger');
-            } else {
-                alert(msg);
-            }
-        }
-    })
-    .catch(function(err) {
-        console.error('Erro na requisição:', err);
-        if (typeof showAlert === 'function') {
-            showAlert('Erro na comunicação com o servidor', 'danger');
-        } else {
-            alert('Erro na comunicação com o servidor');
-        }
+  const today = new Date().toISOString().split('T')[0];
+  const dateInput = prompt(`Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`, today);
+
+  if (!dateInput) return;
+
+  const proc = cosmeticProcedures.find(p => String(p.id) === String(planId));
+
+  const payload = {
+    performed_date: dateInput,
+    appointment_id: proc?.appointmentId || proc?.consultationKey || window.appointmentId || null
+  };
+
+  try {
+    const response = await fetch(`/api/cosmetic-plans/${planId}/perform`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload)
     });
+
+    const raw = await response.text();
+    let result = null;
+
+    try {
+      result = JSON.parse(raw);
+    } catch (e) {
+      console.error('Resposta não-JSON:', raw);
+      throw new Error(`Resposta inválida do servidor (${response.status})`);
+    }
+
+    if (!response.ok || !result?.success) {
+      throw new Error(result?.error || `Erro ao processar procedimento (${response.status})`);
+    }
+
+    if (proc) {
+      proc.performed = true;
+      proc.performedDate = dateInput;
+    }
+
+    if (typeof showAlert === 'function') {
+      showAlert('Procedimento marcado como realizado com sucesso!', 'success');
+    } else {
+      alert('Procedimento marcado como realizado com sucesso!');
+    }
+
+    setTimeout(() => location.reload(), 700);
+  } catch (err) {
+    console.error('Erro ao marcar procedimento como realizado:', err);
+    if (typeof showAlert === 'function') {
+      showAlert(err.message || 'Erro na comunicação com o servidor', 'danger');
+    } else {
+      alert(err.message || 'Erro na comunicação com o servidor');
+    }
+  }
 }
 
 function addCosmeticProcedure() {
-    const nameInput = document.getElementById('newProcedureName');
-    const valueInput = document.getElementById('newProcedureValue');
-    const name = nameInput.value.trim();
-    const valueStr = valueInput.value.trim();
-    const value = valueStr ? parseFloat(valueStr) : 0;
-    const months = parseInt(document.getElementById('newProcedureMonths').value) || 6;
-    const observations = document.getElementById('newProcedureObservations').value || '';
-    
-    // Validação: nome não pode estar vazio
-    if (!name || name === '') {
-        alert('Por favor, selecione um procedimento');
-        nameInput.focus();
-        return;
+  const nameInput = document.getElementById('newProcedureName');
+  const valueInput = document.getElementById('newProcedureValue');
+  const monthsInput = document.getElementById('newProcedureMonths');
+  const observationsInput = document.getElementById('newProcedureObservations');
+
+  const name = (nameInput.value || '').trim();
+  const valueStr = (valueInput.value || '').trim();
+  const value = valueStr ? parseFloat(valueStr) : 0;
+  const months = parseInt(monthsInput.value, 10) || 6;
+  const observations = observationsInput.value || '';
+
+  if (!name) {
+    alert('Por favor, selecione um procedimento');
+    nameInput.focus();
+    return;
+  }
+
+  if (isNaN(value) || value <= 0) {
+    alert('Por favor, informe um valor válido (maior que 0)');
+    valueInput.focus();
+    return;
+  }
+
+  if (editingCosmeticProcedureIndex !== null) {
+    const original = cosmeticProcedures[editingCosmeticProcedureIndex];
+
+    cosmeticProcedures[editingCosmeticProcedureIndex] = {
+      ...original,
+      name,
+      value,
+      months,
+      budget: original?.budget ?? value,
+      observations
+    };
+
+    editingCosmeticProcedureIndex = null;
+
+    const addBtn = document.querySelector('button[onclick="addCosmeticProcedure()"]');
+    if (addBtn) {
+      addBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Adicionar';
+      addBtn.classList.remove('btn-primary');
+      addBtn.classList.add('btn-success');
     }
-    
-    // Validação: valor deve ser maior que 0
-    if (isNaN(value) || value <= 0) {
-        alert('Por favor, informe um valor válido (maior que 0)');
-        valueInput.focus();
-        return;
-    }
-    
-    // Adicionar procedimento
-    cosmeticProcedures.push({ name, value, months, budget: value, performed: false, observations });
-    
-    // Atualizar a renderização
-    renderCosmeticProcedures();
-    renderCosmeticConduct();
-    updateCosmeticTotal();
-    
-    // Limpar campos
-    nameInput.value = '';
-    valueInput.value = '';
-    document.getElementById('newProcedureMonths').value = '6';
-    document.getElementById('newProcedureObservations').value = '';
-    
-    // Focar no próximo procedimento
-    setTimeout(() => nameInput.focus(), 100);
+
+    showAlert('Procedimento atualizado com sucesso.', 'success');
+  } else {
+    cosmeticProcedures.push({
+      name,
+      value,
+      months,
+      budget: value,
+      performed: false,
+      performedDate: null,
+      observations
+    });
+
+    showAlert('Procedimento adicionado com sucesso.', 'success');
+  }
+
+  renderCosmeticProcedures();
+  renderCosmeticConduct();
+  updateCosmeticTotal();
+
+  nameInput.value = '';
+  valueInput.value = '';
+  monthsInput.value = '6';
+  observationsInput.value = '';
+
+  setTimeout(() => nameInput.focus(), 100);
 }
 
 function removeCosmeticProcedure(index) {
@@ -910,25 +961,26 @@ function togglePlanPerformed(index, checked) {
 }
 
 function editCosmeticProcedure(index) {
-    const proc = cosmeticProcedures[index];
-    
-    // Preencher os campos do formulário com os dados do procedimento
-    document.getElementById('newProcedureName').value = proc.name;
-    document.getElementById('newProcedureValue').value = proc.value;
-    document.getElementById('newProcedureMonths').value = proc.months;
-    
-    // Remover o procedimento antigo da lista
-    cosmeticProcedures.splice(index, 1);
-    
-    // Atualizar as visualizações
-    renderCosmeticProcedures();
-    renderCosmeticConduct();
-    updateCosmeticTotal();
-    
-    // Focar no botão de adicionar
-    document.getElementById('newProcedureName').focus();
-    
-    showAlert('Procedimento carregado para edição. Modifique os dados e clique em "Adicionar ao Planejamento".', 'info');
+  const proc = cosmeticProcedures[index];
+  if (!proc) return;
+
+  editingCosmeticProcedureIndex = index;
+
+  document.getElementById('newProcedureName').value = proc.name || '';
+  document.getElementById('newProcedureValue').value = proc.value || 0;
+  document.getElementById('newProcedureMonths').value = proc.months || 6;
+  document.getElementById('newProcedureObservations').value = proc.observations || '';
+
+  const addBtn = document.querySelector('button[onclick="addCosmeticProcedure()"]');
+  if (addBtn) {
+    addBtn.innerHTML = '<i class="bi bi-check-circle"></i> Salvar Edição';
+    addBtn.classList.remove('btn-success');
+    addBtn.classList.add('btn-primary');
+  }
+
+  document.getElementById('newProcedureName').focus();
+
+  showAlert('Procedimento carregado para edição.', 'info');
 }
 
 function updateCosmeticTotal() {
