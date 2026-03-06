@@ -1,0 +1,71 @@
+function addCosmeticProcedure() {
+  const nameInput = document.getElementById('newProcedureName');
+  const valueInput = document.getElementById('newProcedureValue');
+  const monthsInput = document.getElementById('newProcedureMonths');
+  const observationsInput = document.getElementById('newProcedureObservations');
+
+  const name = (nameInput.value || '').trim();
+  const valueStr = (valueInput.value || '').trim();
+  const value = valueStr ? parseFloat(valueStr) : 0;
+  const months = parseInt(monthsInput.value, 10) || 6;
+  const observations = observationsInput.value || '';
+
+  if (!name) {
+    alert('Por favor, selecione um procedimento');
+    nameInput.focus();
+    return;
+  }
+
+  if (isNaN(value) || value <= 0) {
+    alert('Por favor, informe um valor válido (maior que 0)');
+    valueInput.focus();
+    return;
+  }
+
+  if (editingCosmeticProcedureIndex !== null) {
+    const original = cosmeticProcedures[editingCosmeticProcedureIndex];
+
+    cosmeticProcedures[editingCosmeticProcedureIndex] = {
+      ...original,
+      name,
+      value,
+      months,
+      budget: original?.budget ?? value,
+      observations
+    };
+
+    editingCosmeticProcedureIndex = null;
+
+    const addBtn = document.querySelector('button[onclick="addCosmeticProcedure()"]');
+    if (addBtn) {
+      addBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Adicionar';
+      addBtn.classList.remove('btn-primary');
+      addBtn.classList.add('btn-success');
+    }
+
+    showAlert('Procedimento atualizado com sucesso.', 'success');
+  } else {
+    cosmeticProcedures.push({
+      name,
+      value,
+      months,
+      budget: value,
+      performed: false,
+      performedDate: null,
+      observations
+    });
+
+    showAlert('Procedimento adicionado com sucesso.', 'success');
+  }
+
+  renderCosmeticProcedures();
+  renderCosmeticConduct();
+  updateCosmeticTotal();
+
+  nameInput.value = '';
+  valueInput.value = '';
+  monthsInput.value = '6';
+  observationsInput.value = '';
+
+  setTimeout(() => nameInput.focus(), 100);
+}
