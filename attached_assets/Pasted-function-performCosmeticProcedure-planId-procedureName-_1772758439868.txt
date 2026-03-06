@@ -1,0 +1,74 @@
+function performCosmeticProcedure(planId, procedureName, consultationId = null) {
+  console.log('performCosmeticProcedure called:', planId, procedureName, consultationId);
+
+  const today = new Date().toISOString().split('T')[0];
+  const dateInput = prompt(
+    `Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`,
+    today
+  );
+  if (!dateInput) return;
+
+  // ✅ CSRF (prioriza getCSRFToken() se existir no projeto)
+  const csrf =
+    (typeof getCSRFToken === 'function' && getCSRFToken()) ||
+    document.querySelector('meta[name="csrf-token"]')?.content ||
+    null;
+
+  // ✅ appointment/consultation correto:
+  // - se vier do histórico, usa consultationId
+  // - senão usa window.appointmentId
+  const apptId = consultationId || window.appointmentId || null;
+
+  fetch(`/api/cosmetic-plans/${planId}/perform`, {
+    method: 'POST',
+    credentials: 'same-origin', // ✅ importante p/ sessão + CSRF
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrf ? { 'X-CSRFToken': csrf } : {})
+    },
+    body: JSON.stringify({
+      appointment_id: apptId,
+      performed_date: dateInput
+    })
+  })
+    .then(async (r) => {
+      const text = await r.text();
+
+      // ✅ nunca assumir JSON (CSRF/erro pode voltar HTML)
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        data = { success: false, error: text || `Erro HTTP ${r.status}` };
+      }
+
+      if (!r.ok) {
+        console.error('Server error:', r.status, text);
+        throw new Error(data.error || `Erro na requisição (HTTP ${r.status})`);
+      }
+
+      return data;
+    })
+    .then((result) => {
+      console.log('Result:', result);
+
+      if (result.success) {
+        if (typeof showAlert === 'function') {
+          showAlert('Procedimento marcado como realizado!', 'success');
+        } else {
+          alert('Procedimento marcado como realizado!');
+        }
+        setTimeout(() => location.reload(), 800);
+      } else {
+        const msg = result.error || 'Erro ao processar';
+        if (typeof showAlert === 'function') showAlert(msg, 'danger');
+        else alert(msg);
+      }
+    })
+    .catch((err) => {
+      console.error('Erro na requisição:', err);
+      const msg = err?.message || 'Erro na comunicação com o servidor';
+      if (typeof showAlert === 'function') showAlert(msg, 'danger');
+      else alert(msg);
+    });
+}

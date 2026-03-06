@@ -664,66 +664,79 @@ function toggleCategoryTabs() {
 }
 
 // ========== COSMIATRIA: PLANEJAMENTO CLÍNICO ==========
-async function performCosmeticProcedure(planId, procedureName) {
-  console.log('performCosmeticProcedure called:', planId, procedureName);
+function performCosmeticProcedure(planId, procedureName, consultationId = null) {
+  console.log('performCosmeticProcedure called:', planId, procedureName, consultationId);
 
   const today = new Date().toISOString().split('T')[0];
-  const dateInput = prompt(`Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`, today);
-
+  const dateInput = prompt(
+    `Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`,
+    today
+  );
   if (!dateInput) return;
 
-  const proc = cosmeticProcedures.find(p => String(p.id) === String(planId));
+  // ✅ CSRF (prioriza getCSRFToken() se existir no projeto)
+  const csrf =
+    (typeof getCSRFToken === 'function' && getCSRFToken()) ||
+    document.querySelector('meta[name="csrf-token"]')?.content ||
+    null;
 
-  const payload = {
-    performed_date: dateInput,
-    appointment_id: proc?.appointmentId || proc?.consultationKey || window.appointmentId || null
-  };
+  // ✅ appointment/consultation correto:
+  // - se vier do histórico, usa consultationId
+  // - senão usa window.appointmentId
+  const apptId = consultationId || window.appointmentId || null;
 
-  try {
-    const response = await fetch(`/api/cosmetic-plans/${planId}/perform`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCSRFToken()
-      },
-      credentials: 'same-origin',
-      body: JSON.stringify(payload)
+  fetch(`/api/cosmetic-plans/${planId}/perform`, {
+    method: 'POST',
+    credentials: 'same-origin', // ✅ importante p/ sessão + CSRF
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrf ? { 'X-CSRFToken': csrf } : {})
+    },
+    body: JSON.stringify({
+      appointment_id: apptId,
+      performed_date: dateInput
+    })
+  })
+    .then(async (r) => {
+      const text = await r.text();
+
+      // ✅ nunca assumir JSON (CSRF/erro pode voltar HTML)
+      let data = null;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        data = { success: false, error: text || `Erro HTTP ${r.status}` };
+      }
+
+      if (!r.ok) {
+        console.error('Server error:', r.status, text);
+        throw new Error(data.error || `Erro na requisição (HTTP ${r.status})`);
+      }
+
+      return data;
+    })
+    .then((result) => {
+      console.log('Result:', result);
+
+      if (result.success) {
+        if (typeof showAlert === 'function') {
+          showAlert('Procedimento marcado como realizado!', 'success');
+        } else {
+          alert('Procedimento marcado como realizado!');
+        }
+        setTimeout(() => location.reload(), 800);
+      } else {
+        const msg = result.error || 'Erro ao processar';
+        if (typeof showAlert === 'function') showAlert(msg, 'danger');
+        else alert(msg);
+      }
+    })
+    .catch((err) => {
+      console.error('Erro na requisição:', err);
+      const msg = err?.message || 'Erro na comunicação com o servidor';
+      if (typeof showAlert === 'function') showAlert(msg, 'danger');
+      else alert(msg);
     });
-
-    const raw = await response.text();
-    let result = null;
-
-    try {
-      result = JSON.parse(raw);
-    } catch (e) {
-      console.error('Resposta não-JSON:', raw);
-      throw new Error(`Resposta inválida do servidor (${response.status})`);
-    }
-
-    if (!response.ok || !result?.success) {
-      throw new Error(result?.error || `Erro ao processar procedimento (${response.status})`);
-    }
-
-    if (proc) {
-      proc.performed = true;
-      proc.performedDate = dateInput;
-    }
-
-    if (typeof showAlert === 'function') {
-      showAlert('Procedimento marcado como realizado com sucesso!', 'success');
-    } else {
-      alert('Procedimento marcado como realizado com sucesso!');
-    }
-
-    setTimeout(() => location.reload(), 700);
-  } catch (err) {
-    console.error('Erro ao marcar procedimento como realizado:', err);
-    if (typeof showAlert === 'function') {
-      showAlert(err.message || 'Erro na comunicação com o servidor', 'danger');
-    } else {
-      alert(err.message || 'Erro na comunicação com o servidor');
-    }
-  }
 }
 
 function addCosmeticProcedure() {
