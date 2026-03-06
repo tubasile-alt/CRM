@@ -447,17 +447,39 @@
       <div class="card-body">
         <h6 class="mb-3"><i class="bi bi-folder-plus"></i> Categoria do Atendimento</h6>
         <div class="btn-group" role="group">
-          <input type="radio" class="btn-check" name="category" id="catPatologia" value="patologia" checked>
+          <input
+            type="radio"
+            class="btn-check"
+            name="category"
+            id="catPatologia"
+            value="patologia"
+            checked
+            {% if not current_user.is_doctor() %}disabled{% endif %}
+          >
           <label class="btn btn-outline-primary" for="catPatologia">
             <i class="bi bi-capsule"></i> Patologia
           </label>
 
-          <input type="radio" class="btn-check" name="category" id="catCosm" value="cosmiatria">
+          <input
+            type="radio"
+            class="btn-check"
+            name="category"
+            id="catCosm"
+            value="cosmiatria"
+            {% if not current_user.is_doctor() %}disabled{% endif %}
+          >
           <label class="btn btn-outline-success" for="catCosm">
             <i class="bi bi-stars"></i> Cosmiatria
           </label>
 
-          <input type="radio" class="btn-check" name="category" id="catTransp" value="transplante_capilar">
+          <input
+            type="radio"
+            class="btn-check"
+            name="category"
+            id="catTransp"
+            value="transplante_capilar"
+            {% if not current_user.is_doctor() %}disabled{% endif %}
+          >
           <label class="btn btn-outline-info" for="catTransp">
             <i class="bi bi-person-badge"></i> Transplante Capilar
           </label>
