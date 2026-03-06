@@ -799,10 +799,27 @@ function addCosmeticProcedure() {
 }
 
 function removeCosmeticProcedure(index) {
-    cosmeticProcedures.splice(index, 1);
-    renderCosmeticProcedures();
-    renderCosmeticConduct();
-    updateCosmeticTotal();
+  cosmeticProcedures.splice(index, 1);
+
+  if (editingCosmeticProcedureIndex === index) {
+    editingCosmeticProcedureIndex = null;
+
+    const addBtn = document.querySelector('button[onclick="addCosmeticProcedure()"]');
+    if (addBtn) {
+      addBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Adicionar';
+      addBtn.classList.remove('btn-primary');
+      addBtn.classList.add('btn-success');
+    }
+
+    document.getElementById('newProcedureName').value = '';
+    document.getElementById('newProcedureValue').value = '';
+    document.getElementById('newProcedureMonths').value = '6';
+    document.getElementById('newProcedureObservations').value = '';
+  }
+
+  renderCosmeticProcedures();
+  renderCosmeticConduct();
+  updateCosmeticTotal();
 }
 
 function highlightConsultationGroup(consultationKey) {
