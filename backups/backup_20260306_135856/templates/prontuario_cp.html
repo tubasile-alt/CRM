@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+{% block title %}Prontuário CP — {{ patient.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --cp-primary: #6d28d9;
+  --cp-primary-light: #ede9fe;
+  --cp-accent: #7c3aed;
+  --cp-danger: #dc2626;
+  --cp-warning: #d97706;
+  --cp-success: #059669;
+}
+.cp-header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%);
+  color: #fff;
+  padding: 20px 24px 0;
+}
+.cp-header .patient-name { font-size: 1.4rem; font-weight: 700; }
+.cp-header .patient-meta { font-size: 0.82rem; opacity: 0.8; }
+
+.alert-tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; margin: 2px; }
+.alert-tag.allergy { background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; }
+.alert-tag.smoker { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+.alert-tag.imc { background: #dbeafe; color: #1e40af; border: 1px solid #3b82f6; }
+.alert-tag.blood { background: #fce7f3; color: #831843; border: 1px solid #ec4899; }
+
+.patient-tag-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 500; margin: 2px; cursor: pointer; }
+
+.cp-tabs { display: flex; gap: 0; border-bottom: none; background: rgba(255,255,255,0.1); }
+.cp-tab { padding: 10px 20px; color: rgba(255,255,255,0.75); font-size: 0.88rem; font-weight: 500; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
+.cp-tab:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.cp-tab.active { color: #fff; border-bottom-color: #a78bfa; }
+
+.cp-timer { display: flex; align-items: center; gap: 8px; background: rgba(0,0,0,0.25); padding: 6px 14px; border-radius: 8px; font-size: 0.88rem; }
+.cp-timer .time-display { font-family: monospace; font-size: 1.05rem; font-weight: 700; color: #a78bfa; }
+
+.cp-body { background: #f5f3ff; min-height: calc(100vh - 200px); }
+.cp-section { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); margin-bottom: 20px; overflow: hidden; }
+.cp-section-header { background: var(--cp-primary-light); padding: 14px 20px; font-weight: 700; color: var(--cp-accent); font-size: 0.92rem; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e5e7eb; }
+.cp-section-body { padding: 20px; }
+
+.cat-btn { padding: 10px 20px; border-radius: 8px; border: 2px solid #e5e7eb; background: #f9fafb; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.2s; }
+.cat-btn:hover, .cat-btn.active { border-color: var(--cp-accent); background: var(--cp-primary-light); color: var(--cp-accent); }
+
+.proc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 999px; border: 1.5px solid #d1d5db; background: #f9fafb; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; margin: 3px; user-select: none; }
+.proc-chip:hover, .proc-chip.selected { border-color: var(--cp-accent); background: var(--cp-primary-light); color: var(--cp-accent); font-weight: 600; }
+.proc-chip input[type=checkbox] { display: none; }
+
+.area-chip { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 999px; border: 1.5px solid #d1d5db; background: #f9fafb; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; margin: 3px; }
+.area-chip:hover, .area-chip.selected { border-color: #0ea5e9; background: #e0f2fe; color: #0369a1; }
+
+.tech-chip { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 999px; border: 1.5px solid #d1d5db; background: #f9fafb; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; margin: 3px; }
+.tech-chip:hover, .tech-chip.selected { border-color: #d97706; background: #fef3c7; color: #92400e; }
+
+.budget-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.budget-row label { flex: 1; font-size: 0.88rem; color: #374151; }
+.budget-row input { width: 140px; }
+
+.autosave-indicator { font-size: 0.75rem; color: #6b7280; }
+.autosave-indicator.saving { color: #d97706; }
+.autosave-indicator.saved { color: #059669; }
+
+.history-card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.2s; }
+.history-card:hover { border-color: var(--cp-accent); }
+.history-card .hc-date { font-size: 0.78rem; color: #6b7280; }
+.history-card .hc-cat { font-size: 0.78rem; font-weight: 600; color: var(--cp-accent); }
+.history-card .hc-summary { font-size: 0.82rem; color: #374151; margin-top: 4px; }
+
+.voice-btn { transition: all 0.2s; }
+.voice-btn.recording { background: #dc2626; border-color: #dc2626; color: #fff; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+
+.form-control-sm-cp { font-size: 0.88rem; border-radius: 8px; border: 1.5px solid #e5e7eb; padding: 8px 12px; }
+.form-control-sm-cp:focus { border-color: var(--cp-accent); box-shadow: 0 0 0 3px rgba(124,58,237,0.15); outline: none; }
+
+.readonly-overlay { pointer-events: none; opacity: 0.75; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div data-dp-id="{{ dp.id }}"
+     data-read-only="{{ 'true' if read_only else 'false' }}"
+     data-encounter-id="{{ last_encounter.id if last_encounter else '' }}"
+     data-role-clinico="{{ current_user.role_clinico or 'DERM' }}"
+     id="cp-root">
+
+<!-- HEADER -->
+<div class="cp-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <a href="{{ url_for('agenda') }}" class="btn btn-sm btn-outline-light mb-2">
+        <i class="bi bi-arrow-left me-1"></i>Agenda
+      </a>
+      <div class="patient-name">{{ patient.name }}</div>
+      <div class="patient-meta">
+        {% if age %}{{ age }} anos &bull; {% endif %}
+        {% if patient.cpf %}CPF: {{ patient.cpf }} &bull; {% endif %}
+        Cód. {{ dp.patient_code }} &bull; Dr(a). {{ doctor.name if doctor else '—' }}
+        {% if read_only %}<span class="badge bg-warning text-dark ms-2">Somente leitura</span>{% endif %}
+      </div>
+    </div>
+
+    <!-- Timer -->
+    <div class="cp-timer">
+      <i class="bi bi-clock"></i>
+      <span class="time-display" id="cpTimerDisplay">00:00:00</span>
+      <button class="btn btn-sm btn-outline-light py-0 px-2" id="cpTimerToggle" title="Pausar/Iniciar">
+        <i class="bi bi-pause-fill" id="cpTimerIcon"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Clinical Alerts -->
+  <div class="d-flex flex-wrap align-items-center gap-1 mb-3">
+    {% if patient.allergies %}
+      <span class="alert-tag allergy"><i class="bi bi-exclamation-triangle-fill"></i>Alergias: {{ patient.allergies }}</span>
+    {% endif %}
+    {% if patient.smoker and patient.smoker != 'nao' %}
+      <span class="alert-tag smoker"><i class="bi bi-ban"></i>
+        {% if patient.smoker == 'ex-tabagista' %}Ex-tabagista{% else %}Tabagista{% endif %}
+      </span>
+    {% endif %}
+    {% if imc %}
+      <span class="alert-tag imc"><i class="bi bi-activity"></i>IMC {{ imc }} — {{ imc_status }}</span>
+    {% endif %}
+    {% if patient.blood_type %}
+      <span class="alert-tag blood"><i class="bi bi-droplet-fill"></i>{{ patient.blood_type }}</span>
+    {% endif %}
+
+    <!-- Tags -->
+    {% for pt in patient.tags %}
+      <span class="patient-tag-badge" style="background:{{ pt.tag.color }}22; color:{{ pt.tag.color }}; border:1px solid {{ pt.tag.color }}">
+        {{ pt.tag.name }}
+      </span>
+    {% endfor %}
+    {% if not read_only %}
+    <button class="btn btn-sm btn-outline-light py-0 px-2" id="addTagBtn" title="Adicionar tag">
+      <i class="bi bi-tag me-1"></i>Tag
+    </button>
+    {% endif %}
+  </div>
+
+  <!-- Tabs -->
+  <div class="cp-tabs">
+    <div class="cp-tab active" data-section="queixa">Queixa</div>
+    <div class="cp-tab" data-section="planejamento">Planejamento</div>
+    <div class="cp-tab" data-section="orcamento">Orçamento</div>
+    <div class="cp-tab" data-section="retorno">Retorno</div>
+    <div class="cp-tab" data-section="historico">Histórico</div>
+  </div>
+</div>
+
+<!-- BODY -->
+<div class="container-fluid py-4 cp-body" id="cpBody" {% if read_only %}style="background:#f5f3ff"{% endif %}>
+  <div class="row">
+    <div class="col-lg-9">
+
+      <!-- QUEIXA -->
+      <div class="cp-section" id="sec-queixa">
+        <div class="cp-section-header"><i class="bi bi-chat-left-text"></i>Queixa Principal</div>
+        <div class="cp-section-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold mb-2">Categoria</label>
+            <div class="d-flex flex-wrap gap-2" id="catBtns">
+              <button class="cat-btn" data-cat="FACE">😊 Face</button>
+              <button class="cat-btn" data-cat="MAMA">🩺 Mama</button>
+              <button class="cat-btn" data-cat="CORPORAL">✂️ Contorno</button>
+            </div>
+            <input type="hidden" id="cpCategory" name="category">
+          </div>
+          <div class="mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <label class="form-label fw-semibold mb-0">Queixa / Histórico</label>
+              {% if not read_only %}
+              <button class="btn btn-sm btn-outline-secondary py-0 px-2 voice-btn" id="voiceBtn" title="Ditado de voz">
+                <i class="bi bi-mic" id="voiceIcon"></i> Ditado
+              </button>
+              {% endif %}
+            </div>
+            <textarea class="form-control form-control-sm-cp" id="cpComplaintText" rows="5" placeholder="Descreva a queixa da paciente..." {% if read_only %}readonly{% endif %}></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- PLANEJAMENTO -->
+      <div class="cp-section" id="sec-planejamento">
+        <div class="cp-section-header"><i class="bi bi-clipboard2-pulse"></i>Planejamento Cirúrgico</div>
+        <div class="cp-section-body">
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Indicação</label>
+              <div class="d-flex gap-2">
+                <button class="cat-btn indication-btn" data-val="YES">✅ Indicado</button>
+                <button class="cat-btn indication-btn" data-val="NO">❌ Não indicado</button>
+              </div>
+              <input type="hidden" id="cpIndicationStatus" name="indication_status">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tipo de Caso</label>
+              <select class="form-select form-control-sm-cp" id="cpCaseType" {% if read_only %}disabled{% endif %}>
+                <option value="">Selecione...</option>
+                <option value="PRIMARY">Primária</option>
+                <option value="SECONDARY">Secundária</option>
+                <option value="TERTIARY">Terciária</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Procedimentos por categoria -->
+          <div class="mb-4" id="procContainer">
+            <label class="form-label fw-semibold">Procedimentos</label>
+            <div id="procChips" class="d-flex flex-wrap">
+              <span class="text-muted small">Selecione uma categoria acima para ver os procedimentos.</span>
+            </div>
+          </div>
+
+          <!-- Lipoaspiração: áreas -->
+          <div class="mb-4" id="lipoAreasContainer" style="display:none">
+            <label class="form-label fw-semibold">Áreas de Lipoaspiração</label>
+            <div class="d-flex flex-wrap" id="lipoAreaChips">
+              {% for area in ['Abdômen', 'Flancos', 'Costas', 'Braços', 'Coxas', 'Joelhos', 'Papada', 'Axilas', 'Culote', 'Pubis'] %}
+              <span class="area-chip" data-area="{{ area }}">{{ area }}</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Módulo Implante (mama) -->
+          <div class="mb-4" id="implantModule" style="display:none">
+            <label class="form-label fw-semibold">Módulo de Implante</label>
+            <div class="row g-2">
+              <div class="col-md-3">
+                <label class="form-label small">Plano</label>
+                <select class="form-select form-control-sm-cp" id="cpImplantPlane" {% if read_only %}disabled{% endif %}>
+                  <option value="">—</option>
+                  <option value="subfascial">Subfascial</option>
+                  <option value="submuscular">Submuscular</option>
+                  <option value="dual_plane">Dual Plane</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Perfil</label>
+                <select class="form-select form-control-sm-cp" id="cpImplantProfile" {% if read_only %}disabled{% endif %}>
+                  <option value="">—</option>
+                  <option value="baixo">Baixo</option>
+                  <option value="moderado">Moderado</option>
+                  <option value="alto">Alto</option>
+                  <option value="extra_alto">Extra alto</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Volume Mín (ml)</label>
+                <input type="number" class="form-control form-control-sm-cp" id="cpImplantVolMin" placeholder="ex: 240" {% if read_only %}readonly{% endif %}>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label small">Volume Máx (ml)</label>
+                <input type="number" class="form-control form-control-sm-cp" id="cpImplantVolMax" placeholder="ex: 280" {% if read_only %}readonly{% endif %}>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tecnologias adjuvantes -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Tecnologias Adjuvantes</label>
+            <div id="techChips" class="d-flex flex-wrap">
+              {% for tech in ['Renuvion', 'Morpheus8', 'Fita Prineo', 'Tela', 'Laser CO2', 'RF Microneedling'] %}
+              <span class="tech-chip" data-tech="{{ tech }}">{{ tech }}</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Internação e tempo estimado -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Internação</label>
+              <select class="form-select form-control-sm-cp" id="cpInternacao" {% if read_only %}disabled{% endif %}>
+                <option value="">—</option>
+                <option value="DAY_HOSPITAL">Sem pernoite (Day Hospital)</option>
+                <option value="OVERNIGHT">Com pernoite</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tempo Estimado de Cirurgia</label>
+              <select class="form-select form-control-sm-cp" id="cpEstimatedTime" {% if read_only %}disabled{% endif %}>
+                <option value="">—</option>
+                <option value="1h">1 hora</option>
+                <option value="1.5h">1h30</option>
+                <option value="2h">2 horas</option>
+                <option value="3h">3 horas</option>
+                <option value="4h">4 horas</option>
+                <option value="5h+">5+ horas</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Resumo do planejamento -->
+          <div>
+            <label class="form-label fw-semibold">Resumo / Conduta</label>
+            <textarea class="form-control form-control-sm-cp" id="cpPlanSummary" rows="4" placeholder="Descreva o planejamento e conduta..." {% if read_only %}readonly{% endif %}></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ORÇAMENTO -->
+      <div class="cp-section" id="sec-orcamento">
+        <div class="cp-section-header"><i class="bi bi-cash-stack"></i>Orçamento</div>
+        <div class="cp-section-body">
+          <div id="budgetRows">
+            <p class="text-muted small">Selecione procedimentos no Planejamento para gerar linhas de orçamento.</p>
+          </div>
+          <hr>
+          <div class="budget-row">
+            <label class="fw-semibold">Tudo incluído (hospital + anestesia + materiais)</label>
+            <div class="input-group" style="width:180px">
+              <span class="input-group-text">R$</span>
+              <input type="number" class="form-control form-control-sm-cp" id="cpAllIn" placeholder="0,00" step="0.01" {% if read_only %}readonly{% endif %}>
+            </div>
+          </div>
+          <div class="d-flex align-items-center justify-content-between mt-3 p-3 rounded" style="background:#f0fdf4">
+            <span class="fw-bold text-success">Valor Total Estimado</span>
+            <span class="fs-5 fw-bold text-success" id="cpTotalDisplay">R$ 0,00</span>
+          </div>
+          <div class="d-flex gap-2 mt-3 flex-wrap">
+            <button class="btn btn-outline-secondary btn-sm" onclick="cpExamRequest()">
+              <i class="bi bi-printer me-1"></i>Pedidos de Exame (Risco Cirúrgico)
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" onclick="cpTCLE()">
+              <i class="bi bi-file-earmark-text me-1"></i>Termo de Consentimento (TCLE)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RETORNO -->
+      <div class="cp-section" id="sec-retorno">
+        <div class="cp-section-header"><i class="bi bi-calendar-check"></i>Retorno e Logística</div>
+        <div class="cp-section-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Prazo de Retorno</label>
+              <select class="form-select form-control-sm-cp" id="cpFollowUpDeadline" {% if read_only %}disabled{% endif %}>
+                <option value="">—</option>
+                <option value="7d">7 dias</option>
+                <option value="14d">14 dias</option>
+                <option value="30d">30 dias</option>
+                <option value="3m">3 meses</option>
+                <option value="6m">6 meses</option>
+                <option value="anual">Anual</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Internação</label>
+              <p class="form-control-sm-cp border rounded d-flex align-items-center" id="retornoInternacaoDisplay" style="height:42px; background:#f9fafb; margin:0;">—</p>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Observações para Recepção</label>
+              <textarea class="form-control form-control-sm-cp" id="cpReceptionObs" rows="3" placeholder="Orientações para a recepção agendar retorno, contato, etc." {% if read_only %}readonly{% endif %}></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTÓRICO -->
+      <div class="cp-section" id="sec-historico">
+        <div class="cp-section-header"><i class="bi bi-clock-history"></i>Histórico de Consultas CP</div>
+        <div class="cp-section-body">
+          <div id="historyPanel">
+            <p class="text-muted small">Carregando histórico...</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- col-lg-9 -->
+
+    <!-- SIDEBAR -->
+    <div class="col-lg-3">
+      <div class="cp-section">
+        <div class="cp-section-header"><i class="bi bi-floppy2"></i>Ações</div>
+        <div class="cp-section-body d-flex flex-column gap-2">
+          {% if not read_only %}
+          <button class="btn btn-primary w-100" id="cpSaveBtn">
+            <i class="bi bi-floppy2 me-2"></i>Salvar Rascunho
+          </button>
+          <button class="btn btn-success w-100" id="cpFinalizeBtn">
+            <i class="bi bi-check-circle me-2"></i>Finalizar Atendimento
+          </button>
+          {% else %}
+          <div class="alert alert-info py-2 mb-0 small">
+            <i class="bi bi-lock me-1"></i>Modo somente leitura
+          </div>
+          {% endif %}
+          <div class="autosave-indicator text-center" id="autosaveStatus">—</div>
+        </div>
+      </div>
+
+      <!-- Anexos -->
+      <div class="cp-section">
+        <div class="cp-section-header"><i class="bi bi-paperclip"></i>Anexos</div>
+        <div class="cp-section-body">
+          {% if not read_only %}
+          <input type="file" class="form-control form-control-sm mb-2" multiple accept="image/*,.pdf" id="cpFileInput">
+          <button class="btn btn-sm btn-outline-primary w-100" onclick="cpUploadFiles()">
+            <i class="bi bi-cloud-arrow-up me-1"></i>Enviar Arquivo
+          </button>
+          {% endif %}
+          <div class="mt-2 text-muted small" id="attachmentsList">
+            (Funcionalidade de upload disponível em breve)
+          </div>
+        </div>
+      </div>
+
+      <!-- Info rápida -->
+      <div class="cp-section">
+        <div class="cp-section-header"><i class="bi bi-person-badge"></i>Dados da Paciente</div>
+        <div class="cp-section-body">
+          <table class="table table-sm table-borderless small mb-0">
+            <tr><td class="text-muted">Telefone</td><td>{{ patient.phone or '—' }}</td></tr>
+            <tr><td class="text-muted">Peso</td><td>{% if patient.weight %}{{ patient.weight }} kg{% else %}—{% endif %}</td></tr>
+            <tr><td class="text-muted">Altura</td><td>{% if patient.height %}{{ patient.height }} cm{% else %}—{% endif %}</td></tr>
+            <tr><td class="text-muted">Tipo Sang.</td><td>{{ patient.blood_type or '—' }}</td></tr>
+            <tr><td class="text-muted">Tabagismo</td><td>{{ patient.smoker or '—' }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div><!-- col-lg-3 -->
+
+  </div><!-- row -->
+</div><!-- cp-body -->
+</div><!-- cp-root -->
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/prontuario_cp.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Clínica Basile</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container">
+        <div class="row justify-content-center align-items-center min-vh-100">
+            <div class="col-md-5">
+                <div class="card shadow">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <img src="{{ url_for('static', filename='img/logo_3d_final.png') }}" alt="Clínica Basile" style="max-width: 250px; height: auto;">
+                        </div>
+
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <form method="POST" action="{{ url_for('login') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Selecione o Usuário</label>
+                                <select class="form-select" id="email" name="email" required autofocus>
+                                    <option value="" selected disabled>Clique para selecionar...</option>
+                                    <optgroup label="Médicos">
+                                        <option value="tubasile">Dr. Arthur</option>
+                                        <option value="fibasile">Dr. Filipe</option>
+                                        <option value="vinibasile">Dr. Vinicius</option>
+                                        <option value="rbasile">Dr. Basile</option>
+                                    </optgroup>
+                                    <optgroup label="Secretárias">
+                                        <option value="gisele">Gisele</option>
+                                        <option value="erica">Erica</option>
+                                        <option value="Implantecapilaremrp@gmail.com">Recepção</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Senha</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                        </form>
+
+                        <div class="mt-4 small text-muted border-top pt-3">
+                            <h6 class="mb-2 text-dark">Corpo Clínico:</h6>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <p class="mb-1"><strong>Médicos:</strong></p>
+                                    <p class="mb-1">Dr Filipe (CP)</p>
+                                    <p class="mb-1">Dr Vinicius (CP)</p>
+                                    <p class="mb-1">Dr Roberto (CP)</p>
+                                    <p class="mb-1">Dr Arthur (DERM)</p>
+                                </div>
+                                <div class="col-6">
+                                    <p class="mb-1"><strong>Secretárias:</strong></p>
+                                    <p class="mb-1">Gisele (Todas)</p>
+                                    <p class="mb-1">Erica (Todas)</p>
+                                    <p class="mb-1">Recepção (Todas)</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

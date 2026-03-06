@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+
+{% block title %}CRM - Clínica Basile{% endblock %}
+
+{% block extra_css %}
+<style>
+.crm-container {
+    padding: 20px;
+}
+
+.crm-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.crm-stats {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 10px;
+    padding: 15px 25px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    text-align: center;
+    min-width: 150px;
+}
+
+.stat-card .number {
+    font-size: 28px;
+    font-weight: bold;
+    color: #0d6efd;
+}
+
+.stat-card .label {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+}
+
+.stat-card.danger .number {
+    color: #dc3545;
+}
+
+.stat-card.warning .number {
+    color: #ffc107;
+}
+
+.stat-card.success .number {
+    color: #198754;
+}
+
+.crm-panels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.crm-panel {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.panel-header {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+    padding: 15px 20px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.panel-header.danger {
+    background: linear-gradient(135deg, #dc3545 0%, #b02a37 100%);
+}
+
+.panel-header.warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #000;
+}
+
+.panel-header.success {
+    background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+}
+
+.panel-body {
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.procedure-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-left: 4px solid #0d6efd;
+}
+
+.procedure-item:hover {
+    background: #e9ecef;
+    transform: translateX(3px);
+}
+
+.procedure-item.overdue {
+    border-left-color: #dc3545;
+    background: #fff5f5;
+}
+
+.procedure-item.due-soon {
+    border-left-color: #ffc107;
+    background: #fffbeb;
+}
+
+.procedure-item .patient-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.procedure-item .procedure-name {
+    font-size: 13px;
+    color: #0d6efd;
+    margin-bottom: 4px;
+}
+
+.procedure-item .date-info {
+    font-size: 12px;
+    color: #666;
+}
+
+.procedure-item .phone-info {
+    font-size: 12px;
+    color: #198754;
+}
+
+.procedure-item .urgency-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.urgency-badge.overdue {
+    background: #dc3545;
+    color: white;
+}
+
+.urgency-badge.due-soon {
+    background: #ffc107;
+    color: #000;
+}
+
+.urgency-badge.future {
+    background: #6c757d;
+    color: white;
+}
+
+.empty-panel {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.action-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+}
+
+.action-btn.contacted {
+    background: #0d6efd;
+    color: white;
+}
+
+.action-btn.scheduled {
+    background: #198754;
+    color: white;
+}
+
+.action-btn.done {
+    background: #6c757d;
+    color: white;
+}
+
+@media (max-width: 1200px) {
+    .crm-panels {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="crm-container">
+    <div class="crm-header">
+        <h2><i class="bi bi-graph-up"></i> CRM - Gestão de Procedimentos</h2>
+    </div>
+
+    <!-- Dashboard Transplante -->
+    <div class="row mb-5">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 fw-bold text-primary"><i class="bi bi-bar-chart-line"></i> Atendimentos de Transplante / Mês</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="transplantChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold text-danger"><i class="bi bi-person-exclamation"></i> Pendentes de Cirurgia</h5>
+                    <span class="badge bg-danger" id="pendingCount">0</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 250px;">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Paciente</th>
+                                    <th>Consulta</th>
+                                    <th class="text-center">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pendingSurgeriesTable">
+                                <tr>
+                                    <td colspan="3" class="text-center py-4">Carregando...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <hr class="my-5">
+    
+    {% if current_user.is_doctor() %}
+    <div class="crm-header">
+        <h3><i class="bi bi-magic"></i> CRM Cosmiatria</h3>
+    </div>
+    
+    <div class="crm-stats" id="crmStats">
+        <div class="stat-card success">
+            <div class="number" id="statPerformed">0</div>
+            <div class="label">Realizados</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="statPlanned">0</div>
+            <div class="label">Planejados</div>
+        </div>
+        <div class="stat-card danger">
+            <div class="number" id="statOverdue">0</div>
+            <div class="label">Vencidos</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="number" id="statDueSoon">0</div>
+            <div class="label">Próximos 30 dias</div>
+        </div>
+    </div>
+    
+    <div class="crm-panels">
+        <div class="crm-panel">
+            <div class="panel-header danger">
+                <span><i class="bi bi-bell-fill"></i> Follow-ups Pendentes</span>
+                <span class="badge bg-light text-dark" id="followupCount">0</span>
+            </div>
+            <div class="panel-body" id="followupsPanel">
+                <div class="empty-panel">Carregando...</div>
+            </div>
+        </div>
+        
+        <div class="crm-panel">
+            <div class="panel-header warning">
+                <span><i class="bi bi-clipboard-check"></i> Planejados (Não Realizados)</span>
+                <span class="badge bg-light text-dark" id="plannedCount">0</span>
+            </div>
+            <div class="panel-body" id="plannedPanel">
+                <div class="empty-panel">Carregando...</div>
+            </div>
+        </div>
+        
+        <div class="crm-panel">
+            <div class="panel-header success">
+                <span><i class="bi bi-check-circle-fill"></i> Procedimentos Realizados</span>
+                <span class="badge bg-light text-dark" id="performedCount">0</span>
+            </div>
+            <div class="panel-body" id="performedPanel">
+                <div class="empty-panel">Carregando...</div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info border-0 shadow-sm">
+        <i class="bi bi-info-circle-fill"></i> O acesso à gestão de cosmiatria é restrito aos médicos.
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadCRMData();
+    loadTransplantDashboard();
+});
+
+async function loadTransplantDashboard() {
+    try {
+        // Stats do Gráfico
+        const statsResp = await fetch('/api/crm/transplant-stats');
+        const statsData = await statsResp.json();
+        
+        const ctx = document.getElementById('transplantChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: statsData.map(d => d.month),
+                datasets: [{
+                    label: 'Atendimentos',
+                    data: statsData.map(d => d.count),
+                    backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    borderWidth: 2,
+                    borderRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+            }
+        });
+
+        // Tabela de Pendentes
+        const pendingResp = await fetch('/api/crm/pending-surgeries');
+        const pendingData = await pendingResp.json();
+        
+        const tbody = document.getElementById('pendingSurgeriesTable');
+        document.getElementById('pendingCount').textContent = pendingData.length;
+        
+        if (pendingData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-muted">Nenhum pendente.</td></tr>';
+        } else {
+            tbody.innerHTML = pendingData.map(p => `
+                <tr>
+                    <td class="fw-bold">
+                        ${p.name}
+                        ${p.phone ? `<br><a href="https://wa.me/55${p.phone.replace(/\D/g, '')}" target="_blank" class="small text-success text-decoration-none"><i class="bi bi-whatsapp"></i> Contato</a>` : ''}
+                    </td>
+                    <td>${p.last_consultation}</td>
+                    <td class="text-center">
+                        {% if current_user.is_doctor() %}
+                        <a href="${p.dp_id ? '/prontuario/dp/' + p.dp_id : '/prontuario/' + p.id}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;">Ver</a>
+                        {% else %}
+                        ${p.dp_id ? `<a href="/prontuario/dp/${p.dp_id}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size: 11px;">Ver</a>` : '<span class="text-muted small">—</span>'}
+                        {% endif %}
+                    </td>
+                </tr>
+            `).join('');
+        }
+    } catch (e) {
+        console.error("Erro ao carregar dashboard de transplante", e);
+    }
+}
+
+function loadCRMData() {
+    {% if current_user.is_doctor() %}
+    loadStats();
+    loadFollowups();
+    loadPlanned();
+    loadPerformed();
+    {% endif %}
+}
+
+function loadStats() {
+    fetch('/api/crm/stats')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('statPerformed').textContent = data.performed;
+            document.getElementById('statPlanned').textContent = data.planned;
+            document.getElementById('statOverdue').textContent = data.overdue;
+            document.getElementById('statDueSoon').textContent = data.due_soon;
+        });
+}
+
+function loadFollowups() {
+    fetch('/api/crm/followups')
+        .then(r => r.json())
+        .then(data => {
+            const panel = document.getElementById('followupsPanel');
+            document.getElementById('followupCount').textContent = data.length;
+            
+            if (data.length === 0) {
+                panel.innerHTML = '<div class="empty-panel"><i class="bi bi-check-circle"></i><br>Nenhum follow-up pendente</div>';
+                return;
+            }
+            
+            panel.innerHTML = data.map(item => `
+                <div class="procedure-item ${item.urgency === 'Vencido' ? 'overdue' : item.urgency === 'Próximo' ? 'due-soon' : ''}" 
+                     style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
+                     onclick="openPatient(${item.patient_id}, ${item.dp_id || null})">
+                    <div class="patient-name">${item.patient_name}</div>
+                    <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
+                    <div class="date-info">
+                        Realizado: ${formatDate(item.performed_date)} | 
+                        Retorno: ${formatDate(item.follow_up_due_at)}
+                        <span class="urgency-badge ${item.urgency === 'Vencido' ? 'overdue' : item.urgency === 'Próximo' ? 'due-soon' : 'future'}">${item.urgency}</span>
+                    </div>
+                    ${item.patient_phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
+                    <div class="action-buttons" onclick="event.stopPropagation()">
+                        <button class="action-btn contacted" onclick="markAsDone(${item.id})">Marcar Feito</button>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function loadPlanned() {
+    fetch('/api/crm/planned')
+        .then(r => r.json())
+        .then(data => {
+            const panel = document.getElementById('plannedPanel');
+            document.getElementById('plannedCount').textContent = data.length;
+            
+            if (data.length === 0) {
+                panel.innerHTML = '<div class="empty-panel"><i class="bi bi-clipboard"></i><br>Nenhum procedimento planejado</div>';
+                return;
+            }
+            
+            panel.innerHTML = data.map(item => `
+                <div class="procedure-item" 
+                     style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
+                     onclick="openPatient(${item.patient_id}, ${item.dp_id || null})">
+                    <div class="patient-name">${item.patient_name}</div>
+                    <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
+                    <div class="date-info">Planejado: ${item.planned_date ? formatDate(item.planned_date) : 'Sem data'}</div>
+                    ${item.patient_phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
+                    <div class="action-buttons" onclick="event.stopPropagation()">
+                        <button class="action-btn scheduled" onclick="markAsRealizado(${item.id})">Marcar Realizado</button>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function loadPerformed() {
+    fetch('/api/crm/performed')
+        .then(r => r.json())
+        .then(data => {
+            const panel = document.getElementById('performedPanel');
+            document.getElementById('performedCount').textContent = data.length;
+            
+            if (data.length === 0) {
+                panel.innerHTML = '<div class="empty-panel"><i class="bi bi-check-circle"></i><br>Nenhum procedimento realizado</div>';
+                return;
+            }
+            
+            panel.innerHTML = data.map(item => `
+                <div class="procedure-item" 
+                     style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
+                     onclick="openPatient(${item.patient_id}, ${item.dp_id || null})">
+                    <div class="patient-name">${item.patient_name}</div>
+                    <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
+                    <div class="date-info">Realizado: ${formatDate(item.performed_date)}</div>
+                    ${item.follow_up_due_at ? `<div class="date-info">Próximo retorno: ${formatDate(item.follow_up_due_at)}</div>` : ''}
+                </div>
+            `).join('');
+        });
+}
+
+const PROCEDURE_COLORS = {
+    'Botox': '#0d6efd',
+    'Preenchimento': '#d946ef',
+    'Laser': '#ffc107',
+    'Ulthera': '#06b6d4',
+    'Infiltração Capilar': '#10b981',
+    'Sculptra': '#8b5cf6',
+    'Soroterapia': '#f97316',
+    'Pequeña Cirurgia': '#ec4899',
+    'Nitrogênio Líquido': '#6366f1',
+    'Transplante Capilar': '#14b8a6',
+    'Retorno': '#6366f1',
+    'Morpheus': '#84cc16',
+    'Profhilo': '#f43f5e'
+};
+
+function getProcedureColor(procedureName) {
+    return PROCEDURE_COLORS[procedureName] || '#6c757d';
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    // Remove timezone info if present (e.g., "2025-12-10T14:30:00-03:00" -> "2025-12-10")
+    const cleanDate = dateStr.split('T')[0];
+    const date = new Date(cleanDate + 'T00:00:00');
+    return date.toLocaleDateString('pt-BR');
+}
+
+function openPatient(patientId, dpId) {
+    if (dpId) {
+        window.location.href = `/prontuario/dp/${dpId}`;
+    } else {
+        window.location.href = `/prontuario/${patientId}`;
+    }
+}
+
+function markAsDone(planId) {
+    fetch(`/api/crm/records/${planId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({was_performed: true})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadCRMData();
+        }
+    });
+}
+
+function markAsRealizado(planId) {
+    fetch(`/api/crm/records/${planId}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({was_performed: true})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadCRMData();
+        }
+    });
+}
+</script>
+{% endblock %}

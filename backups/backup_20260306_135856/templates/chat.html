@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - Clínica Basile{% endblock %}
+
+{% block extra_css %}
+<style>
+.chat-container {
+    display: flex;
+    height: 600px;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.contacts-panel {
+    width: 300px;
+    background: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+}
+
+.contacts-header {
+    background: #0d6efd;
+    color: white;
+    padding: 15px;
+    font-weight: bold;
+    border-bottom: 1px solid #0a58ca;
+}
+
+.contacts-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.contact-item {
+    padding: 12px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #dee2e6;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.contact-item:hover {
+    background: #e9ecef;
+}
+
+.contact-item.active {
+    background: #cfe2ff;
+    border-left: 3px solid #0d6efd;
+}
+
+.contact-name {
+    font-weight: 600;
+    color: #212529;
+}
+
+.contact-role {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.contact-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #dc3545;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.conversation-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.conversation-header {
+    background: #0d6efd;
+    color: white;
+    padding: 15px 20px;
+    border-bottom: 1px solid #0a58ca;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.conversation-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+}
+
+.messages-area {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background: white;
+}
+
+.message-input-area {
+    padding: 15px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+.no-contact-selected {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+}
+
+.no-contact-selected i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+}
+
+.chat-message {
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    border-radius: 10px;
+    max-width: 70%;
+    word-wrap: break-word;
+}
+
+.chat-message.sent {
+    background: #0d6efd;
+    color: white;
+    margin-left: auto;
+    text-align: right;
+}
+
+.chat-message.received {
+    background: #e9ecef;
+    color: #212529;
+}
+
+.message-text {
+    margin: 5px 0;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    opacity: 0.7;
+    margin-top: 5px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="bi bi-chat-dots"></i> Chat Interno
+        </h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="chat-container">
+            <div class="contacts-panel">
+                <div class="contacts-header">
+                    <i class="bi bi-people"></i> Contatos
+                </div>
+                <div class="contacts-list" id="contactsList">
+                    <div style="padding: 20px; text-align: center; color: #6c757d;">
+                        Carregando contatos...
+                    </div>
+                </div>
+            </div>
+
+            <div class="conversation-panel" id="conversationPanel">
+                <div class="no-contact-selected">
+                    <i class="bi bi-chat-left-dots"></i>
+                    <h4>Selecione um contato</h4>
+                    <p>Escolha um contato na lista para iniciar uma conversa</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}
