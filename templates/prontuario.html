@@ -524,12 +524,14 @@
 
       <div class="card-body">
         <div class="mb-3 d-flex align-items-center">
+          {% if current_user.is_doctor() %}
           <button class="btn btn-sm btn-success" id="startTimer" onclick="startConsultation()">
             <i class="bi bi-play-circle"></i> Iniciar Atendimento
           </button>
           <button class="btn btn-sm btn-primary ms-2" onclick="finishConsultation()">
             <i class="bi bi-check-all"></i> Finalizar Atendimento
           </button>
+          {% endif %}
           <span id="timerDisplay" class="ms-3 fw-bold fs-5 text-primary">00:00</span>
         </div>
 
@@ -580,9 +582,11 @@
               {% if current_user.is_doctor() %}
               <button class="btn btn-sm btn-outline-primary float-end ms-2" onclick="startDictation('condutaText', event)">
                 <i class="bi bi-mic"></i> Ditado
+              {% if current_user.is_doctor() %}
+              <button class="btn btn-sm btn-primary float-end" onclick="abrirDermaScribe()">
+                <i class="bi bi-prescription2"></i> Prescrever
               </button>
               {% endif %}
-          <div class="tab-pane fade" id="conduta">
             <div class="mb-3">
               <label class="form-label">Conduta</label>
               <button class="btn btn-sm btn-outline-primary float-end ms-2" onclick="startDictation('condutaText', event)">
