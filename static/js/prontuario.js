@@ -1,15 +1,15 @@
-console.log('prontuario.js carregado v=20260305-5');
+console.log('prontuario.js carregado v=20260305-6');
 let timerInterval = null;
 let timerStartTime = null;
 let recognition = null;
 let activeTextarea = null;
 
+// ========== MENSAGENS CROSS-WINDOW ==========
 window.addEventListener('message', function(event) {
     if (event.data && event.data.type === 'prescription_saved') {
         showAlert('Receita salva com sucesso no prontuário!', 'success');
-        
         loadPrescriptionHistory();
-        
+
         const prescriptionData = event.data;
         const condutaText = document.getElementById('condutaText');
         if (condutaText) {
@@ -31,69 +31,59 @@ window.addEventListener('message', function(event) {
     }
 });
 
+// ========== RECONHECIMENTO DE VOZ ==========
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
     recognition.lang = 'pt-BR';
     recognition.continuous = true;
     recognition.interimResults = true;
-    
+
     recognition.onresult = function(event) {
         let finalTranscript = '';
-        let interimTranscript = '';
-        
         for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-                finalTranscript += transcript + ' ';
-            } else {
-                interimTranscript += transcript;
+                finalTranscript += event.results[i][0].transcript + ' ';
             }
         }
-        
-        // Atualizar o campo com a transcrição final
         if (activeTextarea && finalTranscript) {
             activeTextarea.value += finalTranscript;
             activeTextarea.dispatchEvent(new Event('input'));
         }
     };
-    
+
     recognition.onerror = function(event) {
         console.error('Erro no reconhecimento de voz:', event.error);
         stopDictation();
         showAlert('Erro no reconhecimento de voz. Verifique se o microfone está habilitado.', 'danger');
     };
-    
+
     recognition.onend = function() {
         stopDictation();
     };
 }
 
-function startDictation(textareaId) {
+// FIX: recebe event como parâmetro explícito para evitar dependência de global implícito
+function startDictation(textareaId, event) {
     if (!recognition) {
         showAlert('Reconhecimento de voz não suportado neste navegador.', 'warning');
         return;
     }
-    
+
     activeTextarea = document.getElementById(textareaId);
     if (!activeTextarea) {
         showAlert('Campo de texto não encontrado.', 'danger');
         return;
     }
-    
+
     const button = event.target.closest('button');
-    
+
     if (button.classList.contains('dictation-active')) {
         stopDictation();
     } else {
         try {
-            // Resetar o reconhecimento antes de iniciar
-            if (recognition) {
-                recognition.stop();
-                setTimeout(() => {
-                    recognition.start();
-                }, 100);
-            }
+            recognition.stop();
+            setTimeout(() => recognition.start(), 100);
             button.classList.add('dictation-active');
             button.innerHTML = '<i class="bi bi-mic-fill"></i> Gravando...';
         } catch (error) {
@@ -104,19 +94,15 @@ function startDictation(textareaId) {
 }
 
 function stopDictation() {
-    if (recognition) {
-        recognition.stop();
-    }
-    
-    const buttons = document.querySelectorAll('.dictation-active');
-    buttons.forEach(button => {
+    if (recognition) recognition.stop();
+    document.querySelectorAll('.dictation-active').forEach(button => {
         button.classList.remove('dictation-active');
         button.innerHTML = '<i class="bi bi-mic"></i> Ditado';
     });
-    
     activeTextarea = null;
 }
 
+// ========== CLASSIFICAÇÃO DO PACIENTE ==========
 function updatePatientStars(stars) {
     fetch(`/api/patients/${patientId}/ivp`, {
         method: 'PATCH',
@@ -124,21 +110,14 @@ function updatePatientStars(stars) {
             'Content-Type': 'application/json',
             'X-CSRFToken': getCSRFToken()
         },
-        body: JSON.stringify({
-            ivp_stars: stars,
-            ivp_manual_override: true
-        })
+        body: JSON.stringify({ ivp_stars: stars, ivp_manual_override: true })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
             showAlert('Classificação atualizada!', 'success');
             const container = document.getElementById('patientStarsContainer');
-            if (stars) {
-                container.innerHTML = `<span class="text-warning">${'⭐'.repeat(stars)}</span>`;
-            } else {
-                container.innerHTML = '';
-            }
+            container.innerHTML = stars ? `<span class="text-warning">${'⭐'.repeat(stars)}</span>` : '';
         } else {
             showAlert(data.error || 'Erro ao atualizar classificação', 'danger');
         }
@@ -154,14 +133,11 @@ function recalculateEvolution(appointmentId) {
         showAlert('ID da consulta não encontrado', 'warning');
         return;
     }
-    
     if (!confirm('Deseja regerar a evolução para esta consulta?')) return;
-    
+
     fetch(`/api/admin/recalculate-evolution/${appointmentId}`, {
         method: 'POST',
-        headers: {
-            'X-CSRFToken': getCSRFToken()
-        }
+        headers: { 'X-CSRFToken': getCSRFToken() }
     })
     .then(r => r.json())
     .then(data => {
@@ -178,31 +154,22 @@ function recalculateEvolution(appointmentId) {
     });
 }
 
+// ========== TIMELINE / SCROLL ==========
 function scrollToConsultation(id) {
     let el = document.getElementById(id);
-    
-    // Fallback para IDs antigos se o novo falhar
     if (!el && typeof id === 'string' && id.startsWith('consultation-')) {
-        const legacyId = id.replace('consultation-', 'consult-');
-        el = document.getElementById(legacyId);
+        el = document.getElementById(id.replace('consultation-', 'consult-'));
     }
-    
     if (!el) return;
 
-    // Open the accordion item if collapsed
     const collapseEl = el.querySelector('.accordion-collapse');
     if (collapseEl && !collapseEl.classList.contains('show')) {
-        const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
-        bsCollapse.show();
+        new bootstrap.Collapse(collapseEl, { toggle: false }).show();
     }
 
-    // Scroll the page to the Histórico de Consultas card first
     const historicoCard = el.closest('.card');
-    if (historicoCard) {
-        historicoCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (historicoCard) historicoCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    // After accordion opens, scroll directly to the item
     setTimeout(() => {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         el.classList.add('timeline-highlight');
@@ -212,43 +179,34 @@ function scrollToConsultation(id) {
 
 function handleTimelineClick(el) {
     const apptId = el.dataset.appointmentId;
-    const type = el.dataset.eventType;
     const dtIso = el.dataset.dtIso;
-    
-    // Validar data (Requisito 2)
-    if (dtIso) {
-        const d = new Date(dtIso);
-        if (isNaN(d.getTime())) {
-            console.error("Data inválida na timeline:", dtIso);
-            showAlert("Data inválida para este evento", "warning");
-            return;
-        }
+
+    if (dtIso && isNaN(new Date(dtIso).getTime())) {
+        console.error("Data inválida na timeline:", dtIso);
+        showAlert("Data inválida para este evento", "warning");
+        return;
     }
-    
-    // Toggle the popover as usual
+
     const popover = el.nextElementSibling;
     if (popover) {
         const isVisible = popover.style.display === 'block';
-        // Close all other popovers first
         document.querySelectorAll('.timeline-popover').forEach(p => p.style.display = 'none');
         popover.style.display = isVisible ? 'none' : 'block';
     }
 
     if (!apptId || apptId === 'None' || apptId === 'null') return;
 
-    // Tentar encontrar pelo ID novo, legado ou específico de evolução
-    const targetId = `consultation-${apptId}`;
-    const legacyId = `consult-${apptId}`;
-    const evolutionId = `evolution-${apptId}`;
-    let target = document.getElementById(targetId) || document.getElementById(legacyId) || document.getElementById(evolutionId);
+    const target = document.getElementById(`consultation-${apptId}`)
+                || document.getElementById(`consult-${apptId}`)
+                || document.getElementById(`evolution-${apptId}`);
 
     if (target) {
         performScrollAndHighlight(target, apptId);
     } else {
-        // Retry logic if content not yet loaded/rendered
         let attempts = 0;
         const interval = setInterval(() => {
-            const retryTarget = document.getElementById(targetId) || document.getElementById(legacyId);
+            const retryTarget = document.getElementById(`consultation-${apptId}`)
+                             || document.getElementById(`consult-${apptId}`);
             if (retryTarget) {
                 clearInterval(interval);
                 performScrollAndHighlight(retryTarget, apptId);
@@ -259,40 +217,31 @@ function handleTimelineClick(el) {
 }
 
 function performScrollAndHighlight(target, apptId) {
-    // 1. Expand accordion if Bootstrap
-    // O ID do collapse costuma seguir o padrão collapse{{id}}
     const collapseEl = document.getElementById(`collapse${apptId}`);
     if (collapseEl && !collapseEl.classList.contains('show')) {
-        const bsCollapse = new bootstrap.Collapse(collapseEl, { toggle: false });
-        bsCollapse.show();
+        new bootstrap.Collapse(collapseEl, { toggle: false }).show();
     }
-
-    // 2. Scroll suave
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    // 3. Highlight
     target.classList.add('timeline-highlight');
     setTimeout(() => target.classList.remove('timeline-highlight'), 2000);
 }
 
+// ========== CRONÔMETRO ==========
 function startConsultation() {
     const button = document.getElementById('startTimer');
     const display = document.getElementById('timerDisplay');
-    
+
     if (timerInterval) {
         clearInterval(timerInterval);
         timerInterval = null;
         button.innerHTML = '<i class="bi bi-play-circle"></i> Iniciar Atendimento';
-        button.classList.remove('btn-danger');
-        button.classList.add('btn-success');
+        button.classList.replace('btn-danger', 'btn-success');
         display.classList.remove('timer-running');
     } else {
         timerStartTime = Date.now();
         button.innerHTML = '<i class="bi bi-stop-circle"></i> Parar Atendimento';
-        button.classList.remove('btn-success');
-        button.classList.add('btn-danger');
+        button.classList.replace('btn-success', 'btn-danger');
         display.classList.add('timer-running');
-        
         timerInterval = setInterval(updateTimer, 1000);
         updateTimer();
     }
@@ -302,11 +251,15 @@ function updateTimer() {
     const elapsed = Math.floor((Date.now() - timerStartTime) / 1000);
     const minutes = Math.floor(elapsed / 60);
     const seconds = elapsed % 60;
-    
-    document.getElementById('timerDisplay').textContent = 
-        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    document.getElementById('timerDisplay').textContent =
+        `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+function getConsultationDuration() {
+    return timerStartTime ? Math.floor((Date.now() - timerStartTime) / 60000) : null;
+}
+
+// ========== ALERTAS ==========
 function showAlert(message, type = 'success') {
     const alertPlaceholder = document.getElementById('alertPlaceholder');
     if (!alertPlaceholder) {
@@ -322,187 +275,12 @@ function showAlert(message, type = 'success') {
     ].join('');
     alertPlaceholder.append(wrapper);
     setTimeout(() => {
-        const alert = bootstrap.Alert.getOrCreateInstance(wrapper.firstElementChild);
-        alert.close();
+        bootstrap.Alert.getOrCreateInstance(wrapper.firstElementChild).close();
     }, 5000);
 }
 
-function getConsultationDuration() {
-    if (timerStartTime) {
-        return Math.floor((Date.now() - timerStartTime) / 60000);
-    }
-    return null;
-}
-
-function finishConsultation() {
-    const duration = timerStartTime ? getConsultationDuration() : 0;
-    
-    // Capturar dados de Transplante Capilar se a categoria for essa
-    let transplantData = null;
-    if (currentCategory === 'transplante_capilar') {
-        transplantData = {
-            norwood: document.getElementById('norwood_class')?.value,
-            previous_transplant: document.querySelector('input[name="previous_transplant"]:checked')?.value,
-            transplant_location: document.getElementById('transplant_location')?.value,
-            frontal: document.getElementById('frontal_transplant')?.checked,
-            crown: document.getElementById('crown_transplant')?.checked,
-            complete: document.getElementById('complete_transplant')?.checked,
-            complete_body_hair: document.getElementById('complete_body_hair')?.checked,
-            dense_packing: document.getElementById('dense_packing')?.checked,
-            surgical_planning_text: document.getElementById('surgical_planning_text')?.value
-        };
-        console.log("DEBUG: Capturando dados de transplante para finalizar:", transplantData);
-    }
-
-    if (confirm(`Deseja finalizar o atendimento? Duração total: ${duration} minutos.`)) {
-        const payload = { 
-            duration: duration,
-            appointment_id: window.appointmentId,
-            consultation_started: true,
-            category: currentCategory,
-            // Incluir campos de texto das abas
-            queixa: document.getElementById('queixaText')?.value,
-            anamnese: document.getElementById('anamneseText')?.value,
-            diagnostico: document.getElementById('diagnosticoText')?.value,
-            conduta: document.getElementById('condutaText')?.value,
-            // Dados estruturados
-            surgical_planning: transplantData,
-            transplant_indication: document.querySelector('input[name="transplant_indication"]:checked')?.value || 'nao',
-            indicated_procedures: Array.from(document.querySelectorAll('.indicated-proc:checked')).map(cb => parseInt(cb.value)),
-            performed_procedures: Array.from(document.querySelectorAll('.performed-proc:checked')).map(cb => parseInt(cb.value)),
-            cosmetic_procedures: currentCategory === 'cosmiatria' ? cosmeticProcedures : []
-        };
-
-        fetch(`/api/prontuario/${patientId}/finalizar`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                // Parar cronômetro
-                if (timerInterval) {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
-                }
-                timerStartTime = null;
-                
-                const button = document.getElementById('startTimer');
-                const display = document.getElementById('timerDisplay');
-                if (button) {
-                    button.innerHTML = '<i class="bi bi-play-circle"></i> Iniciar Atendimento';
-                    button.classList.remove('btn-danger');
-                    button.classList.add('btn-success');
-                }
-                if (display) {
-                    display.textContent = '00:00';
-                    display.classList.remove('timer-running');
-                }
-                
-                showAlert('Atendimento finalizado com sucesso!', 'success');
-                setTimeout(() => {
-                    window.location.href = '/agenda';
-                }, 1500);
-            }
-        })
-        .catch(error => {
-            console.error('Erro ao finalizar atendimento:', error);
-            showAlert('Erro ao finalizar atendimento.', 'danger');
-        });
-    }
-}
-
-function saveNote(noteType) {
-    const textareaId = `${noteType}Text`;
-    const content = document.getElementById(textareaId).value.trim();
-    
-    // Auto-iniciar cronômetro se ainda não começou
-    if (!timerStartTime) {
-        startConsultation();
-    }
-
-    if (!content) {
-        showAlert('Por favor, adicione algum conteúdo antes de salvar.', 'warning');
-        return;
-    }
-    
-    const data = {
-        type: noteType,
-        content: content,
-        duration: getConsultationDuration(),
-        appointment_id: window.appointmentId,
-        consultation_started: !!timerStartTime
-    };
-    
-    if (noteType === 'anamnese') {
-        const indicatedProcs = Array.from(document.querySelectorAll('.indicated-proc:checked'))
-            .map(cb => parseInt(cb.value));
-        if (indicatedProcs.length > 0) {
-            data.indicated_procedures = indicatedProcs;
-        }
-    }
-    
-    if (noteType === 'conduta') {
-        const performedProcs = Array.from(document.querySelectorAll('.performed-proc:checked'))
-            .map(cb => parseInt(cb.value));
-        if (performedProcs.length > 0) {
-            data.performed_procedures = performedProcs;
-        }
-    }
-    
-    fetch(`/api/prontuario/${patientId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Anotação salva com sucesso!');
-            document.getElementById(textareaId).value = '';
-            
-            if (noteType === 'anamnese') {
-                document.querySelectorAll('.indicated-proc').forEach(cb => cb.checked = false);
-            }
-            if (noteType === 'conduta') {
-                document.querySelectorAll('.performed-proc').forEach(cb => cb.checked = false);
-            }
-            
-            setTimeout(() => location.reload(), 1500);
-        }
-    })
-    .catch(error => {
-        showAlert('Erro ao salvar anotação.', 'danger');
-        console.error(error);
-    });
-}
-
-function savePatientTags() {
-    const selectedTags = Array.from(document.querySelectorAll('.tag-checkbox:checked'))
-        .map(cb => parseInt(cb.value));
-    
-    fetch(`/api/patient/${patientId}/tags`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ tags: selectedTags })
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Tags atualizadas com sucesso!');
-        }
-    })
-    .catch(error => {
-        showAlert('Erro ao atualizar tags.', 'danger');
-        console.error(error);
-    });
+function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
 }
 
 // ========== GESTÃO DE CATEGORIAS ==========
@@ -511,23 +289,17 @@ let cosmeticProcedures = [];
 let groupedCosmeticPlans = [];
 let editingCosmeticProcedureIndex = null;
 
-function getCSRFToken() {
-  return document.querySelector('meta[name="csrf-token"]')?.content || '';
-}
-
 async function loadExistingPlans() {
     if (!patientId) return;
-    
     try {
         const response = await fetch(`/api/prontuario/${patientId}/cosmetic-plans-grouped`);
         if (!response.ok) return;
-        
         const data = await response.json();
-        
+
         if (data.success && data.grouped_plans && data.grouped_plans.length > 0) {
             groupedCosmeticPlans = data.grouped_plans;
-            
             cosmeticProcedures = [];
+
             data.grouped_plans.forEach(group => {
                 group.procedures.forEach(plan => {
                     cosmeticProcedures.push({
@@ -545,7 +317,7 @@ async function loadExistingPlans() {
                     });
                 });
             });
-            
+
             if (document.getElementById('cosmeticPlanBody')) {
                 renderCosmeticProcedures();
                 renderCosmeticConduct();
@@ -558,1852 +330,7 @@ async function loadExistingPlans() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Carregar planos existentes ao iniciar
     setTimeout(loadExistingPlans, 500);
-    
-    // Carregar histórico de receitas
     setTimeout(loadPrescriptionHistory, 500);
-    
-    // Listener para mudança de categoria
-    const categoryInputs = document.querySelectorAll('input[name="category"]');
-    categoryInputs.forEach(input => {
-        input.addEventListener('change', handleCategoryChange);
-    });
-    
-    // Inicializar textos pré-preenchidos
-    updateCategoryTexts();
-});
-
-function handleCategoryChange(event) {
-    const newCategory = event.target.value;
-    
-    // Para Cosmiatria e Transplante Capilar: auto-iniciar o timer
-    if (newCategory === 'cosmiatria' || newCategory === 'transplante_capilar') {
-        if (!timerStartTime) {
-            // Auto-iniciar o atendimento
-            startConsultation();
-        }
-    } else if (newCategory === 'patologia') {
-        // Para Patologia: requerer clique manual
-        if (!timerStartTime) {
-            event.preventDefault();
-            alert('⚠️ Por favor, inicie o atendimento antes de selecionar a categoria.\n\nClique no botão "Iniciar Atendimento" no topo da página.');
-            // Reverter para categoria anterior
-            const previousRadio = document.querySelector(`input[name="category"][value="${currentCategory}"]`);
-            if (previousRadio) {
-                previousRadio.checked = true;
-            }
-            return;
-        }
-    }
-    
-    currentCategory = newCategory;
-    updateCategoryTexts();
-    toggleCategoryTabs();
-    
-    // Se mudou para Cosmiatria e ainda não carregou os planos, carregar agora
-    if (currentCategory === 'cosmiatria' && cosmeticProcedures.length === 0) {
-        loadExistingPlans();
-    }
-}
-
-function updateCategoryTexts() {
-    const queixaText = document.getElementById('queixaText');
-    const anamneseText = document.getElementById('anamneseText');
-    const condutaText = document.getElementById('condutaText');
-    
-    if (currentCategory === 'cosmiatria') {
-        // Preencher anamnese padrão para cosmiatria
-        if (!anamneseText.value) {
-            anamneseText.value = 'Paciente refere queixas cosmiátricas, buscando melhora da qualidade da pele. Sem queixas de doenças dermatológicas ativas.';
-        }
-    } else if (currentCategory === 'transplante_capilar') {
-        // Preencher queixa padrão para transplante
-        if (!queixaText.value) {
-            queixaText.value = 'Paciente refere queixa de rarefação capilar e calvície progressiva.';
-        }
-        // Preencher conduta padrão para transplante
-        if (!condutaText.value) {
-            condutaText.value = 'O transplante capilar é uma etapa do tratamento e não o tratamento completo. É fundamental a adesão ao acompanhamento clínico para manutenção dos resultados. O sucesso cirúrgico depende do controle contínuo da queda capilar e da resposta individual do paciente ao tratamento.\n\n';
-        }
-    }
-}
-
-function toggleCategoryTabs() {
-    const tabPlanejamento = document.getElementById('tabPlanejamento');
-    const tabTransplante = document.getElementById('tabTransplante');
-    const tabSurgery = document.getElementById('tabSurgery');
-    const conductProcedures = document.getElementById('conductProceduresSection');
-    const cosmeticConductSection = document.getElementById('cosmeticConductSection');
-    const indicatedProcedures = document.getElementById('indicatedProceduresSection');
-    
-    console.log('toggleCategoryTabs - currentCategory:', currentCategory);
-    
-    if (currentCategory === 'cosmiatria') {
-        if (tabPlanejamento) tabPlanejamento.style.setProperty('display', 'block', 'important');
-        if (tabTransplante) tabTransplante.style.display = 'none';
-        if (tabSurgery) tabSurgery.style.display = 'none';
-        if (conductProcedures) conductProcedures.style.display = 'none';
-        if (cosmeticConductSection) cosmeticConductSection.style.display = 'block';
-        if (indicatedProcedures) indicatedProcedures.style.display = 'none';
-    } else if (currentCategory === 'transplante_capilar') {
-        if (tabPlanejamento) tabPlanejamento.style.display = 'none';
-        if (tabTransplante) tabTransplante.style.display = 'block';
-        if (tabSurgery) tabSurgery.style.display = 'block';
-        if (conductProcedures) conductProcedures.style.display = 'none';
-        if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
-        if (indicatedProcedures) indicatedProcedures.style.display = 'none';
-    } else {
-        if (tabPlanejamento) tabPlanejamento.style.display = 'none';
-        if (tabTransplante) tabTransplante.style.display = 'none';
-        if (tabSurgery) tabSurgery.style.display = 'none';
-        if (conductProcedures) conductProcedures.style.display = 'none';
-        if (cosmeticConductSection) cosmeticConductSection.style.display = 'none';
-        if (indicatedProcedures) indicatedProcedures.style.display = 'block';
-    }
-}
-
-// ========== COSMIATRIA: PLANEJAMENTO CLÍNICO ==========
-function performCosmeticProcedure(planId, procedureName, consultationId = null) {
-  console.log('performCosmeticProcedure called:', planId, procedureName, consultationId);
-
-  const today = new Date().toISOString().split('T')[0];
-  const dateInput = prompt(
-    `Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`,
-    today
-  );
-  if (!dateInput) return;
-
-  // ✅ CSRF (prioriza getCSRFToken() se existir no projeto)
-  const csrf =
-    (typeof getCSRFToken === 'function' && getCSRFToken()) ||
-    document.querySelector('meta[name="csrf-token"]')?.content ||
-    null;
-
-  // ✅ appointment/consultation correto:
-  // - se vier do histórico, usa consultationId
-  // - senão usa window.appointmentId
-  const apptId = consultationId || window.appointmentId || null;
-
-  fetch(`/api/cosmetic-plans/${planId}/perform`, {
-    method: 'POST',
-    credentials: 'same-origin', // ✅ importante p/ sessão + CSRF
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrf ? { 'X-CSRFToken': csrf } : {})
-    },
-    body: JSON.stringify({
-      appointment_id: apptId,
-      performed_date: dateInput
-    })
-  })
-    .then(async (r) => {
-      const text = await r.text();
-
-      // ✅ nunca assumir JSON (CSRF/erro pode voltar HTML)
-      let data = null;
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        data = { success: false, error: text || `Erro HTTP ${r.status}` };
-      }
-
-      if (!r.ok) {
-        console.error('Server error:', r.status, text);
-        throw new Error(data.error || `Erro na requisição (HTTP ${r.status})`);
-      }
-
-      return data;
-    })
-    .then((result) => {
-      console.log('Result:', result);
-
-      if (result.success) {
-        if (typeof showAlert === 'function') {
-          showAlert('Procedimento marcado como realizado!', 'success');
-        } else {
-          alert('Procedimento marcado como realizado!');
-        }
-        setTimeout(() => location.reload(), 800);
-      } else {
-        const msg = result.error || 'Erro ao processar';
-        if (typeof showAlert === 'function') showAlert(msg, 'danger');
-        else alert(msg);
-      }
-    })
-    .catch((err) => {
-      console.error('Erro na requisição:', err);
-      const msg = err?.message || 'Erro na comunicação com o servidor';
-      if (typeof showAlert === 'function') showAlert(msg, 'danger');
-      else alert(msg);
-    });
-}
-
-function addCosmeticProcedure() {
-  const nameInput = document.getElementById('newProcedureName');
-  const valueInput = document.getElementById('newProcedureValue');
-  const monthsInput = document.getElementById('newProcedureMonths');
-  const observationsInput = document.getElementById('newProcedureObservations');
-
-  const name = (nameInput.value || '').trim();
-  const valueStr = (valueInput.value || '').trim();
-  const value = valueStr ? parseFloat(valueStr) : 0;
-  const months = parseInt(monthsInput.value, 10) || 6;
-  const observations = observationsInput.value || '';
-
-  if (!name) {
-    alert('Por favor, selecione um procedimento');
-    nameInput.focus();
-    return;
-  }
-
-  if (isNaN(value) || value <= 0) {
-    alert('Por favor, informe um valor válido (maior que 0)');
-    valueInput.focus();
-    return;
-  }
-
-  if (editingCosmeticProcedureIndex !== null) {
-    const original = cosmeticProcedures[editingCosmeticProcedureIndex];
-
-    cosmeticProcedures[editingCosmeticProcedureIndex] = {
-      ...original,
-      name,
-      value,
-      months,
-      budget: original?.budget ?? value,
-      observations
-    };
-
-    editingCosmeticProcedureIndex = null;
-
-    const addBtn = document.querySelector('button[onclick="addCosmeticProcedure()"]');
-    if (addBtn) {
-      addBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Adicionar';
-      addBtn.classList.remove('btn-primary');
-      addBtn.classList.add('btn-success');
-    }
-
-    showAlert('Procedimento atualizado com sucesso.', 'success');
-  } else {
-    cosmeticProcedures.push({
-      name,
-      value,
-      months,
-      budget: value,
-      performed: false,
-      performedDate: null,
-      observations
-    });
-
-    showAlert('Procedimento adicionado com sucesso.', 'success');
-  }
-
-  renderCosmeticProcedures();
-  renderCosmeticConduct();
-  updateCosmeticTotal();
-
-  nameInput.value = '';
-  valueInput.value = '';
-  monthsInput.value = '6';
-  observationsInput.value = '';
-
-  setTimeout(() => nameInput.focus(), 100);
-}
-
-function removeCosmeticProcedure(index) {
-  cosmeticProcedures.splice(index, 1);
-
-  if (editingCosmeticProcedureIndex === index) {
-    editingCosmeticProcedureIndex = null;
-
-    const addBtn = document.querySelector('button[onclick="addCosmeticProcedure()"]');
-    if (addBtn) {
-      addBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Adicionar';
-      addBtn.classList.remove('btn-primary');
-      addBtn.classList.add('btn-success');
-    }
-
-    document.getElementById('newProcedureName').value = '';
-    document.getElementById('newProcedureValue').value = '';
-    document.getElementById('newProcedureMonths').value = '6';
-    document.getElementById('newProcedureObservations').value = '';
-  }
-
-  renderCosmeticProcedures();
-  renderCosmeticConduct();
-  updateCosmeticTotal();
-}
-
-function highlightConsultationGroup(consultationKey) {
-    if (currentCategory !== 'cosmiatria') {
-        return;
-    }
-    
-    setTimeout(() => {
-        const groupElement = document.getElementById(`group-${consultationKey}`);
-        if (groupElement) {
-            document.querySelectorAll('.consultation-group-header').forEach(el => {
-                el.classList.remove('highlighted-group');
-            });
-            
-            groupElement.classList.add('highlighted-group');
-            groupElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            setTimeout(() => {
-                groupElement.classList.remove('highlighted-group');
-            }, 3000);
-        }
-    }, 300);
-}
-
-
-
-function renderCosmeticProcedures() {
-    const tbody = document.getElementById('cosmeticPlanBody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    
-    // Filtro para novos (ainda não salvos)
-    const newProcedures = cosmeticProcedures.filter(p => !p.id);
-    
-    if (newProcedures.length > 0) {
-        const headerRow = tbody.insertRow();
-        headerRow.className = 'consultation-group-header';
-        headerRow.innerHTML = `
-            <td colspan="5" class="bg-success bg-opacity-10 border-top border-bottom border-2 border-success">
-                <div class="d-flex align-items-center py-2">
-                    <i class="bi bi-plus-circle me-2 text-success"></i>
-                    <strong class="text-success">Nova Consulta (Planejamento Atual)</strong>
-                </div>
-            </td>
-        `;
-        
-        newProcedures.forEach(proc => {
-            const globalIndex = cosmeticProcedures.findIndex(p => p === proc);
-            const row = tbody.insertRow();
-            row.className = proc.performed ? 'table-success' : '';
-            row.innerHTML = `
-                <td class="ps-3">
-                    <div class="fw-bold text-primary">${proc.name}</div>
-                </td>
-                <td>
-                    <input type="number" class="form-control form-control-sm" value="${proc.budget || proc.value}" 
-                           onchange="updatePlanValue(${globalIndex}, this.value)">
-                </td>
-                <td>
-                    <input type="date" class="form-control form-control-sm" value="${proc.performedDate || ''}" 
-                           onchange="updatePlanDate(${globalIndex}, this.value)">
-                </td>
-                <td class="text-center align-middle">
-                    <div class="form-check d-flex justify-content-center">
-                        <input class="form-check-input" type="checkbox" 
-                               ${proc.performed ? 'checked' : ''} 
-                               onchange="togglePlanPerformed(${globalIndex}, this.checked)">
-                    </div>
-                </td>
-                <td class="text-center">
-                    <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${globalIndex})">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </td>
-            `;
-        });
-    }
-    
-    if (groupedCosmeticPlans.length > 0) {
-        groupedCosmeticPlans.forEach(group => {
-            const headerRow = tbody.insertRow();
-            headerRow.className = 'consultation-group-header';
-            headerRow.innerHTML = `
-                <td colspan="5" class="bg-light border-top border-bottom border-2">
-                    <div class="d-flex align-items-center py-2">
-                        <i class="bi bi-calendar3 me-2 text-primary"></i>
-                        <strong>Consulta de ${group.consultation_info.display_date}</strong>
-                    </div>
-                </td>
-            `;
-            
-            group.procedures.forEach(proc => {
-                const globalIndex = cosmeticProcedures.findIndex(p => p.id === proc.id);
-                if (globalIndex === -1) return;
-                
-                const pObj = cosmeticProcedures[globalIndex];
-                const row = tbody.insertRow();
-                row.className = pObj.performed ? 'table-success' : '';
-                row.innerHTML = `
-                    <td class="ps-3">
-                        <div class="fw-bold text-primary">${pObj.name}</div>
-                    </td>
-                    <td>
-                        <input type="number" class="form-control form-control-sm" value="${pObj.budget || pObj.value}" 
-                               onchange="updatePlanValue(${globalIndex}, this.value)">
-                    </td>
-                    <td>
-                        <input type="date" class="form-control form-control-sm" value="${pObj.performedDate || ''}" 
-                               onchange="updatePlanDate(${globalIndex}, this.value)">
-                    </td>
-                    <td class="text-center align-middle">
-                        <div class="form-check d-flex justify-content-center">
-                            <input class="form-check-input" type="checkbox" 
-                                   ${pObj.performed ? 'checked' : ''} 
-                                   onchange="togglePlanPerformed(${globalIndex}, this.checked)">
-                        </div>
-                    </td>
-                    <td class="text-center">
-                        <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${globalIndex})">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                `;
-            });
-        });
-    }
-
-    if (cosmeticProcedures.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
-    }
-}
-
-function updatePlanValue(index, val) {
-    if (cosmeticProcedures[index]) {
-        cosmeticProcedures[index].budget = parseFloat(val) || 0;
-        updateCosmeticTotal();
-    }
-}
-
-function updatePlanDate(index, val) {
-    if (cosmeticProcedures[index]) {
-        cosmeticProcedures[index].performedDate = val;
-    }
-}
-
-function togglePlanPerformed(index, checked) {
-    if (cosmeticProcedures[index]) {
-        cosmeticProcedures[index].performed = checked;
-        if (checked && !cosmeticProcedures[index].performedDate) {
-            cosmeticProcedures[index].performedDate = new Date().toLocaleDateString('en-CA');
-        }
-        renderCosmeticProcedures();
-        renderCosmeticConduct();
-        updateCosmeticTotal();
-    }
-}
-
-function editCosmeticProcedure(index) {
-  const proc = cosmeticProcedures[index];
-  if (!proc) return;
-
-  editingCosmeticProcedureIndex = index;
-
-  document.getElementById('newProcedureName').value = proc.name || '';
-  document.getElementById('newProcedureValue').value = proc.value || 0;
-  document.getElementById('newProcedureMonths').value = proc.months || 6;
-  document.getElementById('newProcedureObservations').value = proc.observations || '';
-
-  const addBtn = document.querySelector('button[onclick="addCosmeticProcedure()"]');
-  if (addBtn) {
-    addBtn.innerHTML = '<i class="bi bi-check-circle"></i> Salvar Edição';
-    addBtn.classList.remove('btn-success');
-    addBtn.classList.add('btn-primary');
-  }
-
-  document.getElementById('newProcedureName').focus();
-
-  showAlert('Procedimento carregado para edição.', 'info');
-}
-
-function updateCosmeticTotal() {
-    const total = cosmeticProcedures.reduce((sum, proc) => sum + proc.value, 0);
-    document.getElementById('cosmeticTotal').textContent = total.toFixed(2).replace('.', ',');
-}
-
-// ========== COSMIATRIA: ABA CONDUTA - EXECUÇÃO ==========
-function renderCosmeticConduct() {
-    console.log("Renderizando Conduta Cosmética...");
-    const tbody = document.getElementById('cosmeticConductBody');
-    if (!tbody) {
-        console.error("Elemento cosmeticConductBody não encontrado!");
-        return;
-    }
-    
-    tbody.innerHTML = '';
-    
-    if (typeof cosmeticProcedures === 'undefined' || cosmeticProcedures.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
-        return;
-    }
-    
-    // Ordenar: primeiro os pendentes (novos ou antigos), depois os realizados
-    const sortedProcs = [...cosmeticProcedures].sort((a, b) => {
-        if (a.performed === b.performed) return 0;
-        return a.performed ? 1 : -1;
-    });
-
-    sortedProcs.forEach((proc) => {
-        const realIndex = cosmeticProcedures.indexOf(proc);
-        const procedureDate = proc.performedDate || '';
-        
-        const row = tbody.insertRow();
-        if (proc.performed) row.className = 'table-success opacity-75';
-        
-        const statusBadge = proc.performed
-          ? `<button type="button" class="btn btn-success btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}">
-               <i class="bi bi-check-lg"></i> REALIZADO
-             </button>`
-          : `<button type="button" class="btn btn-danger btn-sm w-100 fw-bold btn-toggle-proc" data-index="${realIndex}">
-               <i class="bi bi-exclamation-triangle"></i> PENDENTE
-             </button>`;
-
-        row.innerHTML = `
-            <td>
-                <div class="fw-bold ${proc.performed ? 'text-muted text-decoration-line-through' : 'text-primary'}">${proc.name}</div>
-                <div class="text-xs text-muted small">${proc.consultationDate || 'Novo Planejamento'}</div>
-            </td>
-            <td>
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text">R$</span>
-                    <input type="number" 
-                           class="form-control form-control-sm fw-bold" 
-                           value="${proc.budget || proc.value}" 
-                           onchange="updateProcedureBudget(${realIndex}, this.value)"
-                           step="any" min="0" ${proc.performed ? 'disabled' : ''}>
-                </div>
-            </td>
-            <td>
-                <input type="date" 
-                       class="form-control form-control-sm" 
-                       value="${procedureDate}"
-                       onchange="updateProcedureDate(${realIndex}, this.value)"
-                       ${proc.performed ? '' : 'disabled'}>
-            </td>
-            <td>
-                <textarea class="form-control form-control-sm" rows="1" placeholder="Obs..."
-                          onchange="updateProcedureObservation(${realIndex}, this.value)">${proc.observation || ''}</textarea>
-            </td>
-            <td class="text-center align-middle">
-                ${statusBadge}
-            </td>
-            <td class="text-center">
-                <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${realIndex})" ${proc.performed ? 'disabled' : ''}>
-                    <i class="bi bi-trash"></i>
-                </button>
-            </td>
-        `;
-    });
-}
-
-function updateProcedureBudget(index, value) {
-    if (cosmeticProcedures[index]) {
-        const val = parseFloat(value) || 0;
-        cosmeticProcedures[index].budget = val;
-        cosmeticProcedures[index].value = val; // Manter sincronizado para o total
-        updateCosmeticTotal();
-    }
-}
-
-function updateProcedureDate(index, dateValue) {
-    if (cosmeticProcedures[index]) {
-        cosmeticProcedures[index].performedDate = dateValue;
-    }
-}
-
-function updateProcedureObservation(index, value) {
-    if (cosmeticProcedures[index]) {
-        cosmeticProcedures[index].observation = value;
-    }
-}
-
-window.updateProcedureDate = updateProcedureDate;
-window.updateProcedureObservation = updateProcedureObservation;
-
-// ===== TOGGLE STATUS =====
-window.toggleProcedurePerformed = function(index) {
-  console.log('toggleProcedurePerformed index:', index);
-
-  const proc = cosmeticProcedures && cosmeticProcedures[index];
-  if (!proc) {
-    console.error('Procedimento nao encontrado no indice:', index);
-    return;
-  }
-
-  if (proc.id) {
-    const today = new Date().toLocaleDateString('en-CA');
-    const dateInput = prompt('Marcar "' + proc.name + '" como realizado em qual data? (AAAA-MM-DD)', proc.performedDate || today);
-    if (!dateInput) return;
-
-    fetch('/api/cosmetic-plans/' + proc.id + '/perform', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-      body: JSON.stringify({
-        appointment_id: window.appointmentId,
-        performed_date: dateInput
-      })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(result) {
-      if (result.success) {
-        showAlert('Procedimento marcado como realizado!', 'success');
-        loadExistingPlans();
-      } else {
-        showAlert(result.error || 'Erro ao marcar como realizado', 'danger');
-      }
-    })
-    .catch(function(err) {
-      console.error(err);
-      showAlert('Erro de conexao ao salvar procedimento', 'danger');
-    });
-
-    return;
-  }
-
-  proc.performed = !proc.performed;
-
-  if (proc.performed) {
-    if (!proc.performedDate) proc.performedDate = new Date().toLocaleDateString('en-CA');
-    showAlert(proc.name + ' marcado como REALIZADO (ainda nao salvo)', 'info');
-  } else {
-    proc.performedDate = null;
-  }
-
-  renderCosmeticProcedures();
-  renderCosmeticConduct();
-  updateCosmeticTotal();
-};
-
-// listener ÚNICO (não duplicar)
-document.addEventListener('click', function(e) {
-  const btn = e.target.closest('.btn-toggle-proc');
-  if (!btn) return;
-
-  // ==== DEBUG CLICK (REMOVER DEPOIS) ====
-  alert('CLIQUE CAPTURADO NO BOTÃO! index=' + btn.getAttribute('data-index'));
-
-  e.preventDefault();
-  e.stopPropagation();
-
-  const idx = parseInt(btn.getAttribute('data-index'), 10);
-  console.log('✅ Clique detectado no botão toggle, index:', idx);
-
-  window.toggleProcedurePerformed(idx);
-}, true);
-
-function saveCosmeticPlan() {
-    // DEPRECATED: Não salvar mais - dados são salvos ao finalizar
-    // Apenas mostrar mensagem informativa
-    alert('Os procedimentos são salvos automaticamente ao clicar em "Finalizar Atendimento" na aba Conduta.\n\nUse o botão "Gerar Orçamento PDF" se precisar enviar o orçamento ao paciente.');
-}
-
-function generateBudget() {
-    if (cosmeticProcedures.length === 0) {
-        showAlert('Adicione procedimentos ao planejamento antes de gerar o orçamento', 'warning');
-        return;
-    }
-    
-    const data = {
-        procedures: cosmeticProcedures
-    };
-    
-    fetch(`/api/prontuario/${patientId}/generate-budget`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.blob())
-    .then(blob => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `orcamento_${patientId}_${new Date().getTime()}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        showAlert('Orçamento PDF gerado com sucesso!');
-    })
-    .catch(error => {
-        showAlert('Erro ao gerar orçamento.', 'danger');
-        console.error(error);
-    });
-}
-
-// ========== TRANSPLANTE CAPILAR ==========
-let selectedNorwood = null;
-
-function toggleTransplantLocation() {
-    const previousYes = document.getElementById('previousYes');
-    const locationSection = document.getElementById('transplantLocationSection');
-    
-    if (previousYes && previousYes.checked) {
-        locationSection.style.display = '';
-    } else {
-        locationSection.style.display = 'none';
-    }
-}
-
-function selectNorwood(classification) {
-    // Remover seleção anterior
-    document.querySelectorAll('.norwood-card').forEach(card => {
-        card.classList.remove('selected');
-    });
-    
-    // Adicionar seleção atual
-    const card = document.querySelector(`[data-norwood="${classification}"] .norwood-card`);
-    if (card) {
-        card.classList.add('selected');
-        selectedNorwood = classification;
-    }
-}
-
-function saveHairTransplant() {
-    if (!selectedNorwood) {
-        showAlert('Selecione a classificação de Norwood', 'warning');
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('category', 'transplante_capilar');
-    formData.append('norwood', selectedNorwood);
-    formData.append('previous_transplant', document.querySelector('input[name="previousTransplant"]:checked').value);
-    
-    // Se já fez transplante, adicionar local
-    const previousYes = document.getElementById('previousYes');
-    if (previousYes && previousYes.checked) {
-        const location = document.querySelector('input[name="transplantLocation"]:checked');
-        if (location) {
-            formData.append('transplant_location', location.value);
-        }
-    }
-    
-    formData.append('case_type', document.querySelector('input[name="caseType"]:checked').value);
-    formData.append('body_hair', document.getElementById('bodyHair').checked);
-    formData.append('eyebrow_transplant', document.getElementById('eyebrowTransplant').checked);
-    formData.append('beard_transplant', document.getElementById('beardTransplant').checked);
-    formData.append('feminine_hair_transplant', document.getElementById('feminineHairTransplant').checked);
-    formData.append('frontal', document.getElementById('frontalTransplant').checked);
-    formData.append('crown', document.getElementById('crownTransplant').checked);
-    formData.append('complete', document.getElementById('completeTransplant').checked);
-    formData.append('complete_body_hair', document.getElementById('completeBodyHair').checked);
-    formData.append('dense_packing', document.getElementById('densePacking').checked);
-    formData.append('surgical_planning', document.getElementById('surgicalPlanning').value);
-    formData.append('queixa', document.getElementById('queixaText').value);
-    formData.append('conduta', document.getElementById('condutaText').value);
-    
-    // Imagens
-    const consultationPhoto = document.getElementById('consultationPhoto').files[0];
-    const surgicalPlan = document.getElementById('surgicalPlanImage').files[0];
-    const simulation = document.getElementById('simulationImage').files[0];
-    
-    if (!consultationPhoto) {
-        showAlert('Foto da consulta é obrigatória', 'warning');
-        return;
-    }
-    
-    formData.append('consultation_photo', consultationPhoto);
-    if (surgicalPlan) formData.append('surgical_plan', surgicalPlan);
-    if (simulation) formData.append('simulation', simulation);
-    
-    fetch(`/api/prontuario/${patientId}/hair-transplant`, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Dados de transplante capilar salvos com sucesso!');
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            showAlert(result.error || 'Erro ao salvar dados', 'danger');
-        }
-    })
-    .catch(error => {
-        showAlert('Erro ao salvar dados de transplante.', 'danger');
-        console.error(error);
-    });
-}
-
-// ========== FINALIZAR ATENDIMENTO ==========
-function finalizarAtendimento() {
-    if (window.__finalizing) return;
-
-    if (!confirm('Deseja finalizar o atendimento? Todos os dados serão salvos.')) {
-        return;
-    }
-
-    window.__finalizing = true;
-    
-    // Calcular duração em minutos (0 se timer não foi iniciado — consulta retroativa)
-    const duration = timerStartTime ? Math.floor((Date.now() - timerStartTime) / 60000) : 0;
-    
-    // Coletar dados dos campos de texto
-    const queixa = document.getElementById('queixaText')?.value || '';
-    const anamnese = document.getElementById('anamneseText')?.value || '';
-    const diagnostico = document.getElementById('diagnosticoText')?.value || '';
-    const conduta = document.getElementById('condutaText')?.value || '';
-    
-    // Coletar procedimentos indicados e realizados (Patologia)
-    const indicated = Array.from(document.querySelectorAll('.indicated-proc:checked')).map(cb => parseInt(cb.value));
-    const performed = Array.from(document.querySelectorAll('.performed-proc:checked')).map(cb => parseInt(cb.value));
-    
-    // Montar payload base
-    const payload = {
-        consultation_started: true,
-        category: currentCategory,
-        duration: duration,
-        queixa: queixa,
-        anamnese: anamnese,
-        diagnostico: diagnostico,
-        conduta: conduta,
-        indicated_procedures: indicated,
-        performed_procedures: performed,
-        consultation_type: document.querySelector('input[name="patient_type"]')?.value || 'Particular'
-    };
-    
-    // Incluir appointment_id se disponível (usando window.appointmentId)
-    if (typeof window.appointmentId !== 'undefined' && window.appointmentId !== null) {
-        payload.appointment_id = window.appointmentId;
-        console.log('DEBUG finalizarAtendimento: Enviando appointment_id =', window.appointmentId);
-    } else {
-        console.log('DEBUG finalizarAtendimento: ATENCAO - appointment_id NAO disponivel!');
-    }
-    
-    // Adicionar indicação de transplante (na aba Conduta)
-    const transplantIndication = document.querySelector('input[name="transplantIndication"]:checked');
-    if (transplantIndication) {
-        payload.transplant_indication = transplantIndication.value;
-    }
-    
-    // Adicionar dados de planejamento cirúrgico se categoria é transplante
-    if (currentCategory === 'transplante_capilar') {
-        payload.surgical_planning = {
-            norwood: document.querySelector('input[name="norwood"]:checked')?.value || null,
-            previous_transplant: document.querySelector('input[name="previousTransplant"]:checked')?.value || 'nao',
-            transplant_location: document.querySelector('input[name="transplantLocation"]:checked')?.value || null,
-            case_type: document.querySelector('input[name="caseType"]:checked')?.value || 'primaria',
-            body_hair: document.getElementById('bodyHair')?.checked || false,
-            eyebrow_transplant: document.getElementById('eyebrowTransplant')?.checked || false,
-            beard_transplant: document.getElementById('beardTransplant')?.checked || false,
-            feminine_hair_transplant: document.getElementById('feminineHairTransplant')?.checked || false,
-            frontal: document.getElementById('frontalTransplant')?.checked || false,
-            crown: document.getElementById('crownTransplant')?.checked || false,
-            complete: document.getElementById('completeTransplant')?.checked || false,
-            complete_body_hair: document.getElementById('completeBodyHair')?.checked || false,
-            dense_packing: document.getElementById('densePacking')?.checked || false,
-            surgical_planning_text: document.getElementById('surgicalPlanning')?.value || ''
-        };
-    }
-    
-    // Adicionar dados específicos de Cosmiatria
-    if (currentCategory === 'cosmiatria' && cosmeticProcedures.length > 0) {
-        payload.cosmetic_procedures = cosmeticProcedures;
-        
-        // Calcular total dos procedimentos realizados
-        const performedProcedures = cosmeticProcedures.filter(p => p.performed);
-        const totalPerformed = performedProcedures.reduce((sum, p) => sum + (parseFloat(p.budget) || parseFloat(p.value)), 0);
-        
-        if (totalPerformed > 0) {
-            payload.checkout_amount = totalPerformed;
-            payload.checkout_procedures = performedProcedures.map(p => ({
-                name: p.name,
-                value: parseFloat(p.budget) || parseFloat(p.value),
-                budget: parseFloat(p.budget) || parseFloat(p.value)
-            }));
-            console.log('Checkout criado:', { amount: totalPerformed, procedures: payload.checkout_procedures });
-        }
-    }
-    
-    // Adicionar dados específicos de Transplante Capilar
-    if (currentCategory === 'transplante_capilar') {
-        const previousTransplant = document.querySelector('input[name="previousTransplant"]:checked')?.value || 'nao';
-        const transplantLocation = document.querySelector('input[name="transplantLocation"]:checked')?.value || '';
-        const norwood = document.getElementById('norwoodClassification')?.value || '';
-        const surgicalPlanning = document.getElementById('surgicalPlanning')?.value || '';
-        
-        payload.transplant_data = {
-            norwood: norwood,
-            previous_transplant: previousTransplant,
-            transplant_location: transplantLocation,
-            case_type: document.querySelector('input[name="case_type"]:checked')?.value || 'primaria',
-            body_hair_needed: document.getElementById('bodyHairNeeded')?.checked || false,
-            eyebrow_transplant: document.getElementById('eyebrowTransplant')?.checked || false,
-            beard_transplant: document.getElementById('beardTransplant')?.checked || false,
-            feminine_hair_transplant: document.getElementById('feminineHairTransplant')?.checked || false,
-            frontal: document.getElementById('frontalTransplant')?.checked || false,
-            crown: document.getElementById('crownTransplant')?.checked || false,
-            complete: document.getElementById('completeTransplant')?.checked || false,
-            complete_body_hair: document.getElementById('completeBodyHair')?.checked || false,
-            dense_packing: document.getElementById('densePacking')?.checked || false,
-            surgical_planning: surgicalPlanning,
-            clinical_conduct: document.getElementById('clinicalConduct')?.value || ''
-        };
-    }
-    
-    // Mostrar loading no botão
-    const btn = document.querySelector('button[onclick="finalizarAtendimento()"]');
-    const originalText = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Finalizando...';
-    }
-
-    // Enviar para o backend
-    console.log('[FINALIZAR] POST payload', payload);
-    fetch(`/api/prontuario/${patientId}/finalizar`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    })
-    .then(async response => {
-        console.log('[FINALIZAR] status', response.status);
-        const text = await response.text();
-        console.log('[FINALIZAR] body', text);
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            throw new Error('Resposta inválida do servidor (não-JSON): ' + text.substring(0, 100));
-        }
-    })
-    .then(result => {
-        if (result.success) {
-            if (timerInterval) {
-                clearInterval(timerInterval);
-                timerInterval = null;
-            }
-            timerStartTime = null;
-            alert('Atendimento finalizado com sucesso!');
-            window.location.href = '/agenda';
-        } else {
-            alert(result.error || 'Erro ao finalizar atendimento');
-            if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-        }
-    })
-    .catch(error => {
-        console.error('[FINALIZAR] Erro:', error);
-        alert('Erro ao finalizar atendimento: ' + error.message);
-        if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-    })
-    .finally(() => {
-        window.__finalizing = false;
-    });
-}
-
-// Auto-open attention modal if there's content when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    const attentionContent = document.getElementById('attentionContent');
-    if (attentionContent && attentionContent.textContent.trim()) {
-        // Delay slightly to ensure page is fully loaded
-        setTimeout(() => {
-            const attentionText = document.getElementById('attentionText');
-            if (attentionText) {
-                attentionText.value = attentionContent.textContent;
-                new bootstrap.Modal(document.getElementById('attentionModal')).show();
-            }
-        }, 300);
-    }
-});
-
-// Editar data da consulta
-function editConsultationDate(consultationId, dateTime) {
-    document.getElementById('editConsultationId').value = consultationId;
-    document.getElementById('editConsultationDateTime').value = dateTime;
-    
-    // Carregar notas da consulta
-    fetch(`/api/appointments/${consultationId}/notes`)
-        .then(r => r.json())
-        .then(notes => {
-            document.getElementById('editQueixa').value = notes.queixa?.content || '';
-            document.getElementById('editQueixaId').value = notes.queixa?.id || '';
-            
-            document.getElementById('editAnamnese').value = notes.anamnese?.content || '';
-            document.getElementById('editAnamneseId').value = notes.anamnese?.id || '';
-            
-            document.getElementById('editDiagnostico').value = notes.diagnostico?.content || '';
-            document.getElementById('editDiagnosticoId').value = notes.diagnostico?.id || '';
-            
-            document.getElementById('editConduta').value = notes.conduta?.content || '';
-            document.getElementById('editCondutaId').value = notes.conduta?.id || '';
-            
-            new bootstrap.Modal(document.getElementById('editConsultationModal')).show();
-        })
-        .catch(err => {
-            console.error('Erro ao carregar notas:', err);
-            new bootstrap.Modal(document.getElementById('editConsultationModal')).show();
-        });
-}
-
-// Salvar edição da consulta
-function saveConsultationEdit() {
-    const consultationId = document.getElementById('editConsultationId').value;
-    const dateTime = document.getElementById('editConsultationDateTime').value;
-    
-    if (!dateTime) {
-        showAlert('Por favor, selecione uma data e hora', 'warning');
-        return;
-    }
-    
-    // Array de promessas para atualizar cada nota
-    const updatePromises = [];
-    
-    // Atualizar data da consulta - calcular end_time (1 hora depois por padrão)
-    const start = new Date(dateTime);
-    const end = new Date(start.getTime() + 60 * 60 * 1000);
-    
-    updatePromises.push(
-        fetch(`/api/appointments/${consultationId}`, {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                start: dateTime,
-                end: end.toISOString().slice(0, 16).replace('T', ' ')
-            })
-        })
-    );
-    
-    // Atualizar cada nota individualmente
-    const fields = ['Queixa', 'Anamnese', 'Diagnostico', 'Conduta'];
-    fields.forEach(field => {
-        const noteId = document.getElementById(`edit${field}Id`).value;
-        const content = document.getElementById(`edit${field}`).value;
-        
-        if (noteId) {
-            updatePromises.push(
-                fetch(`/api/notes/${noteId}`, {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({content: content})
-                })
-            );
-        }
-    });
-    
-    // Esperar todas as atualizações
-    Promise.all(updatePromises)
-        .then(responses => Promise.all(responses.map(r => r.json())))
-        .then(results => {
-            if (results.every(r => r.success)) {
-                showAlert('Consulta atualizada com sucesso!', 'success');
-                bootstrap.Modal.getInstance(document.getElementById('editConsultationModal')).hide();
-                setTimeout(() => window.location.reload(), 1000);
-            } else {
-                showAlert('Erro ao atualizar algumas informações', 'danger');
-            }
-        })
-        .catch(err => {
-            console.error('Erro:', err);
-            showAlert('Erro ao atualizar consulta', 'danger');
-        });
-}
-
-// Deletar consulta
-function deleteConsultation(consultationId, dateStr) {
-    if (!confirm(`Tem certeza que deseja deletar a consulta de ${dateStr}?\n\nEsta ação não pode ser desfeita.`)) {
-        return;
-    }
-    
-    fetch(`/api/appointments/${consultationId}`, {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'}
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Consulta deletada com sucesso!', 'success');
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            showAlert(result.error || 'Erro ao deletar', 'danger');
-        }
-    })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro ao deletar consulta', 'danger');
-    });
-}
-
-// ============ EVOLUTION FUNCTIONS ============
-function openEvolutionModal() {
-    const now = new Date();
-    document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
-    document.getElementById('evolutionContent').value = '';
-    document.getElementById('evolutionConsultation').value = '';
-    loadConsultationsDropdown();
-    new bootstrap.Modal(document.getElementById('evolutionModal')).show();
-}
-
-function loadConsultationsDropdown() {
-    fetch(`/api/patient/${patientId}/consultations`)
-        .then(r => r.json())
-        .then(data => {
-            const select = document.getElementById('evolutionConsultation');
-            select.innerHTML = '<option value="">-- Selecione uma consulta --</option>';
-            (data.consultations || []).forEach(consultation => {
-                const option = document.createElement('option');
-                option.value = consultation.id;
-                option.textContent = `${consultation.date} - ${consultation.category || 'Consulta'}`;
-                select.appendChild(option);
-            });
-        })
-        .catch(err => console.error('Erro ao carregar consultas:', err));
-}
-
-function saveEvolution() {
-    const content = document.getElementById('evolutionContent').value.trim();
-    const date = document.getElementById('evolutionDate').value;
-    const modal = document.getElementById('evolutionModal');
-    const surgeryId = modal.dataset.surgeryId;
-    const type = modal.dataset.type;
-    const patId = window.patientId || patientId;
-    
-    if (!content) {
-        showAlert('Descrição vazia!', 'warning');
-        return;
-    }
-    
-    console.log('saveEvolution - type:', type, 'surgeryId:', surgeryId);
-    
-    if (type === 'surgery' && surgeryId) {
-        // Salvar evolução de cirurgia
-        fetch(`/api/patient/${patId}/surgery/${surgeryId}/evolution`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ content: content })
-        })
-        .then(r => r.json())
-        .then(result => {
-            console.log('Resultado evolução cirurgia:', result);
-            if (result.success) {
-                showAlert('✅ Evolução de cirurgia salva!', 'success');
-                bootstrap.Modal.getInstance(modal).hide();
-                loadTimeline();
-            } else {
-                showAlert(result.error || 'Erro ao salvar', 'danger');
-            }
-        })
-        .catch(err => {
-            console.error('Erro:', err);
-            showAlert('Erro ao salvar evolução', 'danger');
-        });
-    } else {
-        // Salvar evolução de consulta
-        let consultationId = modal.dataset.consultationId || document.getElementById('evolutionConsultation').value;
-        
-        if (!consultationId || consultationId === '' || consultationId === undefined) {
-            showAlert('Selecione uma consulta!', 'warning');
-            return;
-        }
-        
-        // Garantir que é um número válido
-        consultationId = parseInt(String(consultationId).trim());
-        
-        if (isNaN(consultationId)) {
-            showAlert('ID de consulta inválido!', 'warning');
-            return;
-        }
-        
-        console.log('Salvando evolução consulta - consultationId:', consultationId, 'from dataset:', modal.dataset.consultationId);
-        
-        fetch(`/api/patient/${patId}/evolution`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                content: content,
-                evolution_date: date,
-                consultation_id: consultationId
-            })
-        })
-        .then(r => r.json())
-        .then(result => {
-            console.log('Resultado evolução consulta:', result);
-            if (result.success) {
-                showAlert('Evolução salva com sucesso!', 'success');
-                bootstrap.Modal.getInstance(modal).hide();
-                loadTimeline();
-            } else {
-                showAlert(result.error || 'Erro ao salvar', 'danger');
-            }
-        })
-        .catch(err => {
-            console.error('Erro ao salvar evolução:', err);
-            showAlert('Erro ao salvar evolução: ' + err.message, 'danger');
-        });
-    }
-}
-
-
-function calculateDaysPassed(dateStr) {
-    // Parse data no formato DD/MM/YYYY
-    const [day, month, year] = dateStr.split('/').map(Number);
-    const surgeryDate = new Date(year, month - 1, day);
-    const today = new Date();
-    
-    const diffTime = today - surgeryDate;
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    // Calcular anos, meses e dias
-    let years = Math.floor(diffDays / 365);
-    let months = Math.floor((diffDays % 365) / 30);
-    let days = diffDays % 30;
-    
-    // Formatar output
-    const parts = [];
-    if (years > 0) parts.push(`${years} ano${years !== 1 ? 's' : ''}`);
-    if (months > 0) parts.push(`${months} mês${months !== 1 ? 'es' : ''}`);
-    if (days > 0 || parts.length === 0) parts.push(`${days} dia${days !== 1 ? 's' : ''}`);
-    
-    return parts.slice(0, 2).join(' e '); // Mostrar no máximo 2 unidades
-}
-
-function groupSurgeriesByMonthYear(surgeries) {
-    const grouped = {};
-    
-    surgeries.forEach(surgery => {
-        const [day, month, year] = surgery.surgery_date.split('/');
-        const key = `${month}/${year}`;
-        const monthYear = new Date(year, month - 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-        
-        if (!grouped[key]) {
-            grouped[key] = { monthYear, surgeries: [] };
-        }
-        grouped[key].surgeries.push(surgery);
-    });
-    
-    return grouped;
-}
-
-function renderSurgeries(surgeries = []) {
-    const container = document.getElementById('surgeriesContainer');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    if (surgeries.length === 0) {
-        container.innerHTML = '<p class="text-muted text-center">Nenhuma cirurgia registrada.</p>';
-        return;
-    }
-    
-    // Agrupar cirurgias por mês/ano
-    const grouped = groupSurgeriesByMonthYear(surgeries);
-    
-    // Renderizar grupos
-    Object.keys(grouped).sort().reverse().forEach(key => {
-        const group = grouped[key];
-        
-        // Criar header do grupo
-        const groupHeader = document.createElement('div');
-        groupHeader.className = 'mb-3 mt-3 pt-2 border-top';
-        groupHeader.innerHTML = `<h6 class="text-secondary text-capitalize">${group.monthYear}</h6>`;
-        container.appendChild(groupHeader);
-        
-        // Renderizar cirurgias do grupo
-        group.surgeries.forEach(surgery => {
-            const daysPassed = calculateDaysPassed(surgery.surgery_date);
-            
-            const surgeryDiv = document.createElement('div');
-            surgeryDiv.className = 'mb-4 p-3 border rounded';
-            surgeryDiv.style.backgroundColor = '#e3f2fd';
-            surgeryDiv.style.borderLeft = '5px solid #2196F3';
-            
-            surgeryDiv.innerHTML = `
-                <div class="d-flex justify-content-between align-items-start mb-3">
-                    <div>
-                        <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${surgery.surgery_date}</strong></h6>
-                        <p class="mb-1"><small class="text-success"><i class="bi bi-hourglass-split"></i> ${daysPassed}</small></p>
-                        <p class="mb-1"><small><strong>Cirurgia de Transplante</strong></small></p>
-                    </div>
-                    <button class="btn btn-sm btn-outline-success" onclick="openSurgeryEvolutionModal(${surgery.id}, '${surgery.surgery_date}')">
-                        <i class="bi bi-plus"></i> Evolução
-                    </button>
-                </div>
-                <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${surgery.surgical_data}</p>
-                ${surgery.observations ? `<p><strong>Observações:</strong> ${surgery.observations}</p>` : ''}
-                <p class="mb-3"><small class="text-muted">Dr. ${surgery.doctor_name}</small></p>
-            `;
-            
-            // Sempre adicionar seção de evoluções da cirurgia
-            const evolutionsDiv = document.createElement('div');
-            evolutionsDiv.className = 'mt-3 pt-3 border-top';
-            
-            const evoHeader = document.createElement('h6');
-            evoHeader.className = 'text-success mb-2';
-            evoHeader.innerHTML = '<i class="bi bi-stickies"></i> Evoluções';
-            evolutionsDiv.appendChild(evoHeader);
-            
-            if (surgery.evolutions && surgery.evolutions.length > 0) {
-                const evosContainer = document.createElement('div');
-                evosContainer.className = 'ms-2 ps-3 border-start border-success';
-                
-                surgery.evolutions.forEach(evo => {
-                    const evoDiv = document.createElement('div');
-                    evoDiv.className = 'mb-3 p-2 bg-light rounded';
-                    evoDiv.style.borderLeft = '4px solid #198754';
-                    
-                    evoDiv.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="flex-grow-1">
-                                <small class="text-muted"><i class="bi bi-clock"></i> ${evo.date}</small>
-                                <p class="mb-1 mt-2" style="white-space: pre-wrap;">${evo.content}</p>
-                                <small class="text-muted">Dr. ${evo.doctor}</small>
-                            </div>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgeryEvolution(${evo.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    `;
-                    evosContainer.appendChild(evoDiv);
-                });
-                
-                evolutionsDiv.appendChild(evosContainer);
-            } else {
-                const noEvo = document.createElement('p');
-                noEvo.className = 'text-muted small mb-0';
-                noEvo.innerHTML = '<em>Nenhuma evolução registrada</em>';
-                evolutionsDiv.appendChild(noEvo);
-            }
-            
-            surgeryDiv.appendChild(evolutionsDiv);
-            
-            container.appendChild(surgeryDiv);
-        });
-    });
-}
-
-function renderEvolutionsInAccordion(consultations = []) {
-    // Aguardar um pouco para garantir que o DOM foi renderizado
-    setTimeout(() => {
-        consultations.forEach(consultation => {
-            const containerId = `evolutionsContainer${consultation.id}`;
-            let container = document.getElementById(containerId);
-            
-            if (!container) {
-                // Tentar encontrar dentro do accordion body
-                const collapseDiv = document.getElementById(`collapse${consultation.id}`);
-                if (collapseDiv) {
-                    container = collapseDiv.querySelector(`#${containerId}`);
-                }
-            }
-            
-            if (!container) {
-                console.log(`Container não encontrado para consultaID ${consultation.id}`);
-                return;
-            }
-            
-            container.innerHTML = '';
-            
-            // Container para a caixa de texto (sempre visível para nova evolução)
-            const quickEvoDiv = document.createElement('div');
-            quickEvoDiv.className = 'mt-3 p-3 bg-light rounded border mb-3';
-            quickEvoDiv.innerHTML = `
-                <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Nova Evolução</h6>
-                <textarea class="form-control mb-2" rows="3" id="newEvoText${consultation.id}" 
-                          placeholder="Descreva a evolução do paciente..." 
-                          style="background-color: #fff;"></textarea>
-                <div class="d-flex justify-content-between">
-                    <button class="btn btn-sm btn-success" onclick="saveQuickEvolution(${consultation.id})">
-                        <i class="bi bi-save"></i> Salvar Evolução
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date}')">
-                        <i class="bi bi-arrows-fullscreen"></i> Tela Cheia
-                    </button>
-                </div>
-            `;
-            container.appendChild(quickEvoDiv);
-
-            if (consultation.evolutions && consultation.evolutions.length > 0) {
-                // Título para evoluções anteriores
-                const historyTitle = document.createElement('div');
-                historyTitle.className = 'border-top pt-2 mt-2 mb-2';
-                historyTitle.innerHTML = '<small class="text-muted fw-bold">Evoluções Anteriores:</small>';
-                container.appendChild(historyTitle);
-
-                // Renderizar evoluções existentes
-                consultation.evolutions.forEach(evo => {
-                    const evoDiv = document.createElement('div');
-                    evoDiv.className = 'mb-2 p-2 bg-white rounded border-start border-4 border-success shadow-sm';
-                    evoDiv.innerHTML = `
-                        <div class="d-flex justify-content-between">
-                            <small class="text-muted fw-bold">${evo.date} - Dr. ${evo.doctor}</small>
-                            <button class="btn btn-link btn-sm p-0 text-danger" onclick="deleteEvolution(${evo.id})">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                        <div class="mt-1" style="white-space: pre-wrap;">${evo.content}</div>
-                    `;
-                    container.appendChild(evoDiv);
-                });
-            }
-        });
-    }, 500);
-}
-
-function saveQuickEvolution(consultationId) {
-    const textarea = document.getElementById(`newEvoText${consultationId}`);
-    if (!textarea) return;
-    const content = textarea.value.trim();
-    
-    if (!content) {
-        showAlert('Por favor, digite o conteúdo da evolução.', 'warning');
-        return;
-    }
-    
-    fetch(`/api/patient/${window.patientId}/evolution`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-            content: content,
-            consultation_id: consultationId,
-            evolution_date: new Date().toISOString()
-        })
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Evolução salva com sucesso!', 'success');
-            loadTimeline(); // Recarregar sem refresh total
-        } else {
-            showAlert(result.error || 'Erro ao salvar', 'danger');
-        }
-    })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro ao salvar evolução', 'danger');
-    });
-}
-
-function openSurgeryEvolutionModal(surgeryId, surgeryDate) {
-    const modal = document.getElementById('evolutionModal');
-    document.getElementById('evolutionDate').value = new Date().toISOString().slice(0, 16);
-    document.getElementById('evolutionContent').value = '';
-    document.getElementById('evolutionConsultation').style.display = 'none';
-    document.getElementById('evolutionConsultationDisplay').style.display = 'block';
-    document.getElementById('evolutionConsultationName').textContent = `🏥 Cirurgia de ${surgeryDate}`;
-    
-    modal.dataset.surgeryId = surgeryId;
-    modal.dataset.fromConsultation = 'false';
-    modal.dataset.type = 'surgery';
-    
-    new bootstrap.Modal(modal).show();
-}
-
-function deleteSurgeryEvolution(evolutionId) {
-    if (!confirm('Tem certeza que deseja deletar esta evolução da cirurgia?')) return;
-    
-    fetch(`/api/patient/surgery-evolution/${evolutionId}`, {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'}
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('✅ Evolução deletada!', 'success');
-            loadTimeline();
-        } else {
-            showAlert(result.error || 'Erro ao deletar', 'danger');
-        }
-    })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro ao deletar evolução', 'danger');
-    });
-}
-
-function openEvolutionFromConsultation(consultationId, consultationDate) {
-    console.log('openEvolutionFromConsultation - consultationId:', consultationId);
-    
-    // Tentar encontrar o collapse correspondente no histórico (Timeline)
-    var collapseId = 'collapse' + consultationId;
-    var collapseEl = document.getElementById(collapseId);
-    
-    if (collapseEl) {
-        // Se encontrou o elemento no histórico, rola até ele e abre
-        collapseEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        var bsCollapse = bootstrap.Collapse.getOrCreateInstance(collapseEl);
-        bsCollapse.show();
-        
-        // Focar no textarea e garantir que está habilitado
-        setTimeout(function() {
-            var textarea = collapseEl.querySelector('textarea');
-            if (textarea) {
-                textarea.removeAttribute('readonly');
-                textarea.removeAttribute('disabled');
-                textarea.focus();
-                console.log('Textarea focused and enabled in history');
-            }
-        }, 400);
-
-        // Pequeno destaque visual
-        var content = collapseEl.querySelector('.timeline-content');
-        if (content) {
-            content.style.backgroundColor = '#fff3cd';
-            setTimeout(function() { content.style.backgroundColor = ''; }, 2000);
-        }
-        return;
-    }
-
-    // Se NÃO encontrou no histórico (Timeline), abre o modal de nova evolução
-    var consultations = window.timelineConsultations || [];
-    var consultation = null;
-    for (var i = 0; i < consultations.length; i++) {
-        if (String(consultations[i].id) === String(consultationId)) {
-            consultation = consultations[i];
-            break;
-        }
-    }
-    
-    var category = consultation ? consultation.category : 'Consulta';
-    var displayDate = consultation ? consultation.date : consultationDate;
-    var isSurgery = category && category.toLowerCase().indexOf('cirurgia') !== -1;
-
-    var modalHtml = '<div class="modal fade" id="evolutionModal" tabindex="-1">' +
-        '<div class="modal-dialog modal-lg">' +
-            '<div class="modal-content">' +
-                '<div class="modal-header bg-success text-white">' +
-                    '<h5 class="modal-title"><i class="bi bi-plus-circle"></i> Nova Evolução</h5>' +
-                    '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>' +
-                '</div>' +
-                '<div class="modal-body">' +
-                    '<div class="alert alert-success d-flex align-items-center mb-3">' +
-                        '<i class="bi bi-calendar-event me-2"></i>' +
-                        '<div><strong>' + category + ' de ' + displayDate + '</strong></div>' +
-                    '</div>' +
-                    '<div class="mb-3">' +
-                        '<label class="form-label fw-bold">Data da Evolução</label>' +
-                        '<input type="datetime-local" class="form-control" id="evolution_date_manual">' +
-                    '</div>' +
-                    (isSurgery ? 
-                    '<div class="mb-4">' +
-                        '<label class="form-label fw-bold">Tipo de Evolução Pós-Cirúrgica:</label>' +
-                        '<div class="btn-group w-100" role="group">' +
-                            '<input type="radio" class="btn-check" name="evolution_type_manual" id="evo_rotina_m" value="general" checked>' +
-                            '<label class="btn btn-outline-secondary" for="evo_rotina_m"><i class="bi bi-journal-text"></i> Rotina</label>' +
-                            '<input type="radio" class="btn-check" name="evolution_type_manual" id="evo_7dias_m" value="7_days">' +
-                            '<label class="btn btn-outline-warning" for="evo_7dias_m"><i class="bi bi-calendar-week"></i> 7 Dias</label>' +
-                            '<input type="radio" class="btn-check" name="evolution_type_manual" id="evo_1ano_m" value="1_year">' +
-                            '<label class="btn btn-outline-info" for="evo_1ano_m"><i class="bi bi-calendar-check"></i> 1 Ano</label>' +
-                        '</div>' +
-                    '</div>' : '') +
-                    '<div id="evolutionFormContainerManual">' +
-                        '<div class="mb-3">' +
-                            '<label class="form-label fw-bold">Descrição</label>' +
-                            '<textarea class="form-control" id="evolution_content_manual" rows="6" placeholder="Descreva a evolução do paciente..."></textarea>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="modal-footer">' +
-                    '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>' +
-                    '<button type="button" class="btn btn-success" id="btnSaveEvolutionManual"><i class="bi bi-save"></i> Salvar</button>' +
-                '</div>' +
-            '</div>' +
-        '</div>' +
-    '</div>';
-
-    var existingModal = document.getElementById('evolutionModal');
-    if (existingModal) existingModal.remove();
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    var now = new Date();
-    var offset = now.getTimezoneOffset() * 60000;
-    var localISOTime = (new Date(now - offset)).toISOString().slice(0, 16);
-    document.getElementById('evolution_date_manual').value = localISOTime;
-
-    var modalElement = document.getElementById('evolutionModal');
-    var bsModal = new bootstrap.Modal(modalElement);
-    bsModal.show();
-    
-    // Focar no textarea do modal
-    setTimeout(function() {
-        var modalTextarea = document.getElementById('evolution_content_manual');
-        if (modalTextarea) modalTextarea.focus();
-    }, 500);
-
-    document.getElementById('btnSaveEvolutionManual').onclick = function() {
-        var content = document.getElementById('evolution_content_manual').value;
-        var date = document.getElementById('evolution_date_manual').value;
-        
-        if (!content) {
-            alert('Por favor, descreva a evolução');
-            return;
-        }
-
-        var surgeryId = null;
-        if (isSurgery && typeof window.timelineSurgeries !== 'undefined') {
-            var matchedSurgery = window.timelineSurgeries.find(function(s) { return s.surgery_date === surgeryDateOnly; });
-            if (matchedSurgery) surgeryId = matchedSurgery.id;
-        }
-
-        var payload = {
-            consultation_id: consultationId,
-            content: content,
-            evolution_date: date,
-            evolution_type: isSurgery ? (document.querySelector('input[name="evolution_type_manual"]:checked')?.value || 'general') : 'general'
-        };
-
-        var endpoint = surgeryId ? ('/api/surgery/' + surgeryId + '/evolution') : ('/api/patient/' + (window.patientId || '') + '/evolution');
-
-        fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(res) {
-            if (res.success) {
-                bsModal.hide();
-                location.reload();
-            } else {
-                alert('Erro ao salvar: ' + (res.error || 'Erro desconhecido'));
-            }
-        });
-    };
-}
-
-function deleteEvolution(evoId) {
-    if (!confirm('Tem certeza que deseja deletar esta evolução?')) return;
-    
-    fetch(`/api/evolution/${evoId}`, {
-        method: 'DELETE',
-        headers: {'Content-Type': 'application/json'}
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Evolução deletada!', 'success');
-            loadTimeline();
-        } else {
-            showAlert(result.error || 'Erro ao deletar', 'danger');
-        }
-    })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro ao deletar evolução', 'danger');
-    });
-}
-
-function openEvolutionModal() {
-    const modal = document.getElementById('evolutionModal');
-    const now = new Date();
-    
-    document.getElementById('evolutionDate').value = now.toISOString().slice(0, 16);
-    document.getElementById('evolutionContent').value = '';
-    document.getElementById('evolutionConsultation').value = '';
-    
-    document.getElementById('evolutionConsultation').style.display = 'block';
-    document.getElementById('evolutionConsultationDisplay').style.display = 'none';
-    
-    modal.dataset.fromConsultation = 'false';
-    modal.dataset.type = 'consultation';
-    delete modal.dataset.surgeryId;
-    delete modal.dataset.consultationId;
-    
-    loadConsultationsDropdown();
-    new bootstrap.Modal(modal).show();
-}
-
-
-function renderTimeline(consultations = [], surgeries = []) {
-    console.log('renderTimeline - consultations:', consultations, 'surgeries:', surgeries);
-    renderEvolutionsInAccordion(consultations || []);
-    renderSurgeries(surgeries || []);
-}
-
-function loadTimeline() {
-    const id = window.patientId || patientId;
-    if (!id) {
-        console.error('patientId não encontrado');
-        return;
-    }
-    
-    // Carregar consultas E cirurgias da API
-    Promise.all([
-        fetch(`/api/patient/${id}/evolutions`).then(r => r.json()),
-        fetch(`/api/patient/${id}/surgeries`).then(r => r.json())
-    ])
-    .then(([consultations, surgeries]) => {
-        renderTimeline(consultations || [], surgeries || []);
-    })
-    .catch(err => console.error('Erro ao carregar timeline:', err));
-}
-
-// Carregar timeline ao abrir a página
-document.addEventListener('DOMContentLoaded', function() {
     loadTimeline();
 });
-
-function openEditPatientModal() {
-    const modal = new bootstrap.Modal(document.getElementById('editPatientModal'));
-    modal.show();
-}
-
-function savePatientData() {
-    const data = {
-        name: document.getElementById('editPatientName').value,
-        email: document.getElementById('editPatientEmail').value,
-        phone: document.getElementById('editPatientPhone').value,
-        birth_date: document.getElementById('editPatientBirthDate').value,
-        cpf: document.getElementById('editPatientCpf').value,
-        address: document.getElementById('editPatientAddress').value,
-        city: document.getElementById('editPatientCity').value,
-        state: document.getElementById('editPatientState').value,
-        zip_code: document.getElementById('editPatientZip').value
-    };
-    
-    if (!data.name) {
-        showAlert('Nome é obrigatório', 'danger');
-        return;
-    }
-    
-    const id = window.patientId || patientId;
-    
-    fetch(`/api/patient/${id}/update`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(data)
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Dados atualizados com sucesso!', 'success');
-            bootstrap.Modal.getInstance(document.getElementById('editPatientModal')).hide();
-            setTimeout(() => location.reload(), 500);
-        } else {
-            showAlert(result.error || 'Erro ao atualizar', 'danger');
-        }
-    })
-    .catch(err => {
-        console.error('Erro:', err);
-        showAlert('Erro ao salvar dados', 'danger');
-    });
-}
-
-function saveTransplantIndication() {
-    const indication = document.querySelector('input[name="transplantIndication"]:checked')?.value;
-    if (!indication) return;
-    
-    const id = window.patientId || patientId;
-    
-    fetch(`/api/patient/${id}/transplant-indication`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({has_indication: indication === 'sim'})
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Indicação salva!', 'success');
-        } else {
-            showAlert(result.error || 'Erro ao salvar', 'danger');
-        }
-    })
-    .catch(err => console.error('Erro:', err));
-}
-
-function abrirDermaScribe() {
-    let patientName = '';
-    
-    const h2Element = document.querySelector('h2');
-    if (h2Element) {
-        patientName = h2Element.textContent.replace('Prontuário:', '').trim();
-    }
-    
-    if (!patientName) {
-        patientName = document.getElementById('patientName')?.textContent?.trim() || 
-                      document.querySelector('.patient-name')?.textContent?.trim() || 
-                      window.patientName || '';
-    }
-    
-    const cleanName = patientName.replace(/\s*\(\d+\s*anos?\)/gi, '').replace(/Editar\s*Cadastro/gi, '').trim();
-    const encodedName = encodeURIComponent(cleanName);
-    const currentPatientId = window.patientId || patientId;
-    const dermaScribeUrl = `/dermascribe/?patient=${encodedName}&patient_id=${currentPatientId}`;
-    
-    window.dermaScribeWindow = window.open(dermaScribeUrl, 'DermaScribe', 'width=1200,height=900,scrollbars=yes,resizable=yes');
-}
-
-function handleDermaScribeMessage(event) {
-    const data = event.data;
-    if (data && data.type === 'prescription_saved') {
-        showAlert('Receita salva com sucesso no prontuário!', 'success');
-    }
-}
-
-function savePrescriptionToConduta(prescriptionData) {
-    const patientId = window.patientId || document.getElementById('patientId')?.value;
-    if (!patientId) {
-        console.error('Patient ID não encontrado');
-        return;
-    }
-    
-    fetch(`/api/patient/${patientId}/prescription`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(prescriptionData)
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            showAlert('Receita salva na conduta!', 'success');
-            loadPrescriptionHistory();
-            const condutaText = document.getElementById('condutaText');
-            if (condutaText && prescriptionData.summary) {
-                const currentText = condutaText.value;
-                const separator = currentText ? '\n\n' : '';
-                condutaText.value = currentText + separator + '📋 RECEITA: ' + prescriptionData.summary;
-            }
-        } else {
-            showAlert(result.error || 'Erro ao salvar receita', 'danger');
-        }
-    })
-    .catch(err => {
-        console.error('Erro ao salvar receita:', err);
-        showAlert('Erro ao salvar receita', 'danger');
-    });
-}
-
-function loadPrescriptionHistory() {
-    const currentPatientId = window.patientId || patientId;
-    if (!currentPatientId) return;
-    
-    fetch(`/dermascribe/api/patient/${currentPatientId}/prescriptions`)
-    .then(r => r.json())
-    .then(data => {
-        const container = document.getElementById('prescriptionHistoryList');
-        if (!container) return;
-        
-        if (!data.prescriptions || data.prescriptions.length === 0) {
-            container.innerHTML = '<small class="text-muted">Nenhuma receita emitida</small>';
-            return;
-        }
-        
-        let html = '<ul class="list-unstyled mb-0">';
-        data.prescriptions.forEach(p => {
-            let summary = '';
-            if (p.oral && p.oral.length > 0) {
-                summary += `Oral: ${p.oral.map(m => m.medication || m).join(', ')}. `;
-            }
-            if (p.topical && p.topical.length > 0) {
-                summary += `Tópico: ${p.topical.map(m => m.medication || m).join(', ')}`;
-            }
-            
-            html += `<li class="mb-2 p-2 bg-light rounded">
-                <small class="text-muted">${p.created_at} - Dr(a). ${p.doctor}</small>
-                <div class="small">${summary || 'Receita'}</div>
-                <button class="btn btn-sm btn-outline-primary mt-1" onclick="printPrescription(${p.id})">
-                    <i class="bi bi-printer"></i> Imprimir
-                </button>
-            </li>`;
-        });
-        html += '</ul>';
-        container.innerHTML = html;
-    })
-    .catch(err => console.error('Erro ao carregar histórico:', err));
-}
-
-function printPrescription(prescriptionId) {
-    window.open(`/dermascribe/prescription/${prescriptionId}/print`, '_blank');
-}
-
-function viewPrescription(prescriptionId) {
-    window.open(`/prescription/${prescriptionId}/print`, '_blank');
-}
