@@ -537,17 +537,21 @@
           <div class="tab-pane fade show active" id="queixa">
             <div class="mb-3">
               <label class="form-label">Queixa Principal</label>
+              {% if current_user.is_doctor() %}
               <button class="btn btn-sm btn-outline-primary float-end" onclick="startDictation('queixaText', event)">
                 <i class="bi bi-mic"></i> Ditado
               </button>
+              {% endif %}
             </div>
             <textarea class="form-control" id="queixaText" rows="8" {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
           </div>
 
           <div class="tab-pane fade" id="anamnese">
-            <div class="mb-3">
-              <label class="form-label">Anamnese</label>
+              {% if current_user.is_doctor() %}
               <button class="btn btn-sm btn-outline-primary float-end" onclick="startDictation('anamneseText', event)">
+                <i class="bi bi-mic"></i> Ditado
+              </button>
+              {% endif %}
                 <i class="bi bi-mic"></i> Ditado
               </button>
             </div>
@@ -563,17 +567,21 @@
               {% endfor %}
             </div>
           </div>
-
-          <div class="tab-pane fade" id="diagnostico">
-            <div class="mb-3">
+              {% if current_user.is_doctor() %}
+              <button class="btn btn-sm btn-outline-primary float-end" onclick="startDictation('diagnosticoText', event)">
+                <i class="bi bi-mic"></i> Ditado
+              </button>
+              {% endif %}
               <label class="form-label">Diagnóstico</label>
               <button class="btn btn-sm btn-outline-primary float-end" onclick="startDictation('diagnosticoText', event)">
                 <i class="bi bi-mic"></i> Ditado
               </button>
             </div>
-            <textarea class="form-control" id="diagnosticoText" rows="8" {% if not current_user.is_doctor() %}readonly{% endif %}></textarea>
-          </div>
-
+              {% if current_user.is_doctor() %}
+              <button class="btn btn-sm btn-outline-primary float-end ms-2" onclick="startDictation('condutaText', event)">
+                <i class="bi bi-mic"></i> Ditado
+              </button>
+              {% endif %}
           <div class="tab-pane fade" id="conduta">
             <div class="mb-3">
               <label class="form-label">Conduta</label>
