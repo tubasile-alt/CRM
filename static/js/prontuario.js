@@ -329,8 +329,54 @@ async function loadExistingPlans() {
     }
 }
 
+function handleCategoryChange(event) {
+    const newCategory = event.target.value;
+    const sectionGeral = document.getElementById('section_geral');
+    const sectionCosmiatria = document.getElementById('section_cosmiatria');
+    const sectionTransplante = document.getElementById('section_transplante');
+    const indicatedProcedures = document.getElementById('indicatedProceduresSection');
+    const cosmeticConduct = document.getElementById('cosmeticConductSection');
+    const cosmeticConductLabel = document.getElementById('cosmeticConductLabel');
+
+    // Reset visibility
+    if (sectionGeral) sectionGeral.style.display = 'block';
+    if (sectionCosmiatria) sectionCosmiatria.style.display = 'none';
+    if (sectionTransplante) sectionTransplante.style.display = 'none';
+    if (indicatedProcedures) indicatedProcedures.style.display = 'none';
+    if (cosmeticConduct) cosmeticConduct.style.display = 'none';
+    if (cosmeticConductLabel) cosmeticConductLabel.style.display = 'none';
+
+    if (newCategory === 'patologia') {
+        if (indicatedProcedures) indicatedProcedures.style.display = 'block';
+    } else if (newCategory === 'cosmiatria') {
+        if (sectionCosmiatria) sectionCosmiatria.style.display = 'block';
+        if (cosmeticConduct) cosmeticConduct.style.display = 'block';
+        if (cosmeticConductLabel) cosmeticConductLabel.style.display = 'inline-block';
+    } else if (newCategory === 'transplante_capilar') {
+        if (sectionTransplante) sectionTransplante.style.display = 'block';
+    }
+
+    currentCategory = newCategory;
+    
+    // Auto-start timer for special categories
+    if ((newCategory === 'cosmiatria' || newCategory === 'transplante_capilar') && !timerStartTime) {
+        startConsultation();
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(loadExistingPlans, 500);
     setTimeout(loadPrescriptionHistory, 500);
-    loadTimeline();
+    if (typeof loadTimeline === 'function') loadTimeline();
+
+    const categoryInputs = document.querySelectorAll('input[name="category"]');
+    categoryInputs.forEach(input => {
+        input.addEventListener('change', handleCategoryChange);
+    });
+    
+    // Initialize view based on default checked category
+    const activeCategory = document.querySelector('input[name="category"]:checked');
+    if (activeCategory) {
+        handleCategoryChange({ target: activeCategory });
+    }
 });
