@@ -1076,7 +1076,7 @@
                         {% if plan.was_performed %}
                         <span class="badge bg-success">FEITO</span>
                         {% else %}
-                        <button class="btn btn-sm btn-danger py-0 px-2 fw-bold" onclick="performCosmeticProcedure({{ plan.id }}, '{{ plan.procedure_name }}', {{ consultation.id }})">
+                        <button class="btn btn-sm btn-danger py-0 px-2 fw-bold" onclick="performCosmeticProcedure({{ plan.id }}, '{{ plan.procedure_name|escape }}', {{ plan.appointment_id or 'null' }})">
                           PENDENTE
                         </button>
                         {% endif %}
