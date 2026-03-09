@@ -3662,32 +3662,47 @@ def create_surgery_evolution(surgery_id):
     """Criar evolução pós-cirúrgica"""
     if not current_user.is_doctor():
         return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
-    
+
     from models import TransplantSurgeryRecord, SurgeryEvolution, FollowUpReminder
     surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
-    data = request.get_json()
-    
+    data = request.get_json() or {}
+
     evolution_type = data.get('evolution_type', 'general')
     if evolution_type == 'rotina':
         evolution_type = 'general'
-    if evolution_type not in ['general', '7_days', '1_year']:
+
+    allowed_types = ['general', '7_days', '5_months', '1_year']
+    if evolution_type not in allowed_types:
         evolution_type = 'general'
-    
+
     evolution = SurgeryEvolution(
         surgery_id=surgery_id,
         doctor_id=current_user.id,
         content=data.get('content', ''),
         evolution_type=evolution_type,
+
         has_necrosis=data.get('has_necrosis', False),
         has_scabs=data.get('has_scabs', False),
         has_infection=data.get('has_infection', False),
         has_follicle_loss=data.get('has_follicle_loss', False),
+
+        has_folliculitis_acute=data.get('has_folliculitis_acute', False),
+        has_folliculitis_chronic=data.get('has_folliculitis_chronic', False),
+        has_rarefaction=data.get('has_rarefaction', False),
+        has_local_failure=data.get('has_local_failure', False),
+
+        patient_satisfied=data.get('patient_satisfied'),
+        result_within_expected=data.get('result_within_expected'),
+        using_oral_medication=data.get('using_oral_medication'),
+
         result_rating=data.get('result_rating'),
-        needs_another_surgery=data.get('needs_another_surgery', False)
+        needs_another_surgery=data.get('needs_another_surgery', False),
+        needs_body_hair=data.get('needs_body_hair', False),
+        needs_touch_up=data.get('needs_touch_up', False)
     )
-    
+
     db.session.add(evolution)
-    
+
     if data.get('needs_another_surgery'):
         reminder = FollowUpReminder(
             patient_id=surgery.patient_id,
@@ -3695,13 +3710,17 @@ def create_surgery_evolution(surgery_id):
             scheduled_date=get_brazil_time().date(),
             reminder_type='transplant_revision',
             status='pending',
-            notes=f'Paciente indicado para nova cirurgia na evolução de 1 ano. Observações: {data.get("content", "")}'
+            notes=f'Paciente indicado para nova cirurgia na evolução {evolution_type}. Observações: {data.get("content", "")}'
         )
         db.session.add(reminder)
-    
+
     db.session.commit()
-    
-    return jsonify({'success': True, 'id': evolution.id, 'evolution_type': evolution_type})
+
+    return jsonify({
+        'success': True,
+        'id': evolution.id,
+        'evolution_type': evolution_type
+    })
 
 @app.route('/api/surgery/evolution/<int:evolution_id>', methods=['DELETE'])
 @login_required
