@@ -253,17 +253,35 @@ class SurgeryEvolution(db.Model):
     evolution_date = db.Column(db.DateTime, default=get_brazil_time, nullable=False, index=True)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
-    
-    evolution_type = db.Column(db.String(20), default='general')
-    
+
+    # Tipo do retorno
+    evolution_type = db.Column(db.String(20), default='general')  # general, 7_days, 5_months, 1_year
+
+    # Checklist cirúrgico base
     has_necrosis = db.Column(db.Boolean, default=False)
     has_scabs = db.Column(db.Boolean, default=False)
     has_infection = db.Column(db.Boolean, default=False)
     has_follicle_loss = db.Column(db.Boolean, default=False)
-    
-    result_rating = db.Column(db.String(20), nullable=True)
+
+    # Novos achados
+    has_folliculitis_acute = db.Column(db.Boolean, default=False)
+    has_folliculitis_chronic = db.Column(db.Boolean, default=False)
+    has_rarefaction = db.Column(db.Boolean, default=False)
+    has_local_failure = db.Column(db.Boolean, default=False)
+
+    # 5 meses / 1 ano
+    patient_satisfied = db.Column(db.Boolean, nullable=True)
+    result_within_expected = db.Column(db.Boolean, nullable=True)
+    using_oral_medication = db.Column(db.Boolean, nullable=True)
+
+    # 1 ano
     needs_another_surgery = db.Column(db.Boolean, default=False)
-    
+    needs_body_hair = db.Column(db.Boolean, default=False)
+    needs_touch_up = db.Column(db.Boolean, default=False)
+
+    # Campo legado, pode manter
+    result_rating = db.Column(db.String(20), nullable=True)
+
     doctor = db.relationship('User', backref='surgery_evolutions')
 
 class DoctorPreference(db.Model):
