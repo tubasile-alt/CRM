@@ -727,10 +727,13 @@ function handleCategoryChange(event) {
   updateCategoryTexts();
   toggleCategoryTabs();
 
-  if (currentCategory === "cosmiatria" && cosmeticProcedures.length === 0) {
-    loadExistingPlans();
-  } else {
+  if (currentCategory === "cosmiatria") {
     renderCosmeticConduct();
+    showRightPanel();
+  } else if (currentCategory === "transplante_capilar") {
+    renderTransplantRightPanelFromScreen();
+  } else if (currentCategory === "patologia") {
+    renderPatologiaRightPanelFromScreen();
   }
 }
 
