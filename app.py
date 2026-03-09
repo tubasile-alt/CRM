@@ -1812,11 +1812,11 @@ def prontuario(patient_id):
                 'is_finalized': finalized_note is not None
             })
         
-        # Incluir agendamentos "atendido" sem notas
+        # Incluir agendamentos sem notas (atendido, faltou, agendado)
         covered_appt_ids = {c['id'] for c in consultations}
         empty_q = Appointment.query.filter(
             Appointment.patient_id == patient_id,
-            Appointment.status == 'atendido'
+            Appointment.status.in_(['atendido', 'faltou', 'agendado'])
         )
         if covered_appt_ids:
             empty_q = empty_q.filter(~Appointment.id.in_(list(covered_appt_ids)))
@@ -1832,7 +1832,8 @@ def prontuario(patient_id):
                 'notes_by_type': {},
                 'all_notes': [],
                 'cosmetic_plans': [],
-                'is_finalized': False
+                'is_finalized': False,
+                'status': ea.status
             })
 
         consultations.sort(key=lambda x: x['date'], reverse=True)
