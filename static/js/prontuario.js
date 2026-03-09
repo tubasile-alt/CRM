@@ -3185,6 +3185,74 @@ function renderTransplantRightPanelFromScreen() {
   showRightPanel();
 }
 
+function renderHistoricalConsultationRightPanel(consultationId, category) {
+  const consultationCard = document.getElementById(`consultation-${consultationId}`);
+  const panelTitle = document.getElementById("cosmeticRightColumnTitle");
+  const panelContent = document.getElementById("cosmeticRightColumnContent");
+
+  if (!consultationCard || !panelContent) return;
+
+  currentHistoricalConsultation = consultationId;
+
+  if (category === "cosmiatria") {
+    currentRightPanelMode = "cosmiatria";
+    if (panelTitle) {
+      panelTitle.innerHTML = '<i class="bi bi-heart-pulse me-2"></i>Planejamento e Execução';
+    }
+
+    const items = consultationCard.querySelectorAll(".list-group-item");
+    if (!items.length) {
+      panelContent.innerHTML = `<div class="text-muted small">Nenhum planejamento encontrado nesta consulta.</div>`;
+      showRightPanel();
+      return;
+    }
+
+    let html = "";
+    items.forEach((item) => {
+      html += `<div class="mb-2">${item.outerHTML}</div>`;
+    });
+
+    panelContent.innerHTML = html;
+    showRightPanel();
+    return;
+  }
+
+  if (category === "transplante_capilar") {
+    currentRightPanelMode = "transplante";
+    if (panelTitle) {
+      panelTitle.innerHTML = '<i class="bi bi-scissors me-2"></i>Planejamento Cirúrgico';
+    }
+
+    const wrapper = consultationCard.querySelector(".js-surgical-plan-wrapper");
+    if (!wrapper) {
+      panelContent.innerHTML = `<div class="text-muted small">Nenhum planejamento cirúrgico encontrado nesta consulta.</div>`;
+      showRightPanel();
+      return;
+    }
+
+    panelContent.innerHTML = wrapper.outerHTML;
+    showRightPanel();
+    return;
+  }
+
+  currentRightPanelMode = "patologia";
+  if (panelTitle) {
+    panelTitle.innerHTML = '<i class="bi bi-journal-text me-2"></i>Observações';
+  }
+
+  const queixa = consultationCard.querySelector('h6 .bi-chat-left-text')?.closest(".mb-3")?.outerHTML || "";
+  const diagnostico = consultationCard.querySelector('h6 .bi-clipboard-check')?.closest(".mb-3")?.outerHTML || "";
+  const conduta = consultationCard.querySelector('h6 .bi-prescription2')?.closest(".mb-3")?.outerHTML || "";
+
+  panelContent.innerHTML = `
+    ${queixa || ""}
+    ${diagnostico || ""}
+    ${conduta || ""}
+  `;
+
+  showRightPanel();
+}
+
 /* ============================================================
    ATUALIZAÇÕES DE COSMIATRIA
    ============================================================ */
