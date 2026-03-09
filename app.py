@@ -3730,6 +3730,49 @@ def get_patient_consultations(patient_id):
     } for apt in appointments]
     return jsonify({'consultations': consultations})
 
+@app.route('/api/patient/<int:patient_id>/surgeries', methods=['GET'])
+@login_required
+def get_patient_surgeries(patient_id):
+    from models import TransplantSurgeryRecord
+    surgeries = TransplantSurgeryRecord.query.filter_by(patient_id=patient_id).order_by(TransplantSurgeryRecord.surgery_date.desc()).all()
+    return jsonify([{
+        'id': s.id,
+        'surgery_date': s.surgery_date.strftime('%d/%m/%Y'),
+        'surgery_date_iso': s.surgery_date.isoformat(),
+        'surgical_data': s.surgical_data,
+        'observations': s.observations,
+        'surgery_type': s.surgery_type,
+        'doctor_name': s.doctor.name if s.doctor else 'Desconhecido'
+    } for s in surgeries])
+
+@app.route('/api/patient/<int:patient_id>/surgery', methods=['POST'])
+@login_required
+def create_patient_surgery(patient_id):
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+
+    from models import TransplantSurgeryRecord
+    from datetime import datetime
+    data = request.get_json()
+
+    try:
+        surgery_date = datetime.strptime(data.get('surgery_date'), '%Y-%m-%d').date()
+    except:
+        return jsonify({'success': False, 'error': 'Data inválida'}), 400
+
+    surgery = TransplantSurgeryRecord(
+        patient_id=patient_id,
+        doctor_id=current_user.id,
+        surgery_date=surgery_date,
+        surgical_data=data.get('surgical_data', ''),
+        observations=data.get('observations', ''),
+        surgery_type=data.get('surgery_type', '')
+    )
+    db.session.add(surgery)
+    db.session.commit()
+
+    return jsonify({'success': True, 'id': surgery.id})
+
 # ==================== SALA DE ESPERA / CHECK-IN ====================
 # Rotas movidas para routes/waiting_room.py (blueprint)
 
