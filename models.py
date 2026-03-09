@@ -394,7 +394,7 @@ class Evolution(db.Model):
 class Payment(db.Model):
     __tablename__ = 'payment'
     id = db.Column(db.Integer, primary_key=True)
-    appointment_id = db.Column(db.Integer, db.ForeignKey('appointment.id'), nullable=False, index=True)
+    appointment_id = db.Column(db.Integer, db.ForeignKey('appointment.id'), nullable=True, index=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False)
     payment_method = db.Column(db.String(50), nullable=False)  # 'dinheiro', 'cartao', 'pix'
