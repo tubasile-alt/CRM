@@ -142,7 +142,7 @@ window.deleteSurgery = function(surgeryId) {
         return;
     }
     
-    fetch('/api/patient/delete/' + id, {
+    fetch('/api/surgery/' + id, {
         method: 'DELETE',
         headers: {
             'Content-Type': 'application/json',
