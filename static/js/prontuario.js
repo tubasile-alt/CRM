@@ -3304,16 +3304,17 @@ function updateProcedureDate(id,date){
    REBUILD AUTOMÁTICO DO PAINEL
    ============================================================ */
 
-const originalRenderCosmetic = window.renderCosmeticProcedures
+const originalRenderCosmetic = window.renderCosmeticProcedures;
 
-window.renderCosmeticProcedures = function(){
+window.renderCosmeticProcedures = function () {
+  if (originalRenderCosmetic) {
+    originalRenderCosmetic();
+  }
 
-    if(originalRenderCosmetic){
-        originalRenderCosmetic()
-    }
-
-    renderRightPanel("cosmiatria")
-}
+  if (currentCategory === "cosmiatria" && !currentHistoricalConsultation) {
+    renderCosmeticConduct();
+  }
+};
 
 /* ============================================================
    INICIALIZAÇÃO
