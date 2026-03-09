@@ -34,6 +34,10 @@ args = "python /home/runner/workspace/app.py"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 5904
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "autoscale"
 run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=2", "--threads=2", "--worker-class=gthread", "--timeout=120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
