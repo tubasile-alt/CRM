@@ -1518,9 +1518,20 @@ function generateBudget() {
 }
 
 function highlightConsultationGroup(consultationKey) {
-  if (currentCategory === "cosmiatria") {
-    setCosmeticContextFromConsultation(consultationKey);
+  const btn = document.querySelector(`.accordion-button[data-consultation-key="${consultationKey}"]`);
+  if (!btn) return;
+
+  const badge = btn.querySelector(".badge.bg-primary");
+  let categoryText = badge ? badge.textContent.trim().toLowerCase() : "";
+
+  let category = "patologia";
+  if (categoryText.includes("cosmiatria")) {
+    category = "cosmiatria";
+  } else if (categoryText.includes("transplante")) {
+    category = "transplante_capilar";
   }
+
+  renderHistoricalConsultationRightPanel(consultationKey, category);
 
   setTimeout(() => {
     const groupElement = document.getElementById(`group-${consultationKey}`);
