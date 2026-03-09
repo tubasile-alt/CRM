@@ -101,9 +101,6 @@ function escapeHtml(value) {
   div.textContent = String(value ?? "");
   return div.innerHTML;
 }
-  div.textContent = String(value ?? "");
-  return div.innerHTML;
-}
 
 function formatMoneyBRL(value) {
   const n = parseFloat(value || 0);
