@@ -3631,12 +3631,12 @@ def delete_patient_surgery(surgery_id):
 def get_surgery_evolutions(surgery_id):
     """Listar evoluções de uma cirurgia"""
     from models import TransplantSurgeryRecord, SurgeryEvolution
+
     surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
-    
     evolutions = SurgeryEvolution.query.filter_by(surgery_id=surgery_id).order_by(SurgeryEvolution.evolution_date.desc()).all()
-    
+
     days_since = (get_brazil_time().date() - surgery.surgery_date).days
-    
+
     return jsonify({
         'surgery_id': surgery_id,
         'surgery_date': surgery.surgery_date.isoformat(),
@@ -3646,12 +3646,26 @@ def get_surgery_evolutions(surgery_id):
             'evolution_type': e.evolution_type,
             'evolution_date': e.evolution_date.isoformat(),
             'content': e.content,
+
             'has_necrosis': e.has_necrosis,
             'has_scabs': e.has_scabs,
             'has_infection': e.has_infection,
             'has_follicle_loss': e.has_follicle_loss,
+
+            'has_folliculitis_acute': e.has_folliculitis_acute,
+            'has_folliculitis_chronic': e.has_folliculitis_chronic,
+            'has_rarefaction': e.has_rarefaction,
+            'has_local_failure': e.has_local_failure,
+
+            'patient_satisfied': e.patient_satisfied,
+            'result_within_expected': e.result_within_expected,
+            'using_oral_medication': e.using_oral_medication,
+
             'result_rating': e.result_rating,
             'needs_another_surgery': e.needs_another_surgery,
+            'needs_body_hair': e.needs_body_hair,
+            'needs_touch_up': e.needs_touch_up,
+
             'doctor_name': e.doctor.name if e.doctor else 'Desconhecido'
         } for e in evolutions]
     })
