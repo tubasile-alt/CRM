@@ -1,0 +1,78 @@
+function renderHistoricalConsultationRightPanel(consultationId, category) {
+  const consultationCard = document.getElementById(`consultation-${consultationId}`);
+  const panelTitle = document.getElementById("cosmeticRightColumnTitle");
+  const panelContent = document.getElementById("cosmeticRightColumnContent");
+
+  if (!consultationCard || !panelContent) return;
+
+  currentHistoricalConsultation = consultationId;
+
+  if (category === "cosmiatria") {
+    currentRightPanelMode = "cosmiatria";
+
+    if (panelTitle) {
+      panelTitle.innerHTML = '<i class="bi bi-heart-pulse me-2"></i>Planejamento e Execução';
+    }
+
+    const allBlocks = Array.from(consultationCard.querySelectorAll(".accordion-body > .mb-3, .accordion-body > div"));
+    const planningBlock = allBlocks.find((el) => {
+      const txt = (el.textContent || "").toLowerCase();
+      return txt.includes("planejamento e execução");
+    });
+
+    if (!planningBlock) {
+      panelContent.innerHTML = `<div class="text-muted small">Nenhum planejamento encontrado nesta consulta.</div>`;
+      showRightPanel();
+      return;
+    }
+
+    panelContent.innerHTML = planningBlock.outerHTML;
+    showRightPanel();
+    return;
+  }
+
+  if (category === "transplante_capilar") {
+    currentRightPanelMode = "transplante";
+
+    if (panelTitle) {
+      panelTitle.innerHTML = '<i class="bi bi-scissors me-2"></i>Planejamento Cirúrgico';
+    }
+
+    const wrapper = consultationCard.querySelector(".js-surgical-plan-wrapper");
+
+    if (!wrapper) {
+      panelContent.innerHTML = `<div class="text-muted small">Nenhum planejamento cirúrgico encontrado nesta consulta.</div>`;
+      showRightPanel();
+      return;
+    }
+
+    panelContent.innerHTML = wrapper.outerHTML;
+    showRightPanel();
+    return;
+  }
+
+  currentRightPanelMode = "patologia";
+
+  if (panelTitle) {
+    panelTitle.innerHTML = '<i class="bi bi-journal-text me-2"></i>Observações';
+  }
+
+  const blocks = Array.from(consultationCard.querySelectorAll(".accordion-body > .mb-3, .accordion-body > div")).filter((el) => {
+    const txt = (el.textContent || "").toLowerCase();
+    return (
+      txt.includes("queixa") ||
+      txt.includes("diagnóstico") ||
+      txt.includes("diagnostico") ||
+      txt.includes("conduta")
+    );
+  });
+
+  if (!blocks.length) {
+    panelContent.innerHTML = `<div class="text-muted small">Nenhuma observação encontrada nesta consulta.</div>`;
+    showRightPanel();
+    return;
+  }
+
+  panelContent.innerHTML = blocks.map((el) => el.outerHTML).join("");
+  showRightPanel();
+}
