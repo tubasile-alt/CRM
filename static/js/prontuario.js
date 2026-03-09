@@ -2913,7 +2913,7 @@ function renderRightPanel(contextCategory = null, consultationData = null){
 
     const category = contextCategory || currentCategory
 
-    panel.style.display = "block"
+    panel.classList.remove("d-none")
 
     /* =========================
        COSMIATRIA
@@ -2955,7 +2955,7 @@ function renderRightPanel(contextCategory = null, consultationData = null){
                         <label class="small text-muted">Data</label>
                         <input type="date"
                                class="form-control form-control-sm"
-                               value="${proc.date || ""}"
+                               value="${proc.performedDate || ""}"
                                onchange="updateProcedureDate('${proc.id}', this.value)">
 
                     </div>
@@ -2965,7 +2965,7 @@ function renderRightPanel(contextCategory = null, consultationData = null){
                         <button class="btn btn-sm btn-outline-primary w-100"
                         onclick="performCosmeticProcedure('${proc.id}')">
 
-                        ${proc.status === "done" ? "Realizado" : "Pendente"}
+                        ${proc.performed ? "Realizado" : "Pendente"}
 
                         </button>
 
@@ -3062,7 +3062,7 @@ function renderRightPanel(contextCategory = null, consultationData = null){
         return
     }
 
-    panel.style.display = "none"
+    panel.classList.add("d-none")
 }
 
 /* ============================================================
@@ -3096,7 +3096,7 @@ function updateProcedureDate(id,date){
 
     const proc = cosmeticProcedures.find(p => p.id == id)
     if(proc){
-        proc.date = date
+        proc.performedDate = date
     }
 
 }
