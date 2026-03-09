@@ -643,16 +643,21 @@ function updateCategoryTexts() {
   }
 }
 
-function updateMainLayoutColumns() {
+function updateMainLayoutColumns(forceShow = false) {
   const left = document.getElementById("prontuarioLeftColumn");
   const right = document.getElementById("cosmeticRightColumn");
 
   if (!left || !right) return;
 
+  const hasCosmiatria = Array.isArray(cosmeticProcedures) && cosmeticProcedures.length > 0;
   const shouldShow =
-    currentCategory === "cosmiatria" &&
-    Array.isArray(cosmeticProcedures) &&
-    cosmeticProcedures.length > 0;
+    forceShow ||
+    currentRightPanelMode === "cosmiatria" ||
+    currentRightPanelMode === "transplante" ||
+    currentRightPanelMode === "patologia" ||
+    (currentCategory === "cosmiatria" && hasCosmiatria) ||
+    currentCategory === "transplante_capilar" ||
+    currentCategory === "patologia";
 
   if (shouldShow) {
     left.classList.remove("col-lg-12");
@@ -662,6 +667,8 @@ function updateMainLayoutColumns() {
     right.classList.add("col-lg-4");
   } else {
     right.classList.add("d-none");
+    right.classList.remove("col-lg-4");
+
     left.classList.remove("col-lg-8");
     left.classList.add("col-lg-12");
   }
