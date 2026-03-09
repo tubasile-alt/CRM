@@ -940,9 +940,7 @@
                     <strong>
                       <i class="bi bi-calendar3"></i>
                       {{ consultation.date.strftime('%d/%m/%Y %H:%M') }}
-                      {% if consultation.get('status') == 'faltou' %}
-                      <span class="badge bg-danger ms-1" style="font-size: 0.7em;"><i class="bi bi-x-circle-fill me-1"></i>Faltou</span>
-                      {% elif not consultation.all_notes %}
+                      {% if not consultation.all_notes %}
                       <span class="badge bg-warning text-dark ms-1" style="font-size: 0.7em;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Sem notas</span>
                       {% elif not consultation.is_finalized %}
                       <span class="badge bg-secondary ms-1" style="font-size: 0.7em;">Rascunho</span>

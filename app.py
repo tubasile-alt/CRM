@@ -1534,7 +1534,10 @@ def build_patient_timeline(p_id):
             return datetime.combine(val, datetime.min.time().replace(hour=default_hour))
         return None
 
-    appts = Appointment.query.filter_by(patient_id=p_id).all()
+    appts = Appointment.query.filter(
+        Appointment.patient_id == p_id,
+        Appointment.status != 'faltou'
+    ).all()
     for apt in appts:
         raw = apt.consultation_date or apt.start_time
         if not raw:
@@ -1812,11 +1815,11 @@ def prontuario(patient_id):
                 'is_finalized': finalized_note is not None
             })
         
-        # Incluir agendamentos sem notas (atendido, faltou, agendado)
+        # Incluir agendamentos "atendido" sem notas
         covered_appt_ids = {c['id'] for c in consultations}
         empty_q = Appointment.query.filter(
             Appointment.patient_id == patient_id,
-            Appointment.status.in_(['atendido', 'faltou', 'agendado'])
+            Appointment.status == 'atendido'
         )
         if covered_appt_ids:
             empty_q = empty_q.filter(~Appointment.id.in_(list(covered_appt_ids)))
