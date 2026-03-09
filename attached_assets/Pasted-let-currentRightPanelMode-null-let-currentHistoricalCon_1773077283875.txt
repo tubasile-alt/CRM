@@ -1,0 +1,99 @@
+let currentRightPanelMode = null;
+let currentHistoricalConsultation = null;
+
+function showRightPanel() {
+  updateMainLayoutColumns(true);
+}
+
+function hideRightPanel() {
+  currentRightPanelMode = null;
+  currentHistoricalConsultation = null;
+  updateMainLayoutColumns(false);
+}
+
+function renderPatologiaRightPanelFromScreen() {
+  const panelTitle = document.getElementById("cosmeticRightColumnTitle");
+  const panelContent = document.getElementById("cosmeticRightColumnContent");
+
+  if (!panelContent) return;
+
+  currentRightPanelMode = "patologia";
+
+  if (panelTitle) {
+    panelTitle.innerHTML = '<i class="bi bi-journal-text me-2"></i>Observações';
+  }
+
+  const queixa = document.getElementById("queixaText")?.value || "";
+  const diagnostico = document.getElementById("diagnosticoText")?.value || "";
+  const conduta = document.getElementById("condutaText")?.value || "";
+
+  panelContent.innerHTML = `
+    <div class="card border-0 bg-light">
+      <div class="card-body small">
+        <div class="mb-3">
+          <div class="fw-bold text-primary mb-1">Queixa</div>
+          <div style="white-space: pre-wrap;">${escapeHtml(queixa || "-")}</div>
+        </div>
+        <div class="mb-3">
+          <div class="fw-bold text-primary mb-1">Diagnóstico</div>
+          <div style="white-space: pre-wrap;">${escapeHtml(diagnostico || "-")}</div>
+        </div>
+        <div>
+          <div class="fw-bold text-primary mb-1">Conduta</div>
+          <div style="white-space: pre-wrap;">${escapeHtml(conduta || "-")}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  showRightPanel();
+}
+
+function renderTransplantRightPanelFromScreen() {
+  const panelTitle = document.getElementById("cosmeticRightColumnTitle");
+  const panelContent = document.getElementById("cosmeticRightColumnContent");
+
+  if (!panelContent) return;
+
+  currentRightPanelMode = "transplante";
+
+  if (panelTitle) {
+    panelTitle.innerHTML = '<i class="bi bi-scissors me-2"></i>Planejamento Cirúrgico';
+  }
+
+  const planning = buildSurgicalPlanningPayload();
+
+  const boolText = (v) => (v ? "Sim" : "Não");
+
+  panelContent.innerHTML = `
+    <div class="card border-0 bg-light">
+      <div class="card-body small">
+        <div class="mb-2"><strong>Norwood:</strong> ${escapeHtml(planning.norwood || "-")}</div>
+        <div class="mb-2"><strong>Transplante anterior:</strong> ${escapeHtml(planning.previous_transplant || "-")}</div>
+        <div class="mb-2"><strong>Local:</strong> ${escapeHtml(planning.transplant_location || "-")}</div>
+        <div class="mb-2"><strong>Tipo de caso:</strong> ${escapeHtml(planning.case_type || "-")}</div>
+        <div class="mb-2"><strong>Body hair:</strong> ${boolText(planning.body_hair_needed)}</div>
+        <div class="mb-2"><strong>Sobrancelha:</strong> ${boolText(planning.eyebrow_transplant)}</div>
+        <div class="mb-2"><strong>Barba:</strong> ${boolText(planning.beard_transplant)}</div>
+        <div class="mb-2"><strong>Feminino:</strong> ${boolText(planning.feminine_hair_transplant)}</div>
+        <div class="mb-2"><strong>Frontal:</strong> ${boolText(planning.frontal)}</div>
+        <div class="mb-2"><strong>Coroa:</strong> ${boolText(planning.crown)}</div>
+        <div class="mb-2"><strong>Completo:</strong> ${boolText(planning.complete)}</div>
+        <div class="mb-2"><strong>Completo + body hair:</strong> ${boolText(planning.complete_body_hair)}</div>
+        <div class="mb-2"><strong>Dense packing:</strong> ${boolText(planning.dense_packing)}</div>
+
+        <hr>
+
+        <div class="mb-2 fw-bold text-primary">Planejamento</div>
+        <div style="white-space: pre-wrap;">${escapeHtml(planning.surgical_planning_text || "-")}</div>
+
+        <hr>
+
+        <div class="mb-2 fw-bold text-primary">Conduta clínica</div>
+        <div style="white-space: pre-wrap;">${escapeHtml(planning.clinical_conduct || "-")}</div>
+      </div>
+    </div>
+  `;
+
+  showRightPanel();
+}
