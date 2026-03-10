@@ -2750,7 +2750,7 @@ function renderSurgeryHistoryCard(surgeries = []) {
               <p class="mb-1"><small class="text-success"><i class="bi bi-hourglass-split"></i> ${escapeHtml(daysPassed)}</small></p>
               <p class="mb-1"><small><strong>Cirurgia de Transplante</strong></small></p>
             </div>
-            <button class="btn btn-sm btn-outline-success" onclick="openSurgeryEvolutionModal(${surgery.id}, '${escapeHtml(surgery.surgery_date)}')">
+            <button class="btn btn-sm btn-outline-success" onclick="createEvolutionForSurgery(${surgery.id}, '${escapeHtml(surgery.surgery_date)}')">
               <i class="bi bi-plus"></i> Evolução
             </button>
           </div>
