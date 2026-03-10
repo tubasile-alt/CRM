@@ -1,0 +1,94 @@
+async function saveSurgery() {
+  const pId =
+    window.patientId ||
+    document.getElementById("detailPatientId")?.value ||
+    window.__PRONTUARIO_CONFIG?.patientId;
+
+  if (!pId) {
+    if (typeof showAlert === "function") {
+      showAlert("Erro: ID do paciente não encontrado.", "danger");
+    } else {
+      alert("Erro: ID do paciente não encontrado.");
+    }
+    return;
+  }
+
+  const surgeryDate = document.getElementById("surgeryDate")?.value || "";
+  const surgicalData = document.getElementById("surgicalData")?.value?.trim() || "";
+  const observations = document.getElementById("surgeryObservations")?.value?.trim() || "";
+
+  const surgeryTypes = [];
+  [
+    "surgeryTypeCapilar",
+    "surgeryTypeBodyHair",
+    "surgeryTypeSobrancelhas",
+    "surgeryTypeBarba",
+    "surgeryTypeRetoque"
+  ].forEach((id) => {
+    const cb = document.getElementById(id);
+    if (cb?.checked) surgeryTypes.push(cb.value);
+  });
+
+  const surgeryType = surgeryTypes.join(", ");
+
+  if (!surgeryDate) {
+    showAlert?.("Selecione a data da cirurgia!", "warning");
+    return;
+  }
+
+  if (!surgicalData) {
+    showAlert?.("Preencha os dados cirúrgicos!", "warning");
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/patient/${pId}/surgery`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": typeof getCSRFToken === "function" ? getCSRFToken() : ""
+      },
+      body: JSON.stringify({
+        surgery_date: surgeryDate,
+        surgical_data: surgicalData,
+        observations,
+        surgery_type: surgeryType
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    showAlert?.("Cirurgia registrada com sucesso!", "success");
+
+    ["surgeryDate", "surgicalData", "surgeryObservations"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    });
+
+    [
+      "surgeryTypeCapilar",
+      "surgeryTypeBodyHair",
+      "surgeryTypeSobrancelhas",
+      "surgeryTypeBarba",
+      "surgeryTypeRetoque"
+    ].forEach((id) => {
+      const cb = document.getElementById(id);
+      if (cb) cb.checked = false;
+    });
+
+    if (typeof window.loadSurgeries === "function") {
+      window.loadSurgeries();
+    }
+  } catch (error) {
+    console.error("Erro ao salvar cirurgia:", error);
+    showAlert?.(`Erro ao salvar cirurgia: ${error.message}`, "danger");
+  }
+}
+
+// expor no escopo global
+window.saveSurgery = saveSurgery;
+window.createEvolutionForSurgery = createEvolutionForSurgery;
