@@ -744,3 +744,42 @@ body {
 #clinicalRightPanel {
   /* Inherits from cosmeticRightColumnContent styles */
 }
+/* Responsive layout for prontuario with sticky right panel */
+@media (min-width: 1200px) {
+  #prontuarioMainLayout {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: nowrap;
+    gap: 1rem;
+  }
+
+  #prontuarioLeftColumn {
+    flex: 1 1 auto;
+    max-width: calc(100% - 380px);
+    min-width: 0;
+  }
+
+  #cosmeticRightColumn {
+    flex: 0 0 360px;
+    max-width: 360px;
+    min-width: 360px;
+    display: block !important;
+  }
+}
+
+@media (max-width: 1199.98px) {
+  #cosmeticRightColumn {
+    display: none !important;
+  }
+}
+
+.prontuario-right-panel-wrapper {
+  position: sticky;
+  top: 16px;
+}
+
+.prontuario-right-panel-card {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  border-radius: 14px;
+}
