@@ -2965,7 +2965,6 @@ document.addEventListener("DOMContentLoaded", async function () {
       const input = document.getElementById("consultationDateInput");
       if (!input) return;
 
-
       if (window.appointmentStartIso) {
         input.value = window.appointmentStartIso;
       } else {
