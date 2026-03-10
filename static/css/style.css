@@ -720,47 +720,6 @@ body {
   box-shadow: 0 0 15px rgba(255, 193, 7, 0.4);
 }
 
-/* Responsive layout for prontuario */
-@media (min-width: 1200px) {
-  #prontuarioMainLayout {
-    display: flex;
-    align-items: flex-start;
-    gap: 20px;
-    flex-wrap: nowrap;
-  }
-
-  #prontuarioLeftColumn {
-    flex: 1 1 auto;
-    width: calc(100% - 380px);
-    min-width: 0;
-    max-width: calc(100% - 380px);
-  }
-
-  #cosmeticRightColumn {
-    flex: 0 0 360px;
-    width: 360px;
-    min-width: 360px;
-    max-width: 360px;
-    display: block !important;
-  }
-}
-
-@media (max-width: 1199.98px) {
-  #prontuarioMainLayout {
-    display: block;
-  }
-
-  #prontuarioLeftColumn,
-  #cosmeticRightColumn {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  #cosmeticRightColumn {
-    display: none !important;
-  }
-}
-
 .prontuario-right-panel-wrapper {
   position: sticky;
   top: 16px;
