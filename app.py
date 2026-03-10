@@ -3772,10 +3772,10 @@ def get_patient_surgeries(patient_id):
         'id': s.id,
         'surgery_date': s.surgery_date.strftime('%d/%m/%Y'),
         'surgery_date_iso': s.surgery_date.isoformat(),
+        'surgery_type': s.surgery_type,
         'surgical_data': s.surgical_data,
         'observations': s.observations,
-        'surgery_type': s.surgery_type,
-        'doctor_name': s.doctor.name if s.doctor else 'Desconhecido'
+        'doctor_name': s.doctor.name
     } for s in surgeries])
 
 @app.route('/api/patient/<int:patient_id>/surgery', methods=['POST'])
@@ -3786,20 +3786,21 @@ def create_patient_surgery(patient_id):
 
     from models import TransplantSurgeryRecord
     from datetime import datetime
-    data = request.get_json()
+
+    data = request.get_json() or {}
 
     try:
         surgery_date = datetime.strptime(data.get('surgery_date'), '%Y-%m-%d').date()
-    except:
+    except Exception:
         return jsonify({'success': False, 'error': 'Data inválida'}), 400
 
     surgery = TransplantSurgeryRecord(
         patient_id=patient_id,
         doctor_id=current_user.id,
         surgery_date=surgery_date,
+        surgery_type=data.get('surgery_type'),
         surgical_data=data.get('surgical_data', ''),
-        observations=data.get('observations', ''),
-        surgery_type=data.get('surgery_type', '')
+        observations=data.get('observations', '')
     )
     db.session.add(surgery)
     db.session.commit()
