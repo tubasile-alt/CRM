@@ -6,14 +6,7 @@
 (function () {
   "use strict";
 
-  function escapeHtmlSafe(str) {
-    return String(str || "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
+  const core = window.ProntuarioCore;
 
   function parseDateSafe(dateStr) {
     const d = new Date(dateStr);
@@ -234,21 +227,18 @@
 
       try {
 
-        await fetch(`/api/surgeries/${surgeryId}/evolutions`, {
+        await core.fetchJson(`/api/surgeries/${surgeryId}/evolutions`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
 
+        core.showAppAlert("Evolução salva com sucesso!", "success");
         bsModal.hide();
-
-        if (typeof window.loadTimeline === "function") {
-          window.loadTimeline();
-        }
+        core.refreshProntuarioScreen();
 
       } catch (err) {
         console.error(err);
-        alert("Erro ao salvar evolução.");
+        core.showAppAlert("Erro ao salvar evolução.", "danger");
       }
 
     });
