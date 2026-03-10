@@ -3232,3 +3232,14 @@ window.renderPatologiaRightPanelFromScreen = renderPatologiaRightPanelFromScreen
 window.renderTransplantRightPanelFromScreen = renderTransplantRightPanelFromScreen;
 window.showRightPanel = showRightPanel;
 window.hideRightPanel = hideRightPanel;
+
+window.refreshSurgeryHistory = function () {
+  if (window.ProntuarioCore) {
+    window.ProntuarioCore.refreshProntuarioScreen();
+    return;
+  }
+
+  if (typeof window.loadTimeline === "function") {
+    window.loadTimeline();
+  }
+};

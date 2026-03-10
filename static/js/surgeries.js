@@ -234,7 +234,10 @@
 
         core.showAppAlert("Evolução salva com sucesso!", "success");
         bsModal.hide();
-        core.refreshProntuarioScreen();
+
+        if (typeof window.refreshSurgeryHistory === "function") {
+          window.refreshSurgeryHistory();
+        }
 
       } catch (err) {
         console.error(err);
