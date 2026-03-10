@@ -432,10 +432,10 @@ function createEvolutionForSurgery(surgeryId, surgeryDate) {
         '<div class="mb-4">' +
         '<label class="form-label fw-bold">Tipo de Retorno:</label>' +
         '<select class="form-select" id="evolution_type_select">' +
-        '<option value="general">Retorno livre</option>' +
         '<option value="7_days">Retorno 7 dias</option>' +
         '<option value="5_months">Retorno 5 meses</option>' +
         '<option value="1_year">Retorno 1 ano</option>' +
+        '<option value="general">Retorno livre</option>' +
         "</select>" +
         "</div>" +
         '<div id="evolutionFormContainer"></div>' +
