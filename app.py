@@ -2260,6 +2260,9 @@ def finalizar_atendimento(patient_id):
         duration = data.get('duration')
         appointment_id = data.get('appointment_id')  # Chave de agrupamento
         
+        # Fetch patient object early for reuse
+        patient = db.session.get(Patient, patient_id)
+        
         # Salvar cada seção como nota separada
         sections = ['queixa', 'anamnese', 'diagnostico']
         note_ids = {}
@@ -2514,8 +2517,9 @@ def finalizar_atendimento(patient_id):
                 db.session.add(transplant)
                 
                 # Marcar indicação no paciente se houver classificação Norwood
-                if surgical_planning.get('norwood'):
+                if surgical_planning.get('norwood') and patient:
                     patient.has_transplant_indication = True
+                    db.session.add(patient)
         
         # Atualizar status do agendamento para "atendido"
         print(f"DEBUG finalizar: appointment_id={appointment_id}, patient_id={patient_id}, doctor_id={current_user.id}")
@@ -2550,9 +2554,8 @@ def finalizar_atendimento(patient_id):
             from services.google_sheets import append_procedures_batch
             from dateutil.relativedelta import relativedelta
             
-            patient_obj = db.session.get(Patient, patient_id)
-            patient_name = patient_obj.name if patient_obj else f"Paciente #{patient_id}"
-            patient_phone = patient_obj.phone if patient_obj else ''
+            patient_name = patient.name if patient else f"Paciente #{patient_id}"
+            patient_phone = patient.phone if patient else ''
             now = get_brazil_time()
 
             gs_rows = []
