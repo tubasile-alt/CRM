@@ -14,6 +14,8 @@ let activeCosmeticContext = null;
 let currentRightPanelMode = null;
 let currentHistoricalConsultation = null;
 
+const core = window.ProntuarioCore;
+
 function cfg() {
   return window.__PRONTUARIO_CONFIG || {};
 }
@@ -34,33 +36,6 @@ function getCSRFToken() {
   );
 }
 
-async function fetchJson(url, options = {}) {
-  const response = await fetch(url, {
-    credentials: "same-origin",
-    ...options,
-    headers: {
-      ...(options.headers || {})
-    }
-  });
-
-  const text = await response.text();
-  let data;
-
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    data = {
-      success: false,
-      error: text || `Resposta inválida do servidor (HTTP ${response.status})`
-    };
-  }
-
-  if (!response.ok) {
-    throw new Error(data.error || `Erro HTTP ${response.status}`);
-  }
-
-  return data;
-}
 
 function showAlert(message, type = "success") {
   const alertPlaceholder = document.getElementById("alertPlaceholder");
@@ -94,11 +69,6 @@ function nl2br(text) {
   return String(text || "").replace(/\n/g, "<br>");
 }
 
-function escapeHtml(value) {
-  const div = document.createElement("div");
-  div.textContent = String(value ?? "");
-  return div.innerHTML;
-}
 
 function formatMoneyBRL(value) {
   const n = parseFloat(value || 0);
@@ -297,7 +267,7 @@ async function updatePatientStars(stars) {
   if (!patientId) return;
 
   try {
-    const data = await fetchJson(`/api/patients/${patientId}/ivp`, {
+    const data = await core.core.fetchJson(`/api/patients/${patientId}/ivp`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -340,7 +310,7 @@ async function saveAttentionNote() {
   const content = document.getElementById("attentionText")?.value || "";
 
   try {
-    const result = await fetchJson(`/api/patient/${patientId}/attention-note`, {
+    const result = await core.core.fetchJson(`/api/patient/${patientId}/attention-note`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -396,7 +366,7 @@ async function savePatientData() {
   }
 
   try {
-    const result = await fetchJson(`/api/patient/${patientId}/update`, {
+    const result = await core.core.fetchJson(`/api/patient/${patientId}/update`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -459,7 +429,7 @@ async function deletePatientPhoto() {
   if (!confirm("Remover foto do paciente?")) return;
 
   try {
-    const result = await fetchJson(`/api/patient/${patientId}/photo`, {
+    const result = await core.core.fetchJson(`/api/patient/${patientId}/photo`, {
       method: "DELETE",
       headers: {
         "X-CSRFToken": getCSRFToken()
@@ -488,7 +458,7 @@ async function savePatientTags() {
     .map((cb) => parseInt(cb.value, 10));
 
   try {
-    const result = await fetchJson(`/api/patient/${patientId}/tags`, {
+    const result = await core.core.fetchJson(`/api/patient/${patientId}/tags`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -598,7 +568,7 @@ async function recalculateEvolution(itemId) {
 
   for (const url of tryUrls) {
     try {
-      const result = await fetchJson(url, {
+      const result = await core.core.fetchJson(url, {
         method: "POST",
         headers: {
           "X-CSRFToken": getCSRFToken()
@@ -880,7 +850,7 @@ function renderCosmeticSummaryCards(summary, contextLabel) {
           <h5 class="fw-bold mb-1 text-success">
             <i class="bi bi-heart-pulse me-2"></i>Painel Cosmiatria
           </h5>
-          <div class="small text-muted">${escapeHtml(contextLabel)}</div>
+          <div class="small text-muted">${core.escapeHtml(contextLabel)}</div>
         </div>
         ${
           activeCosmeticContext
@@ -948,24 +918,24 @@ function renderProcedureCard(proc) {
               <i class="bi ${iconClass} fs-5 mt-1"></i>
               <div>
                 <div class="fw-bold ${proc.performed ? "text-muted text-decoration-line-through" : "text-dark"}">
-                  ${escapeHtml(proc.name)}
+                  ${core.escapeHtml(proc.name)}
                 </div>
                 <div class="text-muted">
                   R$ ${formatMoneyBRL(value)}
                 </div>
                 ${
                   procedureDate
-                    ? `<div class="small text-muted mt-1">Data: ${escapeHtml(formatDateBR(procedureDate))}</div>`
+                    ? `<div class="small text-muted mt-1">Data: ${core.escapeHtml(formatDateBR(procedureDate))}</div>`
                     : ""
                 }
                 ${
                   proc.consultationDate
-                    ? `<div class="small text-muted mt-1"><i class="bi bi-calendar3 me-1"></i>${escapeHtml(proc.consultationDate)}</div>`
+                    ? `<div class="small text-muted mt-1"><i class="bi bi-calendar3 me-1"></i>${core.escapeHtml(proc.consultationDate)}</div>`
                     : ""
                 }
                 ${
                   proc.observation || proc.observations
-                    ? `<div class="small text-muted mt-1">${escapeHtml(proc.observation || proc.observations)}</div>`
+                    ? `<div class="small text-muted mt-1">${core.escapeHtml(proc.observation || proc.observations)}</div>`
                     : ""
                 }
               </div>
@@ -1056,7 +1026,7 @@ function renderCosmeticConduct() {
         <div class="mt-3 mb-2 border-top pt-3">
           <div class="d-flex align-items-center justify-content-between">
             <div class="fw-bold text-secondary">
-              <i class="bi bi-calendar3 me-2"></i>${escapeHtml(group.title)}
+              <i class="bi bi-calendar3 me-2"></i>${core.escapeHtml(group.title)}
             </div>
           </div>
         </div>
@@ -1119,15 +1089,15 @@ function renderPatologiaRightPanelFromScreen() {
       <div class="card-body small">
         <div class="mb-3">
           <div class="fw-bold text-primary mb-1">Queixa</div>
-          <div style="white-space: pre-wrap;">${escapeHtml(queixa || "-")}</div>
+          <div style="white-space: pre-wrap;">${core.escapeHtml(queixa || "-")}</div>
         </div>
         <div class="mb-3">
           <div class="fw-bold text-primary mb-1">Diagnóstico</div>
-          <div style="white-space: pre-wrap;">${escapeHtml(diagnostico || "-")}</div>
+          <div style="white-space: pre-wrap;">${core.escapeHtml(diagnostico || "-")}</div>
         </div>
         <div>
           <div class="fw-bold text-primary mb-1">Conduta</div>
-          <div style="white-space: pre-wrap;">${escapeHtml(conduta || "-")}</div>
+          <div style="white-space: pre-wrap;">${core.escapeHtml(conduta || "-")}</div>
         </div>
       </div>
     </div>
@@ -1153,10 +1123,10 @@ function renderTransplantRightPanelFromScreen() {
   panelContent.innerHTML = `
     <div class="card border-0 bg-light">
       <div class="card-body small">
-        <div class="mb-2"><strong>Norwood:</strong> ${escapeHtml(planning.norwood || "-")}</div>
-        <div class="mb-2"><strong>Transplante anterior:</strong> ${escapeHtml(planning.previous_transplant || "-")}</div>
-        <div class="mb-2"><strong>Local:</strong> ${escapeHtml(planning.transplant_location || "-")}</div>
-        <div class="mb-2"><strong>Tipo de caso:</strong> ${escapeHtml(planning.case_type || "-")}</div>
+        <div class="mb-2"><strong>Norwood:</strong> ${core.escapeHtml(planning.norwood || "-")}</div>
+        <div class="mb-2"><strong>Transplante anterior:</strong> ${core.escapeHtml(planning.previous_transplant || "-")}</div>
+        <div class="mb-2"><strong>Local:</strong> ${core.escapeHtml(planning.transplant_location || "-")}</div>
+        <div class="mb-2"><strong>Tipo de caso:</strong> ${core.escapeHtml(planning.case_type || "-")}</div>
         <div class="mb-2"><strong>Body hair:</strong> ${boolText(planning.body_hair_needed)}</div>
         <div class="mb-2"><strong>Sobrancelha:</strong> ${boolText(planning.eyebrow_transplant)}</div>
         <div class="mb-2"><strong>Barba:</strong> ${boolText(planning.beard_transplant)}</div>
@@ -1170,12 +1140,12 @@ function renderTransplantRightPanelFromScreen() {
         <hr>
 
         <div class="mb-2 fw-bold text-primary">Planejamento</div>
-        <div style="white-space: pre-wrap;">${escapeHtml(planning.surgical_planning_text || "-")}</div>
+        <div style="white-space: pre-wrap;">${core.escapeHtml(planning.surgical_planning_text || "-")}</div>
 
         <hr>
 
         <div class="mb-2 fw-bold text-primary">Conduta clínica</div>
-        <div style="white-space: pre-wrap;">${escapeHtml(planning.clinical_conduct || "-")}</div>
+        <div style="white-space: pre-wrap;">${core.escapeHtml(planning.clinical_conduct || "-")}</div>
       </div>
     </div>
   `;
@@ -1301,13 +1271,13 @@ function renderRightPanel(contextCategory = null, consultationData = null) {
     panelContent.innerHTML = `
       <div class="card border-0 bg-light">
         <div class="card-body small">
-          <div><b>Norwood:</b> ${escapeHtml(p.norwood || "-")}</div>
-          <div><b>Área:</b> ${escapeHtml(p.area || "-")}</div>
-          <div><b>Técnica:</b> ${escapeHtml(p.technique || "-")}</div>
+          <div><b>Norwood:</b> ${core.escapeHtml(p.norwood || "-")}</div>
+          <div><b>Área:</b> ${core.escapeHtml(p.area || "-")}</div>
+          <div><b>Técnica:</b> ${core.escapeHtml(p.technique || "-")}</div>
           <div><b>Body Hair:</b> ${p.body_hair ? "Sim" : "Não"}</div>
           <div><b>Dense Packing:</b> ${p.dense_packing ? "Sim" : "Não"}</div>
           <hr>
-          <div style="white-space: pre-wrap;">${escapeHtml(p.description || "")}</div>
+          <div style="white-space: pre-wrap;">${core.escapeHtml(p.description || "")}</div>
         </div>
       </div>
     `;
@@ -1332,7 +1302,7 @@ async function loadExistingPlans() {
   if (!patientId) return;
 
   try {
-    const data = await fetchJson(`/api/prontuario/${patientId}/cosmetic-plans-grouped`);
+    const data = await core.core.fetchJson(`/api/prontuario/${patientId}/cosmetic-plans-grouped`);
 
     if (data.success && data.grouped_plans && data.grouped_plans.length > 0) {
       groupedCosmeticPlans = data.grouped_plans;
@@ -1595,7 +1565,7 @@ function renderCosmeticProcedures() {
       row.className = proc.performed ? "table-success" : "";
       row.innerHTML = `
         <td class="ps-3">
-          <div class="fw-bold text-primary">${escapeHtml(proc.name)}</div>
+          <div class="fw-bold text-primary">${core.escapeHtml(proc.name)}</div>
         </td>
         <td>
           <input type="number" class="form-control form-control-sm" value="${proc.budget || proc.value}" onchange="updatePlanValue(${globalIndex}, this.value)">
@@ -1627,7 +1597,7 @@ function renderCosmeticProcedures() {
         <td colspan="5" class="bg-light border-top border-bottom border-2">
           <div class="d-flex align-items-center py-2">
             <i class="bi bi-calendar3 me-2 text-primary"></i>
-            <strong>Consulta de ${escapeHtml(group.consultation_info?.display_date || "")}</strong>
+            <strong>Consulta de ${core.escapeHtml(group.consultation_info?.display_date || "")}</strong>
           </div>
         </td>
       `;
@@ -1641,7 +1611,7 @@ function renderCosmeticProcedures() {
         row.className = pObj.performed ? "table-success" : "";
         row.innerHTML = `
           <td class="ps-3">
-            <div class="fw-bold text-primary">${escapeHtml(pObj.name)}</div>
+            <div class="fw-bold text-primary">${core.escapeHtml(pObj.name)}</div>
           </td>
           <td>
             <input type="number" class="form-control form-control-sm" value="${pObj.budget || pObj.value}" onchange="updatePlanValue(${globalIndex}, this.value)">
@@ -1680,7 +1650,7 @@ async function performCosmeticProcedure(planId, procedureName, consultationId = 
   const apptId = consultationId || getAppointmentId() || null;
 
   try {
-    const result = await fetchJson(`/api/cosmetic-plans/${planId}/perform`, {
+    const result = await core.core.fetchJson(`/api/cosmetic-plans/${planId}/perform`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1717,7 +1687,7 @@ window.toggleProcedurePerformed = async function (index) {
     if (!dateInput) return;
 
     try {
-      const result = await fetchJson(`/api/cosmetic-plans/${proc.id}/perform`, {
+      const result = await core.core.fetchJson(`/api/cosmetic-plans/${proc.id}/perform`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1860,7 +1830,7 @@ async function saveTransplantIndication() {
   if (!indication) return;
 
   try {
-    const result = await fetchJson(`/api/patient/${patientId}/transplant-indication`, {
+    const result = await core.core.fetchJson(`/api/patient/${patientId}/transplant-indication`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1915,7 +1885,7 @@ async function loadPrescriptionHistory() {
   if (!patientId) return;
 
   try {
-    const data = await fetchJson(`/dermascribe/api/patient/${patientId}/prescriptions`);
+    const data = await core.core.fetchJson(`/dermascribe/api/patient/${patientId}/prescriptions`);
     const container = document.getElementById("prescriptionHistoryList");
     if (!container) return;
 
@@ -1936,8 +1906,8 @@ async function loadPrescriptionHistory() {
 
       html += `
         <li class="mb-2 p-2 bg-light rounded">
-          <small class="text-muted">${escapeHtml(p.created_at)} - Dr(a). ${escapeHtml(p.doctor)}</small>
-          <div class="small">${escapeHtml(summary || "Receita")}</div>
+          <small class="text-muted">${core.escapeHtml(p.created_at)} - Dr(a). ${core.escapeHtml(p.doctor)}</small>
+          <div class="small">${core.escapeHtml(summary || "Receita")}</div>
           <button class="btn btn-sm btn-outline-primary mt-1" onclick="printPrescription(${p.id})">
             <i class="bi bi-printer"></i> Imprimir
           </button>
@@ -2090,7 +2060,7 @@ async function finalizeConsultationUnified() {
   }
 
   try {
-    const result = await fetchJson(`/api/prontuario/${patientId}/finalizar`, {
+    const result = await core.core.fetchJson(`/api/prontuario/${patientId}/finalizar`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2143,7 +2113,7 @@ async function editConsultationDate(consultationId, dateTime) {
   document.getElementById("editConsultationDateTime").value = dateTime;
 
   try {
-    const notes = await fetchJson(`/api/appointments/${consultationId}/notes`);
+    const notes = await core.core.fetchJson(`/api/appointments/${consultationId}/notes`);
     document.getElementById("editQueixa").value = notes.queixa?.content || "";
     document.getElementById("editQueixaId").value = notes.queixa?.id || "";
 
@@ -2176,7 +2146,7 @@ async function saveConsultationEdit() {
   const end = new Date(start.getTime() + 60 * 60 * 1000);
 
   updatePromises.push(
-    fetchJson(`/api/appointments/${consultationId}`, {
+    core.fetchJson(`/api/appointments/${consultationId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -2196,7 +2166,7 @@ async function saveConsultationEdit() {
 
     if (noteId) {
       updatePromises.push(
-        fetchJson(`/api/notes/${noteId}`, {
+        core.fetchJson(`/api/notes/${noteId}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -2229,7 +2199,7 @@ async function deleteConsultation(consultationId, dateStr) {
   }
 
   try {
-    const result = await fetchJson(`/api/appointments/${consultationId}`, {
+    const result = await core.core.fetchJson(`/api/appointments/${consultationId}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -2269,7 +2239,7 @@ async function saveConsultationDate() {
   const isoDate = new Date(input.value).toISOString();
 
   try {
-    const data = await fetchJson(`/api/appointments/${apptId}`, {
+    const data = await core.core.fetchJson(`/api/appointments/${apptId}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -2285,7 +2255,7 @@ async function saveConsultationDate() {
         status.innerHTML = "";
       }, 3000);
     } else {
-      status.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${escapeHtml(data.error || "Erro ao salvar.")}</span>`;
+      status.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle me-1"></i>${core.escapeHtml(data.error || "Erro ao salvar.")}</span>`;
     }
   } catch (err) {
     console.error(err);
@@ -2367,7 +2337,7 @@ async function loadConsultationsDropdown() {
   const patientId = getPatientId();
 
   try {
-    const data = await fetchJson(`/api/patient/${patientId}/consultations`);
+    const data = await core.core.fetchJson(`/api/patient/${patientId}/consultations`);
     const select = document.getElementById("evolutionConsultation");
     if (!select) return;
 
@@ -2461,7 +2431,7 @@ async function saveEvolution() {
 
   try {
     if (type === "surgery" && surgeryId) {
-      const result = await fetchJson(`/api/patient/${patientId}/surgery/${surgeryId}/evolution`, {
+      const result = await core.core.fetchJson(`/api/patient/${patientId}/surgery/${surgeryId}/evolution`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -2492,7 +2462,7 @@ async function saveEvolution() {
       return;
     }
 
-    const result = await fetchJson(`/api/patient/${patientId}/evolution`, {
+    const result = await core.core.fetchJson(`/api/patient/${patientId}/evolution`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2529,7 +2499,7 @@ async function saveQuickEvolution(consultationId) {
   }
 
   try {
-    const result = await fetchJson(`/api/patient/${patientId}/evolution`, {
+    const result = await core.core.fetchJson(`/api/patient/${patientId}/evolution`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2558,7 +2528,7 @@ async function deleteEvolution(evoId) {
   if (!confirm("Tem certeza que deseja deletar esta evolução?")) return;
 
   try {
-    const result = await fetchJson(`/api/evolution/${evoId}`, {
+    const result = await core.core.fetchJson(`/api/evolution/${evoId}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -2582,7 +2552,7 @@ async function deleteSurgeryEvolution(evolutionId) {
   if (!confirm("Tem certeza que deseja deletar esta evolução da cirurgia?")) return;
 
   try {
-    const result = await fetchJson(`/api/patient/surgery-evolution/${evolutionId}`, {
+    const result = await core.core.fetchJson(`/api/patient/surgery-evolution/${evolutionId}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -2637,12 +2607,12 @@ function renderEvolutionsInAccordion(consultations = []) {
           evoDiv.className = "mb-2 p-2 bg-white rounded border-start border-4 border-success shadow-sm";
           evoDiv.innerHTML = `
             <div class="d-flex justify-content-between">
-              <small class="text-muted fw-bold">${escapeHtml(evo.date)} - Dr. ${escapeHtml(evo.doctor)}</small>
+              <small class="text-muted fw-bold">${core.escapeHtml(evo.date)} - Dr. ${core.escapeHtml(evo.doctor)}</small>
               <button class="btn btn-link btn-sm p-0 text-danger" onclick="deleteEvolution(${evo.id})">
                 <i class="bi bi-trash"></i>
               </button>
             </div>
-            <div class="mt-1" style="white-space: pre-wrap;">${escapeHtml(evo.content)}</div>
+            <div class="mt-1" style="white-space: pre-wrap;">${core.escapeHtml(evo.content)}</div>
           `;
           container.appendChild(evoDiv);
         });
@@ -2732,7 +2702,7 @@ function renderSurgeryHistoryCard(surgeries = []) {
 
       const groupHeader = document.createElement("div");
       groupHeader.className = "mb-3 mt-3 pt-2 border-top";
-      groupHeader.innerHTML = `<h6 class="text-secondary text-capitalize">${escapeHtml(group.monthYear)}</h6>`;
+      groupHeader.innerHTML = `<h6 class="text-secondary text-capitalize">${core.escapeHtml(group.monthYear)}</h6>`;
       container.appendChild(groupHeader);
 
       group.surgeries.forEach((surgery) => {
@@ -2746,17 +2716,17 @@ function renderSurgeryHistoryCard(surgeries = []) {
         surgeryDiv.innerHTML = `
           <div class="d-flex justify-content-between align-items-start mb-3">
             <div>
-              <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${escapeHtml(surgery.surgery_date)}</strong></h6>
-              <p class="mb-1"><small class="text-success"><i class="bi bi-hourglass-split"></i> ${escapeHtml(daysPassed)}</small></p>
+              <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${core.escapeHtml(surgery.surgery_date)}</strong></h6>
+              <p class="mb-1"><small class="text-success"><i class="bi bi-hourglass-split"></i> ${core.escapeHtml(daysPassed)}</small></p>
               <p class="mb-1"><small><strong>Cirurgia de Transplante</strong></small></p>
             </div>
-            <button class="btn btn-sm btn-outline-success" onclick="createEvolutionForSurgery(${surgery.id}, '${escapeHtml(surgery.surgery_date_iso || surgery.surgery_date)}')">
+            <button class="btn btn-sm btn-outline-success" onclick="createEvolutionForSurgery(${surgery.id}, '${core.escapeHtml(surgery.surgery_date_iso || surgery.surgery_date)}')">
               <i class="bi bi-plus"></i> Evolução
             </button>
           </div>
-          <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${escapeHtml(surgery.surgical_data || "")}</p>
-          ${surgery.observations ? `<p><strong>Observações:</strong> ${escapeHtml(surgery.observations)}</p>` : ""}
-          <p class="mb-3"><small class="text-muted">Dr. ${escapeHtml(surgery.doctor_name || "")}</small></p>
+          <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${core.escapeHtml(surgery.surgical_data || "")}</p>
+          ${surgery.observations ? `<p><strong>Observações:</strong> ${core.escapeHtml(surgery.observations)}</p>` : ""}
+          <p class="mb-3"><small class="text-muted">Dr. ${core.escapeHtml(surgery.doctor_name || "")}</small></p>
         `;
 
         const evolutionsDiv = document.createElement("div");
@@ -2778,9 +2748,9 @@ function renderSurgeryHistoryCard(surgeries = []) {
             evoDiv.innerHTML = `
               <div class="d-flex justify-content-between align-items-start">
                 <div class="flex-grow-1">
-                  <small class="text-muted"><i class="bi bi-clock"></i> ${escapeHtml(evo.date)}</small>
-                  <p class="mb-1 mt-2" style="white-space: pre-wrap;">${escapeHtml(evo.content)}</p>
-                  <small class="text-muted">Dr. ${escapeHtml(evo.doctor)}</small>
+                  <small class="text-muted"><i class="bi bi-clock"></i> ${core.escapeHtml(evo.date)}</small>
+                  <p class="mb-1 mt-2" style="white-space: pre-wrap;">${core.escapeHtml(evo.content)}</p>
+                  <small class="text-muted">Dr. ${core.escapeHtml(evo.doctor)}</small>
                 </div>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgeryEvolution(${evo.id})">
                   <i class="bi bi-trash"></i>
@@ -2821,8 +2791,8 @@ async function loadTimeline() {
 
   try {
     const [consultations, surgeries] = await Promise.all([
-      fetchJson(`/api/patient/${patientId}/evolutions`),
-      fetchJson(`/api/patient/${patientId}/surgeries`)
+      core.fetchJson(`/api/patient/${patientId}/evolutions`),
+      core.fetchJson(`/api/patient/${patientId}/surgeries`)
     ]);
 
     renderTimeline(consultations || [], surgeries || []);
@@ -2850,7 +2820,7 @@ async function scheduleTransplantSurgery(button) {
   button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processando...';
 
   try {
-    const out = await fetchJson(`/api/patient/${patientId}/transplant/schedule-surgery`, {
+    const out = await core.core.fetchJson(`/api/patient/${patientId}/transplant/schedule-surgery`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2895,7 +2865,7 @@ async function loadTransplantPlanningSummary() {
   if (!patientId) return;
 
   try {
-    const data = await fetchJson(`/api/patient/${patientId}/transplant/planning-summary`);
+    const data = await core.core.fetchJson(`/api/patient/${patientId}/transplant/planning-summary`);
     if (!data || !data.success || !data.has_planning) return;
 
     const planningEl = document.getElementById("transplantPlanningTextInEvolution");
@@ -2938,7 +2908,7 @@ function formatSurgicalPlanDisplays() {
       const planData = typeof decoded === "string" ? JSON.parse(decoded) : decoded;
 
       if (!planData || typeof planData !== "object") {
-        container.innerHTML = `<p class="mb-0 small">${escapeHtml(String(decoded))}</p>`;
+        container.innerHTML = `<p class="mb-0 small">${core.escapeHtml(String(decoded))}</p>`;
         return;
       }
 
@@ -2954,12 +2924,12 @@ function formatSurgicalPlanDisplays() {
         if (typeof val === "boolean") {
           display = val ? "Sim" : "Não";
         } else if (typeof val === "string") {
-          display = nl2br(escapeHtml(val));
+          display = nl2br(core.escapeHtml(val));
         } else {
           display = escapeHtml(String(val));
         }
 
-        html += `<dt class="col-sm-5 text-muted">${escapeHtml(label)}:</dt><dd class="col-sm-7"><strong>${display}</strong></dd>`;
+        html += `<dt class="col-sm-5 text-muted">${core.escapeHtml(label)}:</dt><dd class="col-sm-7"><strong>${display}</strong></dd>`;
       });
 
       html += "</dl>";
@@ -2973,7 +2943,7 @@ function formatSurgicalPlanDisplays() {
       container.innerHTML = html;
     } catch (e) {
       console.error("Erro ao processar planejamento:", e);
-      container.innerHTML = `<p class="mb-0 small">${escapeHtml(raw)}</p>`;
+      container.innerHTML = `<p class="mb-0 small">${core.escapeHtml(raw)}</p>`;
     }
   });
 }
@@ -3103,7 +3073,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
   if (!getAppointmentId()) {
     try {
-      const data = await fetchJson(`/api/patient/${getPatientId()}/today-appointment`);
+      const data = await core.core.fetchJson(`/api/patient/${getPatientId()}/today-appointment`);
       if (data.appointment_id) {
         window.appointmentId = data.appointment_id;
       }
