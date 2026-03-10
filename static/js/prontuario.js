@@ -1164,27 +1164,30 @@ function renderHistoricalConsultationRightPanel(consultationId, category) {
 
   if (category === "cosmiatria") {
     currentRightPanelMode = "cosmiatria";
+
     if (panelTitle) {
       panelTitle.innerHTML = '<i class="bi bi-heart-pulse me-2"></i>Planejamento e Execução';
     }
 
-    const planningBlock = Array.from(consultationCard.querySelectorAll(".accordion-body .mb-3"))
-      .find((block) => block.textContent.includes("Planejamento e Execução"));
+    // Garante que o painel use o mesmo motor oficial da cosmiatria
+    currentCategory = "cosmiatria";
 
-    if (!planningBlock) {
+    // Se ainda não houver dados carregados, tenta carregar antes de renderizar
+    if (!Array.isArray(cosmeticProcedures) || cosmeticProcedures.length === 0) {
       panelContent.innerHTML = `<div class="text-muted small">Nenhum planejamento encontrado nesta consulta.</div>`;
       showRightPanel();
       return;
     }
 
-    const listGroup = planningBlock.querySelector(".list-group");
-    if (!listGroup) {
-      panelContent.innerHTML = `<div class="text-muted small">Nenhum planejamento encontrado nesta consulta.</div>`;
-      showRightPanel();
-      return;
-    }
+    // Foca a consulta histórica específica no painel lateral
+    activeCosmeticContext = {
+      type: "consultation",
+      consultationKey: String(consultationId),
+      appointmentId: String(consultationId),
+      label: `Consulta ${consultationId}`
+    };
 
-    panelContent.innerHTML = listGroup.outerHTML;
+    renderCosmeticConduct();
     showRightPanel();
     return;
   }
