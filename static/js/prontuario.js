@@ -959,7 +959,7 @@ function renderProcedureCard(proc) {
 
 function renderCosmeticConduct() {
   const rightColumn = document.getElementById("cosmeticRightColumn");
-  const rightContent = document.getElementById("cosmeticRightColumnContent");
+  const rightContent = document.getElementById("clinicalRightPanel");
   const panelTitle = document.getElementById("cosmeticRightColumnTitle");
 
   if (!rightColumn || !rightContent) return;
@@ -1071,7 +1071,7 @@ function hideRightPanel() {
 
 function renderPatologiaRightPanelFromScreen() {
   const panelTitle = document.getElementById("cosmeticRightColumnTitle");
-  const panelContent = document.getElementById("cosmeticRightColumnContent");
+  const panelContent = document.getElementById("clinicalRightPanel");
   if (!panelContent) return;
 
   currentRightPanelMode = "patologia";
@@ -1108,7 +1108,7 @@ function renderPatologiaRightPanelFromScreen() {
 
 function renderTransplantRightPanelFromScreen() {
   const panelTitle = document.getElementById("cosmeticRightColumnTitle");
-  const panelContent = document.getElementById("cosmeticRightColumnContent");
+  const panelContent = document.getElementById("clinicalRightPanel");
   if (!panelContent) return;
 
   currentRightPanelMode = "transplante";
@@ -1156,7 +1156,7 @@ function renderTransplantRightPanelFromScreen() {
 function renderHistoricalConsultationRightPanel(consultationId, category) {
   const consultationCard = document.getElementById(`consultation-${consultationId}`);
   const panelTitle = document.getElementById("cosmeticRightColumnTitle");
-  const panelContent = document.getElementById("cosmeticRightColumnContent");
+  const panelContent = document.getElementById("clinicalRightPanel");
 
   if (!consultationCard || !panelContent) return;
 
@@ -1237,7 +1237,7 @@ function renderHistoricalConsultationRightPanel(consultationId, category) {
 
 function renderRightPanel(contextCategory = null, consultationData = null) {
   const panel = document.getElementById("cosmeticRightColumn");
-  const panelContent = document.getElementById("cosmeticRightColumnContent");
+  const panelContent = document.getElementById("clinicalRightPanel");
   const panelTitle = document.getElementById("cosmeticRightColumnTitle");
 
   if (!panel || !panelContent) return;

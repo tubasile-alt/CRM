@@ -734,3 +734,13 @@ body {
   height: calc(100vh - 100px);
   overflow-y: auto;
 }
+
+/* Main layout alignment fix for sticky panels */
+#prontuarioMainLayout {
+  align-items: flex-start;
+}
+
+/* Clinical right panel styles */
+#clinicalRightPanel {
+  /* Inherits from cosmeticRightColumnContent styles */
+}
