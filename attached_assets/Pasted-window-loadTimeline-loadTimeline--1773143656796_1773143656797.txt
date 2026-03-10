@@ -1,0 +1,203 @@
+window.loadTimeline = loadTimeline;
+
+/* ============================================================
+   PAINEL LATERAL UNIVERSAL – COSMIATRIA / TRANSPLANTE / PATOLOGIA
+============================================================ */
+
+let currentRightPanelMode = null;
+let currentHistoricalConsultation = null;
+
+function showRightPanel() {
+  updateMainLayoutColumns(true);
+}
+
+function hideRightPanel() {
+  currentRightPanelMode = null;
+  currentHistoricalConsultation = null;
+  updateMainLayoutColumns(false);
+}
+
+function renderPatologiaRightPanelFromScreen() {
+  const panelTitle = document.getElementById("cosmeticRightColumnTitle");
+  const panelContent = document.getElementById("cosmeticRightColumnContent");
+  if (!panelContent) return;
+
+  currentRightPanelMode = "patologia";
+
+  if (panelTitle) {
+    panelTitle.innerHTML = '<i class="bi bi-journal-text me-2"></i>Observações';
+  }
+
+  const queixa = document.getElementById("queixaText")?.value || "";
+  const diagnostico = document.getElementById("diagnosticoText")?.value || "";
+  const conduta = document.getElementById("condutaText")?.value || "";
+
+  panelContent.innerHTML = `
+    <div class="card border-0 bg-light">
+      <div class="card-body small">
+        <div class="mb-3">
+          <div class="fw-bold text-primary mb-1">Queixa</div>
+          <div style="white-space: pre-wrap;">${escapeHtml(queixa || "-")}</div>
+        </div>
+        <div class="mb-3">
+          <div class="fw-bold text-primary mb-1">Diagnóstico</div>
+          <div style="white-space: pre-wrap;">${escapeHtml(diagnostico || "-")}</div>
+        </div>
+        <div>
+          <div class="fw-bold text-primary mb-1">Conduta</div>
+          <div style="white-space: pre-wrap;">${escapeHtml(conduta || "-")}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  showRightPanel();
+}
+
+function renderTransplantRightPanelFromScreen() {
+  const panelTitle = document.getElementById("cosmeticRightColumnTitle");
+  const panelContent = document.getElementById("cosmeticRightColumnContent");
+  if (!panelContent) return;
+
+  currentRightPanelMode = "transplante";
+
+  if (panelTitle) {
+    panelTitle.innerHTML = '<i class="bi bi-scissors me-2"></i>Planejamento Cirúrgico';
+  }
+
+  const planning = buildSurgicalPlanningPayload();
+  const boolText = (v) => (v ? "Sim" : "Não");
+
+  panelContent.innerHTML = `
+    <div class="card border-0 bg-light">
+      <div class="card-body small">
+        <div class="mb-2"><strong>Norwood:</strong> ${escapeHtml(planning.norwood || "-")}</div>
+        <div class="mb-2"><strong>Transplante anterior:</strong> ${escapeHtml(planning.previous_transplant || "-")}</div>
+        <div class="mb-2"><strong>Local:</strong> ${escapeHtml(planning.transplant_location || "-")}</div>
+        <div class="mb-2"><strong>Tipo de caso:</strong> ${escapeHtml(planning.case_type || "-")}</div>
+        <div class="mb-2"><strong>Body hair:</strong> ${boolText(planning.body_hair_needed)}</div>
+        <div class="mb-2"><strong>Sobrancelha:</strong> ${boolText(planning.eyebrow_transplant)}</div>
+        <div class="mb-2"><strong>Barba:</strong> ${boolText(planning.beard_transplant)}</div>
+        <div class="mb-2"><strong>Feminino:</strong> ${boolText(planning.feminine_hair_transplant)}</div>
+        <div class="mb-2"><strong>Frontal:</strong> ${boolText(planning.frontal)}</div>
+        <div class="mb-2"><strong>Coroa:</strong> ${boolText(planning.crown)}</div>
+        <div class="mb-2"><strong>Completo:</strong> ${boolText(planning.complete)}</div>
+        <div class="mb-2"><strong>Completo + body hair:</strong> ${boolText(planning.complete_body_hair)}</div>
+        <div class="mb-2"><strong>Dense packing:</strong> ${boolText(planning.dense_packing)}</div>
+
+        <hr>
+
+        <div class="mb-2 fw-bold text-primary">Planejamento</div>
+        <div style="white-space: pre-wrap;">${escapeHtml(planning.surgical_planning_text || "-")}</div>
+
+        <hr>
+
+        <div class="mb-2 fw-bold text-primary">Conduta clínica</div>
+        <div style="white-space: pre-wrap;">${escapeHtml(planning.clinical_conduct || "-")}</div>
+      </div>
+    </div>
+  `;
+
+  showRightPanel();
+}
+
+function renderHistoricalConsultationRightPanel(consultationId, category) {
+  const consultationCard = document.getElementById(`consultation-${consultationId}`);
+  const panelTitle = document.getElementById("cosmeticRightColumnTitle");
+  const panelContent = document.getElementById("cosmeticRightColumnContent");
+
+  if (!consultationCard || !panelContent) return;
+
+  currentHistoricalConsultation = consultationId;
+
+  if (category === "cosmiatria") {
+    currentRightPanelMode = "cosmiatria";
+
+    if (panelTitle) {
+      panelTitle.innerHTML = '<i class="bi bi-heart-pulse me-2"></i>Planejamento e Execução';
+    }
+
+    const planningBlock = consultationCard.querySelector(".list-group");
+    if (!planningBlock) {
+      panelContent.innerHTML = '<div class="text-muted small">Nenhum planejamento encontrado nesta consulta.</div>';
+      showRightPanel();
+      return;
+    }
+
+    panelContent.innerHTML = planningBlock.outerHTML;
+    showRightPanel();
+    return;
+  }
+
+  if (category === "transplante_capilar") {
+    currentRightPanelMode = "transplante";
+
+    if (panelTitle) {
+      panelTitle.innerHTML = '<i class="bi bi-scissors me-2"></i>Planejamento Cirúrgico';
+    }
+
+    const wrapper = consultationCard.querySelector(".js-surgical-plan-wrapper");
+    if (!wrapper) {
+      panelContent.innerHTML = '<div class="text-muted small">Nenhum planejamento cirúrgico encontrado nesta consulta.</div>';
+      showRightPanel();
+      return;
+    }
+
+    panelContent.innerHTML = wrapper.outerHTML;
+    showRightPanel();
+    return;
+  }
+
+  currentRightPanelMode = "patologia";
+
+  if (panelTitle) {
+    panelTitle.innerHTML = '<i class="bi bi-journal-text me-2"></i>Observações';
+  }
+
+  const blocks = consultationCard.querySelector(".accordion-body");
+  panelContent.innerHTML = blocks ? blocks.innerHTML : '<div class="text-muted small">Sem conteúdo.</div>';
+
+  showRightPanel();
+}
+
+function updateProcedureValue(id, value) {
+  const proc = cosmeticProcedures.find((p) => String(p.id) === String(id));
+  if (proc) {
+    proc.value = parseFloat(value) || 0;
+    proc.budget = parseFloat(value) || 0;
+    updateCosmeticTotal();
+    renderCosmeticConduct();
+  }
+}
+
+function updateProcedureDate(id, date) {
+  const proc = cosmeticProcedures.find((p) => String(p.id) === String(id));
+  if (proc) {
+    proc.performedDate = date;
+    renderCosmeticConduct();
+  }
+}
+
+const __originalRenderCosmeticProcedures = renderCosmeticProcedures;
+
+renderCosmeticProcedures = function () {
+  __originalRenderCosmeticProcedures();
+
+  if (currentCategory === "cosmiatria" || currentRightPanelMode === "cosmiatria") {
+    renderCosmeticConduct();
+    showRightPanel();
+  }
+};
+
+document.addEventListener("DOMContentLoaded", function () {
+  setTimeout(() => {
+    if (currentCategory === "cosmiatria") {
+      renderCosmeticConduct();
+      showRightPanel();
+    } else if (currentCategory === "transplante_capilar") {
+      renderTransplantRightPanelFromScreen();
+    } else {
+      renderPatologiaRightPanelFromScreen();
+    }
+  }, 500);
+});
