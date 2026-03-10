@@ -719,3 +719,18 @@ body {
   transition: outline 0.2s ease-in-out;
   box-shadow: 0 0 15px rgba(255, 193, 7, 0.4);
 }
+
+/* Right Panel Sticky Styles */
+#cosmeticRightColumn {
+  position: relative;
+}
+
+.prontuario-right-panel-wrapper {
+  position: sticky;
+  top: 80px;
+}
+
+.prontuario-right-panel-card {
+  height: calc(100vh - 100px);
+  overflow-y: auto;
+}
