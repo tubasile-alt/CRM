@@ -1,121 +1,109 @@
 // ========== GERENCIAR CIRURGIAS ==========
 
 window.saveSurgery = function () {
-    console.log("saveSurgery chamada");
+  console.log("saveSurgery chamada");
 
-    var pId = typeof patientId !== "undefined" ? patientId : null;
-    if (!pId) {
-        var el = document.getElementById("detailPatientId");
-        if (el) pId = el.value;
-    }
+  const pId = window.patientId || document.getElementById("detailPatientId")?.value;
 
-    if (!pId) {
-        console.error("patientId nao encontrado!");
-        if (typeof showAlert === "function") {
-            showAlert("Erro: ID do paciente nao encontrado.", "danger");
-        } else {
-            alert("Erro: ID do paciente nao encontrado.");
-        }
-        return;
-    }
+  if (!pId) {
+    showAlert?.("Erro: ID do paciente não encontrado.", "danger");
+    return;
+  }
 
-    var surgeryDateEl = document.getElementById("surgeryDate");
-    var surgeryModalDateEl = document.getElementById("surgeryModalDate");
-    var surgeryDate = (surgeryDateEl && surgeryDateEl.value) || (surgeryModalDateEl && surgeryModalDateEl.value) || "";
+  const surgeryDate =
+    document.getElementById("surgeryDate")?.value ||
+    document.getElementById("surgeryModalDate")?.value ||
+    "";
 
-    var surgicalDataEl = document.getElementById("surgicalData");
-    var surgeryModalPlanningEl = document.getElementById("surgeryModalSurgicalPlanning");
-    var surgicalData = ((surgicalDataEl && surgicalDataEl.value) || (surgeryModalPlanningEl && surgeryModalPlanningEl.value) || "").trim();
+  const surgicalData =
+    document.getElementById("surgicalData")?.value?.trim() ||
+    document.getElementById("surgeryModalSurgicalPlanning")?.value?.trim() ||
+    "";
 
-    var observationsEl = document.getElementById("surgeryObservations");
-    var surgeryModalCompEl = document.getElementById("surgeryModalComplications");
-    var observations = ((observationsEl && observationsEl.value) || (surgeryModalCompEl && surgeryModalCompEl.value) || "").trim();
+  const observations =
+    document.getElementById("surgeryObservations")?.value?.trim() ||
+    document.getElementById("surgeryModalComplications")?.value?.trim() ||
+    "";
 
-    var surgeryTypes = [];
-    var typeCheckboxes = [
-        "surgeryTypeCapilar",
-        "surgeryTypeBodyHair",
-        "surgeryTypeSobrancelhas",
-        "surgeryTypeBarba",
-        "surgeryTypeRetoque"
-    ];
+  const surgeryTypes = [];
+  [
+    "surgeryTypeCapilar",
+    "surgeryTypeBodyHair",
+    "surgeryTypeSobrancelhas",
+    "surgeryTypeBarba",
+    "surgeryTypeRetoque"
+  ].forEach((id) => {
+    const cb = document.getElementById(id);
+    if (cb?.checked) surgeryTypes.push(cb.value);
+  });
 
-    typeCheckboxes.forEach(function (id) {
-        var cb = document.getElementById(id);
-        if (cb && cb.checked) surgeryTypes.push(cb.value);
-    });
+  const surgeryType = surgeryTypes.join(", ");
 
-    var surgeryType = surgeryTypes.join(", ");
+  if (!surgeryDate) {
+    showAlert?.("Selecione a data da cirurgia!", "warning");
+    return;
+  }
 
-    if (!surgeryDate) {
-        if (typeof showAlert === "function") showAlert("Selecione a data da cirurgia!", "warning");
-        return;
-    }
+  if (!surgicalData) {
+    showAlert?.("Preencha os dados cirúrgicos!", "warning");
+    return;
+  }
 
-    if (!surgicalData) {
-        if (typeof showAlert === "function") showAlert("Preencha os dados cirurgicos!", "warning");
-        return;
-    }
-
-    fetch("/api/patient/" + pId + "/surgery", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": typeof getCSRFToken === "function" ? getCSRFToken() : ""
-        },
-        body: JSON.stringify({
-            surgery_date: surgeryDate.split("T")[0],
-            surgical_data: surgicalData,
-            observations: observations,
-            surgery_type: surgeryType
-        })
+  fetch(`/api/patient/${pId}/surgery`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": typeof getCSRFToken === "function" ? getCSRFToken() : ""
+    },
+    body: JSON.stringify({
+      surgery_date: surgeryDate.split("T")[0],
+      surgical_data: surgicalData,
+      observations: observations,
+      surgery_type: surgeryType
     })
-        .then(function (r) {
-            if (!r.ok) throw new Error("Servidor retornou erro");
-            return r.json();
-        })
-        .then(function (result) {
-            if (result.success) {
-                if (typeof showAlert === "function") showAlert("Cirurgia registrada com sucesso!", "success");
+  })
+    .then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then((result) => {
+      if (result.success) {
+        showAlert?.("Cirurgia registrada com sucesso!", "success");
 
-                [
-                    "surgeryDate",
-                    "surgicalData",
-                    "surgeryObservations",
-                    "surgeryModalDate",
-                    "surgeryModalSurgicalPlanning",
-                    "surgeryModalComplications"
-                ].forEach(function (id) {
-                    var el = document.getElementById(id);
-                    if (el) el.value = "";
-                });
-
-                [
-                    "surgeryTypeCapilar",
-                    "surgeryTypeBodyHair",
-                    "surgeryTypeSobrancelhas",
-                    "surgeryTypeBarba",
-                    "surgeryTypeRetoque"
-                ].forEach(function (id) {
-                    var cb = document.getElementById(id);
-                    if (cb) cb.checked = false;
-                });
-
-                var modalEl = document.getElementById("surgeryModal");
-                if (modalEl && typeof bootstrap !== "undefined") {
-                    var modal = bootstrap.Modal.getInstance(modalEl);
-                    if (modal) modal.hide();
-                }
-
-                if (typeof window.loadSurgeries === "function") window.loadSurgeries();
-            } else {
-                if (typeof showAlert === "function") showAlert("Erro: " + (result.error || "Erro ao salvar"), "danger");
-            }
-        })
-        .catch(function (err) {
-            console.error("Erro:", err);
-            if (typeof showAlert === "function") showAlert("Erro ao salvar cirurgia", "danger");
+        [
+          "surgeryDate",
+          "surgicalData",
+          "surgeryObservations",
+          "surgeryModalDate",
+          "surgeryModalSurgicalPlanning",
+          "surgeryModalComplications"
+        ].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.value = "";
         });
+
+        [
+          "surgeryTypeCapilar",
+          "surgeryTypeBodyHair",
+          "surgeryTypeSobrancelhas",
+          "surgeryTypeBarba",
+          "surgeryTypeRetoque"
+        ].forEach((id) => {
+          const cb = document.getElementById(id);
+          if (cb) cb.checked = false;
+        });
+
+        if (typeof window.loadSurgeries === "function") {
+          window.loadSurgeries();
+        }
+      } else {
+        showAlert?.(`Erro: ${result.error || "Erro ao salvar"}`, "danger");
+      }
+    })
+    .catch((err) => {
+      console.error("Erro ao salvar cirurgia:", err);
+      showAlert?.("Erro ao salvar cirurgia", "danger");
+    });
 };
 
 window.loadSurgeries = function () {
