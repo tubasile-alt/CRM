@@ -214,36 +214,88 @@
     typeSelect.addEventListener("change", renderChecklist);
 
     modal.querySelector("#saveEvolutionBtn").addEventListener("click", async () => {
-
       const checked = Array.from(modal.querySelectorAll(".evolution-check:checked"))
         .map((el) => el.value);
 
+      const notes = modal.querySelector("#evolutionContent").value.trim();
+      const returnType = typeSelect.value;
+
+      const checkedLabels = Array.from(modal.querySelectorAll(".evolution-check:checked"))
+        .map((el) => el.closest(".form-check")?.innerText?.trim())
+        .filter(Boolean);
+
+      const contentParts = [];
+
+      contentParts.push(`[TIPO DE RETORNO] ${returnType}`);
+
+      if (checkedLabels.length) {
+        contentParts.push("[CHECKLIST]");
+        checkedLabels.forEach((label) => contentParts.push(`- ${label}`));
+      }
+
+      if (notes) {
+        contentParts.push("[OBSERVAÇÕES]");
+        contentParts.push(notes);
+      }
+
+      const content = contentParts.join("\n").trim();
+
+      if (!content) {
+        alert("Preencha pelo menos uma informação na evolução.");
+        return;
+      }
+
+      const patientId =
+        window.ProntuarioCore?.getPatientId?.() ||
+        window.__PRONTUARIO_CONFIG?.patientId;
+
+      if (!patientId) {
+        alert("Patient ID não encontrado.");
+        return;
+      }
+
       const payload = {
         evolution_date: dateInput.value,
-        notes: modal.querySelector("#evolutionContent").value,
-        return_type: typeSelect.value,
+        content: content,
+        notes: notes,
+        return_type: returnType,
         checked_items: checked
       };
 
       try {
+        await (window.ProntuarioCore?.fetchJson
+          ? window.ProntuarioCore.fetchJson(`/api/patient/${patientId}/surgery/${surgeryId}/evolution`, {
+              method: "POST",
+              body: JSON.stringify(payload)
+            })
+          : fetch(`/api/patient/${patientId}/surgery/${surgeryId}/evolution`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+              credentials: "same-origin"
+            }).then(async (r) => {
+              const t = await r.text();
+              let d = null;
+              try { d = t ? JSON.parse(t) : null; } catch (_) {}
+              if (!r.ok) throw new Error((d && (d.error || d.message)) || t || `HTTP ${r.status}`);
+              return d;
+            }));
 
-        await core.fetchJson(`/api/surgeries/${surgeryId}/evolutions`, {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-
-        core.showAppAlert("Evolução salva com sucesso!", "success");
         bsModal.hide();
 
-        if (typeof window.refreshSurgeryHistory === "function") {
-          window.refreshSurgeryHistory();
+        if (typeof window.loadTimeline === "function") {
+          window.loadTimeline();
         }
 
+        if (window.ProntuarioCore?.showAppAlert) {
+          window.ProntuarioCore.showAppAlert("Evolução salva com sucesso!", "success");
+        } else {
+          alert("Evolução salva com sucesso!");
+        }
       } catch (err) {
         console.error(err);
-        core.showAppAlert("Erro ao salvar evolução.", "danger");
+        alert(`Erro ao salvar evolução: ${err.message}`);
       }
-
     });
 
     modal.addEventListener("hidden.bs.modal", () => {
