@@ -376,15 +376,15 @@
     border-radius: 14px;
   }
 
-  #cosmeticRightColumnContent .card {
+  #clinicalRightPanel .card {
     border-radius: 12px;
   }
 
-  #cosmeticRightColumnContent .btn {
+  #clinicalRightPanel .btn {
     border-radius: 10px;
   }
 
-  #cosmeticRightColumnContent {
+  #clinicalRightPanel {
     min-height: 120px;
   }
 </style>
@@ -524,7 +524,7 @@
 </div>
 
 <div class="row g-3 align-items-start prontuario-two-column-layout" id="prontuarioMainLayout">
-  <div class="col-12 col-lg-12" id="prontuarioLeftColumn">
+  <div class="col-12 col-lg-8" id="prontuarioLeftColumn">
     <div class="card">
       <div class="card-header">
         <ul class="nav nav-tabs card-header-tabs" role="tablist">
@@ -1025,38 +1025,38 @@
                         {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
                       </span>
 
-                      <button
-                        class="btn btn-sm btn-outline-success"
+                      <span
+                        class="btn btn-sm btn-outline-success" role="button" tabindex="0"
                         onclick="event.stopPropagation(); openEvolutionFromConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y %H:%M') }}')"
                         title="Adicionar evolução para esta consulta"
                       >
                         <i class="bi bi-plus-circle"></i> Evolução
-                      </button>
+                      </span>
 
-                      <button
-                        class="btn btn-sm btn-outline-warning"
+                      <span
+                        class="btn btn-sm btn-outline-warning" role="button" tabindex="0"
                         onclick="event.stopPropagation(); editConsultationDate({{ consultation.id }}, '{{ consultation.date.strftime('%Y-%m-%dT%H:%M') }}')"
                         title="Editar data e informações"
                       >
                         <i class="bi bi-pencil"></i>
-                      </button>
+                      </span>
 
-                      <button
-                        class="btn btn-sm btn-outline-danger"
+                      <span
+                        class="btn btn-sm btn-outline-danger" role="button" tabindex="0"
                         onclick="event.stopPropagation(); deleteConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y') }}')"
                         title="Deletar consulta"
                       >
                         <i class="bi bi-trash"></i>
-                      </button>
+                      </span>
 
                       {% if consultation.appointment_id %}
-                      <button
-                        class="btn btn-sm btn-outline-primary"
+                      <span
+                        class="btn btn-sm btn-outline-primary" role="button" tabindex="0"
                         onclick="event.stopPropagation(); window.location.href='/prontuario/{{ patient.id }}?appointment_id={{ consultation.appointment_id }}'"
                         title="Editar consulta completa"
                       >
                         <i class="bi bi-pencil-square"></i>
-                      </button>
+                      </span>
                       {% endif %}
                     </div>
                   </div>
@@ -1180,7 +1180,7 @@
                       {% if conduta_note.transplant_indication == 'sim' %}
                       <button type="button" class="btn btn-sm btn-info">Sim</button>
                       {% else %}
-                      <button type="button" class="btn btn-sm btn-secondary">Não</button>
+                      <button type="button" class="btn btn-sm btn-secondary">Não</span>
                       {% endif %}
                     </div>
                   </div>
@@ -1231,7 +1231,7 @@
     </div>
   </div>
 
-  <div class="col-12 col-lg-4 d-none" id="cosmeticRightColumn">
+  <div class="col-12 col-lg-4" id="cosmeticRightColumn">
     <div class="prontuario-right-panel-wrapper">
       <div class="card border-0 shadow-sm prontuario-right-panel-card">
         <div class="card-body">
