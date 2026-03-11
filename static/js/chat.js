@@ -1,5 +1,7 @@
 let selectedContactId = null;
   const currentUserId = parseInt(document.body.dataset.userId || '0');
+  let knownMessageIds = new Set();
+  let lastAlertedIncomingId = null;
 
   function loadContacts() {
       fetch('/api/chat/contacts')
@@ -43,6 +45,8 @@ let selectedContactId = null;
   function selectContact(contactId, contactName) {
       console.log('[CHAT] Selecionando contato:', contactId, contactName);
       selectedContactId = contactId;
+      knownMessageIds = new Set();
+      lastAlertedIncomingId = null;
       const panel = document.getElementById('conversationPanel');
       if (!panel) return;
 
@@ -115,6 +119,14 @@ let selectedContactId = null;
                    return;
               }
 
+              const incomingNewMessages = messages.filter(msg => {
+                  const msgId = String(msg.id);
+                  const isIncoming = parseInt(msg.senderId, 10) !== currentUserId;
+                  return isIncoming && !knownMessageIds.has(msgId);
+              });
+
+              messages.forEach(msg => knownMessageIds.add(String(msg.id)));
+
               const existingMsgs = Array.from(messagesArea.querySelectorAll('.chat-message'));
               const tempMsgs = existingMsgs.filter(el => el.id && el.id.startsWith('temp-'));
               const currentOfficialIds = existingMsgs.filter(el => el.dataset.msgId && !el.dataset.msgId.toString().startsWith('temp-')).map(el => el.dataset.msgId).join(',');
@@ -143,6 +155,19 @@ let selectedContactId = null;
                   messagesArea.scrollTop = messagesArea.scrollHeight;
               } else {
                   messagesArea.scrollTop = scrollTop;
+              }
+              if (incomingNewMessages.length > 0) {
+                  const newestIncoming = incomingNewMessages[incomingNewMessages.length - 1];
+                  if (String(newestIncoming.id) !== String(lastAlertedIncomingId)) {
+                      lastAlertedIncomingId = newestIncoming.id;
+                      if (window.ChatNotifier && typeof window.ChatNotifier.notifyIncomingInActiveChat === 'function') {
+                          window.ChatNotifier.notifyIncomingInActiveChat({
+                              id: newestIncoming.id,
+                              from_name: document.querySelector('.conversation-title')?.textContent || 'Contato',
+                              message: newestIncoming.message
+                          });
+                      }
+                  }
               }
           })
           .catch(err => console.error('[CHAT] Erro polling mensagens:', err));
