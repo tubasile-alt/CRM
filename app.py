@@ -1435,8 +1435,8 @@ def send_agenda_email():
 @app.route('/api/patient/<int:patient_id>/attention-note', methods=['POST'])
 @login_required
 def save_attention_note(patient_id):
-    if not current_user.is_doctor():
-        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Sem permissão'}), 403
     
     data = request.get_json(silent=True)
     if not data:

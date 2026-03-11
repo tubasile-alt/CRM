@@ -115,7 +115,7 @@
                   {% endif %}
                   <div class="vr"></div>
 
-                  {% if current_user.is_doctor() %}
+                  {% if current_user.is_doctor() or current_user.is_secretary() %}
                   <button
                     class="btn btn-sm btn-warning d-flex align-items-center gap-2 px-3 py-1 rounded-pill fw-bold text-dark border-0"
                     onclick="openAttentionModal()"
@@ -393,7 +393,7 @@
   }
 </style>
 
-{% if current_user.is_doctor() %}
+{% if current_user.is_doctor() or current_user.is_secretary() %}
 <div class="modal fade" id="attentionModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -499,7 +499,7 @@
 </div>
 {% endif %}
 
-{% if current_user.is_doctor() %}
+{% if current_user.is_doctor() or current_user.is_secretary() %}
 <div class="row mb-3">
   <div class="col-12">
     <div class="card bg-light">
@@ -1029,38 +1029,40 @@
                         {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
                       </span>
 
-                      <span
-                        class="btn btn-sm btn-outline-success" role="button" tabindex="0"
-                        onclick="event.stopPropagation(); openEvolutionFromConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y %H:%M') }}')"
-                        title="Adicionar evolução para esta consulta"
-                      >
-                        <i class="bi bi-plus-circle"></i> Evolução
-                      </span>
+                      {% if current_user.is_doctor() %}
+                        <span
+                          class="btn btn-sm btn-outline-success" role="button" tabindex="0"
+                          onclick="event.stopPropagation(); openEvolutionFromConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y %H:%M') }}')"
+                          title="Adicionar evolução para esta consulta"
+                        >
+                          <i class="bi bi-plus-circle"></i> Evolução
+                        </span>
 
-                      <span
-                        class="btn btn-sm btn-outline-warning" role="button" tabindex="0"
-                        onclick="event.stopPropagation(); editConsultationDate({{ consultation.id }}, '{{ consultation.date.strftime('%Y-%m-%dT%H:%M') }}')"
-                        title="Editar data e informações"
-                      >
-                        <i class="bi bi-pencil"></i>
-                      </span>
+                        <span
+                          class="btn btn-sm btn-outline-warning" role="button" tabindex="0"
+                          onclick="event.stopPropagation(); editConsultationDate({{ consultation.id }}, '{{ consultation.date.strftime('%Y-%m-%dT%H:%M') }}')"
+                          title="Editar data e informações"
+                        >
+                          <i class="bi bi-pencil"></i>
+                        </span>
 
-                      <span
-                        class="btn btn-sm btn-outline-danger" role="button" tabindex="0"
-                        onclick="event.stopPropagation(); deleteConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y') }}')"
-                        title="Deletar consulta"
-                      >
-                        <i class="bi bi-trash"></i>
-                      </span>
+                        <span
+                          class="btn btn-sm btn-outline-danger" role="button" tabindex="0"
+                          onclick="event.stopPropagation(); deleteConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y') }}')"
+                          title="Deletar consulta"
+                        >
+                          <i class="bi bi-trash"></i>
+                        </span>
 
-                      {% if consultation.appointment_id %}
-                      <span
-                        class="btn btn-sm btn-outline-primary" role="button" tabindex="0"
-                        onclick="event.stopPropagation(); window.location.href='/prontuario/{{ patient.id }}?appointment_id={{ consultation.appointment_id }}'"
-                        title="Editar consulta completa"
-                      >
-                        <i class="bi bi-pencil-square"></i>
-                      </span>
+                        {% if consultation.appointment_id %}
+                        <span
+                          class="btn btn-sm btn-outline-primary" role="button" tabindex="0"
+                          onclick="event.stopPropagation(); window.location.href='/prontuario/{{ patient.id }}?appointment_id={{ consultation.appointment_id }}'"
+                          title="Editar consulta completa"
+                        >
+                          <i class="bi bi-pencil-square"></i>
+                        </span>
+                        {% endif %}
                       {% endif %}
                     </div>
                   </div>
@@ -1265,7 +1267,7 @@
   </div>
 </div>
 
-{% if current_user.is_doctor() %}
+{% if current_user.is_doctor() or current_user.is_secretary() %}
 <div class="modal fade" id="evolutionModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
