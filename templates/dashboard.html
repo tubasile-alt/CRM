@@ -130,7 +130,7 @@
             <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-bom">-</h4><small>Bom</small></div></div></div>
             <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-medio">-</h4><small>Médio</small></div></div></div>
             <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-ruim">-</h4><small>Ruim</small></div></div></div>
-            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-nova-cirurgia">-</h4><small>Nova Cirurgia</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4><button type="button" id="stat-nova-cirurgia-btn" class="btn btn-link p-0 text-decoration-none text-info fw-bold" data-bs-toggle="modal" data-bs-target="#secondSurgeryModal"><span id="stat-nova-cirurgia">-</span></button></h4><small>Nova Cirurgia (1 ano)</small></div></div></div>
         </div>
     </div>
 
@@ -151,6 +151,20 @@
             <div class="col-lg-6"><div class="card metric-card"><div class="card-header bg-primary text-white">Cirurgias por Mês (12 meses)</div><div class="card-body"><div id="monthly-chart"><p class="muted-dark text-center">Carregando...</p></div></div></div></div>
         </div>
     </div>
+</div>
+
+<div class="modal fade" id="secondSurgeryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content bg-dark text-light border-secondary">
+      <div class="modal-header">
+        <h5 class="modal-title">Pacientes com indicação de segunda cirurgia (evolução 1 ano)</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="secondSurgeryList" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -215,5 +229,39 @@ fetch('/api/dashboard/surgery-stats', {credentials: 'same-origin'})
         }
     })
     .catch(e => console.error('Erro ao carregar estatisticas de cirurgia:', e));
+
+function loadSecondSurgeryPatients() {
+    const list = document.getElementById('secondSurgeryList');
+    if (!list) return;
+    list.innerHTML = '<div class="text-center muted-dark">Carregando...</div>';
+
+    fetch('/api/dashboard/one-year-second-surgery-patients', { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+            const rows = data.patients || [];
+            if (!rows.length) {
+                list.innerHTML = '<div class="text-center muted-dark">Nenhum paciente encontrado.</div>';
+                return;
+            }
+
+            list.innerHTML = rows.map(p => `
+                <div class="list-group-item bg-transparent text-light border-secondary">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold">${p.patient_name}</div>
+                            <small class="text-secondary">Evolução: ${p.evolution_date || '-'} • Cirurgia: ${p.surgery_date || '-'}</small>
+                        </div>
+                        <a class="btn btn-sm btn-outline-info" href="${p.prontuario_url}">Abrir prontuário</a>
+                    </div>
+                </div>
+            `).join('');
+        })
+        .catch(() => {
+            list.innerHTML = '<div class="text-center text-danger">Erro ao carregar pacientes.</div>';
+        });
+}
+
+document.getElementById('secondSurgeryModal')?.addEventListener('show.bs.modal', loadSecondSurgeryPatients);
+
 </script>
 {% endblock %}

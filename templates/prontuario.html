@@ -11,7 +11,9 @@
     patientName: {{ patient.name | tojson }},
     appointmentId: {{ appointment_id | tojson }},
     appointmentStartIso: {{ appointment_start_iso | tojson }},
-    csrfToken: "{{ csrf_token() }}"
+    csrfToken: "{{ csrf_token() }}",
+    canEditClinical: {{ "true" if current_user.is_doctor() else "false" }},
+    canEditPatientPersonalData: {{ "true" if (current_user.is_doctor() or current_user.is_secretary()) else "false" }}
   };
 
   window.patientId = {{ patient.id }};
@@ -98,7 +100,9 @@
                       <li><a class="dropdown-item" href="#" onclick="updatePatientStars(3)">⭐⭐⭐</a></li>
                     </ul>
                   </div>
+                  {% endif %}
 
+                  {% if current_user.is_doctor() or current_user.is_secretary() %}
                   <button class="btn btn-sm btn-outline-secondary border-0 ms-2" onclick="openEditPatientModal()" title="Editar Cadastro">
                     <i class="bi bi-pencil-square"></i> Editar Cadastro
                   </button>

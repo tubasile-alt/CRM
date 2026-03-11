@@ -276,8 +276,11 @@ function handleChatNotification(currentCount) {
             lastSeenMessageId = data.id;
             localStorage.setItem('chatLastSeenMessageId', lastSeenMessageId);
 
-            showToastNotification(data);
-            ChatNotifier.showUrgentPopup(data);
+            const isChatScreen = window.location.pathname === '/chat';
+            if (!isChatScreen) {
+                showToastNotification(data);
+                ChatNotifier.showUrgentPopup(data);
+            }
 
             if (document.hidden || window.location.pathname !== '/chat') {
                 if (Notification.permission === "granted") {
