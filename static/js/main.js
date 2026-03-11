@@ -249,11 +249,13 @@ function updateChatBadge() {
             
             if (count > 0) {
                 badge.style.display = 'inline-block';
+                badge.classList.add('has-unread');
                 if (count > lastUnreadCount) {
                     handleChatNotification(count);
                 }
             } else {
                 badge.style.display = 'none';
+                badge.classList.remove('has-unread');
             }
             lastUnreadCount = count;
             localStorage.setItem('chatLastUnreadCount', lastUnreadCount);
