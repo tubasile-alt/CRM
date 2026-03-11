@@ -1,4 +1,4 @@
-console.log("prontuario.js carregado v=20260310-right-panel-fix-1");
+console.log("prontuario.js carregado v=20260311-right-panel-stable");
 
 let timerInterval = null;
 let timerStartTime = null;
@@ -619,26 +619,18 @@ function updateMainLayoutColumns(forceShow = false) {
 
   if (!left || !right) return;
 
-  const hasCosmiatria = Array.isArray(cosmeticProcedures) && cosmeticProcedures.length > 0;
-  const shouldShow =
-    forceShow ||
-    currentRightPanelMode === "cosmiatria" ||
-    currentRightPanelMode === "transplante" ||
-    currentRightPanelMode === "patologia" ||
-    (currentCategory === "cosmiatria" && hasCosmiatria) ||
-    currentCategory === "transplante_capilar" ||
-    currentCategory === "patologia";
+  // Desktop: painel sempre visível durante todo o atendimento.
+  const isDesktop = window.matchMedia("(min-width: 1200px)").matches;
+  const shouldShowMobile = forceShow || currentRightPanelMode !== null || !!currentCategory;
 
-  if (shouldShow) {
-    left.classList.remove("col-lg-12");
-    left.classList.add("col-lg-8");
+  left.classList.remove("col-lg-12");
+  left.classList.add("col-lg-8");
+  right.classList.add("col-lg-4");
+
+  if (isDesktop || shouldShowMobile) {
     right.classList.remove("d-none");
-    right.classList.add("col-lg-4");
   } else {
     right.classList.add("d-none");
-    right.classList.remove("col-lg-4");
-    left.classList.remove("col-lg-8");
-    left.classList.add("col-lg-12");
   }
 }
 
@@ -903,11 +895,12 @@ function renderProcedureCard(proc) {
   const realIndex = cosmeticProcedures.indexOf(proc);
   const value = parseFloat(proc.budget ?? proc.value) || 0;
   const procedureDate = proc.performedDate || "";
-  const statusClass = proc.performed ? "bg-success" : "bg-danger";
-  const statusText = proc.performed ? "REALIZADO" : "PENDENTE";
   const iconClass = proc.performed
     ? "bi-check-circle-fill text-success"
     : "bi-x-circle-fill text-danger";
+  const valueInput = Number.isFinite(value)
+    ? value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : "0,00";
 
   return `
     <div class="card mb-2 border-0 shadow-sm ${proc.performed ? "opacity-75" : ""}">
@@ -942,19 +935,66 @@ function renderProcedureCard(proc) {
             </div>
           </div>
 
-          <div class="text-end">
-            <button
-              type="button"
-              class="btn btn-sm ${statusClass} fw-bold btn-toggle-proc"
-              data-index="${realIndex}"
+          <div class="text-end" style="min-width: 200px;">
+            <div class="small text-muted text-start mb-1">Data do procedimento</div>
+            <input
+              type="date"
+              class="form-control form-control-sm mb-2"
+              value="${procedureDate}"
+              onchange="updatePlanDate(${realIndex}, this.value)"
             >
-              ${statusText}
-            </button>
+
+            <div class="small text-muted text-start mb-1">Valor do procedimento</div>
+            <div class="input-group input-group-sm mb-2">
+              <span class="input-group-text">R$</span>
+              <input
+                type="text"
+                class="form-control"
+                value="${valueInput}"
+                inputmode="decimal"
+                onchange="updateProcedureValueFromCurrencyInput(${realIndex}, this.value, this)"
+              >
+            </div>
+
+            <div class="form-check d-flex justify-content-end align-items-center gap-2 mt-2">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="panelPerformed${realIndex}"
+                ${proc.performed ? "checked" : ""}
+                onchange="togglePlanPerformed(${realIndex}, this.checked)"
+              >
+              <label class="form-check-label small" for="panelPerformed${realIndex}">
+                Realizado
+              </label>
+            </div>
           </div>
         </div>
       </div>
     </div>
   `;
+}
+
+function parseCurrencyInputToFloat(value) {
+  if (value === null || value === undefined) return 0;
+  const numeric = String(value)
+    .replace(/\s/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".")
+    .replace(/[^\d.-]/g, "");
+  return parseFloat(numeric) || 0;
+}
+
+function updateProcedureValueFromCurrencyInput(index, rawValue, inputEl = null) {
+  const value = parseCurrencyInputToFloat(rawValue);
+  updatePlanValue(index, value);
+
+  if (inputEl) {
+    inputEl.value = value.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
 }
 
 function renderCosmeticConduct() {
@@ -1066,6 +1106,7 @@ function showRightPanel() {
 function hideRightPanel() {
   currentRightPanelMode = null;
   currentHistoricalConsultation = null;
+  // Mantém coluna no desktop; apenas permite ocultar no mobile quando necessário.
   updateMainLayoutColumns(false);
 }
 
@@ -1242,7 +1283,7 @@ function renderRightPanel(contextCategory = null, consultationData = null) {
 
   if (!panel || !panelContent) return;
 
-  const category = contextCategory || currentCategory;
+  const category = contextCategory || currentCategory || "patologia";
   panel.classList.remove("d-none");
 
   if (category === "cosmiatria") {
@@ -1288,12 +1329,45 @@ function renderRightPanel(contextCategory = null, consultationData = null) {
     return;
   }
 
-  if (category === "patologia") {
-    renderPatologiaRightPanelFromScreen();
+  // Fallback explícito: patologia (nunca esconde o painel no desktop).
+  renderPatologiaRightPanelFromScreen();
+}
+
+function resolveHistoryCategoryFromBadgeText(categoryText) {
+  const txt = String(categoryText || "").trim().toLowerCase();
+  if (txt.includes("cosmiatria")) return "cosmiatria";
+  if (txt.includes("transplante")) return "transplante_capilar";
+  return "patologia";
+}
+
+function initializeRightPanelFromHistory() {
+  const historyButtons = Array.from(document.querySelectorAll(".accordion-button[data-consultation-key]"));
+
+  // Sem histórico: mantém painel visível e coerente com categoria atual.
+  if (!historyButtons.length) {
+    renderRightPanel(currentCategory || "patologia");
     return;
   }
 
-  panel.classList.add("d-none");
+  // Estratégia previsível: primeiro item renderizado no histórico (ordem do backend).
+  const firstButton = historyButtons[0];
+  const consultationKey = firstButton.getAttribute("data-consultation-key");
+  const badge = firstButton.querySelector(".badge.bg-primary");
+  const historyCategory = resolveHistoryCategoryFromBadgeText(badge ? badge.textContent : "");
+
+  if (historyCategory) {
+    currentCategory = historyCategory;
+    const categoryInput = document.querySelector(`input[name="category"][value="${historyCategory}"]`);
+    if (categoryInput) categoryInput.checked = true;
+    toggleCategoryTabs();
+  }
+
+  if (consultationKey) {
+    renderHistoricalConsultationRightPanel(consultationKey, historyCategory);
+    return;
+  }
+
+  renderRightPanel(historyCategory);
 }
 
 /* =========================
@@ -3037,11 +3111,7 @@ document.addEventListener("DOMContentLoaded", async function () {
       if (!consultationKey) return;
 
       const badge = btn.querySelector(".badge.bg-primary");
-      const categoryText = badge ? badge.textContent.trim().toLowerCase() : "";
-
-      let historyCategory = "patologia";
-      if (categoryText.includes("cosmiatria")) historyCategory = "cosmiatria";
-      if (categoryText.includes("transplante")) historyCategory = "transplante_capilar";
+      const historyCategory = resolveHistoryCategoryFromBadgeText(badge ? badge.textContent : "");
 
       renderHistoricalConsultationRightPanel(consultationKey, historyCategory);
 
@@ -3148,13 +3218,10 @@ document.addEventListener("DOMContentLoaded", async function () {
   toggleTransplantLocation();
   updateCosmeticTotal();
 
-  if (currentCategory === "cosmiatria") {
-    renderCosmeticConduct();
-  } else if (currentCategory === "transplante_capilar") {
-    renderTransplantRightPanelFromScreen();
-  } else {
-    renderPatologiaRightPanelFromScreen();
-  }
+  initializeRightPanelFromHistory();
+  updateMainLayoutColumns(true);
+
+  window.addEventListener("resize", () => updateMainLayoutColumns(true));
 
 });
 

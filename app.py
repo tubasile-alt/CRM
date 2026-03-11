@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for, f
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
-from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta, date
 import pytz
@@ -36,7 +35,6 @@ app.config.from_object(Config)
 #             pass  # Não interromper requisição se backup falhar
 
 db.init_app(app)
-migrate = Migrate(app, db)
 csrf = CSRFProtect(app)
 mail = Mail(app)
 
