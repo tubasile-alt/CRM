@@ -1791,7 +1791,8 @@ def prontuario(patient_id):
     if not current_user.is_doctor() and not current_user.is_secretary():
         return redirect(url_for('agenda'))
 
-    # Secretárias: permitir visualizar se houver vínculo PatientDoctor
+    # Secretárias: priorizar DP quando existir, mas manter acesso ao histórico geral
+    # mesmo sem vínculo PatientDoctor (garante visão para todas as 3 secretárias).
     if current_user.is_secretary():
         from models import PatientDoctor
         pd = PatientDoctor.query.filter_by(patient_id=patient_id).first()
@@ -1799,7 +1800,7 @@ def prontuario(patient_id):
             from services.authz import can_view_dp
             if can_view_dp(pd):
                 return redirect(url_for('prontuario_dp', dp_id=pd.id))
-        return render_template('select_dp.html', patient_id=patient_id), 400
+        # Sem vínculo DP válido: continuar para o prontuário padrão com histórico.
 
     # Médicos CP: criar/obter dp e redirecionar para rota dp
     if current_user.role_clinico == 'CP':
