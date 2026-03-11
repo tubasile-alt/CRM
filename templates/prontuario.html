@@ -1037,21 +1037,15 @@
                         >
                           <i class="bi bi-plus-circle"></i> Evolução
                         </span>
+                      {% endif %}
 
+                      {% if current_user.is_doctor() or current_user.is_secretary() %}
                         <span
                           class="btn btn-sm btn-outline-warning" role="button" tabindex="0"
                           onclick="event.stopPropagation(); editConsultationDate({{ consultation.id }}, '{{ consultation.date.strftime('%Y-%m-%dT%H:%M') }}')"
                           title="Editar data e informações"
                         >
                           <i class="bi bi-pencil"></i>
-                        </span>
-
-                        <span
-                          class="btn btn-sm btn-outline-danger" role="button" tabindex="0"
-                          onclick="event.stopPropagation(); deleteConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y') }}')"
-                          title="Deletar consulta"
-                        >
-                          <i class="bi bi-trash"></i>
                         </span>
 
                         {% if consultation.appointment_id %}
@@ -1063,6 +1057,16 @@
                           <i class="bi bi-pencil-square"></i>
                         </span>
                         {% endif %}
+                      {% endif %}
+
+                      {% if current_user.is_doctor() %}
+                        <span
+                          class="btn btn-sm btn-outline-danger" role="button" tabindex="0"
+                          onclick="event.stopPropagation(); deleteConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y') }}')"
+                          title="Deletar consulta"
+                        >
+                          <i class="bi bi-trash"></i>
+                        </span>
                       {% endif %}
                     </div>
                   </div>
