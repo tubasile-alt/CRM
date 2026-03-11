@@ -2825,7 +2825,6 @@ function renderSurgeryHistoryCard(surgeries = []) {
             evoDiv.innerHTML = `
               <div class="d-flex justify-content-between align-items-start">
                 <div class="flex-grow-1">
-                  <small class="text-muted"><i class="bi bi-clock"></i> ${core.escapeHtml(evo.date)}</small>
                   <p class="mb-1 mt-2" style="white-space: pre-wrap;">${core.escapeHtml(evo.content)}</p>
                   <small class="text-muted">Dr. ${core.escapeHtml(evo.doctor)}</small>
                 </div>
