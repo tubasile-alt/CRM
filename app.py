@@ -1255,13 +1255,14 @@ def update_note(note_id):
     try:
         note = Note.query.get_or_404(note_id)
 
-        if not current_user.is_doctor():
-            return jsonify({'success': False, 'error': 'Apenas médicos podem editar conteúdo clínico'}), 403
+        if not (current_user.is_doctor() or current_user.is_secretary()):
+            return jsonify({'success': False, 'error': 'Sem permissão para editar anotações'}), 403
 
-        from models import PatientDoctor
-        pd = PatientDoctor.query.filter_by(patient_id=note.patient_id, doctor_id=current_user.id).first()
-        if not pd and not getattr(current_user, 'is_admin', lambda: False)():
-            return jsonify({'success': False, 'error': 'Sem acesso a este paciente'}), 403
+        if current_user.is_doctor():
+            from models import PatientDoctor
+            pd = PatientDoctor.query.filter_by(patient_id=note.patient_id, doctor_id=current_user.id).first()
+            if not pd and not getattr(current_user, 'is_admin', lambda: False)():
+                return jsonify({'success': False, 'error': 'Sem acesso a este paciente'}), 403
 
         data = request.get_json() or {}
         
@@ -1791,7 +1792,8 @@ def prontuario(patient_id):
     if not current_user.is_doctor() and not current_user.is_secretary():
         return redirect(url_for('agenda'))
 
-    # Secretárias: permitir visualizar se houver vínculo PatientDoctor
+    # Secretárias: priorizar DP quando existir, mas manter acesso ao histórico geral
+    # mesmo sem vínculo PatientDoctor (garante visão para todas as 3 secretárias).
     if current_user.is_secretary():
         from models import PatientDoctor
         pd = PatientDoctor.query.filter_by(patient_id=patient_id).first()
@@ -1799,7 +1801,7 @@ def prontuario(patient_id):
             from services.authz import can_view_dp
             if can_view_dp(pd):
                 return redirect(url_for('prontuario_dp', dp_id=pd.id))
-        return render_template('select_dp.html', patient_id=patient_id), 400
+        # Sem vínculo DP válido: continuar para o prontuário padrão com histórico.
 
     # Médicos CP: criar/obter dp e redirecionar para rota dp
     if current_user.role_clinico == 'CP':
