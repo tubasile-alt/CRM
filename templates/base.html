@@ -33,11 +33,25 @@
   .chat-toast .t{ font-weight:700; font-size:14px; margin-bottom:6px; }
   .chat-toast .b{ font-size:13px; opacity:.92; }
   .chat-toast .x{ position:absolute; top:8px; right:10px; opacity:.7; cursor:pointer; }
+
+  .main-navbar{ z-index:1030; }
+  body.has-fixed-navbar .container-fluid.py-4{
+    padding-top: 92px !important;
+  }
+  #chat-badge.has-unread{
+    animation: chatBadgePulse 1.2s infinite;
+    box-shadow: 0 0 0 0 rgba(220,53,69,.6);
+  }
+  @keyframes chatBadgePulse{
+    0%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(220,53,69,.55);}
+    70%{ transform: scale(1.08); box-shadow: 0 0 0 8px rgba(220,53,69,0);}
+    100%{ transform: scale(1); box-shadow: 0 0 0 0 rgba(220,53,69,0);}
+  }
   </style>
   </head>
-<body data-user-id="{{ current_user.id if current_user.is_authenticated else 0 }}">
+<body class="{% if current_user.is_authenticated %}has-fixed-navbar{% endif %}" data-user-id="{{ current_user.id if current_user.is_authenticated else 0 }}">
     {% if current_user.is_authenticated %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top main-navbar">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
                 <img src="{{ url_for('static', filename='img/logo_3d_final.png') }}" alt="Clínica Basile" height="60" class="me-2">
