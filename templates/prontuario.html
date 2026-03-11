@@ -563,6 +563,7 @@
       </div>
       {% endif %}
 
+      {% if current_user.is_doctor() %}
       <div class="card-body">
         <div class="mb-3 d-flex align-items-center">
           <button class="btn btn-sm btn-success" id="startTimer" onclick="startConsultation()">
@@ -1242,6 +1243,7 @@
         </p>
         {% endif %}
       </div>
+      {% endif %}
     </div>
   </div>
 
