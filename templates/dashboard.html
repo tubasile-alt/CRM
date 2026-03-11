@@ -4,421 +4,180 @@
 
 {% block extra_css %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    .dashboard-dark {
+        background: linear-gradient(180deg, #0b1020 0%, #111827 100%);
+        border-radius: 18px;
+        padding: 1.5rem;
+        color: #e5e7eb;
+        border: 1px solid #24324d;
+    }
+    .dashboard-block {
+        background: #101a2f;
+        border: 1px solid #24324d;
+        border-radius: 14px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .block-title { color: #93c5fd; font-weight: 700; }
+    .metric-card {
+        background: #0b1225;
+        border: 1px solid #2d3d5c;
+        border-radius: 12px;
+        color: #e2e8f0;
+    }
+    .metric-value { font-size: 1.7rem; font-weight: 800; }
+    .muted-dark { color: #94a3b8; }
+    .alert-noshow { border-color: #ef4444 !important; box-shadow: 0 0 0 1px rgba(239, 68, 68, .35); }
+    .badge-dark-soft { background: #1e293b; color: #cbd5e1; }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h2 class="mb-4">Dashboard</h2>
+<div class="dashboard-dark">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Dashboard Médico DERM</h2>
+        <span class="badge badge-dark-soft">Visão clínica + financeira</span>
     </div>
-</div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-calendar-check text-secondary" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ stats.agendados }}</h3>
-                <p class="text-muted mb-0">Agendados Hoje</p>
-            </div>
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-speedometer2"></i> Operação do Dia</h4>
+        <div class="row g-3">
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><i class="bi bi-calendar-check text-info fs-3"></i><div class="metric-value">{{ stats.agendados }}</div><p class="muted-dark mb-0">Agendados Hoje</p></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><i class="bi bi-check-circle text-primary fs-3"></i><div class="metric-value">{{ stats.confirmados }}</div><p class="muted-dark mb-0">Confirmados</p></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><i class="bi bi-clipboard-check text-success fs-3"></i><div class="metric-value">{{ stats.atendidos }}</div><p class="muted-dark mb-0">Atendidos</p></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><i class="bi bi-stopwatch text-warning fs-3"></i><div class="metric-value" id="avgWaitingTime">--</div><p class="muted-dark mb-0">Tempo Médio de Espera (min)</p></div></div></div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-check-circle text-primary" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ stats.confirmados }}</h3>
-                <p class="text-muted mb-0">Confirmados</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-clipboard-check text-success" style="font-size: 2rem;"></i>
-                <h3 class="mt-2">{{ stats.atendidos }}</h3>
-                <p class="text-muted mb-0">Atendidos</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <i class="bi bi-stopwatch text-warning" style="font-size: 2rem;"></i>
-                <h3 class="mt-2" id="avgWaitingTime">--</h3>
-                <p class="text-muted mb-0">Tempo Médio de Espera (min)</p>
-            </div>
-        </div>
-    </div>
-</div>
 
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-graph-up"></i> Consultas por Tipo - Esta Semana</h4>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-primary">
-            <div class="card-body text-center">
-                <i class="bi bi-person-check text-primary" style="font-size: 1.8rem;"></i>
-                <h3 class="mt-2">{{ stats.particular_week }}</h3>
-                <p class="text-muted mb-0">Particulares</p>
-            </div>
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-cash-stack"></i> Receita</h4>
+        <div class="row g-3">
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><p class="muted-dark mb-1">💰 Receita Hoje</p><div class="metric-value">R$ {{ '%.2f'|format(stats.receita_hoje) }}</div></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><p class="muted-dark mb-1">💰 Receita Semana</p><div class="metric-value">R$ {{ '%.2f'|format(stats.receita_semana) }}</div></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><p class="muted-dark mb-1">💰 Receita Mês</p><div class="metric-value">R$ {{ '%.2f'|format(stats.receita_mes) }}</div></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><p class="muted-dark mb-1">💰 Ticket Médio</p><div class="metric-value">R$ {{ '%.2f'|format(stats.ticket_medio) }}</div></div></div></div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card border-info">
-            <div class="card-body text-center">
-                <i class="bi bi-shield-check text-info" style="font-size: 1.8rem;"></i>
-                <h3 class="mt-2">{{ stats.unimed_week }}</h3>
-                <p class="text-muted mb-0">UNIMED</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <i class="bi bi-scissors text-success" style="font-size: 1.8rem;"></i>
-                <h3 class="mt-2">{{ stats.transplante_week }}</h3>
-                <p class="text-muted mb-0">Transplante Capilar</p>
-            </div>
-        </div>
-    </div>
-</div>
 
-<!-- PROCEDIMENTOS COMPLETADOS -->
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-check-circle"></i> Procedimentos Planejados + Feitos</h4>
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-graph-up"></i> Consultas por Tipo - Esta Semana</h4>
+        <div class="row g-3">
+            <div class="col-md-4"><div class="card metric-card text-center"><div class="card-body"><h3>{{ stats.particular_week }}</h3><p class="muted-dark mb-0">Particulares</p></div></div></div>
+            <div class="col-md-4"><div class="card metric-card text-center"><div class="card-body"><h3>{{ stats.unimed_week }}</h3><p class="muted-dark mb-0">UNIMED</p></div></div></div>
+            <div class="col-md-4"><div class="card metric-card text-center"><div class="card-body"><h3>{{ stats.transplante_week }}</h3><p class="muted-dark mb-0">Transplante Capilar</p></div></div></div>
+        </div>
     </div>
-    <div class="col-md-6">
-        <div class="card border-success">
-            <div class="card-header bg-success text-white">
-                <h6 class="mb-0"><i class="bi bi-check-all"></i> Realizados</h6>
-            </div>
-            <div class="card-body">
-                {% if stats.procedures_completed %}
-                <div class="list-group list-group-sm">
-                    {% for procedure, count in stats.procedures_completed.items() %}
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>{{ procedure }}</span>
-                        <span class="badge bg-success rounded-pill">{{ count }}</span>
-                    </div>
-                    {% endfor %}
+
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-calendar-x"></i> No-show</h4>
+        <div class="row g-3">
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><p class="muted-dark mb-1">📅 Agendados</p><div class="metric-value">{{ stats.agendados_mes_total }}</div></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><p class="muted-dark mb-1">👤 Compareceram</p><div class="metric-value">{{ stats.compareceram_mes }}</div></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><p class="muted-dark mb-1">❌ No-show</p><div class="metric-value">{{ stats.no_show_mes }}</div></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center {% if stats.taxa_no_show > 15 %}alert-noshow{% endif %}"><div class="card-body"><p class="muted-dark mb-1">📉 Taxa No-show</p><div class="metric-value">{{ '%.1f'|format(stats.taxa_no_show) }}%</div><small class="{% if stats.taxa_no_show > 15 %}text-danger{% else %}text-success{% endif %}">Meta ideal: &lt; 10%</small></div></div></div>
+        </div>
+    </div>
+
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-check-circle"></i> Procedimentos Planejados + Feitos</h4>
+        <div class="row g-3">
+            <div class="col-md-6"><div class="card metric-card"><div class="card-header bg-success text-white">Realizados</div><div class="card-body">{% if stats.procedures_completed %}{% for procedure, count in stats.procedures_completed.items() %}<div class="d-flex justify-content-between"><span>{{ procedure }}</span><span class="badge bg-success">{{ count }}</span></div>{% endfor %}{% else %}<p class="muted-dark mb-0">Nenhum procedimento realizado</p>{% endif %}</div></div></div>
+            <div class="col-md-6"><div class="card metric-card"><div class="card-header bg-warning text-dark">Pendentes</div><div class="card-body">{% if stats.procedures_pending %}{% for procedure, count in stats.procedures_pending.items() %}<div class="d-flex justify-content-between"><span>{{ procedure }}</span><span class="badge bg-warning text-dark">{{ count }}</span></div>{% endfor %}{% else %}<p class="muted-dark mb-0">Nenhum procedimento pendente</p>{% endif %}</div></div></div>
+        </div>
+    </div>
+
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-funnel"></i> Pipeline de Tratamentos</h4>
+        <div class="row g-3">
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><div class="metric-value">{{ stats.indicados_pipeline }}</div><p class="muted-dark mb-0">Indicados</p></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><div class="metric-value">{{ stats.realizados_pipeline }}</div><p class="muted-dark mb-0">Realizados</p></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><div class="metric-value">{{ stats.pendentes_pipeline }}</div><p class="muted-dark mb-0">Pendentes</p></div></div></div>
+            <div class="col-md-3"><div class="card metric-card text-center"><div class="card-body"><div class="metric-value">R$ {{ '%.2f'|format(stats.valor_potencial) }}</div><p class="muted-dark mb-0">Valor Potencial</p></div></div></div>
+        </div>
+    </div>
+
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-graph-up-arrow"></i> Procedimentos por Mês</h4>
+        <div class="row g-3">
+            <div class="col-lg-6"><div class="card metric-card"><div class="card-header bg-success text-white">Realizados</div><div class="card-body"><canvas id="completedChart" height="80"></canvas></div></div></div>
+            <div class="col-lg-6"><div class="card metric-card"><div class="card-header bg-warning text-dark">Pendentes</div><div class="card-body"><canvas id="pendingChart" height="80"></canvas></div></div></div>
+        </div>
+    </div>
+
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-trophy"></i> Top Receita por Procedimento</h4>
+        <div class="card metric-card"><div class="card-body">{% if stats.top_revenue %}{% for procedure, value in stats.top_revenue.items() %}<div class="d-flex justify-content-between border-bottom border-secondary py-2"><span>{{ procedure }}</span><strong class="text-success">R$ {{ '%.2f'|format(value) }}</strong></div>{% endfor %}{% else %}<p class="muted-dark mb-0">Sem dados de receita no período.</p>{% endif %}</div></div>
+    </div>
+
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-calendar2-check"></i> Consultas por Tipo - Este Mês</h4>
+        <div class="row g-3">
+            <div class="col-md-4"><div class="card metric-card text-center"><div class="card-body"><h3>{{ stats.particular_month }}</h3><p class="muted-dark mb-0">Particulares</p></div></div></div>
+            <div class="col-md-4"><div class="card metric-card text-center"><div class="card-body"><h3>{{ stats.unimed_month }}</h3><p class="muted-dark mb-0">UNIMED</p></div></div></div>
+            <div class="col-md-4"><div class="card metric-card text-center"><div class="card-body"><h3>{{ stats.transplante_month }}</h3><p class="muted-dark mb-0">Transplante Capilar</p></div></div></div>
+        </div>
+    </div>
+
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-clipboard-pulse"></i> Estatísticas de Cirurgias</h4>
+        <div class="row g-3" id="stats-7days">
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-necrosis">-</h4><small>Necrose</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-scabs">-</h4><small>Crostas</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-infection">-</h4><small>Infecção</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-follicle">-</h4><small>Perda Folículos</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-otimo">-</h4><small>Ótimo</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-bom">-</h4><small>Bom</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-medio">-</h4><small>Médio</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-ruim">-</h4><small>Ruim</small></div></div></div>
+            <div class="col"><div class="card metric-card text-center"><div class="card-body"><h4 id="stat-nova-cirurgia">-</h4><small>Nova Cirurgia</small></div></div></div>
+        </div>
+    </div>
+
+    <div class="dashboard-block">
+        <h4 class="mb-3 block-title"><i class="bi bi-heart-pulse"></i> Cirurgias</h4>
+        <div class="row g-3">
+            <div class="col-lg-6">
+                <div class="card metric-card"><div class="card-header bg-success text-white">Cirurgias por Tipo</div>
+                    <div class="card-body"><div class="row text-center" id="stats-surgery-types">
+                        <div class="col"><h4 id="stat-capilar">-</h4><small>Capilar</small></div>
+                        <div class="col"><h4 id="stat-bodyhair">-</h4><small>Body Hair</small></div>
+                        <div class="col"><h4 id="stat-sobrancelhas">-</h4><small>Sobrancelhas</small></div>
+                        <div class="col"><h4 id="stat-barba">-</h4><small>Barba</small></div>
+                        <div class="col"><h4 id="stat-retoque">-</h4><small>Retoque</small></div>
+                    </div><div class="text-center mt-3"><span class="badge bg-success">Total: <span id="stat-total-surgeries">-</span></span></div></div>
                 </div>
-                {% else %}
-                <p class="text-muted text-center mb-0">Nenhum procedimento realizado</p>
-                {% endif %}
             </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h6 class="mb-0"><i class="bi bi-clock-history"></i> Pendentes</h6>
-            </div>
-            <div class="card-body">
-                {% if stats.procedures_pending %}
-                <div class="list-group list-group-sm">
-                    {% for procedure, count in stats.procedures_pending.items() %}
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>{{ procedure }}</span>
-                        <span class="badge bg-warning text-dark rounded-pill">{{ count }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% else %}
-                <p class="text-muted text-center mb-0">Nenhum procedimento pendente</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- GRÁFICOS DE PROCEDIMENTOS POR MÊS - SEPARADOS -->
-<div class="row g-3 mb-4">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-graph-up"></i> Procedimentos por Mês</h4>
-    </div>
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header bg-success text-white">
-                <h6 class="mb-0"><i class="bi bi-check-circle"></i> Realizados</h6>
-            </div>
-            <div class="card-body">
-                <canvas id="completedChart" height="80"></canvas>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-header bg-warning text-dark">
-                <h6 class="mb-0"><i class="bi bi-clock-history"></i> Pendentes</h6>
-            </div>
-            <div class="card-body">
-                <canvas id="pendingChart" height="80"></canvas>
-            </div>
+            <div class="col-lg-6"><div class="card metric-card"><div class="card-header bg-primary text-white">Cirurgias por Mês (12 meses)</div><div class="card-body"><div id="monthly-chart"><p class="muted-dark text-center">Carregando...</p></div></div></div></div>
         </div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Carregar tempo médio de espera
-    fetch('/espera/api/average-wait')
-        .then(r => r.json())
-        .then(data => {
-            const avgEl = document.getElementById('avgWaitingTime');
-            if (data.average > 0) {
-                avgEl.textContent = Math.round(data.average);
-            }
-        })
-        .catch(e => console.error('Erro ao carregar tempo médio:', e));
-    
+    fetch('/espera/api/average-wait').then(r => r.json()).then(data => {
+        const avgEl = document.getElementById('avgWaitingTime');
+        if (data.average > 0) avgEl.textContent = Math.round(data.average);
+    }).catch(e => console.error('Erro ao carregar tempo médio:', e));
+
     const procedureData = {{ stats.procedures_by_month_json | safe }};
     const months = Object.keys(procedureData);
     const completed = Object.values(procedureData).map(d => d.completed);
     const pending = Object.values(procedureData).map(d => d.pending);
-    
-    // Gráfico de Realizados
-    const ctxCompleted = document.getElementById('completedChart').getContext('2d');
-    new Chart(ctxCompleted, {
+
+    new Chart(document.getElementById('completedChart').getContext('2d'), {
         type: 'line',
-        data: {
-            labels: months,
-            datasets: [
-                {
-                    label: 'Realizados',
-                    data: completed,
-                    borderColor: '#198754',
-                    backgroundColor: 'rgba(25, 135, 84, 0.15)',
-                    tension: 0.4,
-                    borderWidth: 3,
-                    fill: true,
-                    pointRadius: 6,
-                    pointBackgroundColor: '#198754',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1,
-                    },
-                    title: {
-                        display: true,
-                        text: 'Quantidade'
-                    }
-                }
-            }
-        }
+        data: { labels: months, datasets: [{ label: 'Realizados', data: completed, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', tension: 0.4, borderWidth: 3, fill: true }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     });
-    
-    // Gráfico de Pendentes
-    const ctxPending = document.getElementById('pendingChart').getContext('2d');
-    new Chart(ctxPending, {
+
+    new Chart(document.getElementById('pendingChart').getContext('2d'), {
         type: 'line',
-        data: {
-            labels: months,
-            datasets: [
-                {
-                    label: 'Pendentes',
-                    data: pending,
-                    borderColor: '#ffc107',
-                    backgroundColor: 'rgba(255, 193, 7, 0.15)',
-                    tension: 0.4,
-                    borderWidth: 3,
-                    fill: true,
-                    pointRadius: 6,
-                    pointBackgroundColor: '#ffc107',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        stepSize: 1,
-                    },
-                    title: {
-                        display: true,
-                        text: 'Quantidade'
-                    }
-                }
-            }
-        }
+        data: { labels: months, datasets: [{ label: 'Pendentes', data: pending, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', tension: 0.4, borderWidth: 3, fill: true }] },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
     });
 });
-</script>
 
-<div class="row g-3">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-calendar2-check"></i> Consultas por Tipo - Este Mês</h4>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-primary">
-            <div class="card-body text-center">
-                <i class="bi bi-person-check text-primary" style="font-size: 1.8rem;"></i>
-                <h3 class="mt-2">{{ stats.particular_month }}</h3>
-                <p class="text-muted mb-0">Particulares</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-info">
-            <div class="card-body text-center">
-                <i class="bi bi-shield-check text-info" style="font-size: 1.8rem;"></i>
-                <h3 class="mt-2">{{ stats.unimed_month }}</h3>
-                <p class="text-muted mb-0">UNIMED</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <i class="bi bi-scissors text-success" style="font-size: 1.8rem;"></i>
-                <h3 class="mt-2">{{ stats.transplante_month }}</h3>
-                <p class="text-muted mb-0">Transplante Capilar</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-3 mt-4 mb-4">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-clipboard-pulse"></i> Estatísticas de Cirurgias</h4>
-    </div>
-    <div class="col-lg-6">
-        <div class="card border-warning">
-            <div class="card-header bg-warning text-dark">
-                <h6 class="mb-0"><i class="bi bi-calendar-week"></i> Avaliação 7 Dias</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center" id="stats-7days">
-                    <div class="col-3">
-                        <h4 class="text-danger" id="stat-necrosis">-</h4>
-                        <small>Necrose</small>
-                    </div>
-                    <div class="col-3">
-                        <h4 class="text-warning" id="stat-scabs">-</h4>
-                        <small>Crostas</small>
-                    </div>
-                    <div class="col-3">
-                        <h4 class="text-danger" id="stat-infection">-</h4>
-                        <small>Infecção</small>
-                    </div>
-                    <div class="col-3">
-                        <h4 class="text-secondary" id="stat-follicle">-</h4>
-                        <small>Perda Folículos</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card border-info">
-            <div class="card-header bg-info text-white">
-                <h6 class="mb-0"><i class="bi bi-star"></i> Resultado 1 Ano</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center" id="stats-1year">
-                    <div class="col">
-                        <h4 class="text-success" id="stat-otimo">-</h4>
-                        <small>Ótimo</small>
-                    </div>
-                    <div class="col">
-                        <h4 class="text-primary" id="stat-bom">-</h4>
-                        <small>Bom</small>
-                    </div>
-                    <div class="col">
-                        <h4 class="text-warning" id="stat-medio">-</h4>
-                        <small>Médio</small>
-                    </div>
-                    <div class="col">
-                        <h4 class="text-danger" id="stat-ruim">-</h4>
-                        <small>Ruim</small>
-                    </div>
-                    <div class="col">
-                        <h4 class="text-info" id="stat-nova-cirurgia">-</h4>
-                        <small>Nova Cirurgia</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Estatisticas por Tipo de Cirurgia -->
-<div class="row g-3 mt-2 mb-4">
-    <div class="col-lg-6">
-        <div class="card border-success">
-            <div class="card-header bg-success text-white">
-                <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Cirurgias por Tipo</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center" id="stats-surgery-types">
-                    <div class="col">
-                        <h4 class="text-primary" id="stat-capilar">-</h4>
-                        <small>Capilar</small>
-                    </div>
-                    <div class="col">
-                        <h4 class="text-info" id="stat-bodyhair">-</h4>
-                        <small>Body Hair</small>
-                    </div>
-                    <div class="col">
-                        <h4 class="text-secondary" id="stat-sobrancelhas">-</h4>
-                        <small>Sobrancelhas</small>
-                    </div>
-                    <div class="col">
-                        <h4 class="text-dark" id="stat-barba">-</h4>
-                        <small>Barba</small>
-                    </div>
-                    <div class="col">
-                        <h4 class="text-warning" id="stat-retoque">-</h4>
-                        <small>Retoque</small>
-                    </div>
-                </div>
-                <div class="text-center mt-3">
-                    <span class="badge bg-success fs-6">Total: <span id="stat-total-surgeries">-</span></span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card border-primary">
-            <div class="card-header bg-primary text-white">
-                <h6 class="mb-0"><i class="bi bi-calendar3"></i> Cirurgias por Mes (12 meses)</h6>
-            </div>
-            <div class="card-body">
-                <div id="monthly-chart" style="max-height: 150px; overflow-y: auto;">
-                    <p class="text-muted text-center">Carregando...</p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<script>
 fetch('/api/dashboard/surgery-stats', {credentials: 'same-origin'})
     .then(r => r.json())
     .then(data => {
@@ -431,8 +190,6 @@ fetch('/api/dashboard/surgery-stats', {credentials: 'same-origin'})
         document.getElementById('stat-medio').textContent = data.one_year_stats?.results?.medio || 0;
         document.getElementById('stat-ruim').textContent = data.one_year_stats?.results?.ruim || 0;
         document.getElementById('stat-nova-cirurgia').textContent = data.one_year_stats?.needs_another_surgery || 0;
-        
-        // Estatisticas por tipo de cirurgia
         if (data.surgery_types) {
             document.getElementById('stat-capilar').textContent = data.surgery_types['Capilar'] || 0;
             document.getElementById('stat-bodyhair').textContent = data.surgery_types['Body Hair'] || 0;
@@ -441,18 +198,16 @@ fetch('/api/dashboard/surgery-stats', {credentials: 'same-origin'})
             document.getElementById('stat-retoque').textContent = data.surgery_types['Retoque'] || 0;
         }
         document.getElementById('stat-total-surgeries').textContent = data.total_surgeries || 0;
-        
-        // Grafico mensal (barras simples)
         if (data.monthly_stats) {
             var chartHtml = '<div class="d-flex flex-wrap gap-1">';
             data.monthly_stats.forEach(function(m) {
                 var pct = Math.min(100, (m.count / Math.max(1, data.total_surgeries)) * 500);
                 chartHtml += '<div class="text-center" style="flex: 1; min-width: 60px;">';
                 chartHtml += '<div style="height: 60px; display: flex; align-items: flex-end; justify-content: center;">';
-                chartHtml += '<div style="width: 30px; height: ' + Math.max(5, pct) + '%; background: #0d6efd; border-radius: 3px 3px 0 0;"></div>';
+                chartHtml += '<div style="width: 30px; height: ' + Math.max(5, pct) + '%; background: #3b82f6; border-radius: 3px 3px 0 0;"></div>';
                 chartHtml += '</div>';
                 chartHtml += '<small class="d-block"><strong>' + m.count + '</strong></small>';
-                chartHtml += '<small class="text-muted" style="font-size: 0.7rem;">' + m.month + '</small>';
+                chartHtml += '<small class="muted-dark" style="font-size: 0.7rem;">' + m.month + '</small>';
                 chartHtml += '</div>';
             });
             chartHtml += '</div>';

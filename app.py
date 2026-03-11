@@ -314,7 +314,7 @@ def dashboard():
     ).all()
     
     # Carregar procedimentos do médico
-    from models import Indication, CosmeticProcedurePlan, HairTransplant, Procedure
+    from models import Indication, CosmeticProcedurePlan, HairTransplant, Procedure, Payment
     from collections import defaultdict
     
     # Buscar todas as indicações do médico
@@ -385,6 +385,54 @@ def dashboard():
     months_list = sorted(procedures_by_month.keys(), reverse=True)[:6]
     procedures_by_month_ordered = {m: procedures_by_month[m] for m in reversed(months_list)}
     
+    # Receita (apenas pagamentos pagos vinculados às consultas do médico)
+    paid_payments = Payment.query.join(Appointment, Payment.appointment_id == Appointment.id).filter(
+        Appointment.doctor_id == current_user.id,
+        Payment.status == 'pago'
+    )
+
+    day_start = datetime.combine(today, datetime.min.time())
+    day_end = datetime.combine(today, datetime.max.time())
+    week_start = datetime.combine(monday, datetime.min.time())
+    week_end = datetime.combine(sunday, datetime.max.time())
+    month_start = datetime.combine(first_day, datetime.min.time())
+    month_end = datetime.combine(last_day, datetime.max.time())
+
+    payments_today = paid_payments.filter(Payment.created_at >= day_start, Payment.created_at <= day_end).all()
+    payments_week = paid_payments.filter(Payment.created_at >= week_start, Payment.created_at <= week_end).all()
+    payments_month = paid_payments.filter(Payment.created_at >= month_start, Payment.created_at <= month_end).all()
+
+    receita_hoje = float(sum(float(p.total_amount or 0) for p in payments_today))
+    receita_semana = float(sum(float(p.total_amount or 0) for p in payments_week))
+    receita_mes = float(sum(float(p.total_amount or 0) for p in payments_month))
+    ticket_medio = (receita_mes / len(payments_month)) if payments_month else 0
+
+    # No-show (mês atual)
+    agendados_mes_total = len(month_appointments)
+    compareceram_mes = sum(1 for a in month_appointments if a.status == 'atendido')
+    no_show_mes = sum(1 for a in month_appointments if a.status == 'faltou')
+    taxa_no_show = (no_show_mes / agendados_mes_total * 100) if agendados_mes_total else 0
+
+    # Pipeline de tratamentos
+    indicados_pipeline = sum(procedures_completed.values()) + sum(procedures_pending.values())
+    realizados_pipeline = sum(procedures_completed.values())
+    pendentes_pipeline = sum(procedures_pending.values())
+    valor_potencial = float(sum(float(plan.planned_value or 0) for plan in cosmetic_plans if not plan.was_performed))
+
+    # Top receita por procedimento (pagamentos do mês)
+    top_revenue = defaultdict(float)
+    for payment in payments_month:
+        for item in (payment.procedures or []):
+            proc_name = item.get('name', 'Procedimento')
+            if proc_name.lower().startswith('consulta'):
+                continue
+            try:
+                top_revenue[proc_name] += float(item.get('value', 0) or 0)
+            except (ValueError, TypeError):
+                continue
+
+    top_revenue_ordered = dict(sorted(top_revenue.items(), key=lambda x: x[1], reverse=True)[:5])
+
     stats = {
         'agendados': sum(1 for a in today_appointments if a.status in ['agendado', 'confirmado']),
         'confirmados': sum(1 for a in today_appointments if a.status == 'confirmado'),
@@ -403,6 +451,23 @@ def dashboard():
         'procedures_pending': dict(procedures_pending),
         'procedures_by_month': procedures_by_month_ordered,
         'procedures_by_month_json': json.dumps(procedures_by_month_ordered),
+        # Receita
+        'receita_hoje': receita_hoje,
+        'receita_semana': receita_semana,
+        'receita_mes': receita_mes,
+        'ticket_medio': ticket_medio,
+        # No-show
+        'agendados_mes_total': agendados_mes_total,
+        'compareceram_mes': compareceram_mes,
+        'no_show_mes': no_show_mes,
+        'taxa_no_show': taxa_no_show,
+        # Pipeline
+        'indicados_pipeline': indicados_pipeline,
+        'realizados_pipeline': realizados_pipeline,
+        'pendentes_pipeline': pendentes_pipeline,
+        'valor_potencial': valor_potencial,
+        # Top lucrativos
+        'top_revenue': top_revenue_ordered,
     }
     
     return render_template('dashboard.html', stats=stats)
@@ -3812,4 +3877,3 @@ def create_patient_surgery(patient_id):
 
 # ==================== SALA DE ESPERA / CHECK-IN ====================
 # Rotas movidas para routes/waiting_room.py (blueprint)
-
