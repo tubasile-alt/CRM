@@ -528,6 +528,7 @@
 </div>
 {% endif %}
 
+{% if current_user.is_doctor() or current_user.is_secretary() %}
 <div class="row g-3 align-items-start prontuario-two-column-layout" id="prontuarioMainLayout">
   <div class="col-12 col-lg-8" id="prontuarioLeftColumn">
     <div class="card">
