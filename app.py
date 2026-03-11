@@ -147,11 +147,21 @@ def get_surgery_stats():
     from datetime import datetime
     import pytz
     
-    evolutions_7days = SurgeryEvolution.query.filter_by(evolution_type='7_days').all()
-    evolutions_1year = SurgeryEvolution.query.filter_by(evolution_type='1_year').all()
+    surgery_ids_subq = db.session.query(TransplantSurgeryRecord.id).filter(
+        TransplantSurgeryRecord.doctor_id == current_user.id
+    ).subquery()
+
+    evolutions_7days = SurgeryEvolution.query.filter(
+        SurgeryEvolution.evolution_type == '7_days',
+        SurgeryEvolution.surgery_id.in_(surgery_ids_subq)
+    ).all()
+    evolutions_1year = SurgeryEvolution.query.filter(
+        SurgeryEvolution.evolution_type == '1_year',
+        SurgeryEvolution.surgery_id.in_(surgery_ids_subq)
+    ).all()
     
     # Estatisticas por tipo de cirurgia
-    all_surgeries = TransplantSurgeryRecord.query.all()
+    all_surgeries = TransplantSurgeryRecord.query.filter_by(doctor_id=current_user.id).all()
     type_counts = {
         'Capilar': 0,
         'Body Hair': 0,
@@ -180,6 +190,7 @@ def get_surgery_stats():
             month += 12
             year -= 1
         count = TransplantSurgeryRecord.query.filter(
+            TransplantSurgeryRecord.doctor_id == current_user.id,
             extract('month', TransplantSurgeryRecord.surgery_date) == month,
             extract('year', TransplantSurgeryRecord.surgery_date) == year
         ).count()
@@ -213,6 +224,52 @@ def get_surgery_stats():
     }
     
     return jsonify(stats)
+
+@app.route('/api/dashboard/one-year-second-surgery-patients', methods=['GET'])
+@login_required
+def dashboard_one_year_second_surgery_patients():
+    if not current_user.is_doctor():
+        return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
+
+    from models import SurgeryEvolution, TransplantSurgeryRecord, Patient
+
+    rows = db.session.query(
+        SurgeryEvolution.id.label('evolution_id'),
+        SurgeryEvolution.evolution_date,
+        TransplantSurgeryRecord.id.label('surgery_id'),
+        TransplantSurgeryRecord.surgery_date,
+        Patient.id.label('patient_id'),
+        Patient.name.label('patient_name')
+    ).join(
+        TransplantSurgeryRecord, SurgeryEvolution.surgery_id == TransplantSurgeryRecord.id
+    ).join(
+        Patient, TransplantSurgeryRecord.patient_id == Patient.id
+    ).filter(
+        TransplantSurgeryRecord.doctor_id == current_user.id,
+        SurgeryEvolution.evolution_type == '1_year',
+        SurgeryEvolution.needs_another_surgery.is_(True)
+    ).order_by(
+        SurgeryEvolution.evolution_date.desc(),
+        SurgeryEvolution.id.desc()
+    ).all()
+
+    seen_patients = set()
+    patients = []
+    for row in rows:
+        if row.patient_id in seen_patients:
+            continue
+        seen_patients.add(row.patient_id)
+        patients.append({
+            'patient_id': row.patient_id,
+            'patient_name': row.patient_name,
+            'prontuario_url': url_for('prontuario', patient_id=row.patient_id),
+            'surgery_id': row.surgery_id,
+            'surgery_date': row.surgery_date.strftime('%d/%m/%Y') if row.surgery_date else None,
+            'evolution_id': row.evolution_id,
+            'evolution_date': row.evolution_date.strftime('%d/%m/%Y %H:%M') if row.evolution_date else None,
+        })
+
+    return jsonify({'success': True, 'total': len(patients), 'patients': patients})
 
 @app.route('/')
 def index():
@@ -612,7 +669,7 @@ def get_appointments():
                 'title': f"{patient_name} - {doctor_name}",
                 'start': start_iso,
                 'end': end_iso,
-                'backgroundColor': doctor_color,
+                'backgroundColor': '#0A66C2' if (apt.appointment_type or '') == 'Transplante Capilar' else doctor_color,
                 'borderColor': border_color,
                 'extendedProps': {
                     'status': apt.status,
@@ -1197,7 +1254,16 @@ def get_appointment_notes(id):
 def update_note(note_id):
     try:
         note = Note.query.get_or_404(note_id)
-        data = request.get_json()
+
+        if not current_user.is_doctor():
+            return jsonify({'success': False, 'error': 'Apenas médicos podem editar conteúdo clínico'}), 403
+
+        from models import PatientDoctor
+        pd = PatientDoctor.query.filter_by(patient_id=note.patient_id, doctor_id=current_user.id).first()
+        if not pd and not getattr(current_user, 'is_admin', lambda: False)():
+            return jsonify({'success': False, 'error': 'Sem acesso a este paciente'}), 403
+
+        data = request.get_json() or {}
         
         if 'content' in data:
             note.content = data['content']
@@ -2962,6 +3028,19 @@ def mark_messages_read():
 @app.route('/api/chat/latest_unread')
 @login_required
 def get_latest_unread():
+      def _chat_display_name(user):
+          if not user:
+              return "Sistema"
+
+          raw_name = (user.name or '').strip()
+          username = (user.username or '').strip().lower()
+
+          # Compatibilidade com base legada: usuário técnico/admin que representa o Dr. Arthur
+          if username == 'admin' and (not raw_name or raw_name.lower() == 'admin'):
+              return 'Dr. Arthur'
+
+          return raw_name or user.email or user.username or "Sistema"
+
       subquery = db.session.query(MessageRead.message_id).filter(MessageRead.user_id == current_user.id)
       latest = ChatMessage.query.filter(
           ChatMessage.recipient_id == current_user.id,
@@ -2972,7 +3051,7 @@ def get_latest_unread():
           return jsonify({
               'id': latest.id,
               'from_user_id': latest.sender_id,
-              'from_name': latest.sender.name if latest.sender else "Sistema",
+              'from_name': _chat_display_name(latest.sender),
               'message': (latest.message[:80] + ('...' if len(latest.message) > 80 else '')) if latest.message else "",
               'created_at': latest.created_at.isoformat()
           })
@@ -2995,9 +3074,34 @@ def get_unread_count():
 @app.route('/api/chat/contacts')
 @login_required
 def get_chat_contacts():
+      def _chat_role_kind(user):
+          role = (user.role or '').strip().lower()
+          role_clinico = (user.role_clinico or '').strip().upper()
+
+          if role == 'medico' or role_clinico in ('DERM', 'CP'):
+              return 'medico'
+          if role == 'secretaria' or role_clinico == 'SECRETARY':
+              return 'secretaria'
+          return None
+
+      def _chat_display_name(user):
+          raw_name = (user.name or '').strip()
+          username = (user.username or '').strip().lower()
+
+          # Compatibilidade com base legada: usuário técnico/admin que representa o Dr. Arthur
+          if username == 'admin' and (not raw_name or raw_name.lower() == 'admin'):
+              return 'Dr. Arthur'
+
+          return raw_name or user.email or user.username or 'Usuário'
+
       users = User.query.filter(User.id != current_user.id).all()
       contacts = []
       for user in users:
+          role_kind = _chat_role_kind(user)
+          if role_kind is None:
+              # Excluir perfis administrativos/técnicos do chat clínico
+              continue
+
           unread_count = db.session.query(ChatMessage).filter(
               ChatMessage.recipient_id == current_user.id,
               ChatMessage.sender_id == user.id
@@ -3008,10 +3112,12 @@ def get_chat_contacts():
           
           contacts.append({
               'id': user.id,
-              'name': user.name,
-              'role': user.role,
+              'name': _chat_display_name(user),
+              'role': role_kind,
               'unread_count': unread_count
           })
+
+      contacts.sort(key=lambda c: (0 if c['role'] == 'medico' else 1, c['name'].lower()))
       return jsonify(contacts)
   
 

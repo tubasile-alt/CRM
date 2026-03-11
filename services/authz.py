@@ -36,7 +36,8 @@ def can_edit_dp(dp):
     user_role = getattr(current_user, 'role', '').upper()
     user_role_clinico = getattr(current_user, 'role_clinico', '').upper()
     
-    # Secretárias e Admins podem editar (necessário para salvar triagem/dados iniciais)
+    # Secretárias podem visualizar, mas não podem editar conteúdo clínico.
+    # Edição fica restrita a médico responsável ou admin.
     is_sec = (
         user_role == 'SECRETARY' or 
         user_role_clinico == 'SECRETARY' or
@@ -44,7 +45,10 @@ def can_edit_dp(dp):
         (hasattr(current_user, 'is_secretary') and current_user.is_secretary())
     )
     
-    if is_sec or user_role == 'ADMIN' or user_role_clinico == 'ADMIN':
+    if is_sec:
+        return False
+
+    if user_role == 'ADMIN' or user_role_clinico == 'ADMIN':
         return True
         
     return dp.doctor_id == current_user.id

@@ -93,6 +93,17 @@ function hasValue(value) {
   return value !== null && value !== undefined && String(value).trim() !== "";
 }
 
+function canEditClinical() {
+  const v = cfg().canEditClinical;
+  return v === true || v === 'true';
+}
+
+function ensureClinicalEditAllowed() {
+  if (canEditClinical()) return true;
+  showAlert('Perfil com acesso somente leitura para conteúdo clínico.', 'warning');
+  return false;
+}
+
 /* =========================
    DITADO
 ========================= */
@@ -2491,6 +2502,7 @@ function openEvolutionFromConsultation(consultationId, consultationDate) {
 }
 
 async function saveEvolution() {
+  if (!ensureClinicalEditAllowed()) return;
   const modal = document.getElementById("evolutionModal");
   const contentEl = document.getElementById("evolutionContent");
   const date = document.getElementById("evolutionDate").value;
@@ -2566,6 +2578,7 @@ async function saveEvolution() {
 }
 
 async function saveQuickEvolution(consultationId) {
+  if (!ensureClinicalEditAllowed()) return;
   const patientId = getPatientId();
   const textarea = document.getElementById(`newEvoText${consultationId}`);
   const content = textarea?.value.trim() || "";
@@ -2602,6 +2615,7 @@ async function saveQuickEvolution(consultationId) {
 }
 
 async function deleteEvolution(evoId) {
+  if (!ensureClinicalEditAllowed()) return;
   if (!confirm("Tem certeza que deseja deletar esta evolução?")) return;
 
   try {
@@ -2657,21 +2671,23 @@ function renderEvolutionsInAccordion(consultations = []) {
 
       container.innerHTML = "";
 
-      const quickEvoDiv = document.createElement("div");
-      quickEvoDiv.className = "mt-3 p-3 bg-light rounded border mb-3";
-      quickEvoDiv.innerHTML = `
-        <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Nova Evolução</h6>
-        <textarea class="form-control mb-2" rows="3" id="newEvoText${consultation.id}" placeholder="Descreva a evolução do paciente..." style="background-color: #fff;"></textarea>
-        <div class="d-flex justify-content-between">
-          <button class="btn btn-sm btn-success" onclick="saveQuickEvolution(${consultation.id})">
-            <i class="bi bi-save"></i> Salvar Evolução
-          </button>
-          <button class="btn btn-sm btn-outline-secondary" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date || ""}')">
-            <i class="bi bi-arrows-fullscreen"></i> Tela Cheia
-          </button>
-        </div>
-      `;
-      container.appendChild(quickEvoDiv);
+      if (canEditClinical()) {
+        const quickEvoDiv = document.createElement("div");
+        quickEvoDiv.className = "mt-3 p-3 bg-light rounded border mb-3";
+        quickEvoDiv.innerHTML = `
+          <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Nova Evolução</h6>
+          <textarea class="form-control mb-2" rows="3" id="newEvoText${consultation.id}" placeholder="Descreva a evolução do paciente..." style="background-color: #fff;"></textarea>
+          <div class="d-flex justify-content-between">
+            <button class="btn btn-sm btn-success" onclick="saveQuickEvolution(${consultation.id})">
+              <i class="bi bi-save"></i> Salvar Evolução
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date || ""}')">
+              <i class="bi bi-arrows-fullscreen"></i> Tela Cheia
+            </button>
+          </div>
+        `;
+        container.appendChild(quickEvoDiv);
+      }
 
       if (consultation.evolutions && consultation.evolutions.length > 0) {
         const historyTitle = document.createElement("div");
@@ -2685,9 +2701,7 @@ function renderEvolutionsInAccordion(consultations = []) {
           evoDiv.innerHTML = `
             <div class="d-flex justify-content-between">
               <small class="text-muted fw-bold">${core.escapeHtml(evo.date)} - Dr. ${core.escapeHtml(evo.doctor)}</small>
-              <button class="btn btn-link btn-sm p-0 text-danger" onclick="deleteEvolution(${evo.id})">
-                <i class="bi bi-trash"></i>
-              </button>
+              ${canEditClinical() ? `<button class="btn btn-link btn-sm p-0 text-danger" onclick="deleteEvolution(${evo.id})"><i class="bi bi-trash"></i></button>` : ''}
             </div>
             <div class="mt-1" style="white-space: pre-wrap;">${core.escapeHtml(evo.content)}</div>
           `;
