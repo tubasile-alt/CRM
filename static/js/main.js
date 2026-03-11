@@ -58,6 +58,120 @@ let lastUnreadCount = parseInt(localStorage.getItem('chatLastUnreadCount') || '0
 let lastNotifiedAt = 0;
 let lastSeenMessageId = localStorage.getItem('chatLastSeenMessageId');
 
+const ChatNotifier = {
+    activePopupId: null,
+    popupAutoCloseMs: 12000,
+
+    playIcqAlert() {
+        try {
+            if (!(window.AudioContext || window.webkitAudioContext)) return;
+
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = audioCtx.currentTime;
+            const notes = [740, 988, 740];
+
+            notes.forEach((frequency, index) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(frequency, now + index * 0.12);
+                gain.gain.setValueAtTime(0.0001, now + index * 0.12);
+                gain.gain.exponentialRampToValueAtTime(0.15, now + index * 0.12 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + index * 0.12 + 0.1);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now + index * 0.12);
+                osc.stop(now + index * 0.12 + 0.11);
+            });
+        } catch (e) {
+            console.error('[ChatNotifier] Erro ao tocar alerta ICQ-like:', e);
+        }
+    },
+
+    showUrgentPopup(data) {
+        if (!data || !data.id) return;
+
+        const oldPopup = document.getElementById('chat-urgent-popup');
+        if (oldPopup) oldPopup.remove();
+
+        const popup = document.createElement('div');
+        popup.id = 'chat-urgent-popup';
+        popup.style.cssText = `
+            position: fixed;
+            top: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100000;
+            width: min(520px, calc(100vw - 24px));
+            background: linear-gradient(135deg, #0b5ed7 0%, #0a3ea9 100%);
+            color: #fff;
+            border-radius: 14px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 16px;
+            animation: chatPulseIn .28s ease-out;
+        `;
+
+        popup.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                <div>
+                    <div style="font-size: 15px; font-weight: 700; letter-spacing: .2px;">
+                        <i class="bi bi-bell-fill"></i> Nova mensagem para responder
+                    </div>
+                    <div style="font-size: 13px; opacity: .9; margin-top: 2px;">${data.from_name || 'Contato'} acabou de te chamar.</div>
+                </div>
+                <button id="chat-urgent-close" class="btn btn-sm btn-light" style="line-height:1;">Fechar</button>
+            </div>
+            <div style="margin-top: 10px; background: rgba(255,255,255,.12); border-radius: 10px; padding: 10px 12px;">
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${data.from_name || 'Contato'}</div>
+                <div style="font-size: 14px; line-height: 1.35;">${data.message || ''}</div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
+                <button id="chat-open-now" class="btn btn-warning btn-sm fw-semibold">Responder agora</button>
+            </div>
+        `;
+
+        document.body.appendChild(popup);
+        this.activePopupId = data.id;
+
+        const closePopup = () => {
+            if (popup && popup.parentNode) popup.remove();
+            this.activePopupId = null;
+        };
+
+        document.getElementById('chat-open-now')?.addEventListener('click', () => {
+            window.location.href = '/chat';
+        });
+
+        document.getElementById('chat-urgent-close')?.addEventListener('click', closePopup);
+
+        setTimeout(() => {
+            if (this.activePopupId === data.id) closePopup();
+        }, this.popupAutoCloseMs);
+    },
+
+    notifyIncomingInActiveChat(msg) {
+        this.showUrgentPopup({
+            id: `live-${msg.id || Date.now()}`,
+            from_name: msg.from_name || 'Contato',
+            message: msg.message
+        });
+        if (localStorage.getItem('chatSoundEnabled') === 'true') {
+            this.playIcqAlert();
+        }
+    }
+};
+
+window.ChatNotifier = ChatNotifier;
+
+if (!document.getElementById('chat-notifier-inline-style')) {
+    const style = document.createElement('style');
+    style.id = 'chat-notifier-inline-style';
+    style.textContent = '@keyframes chatPulseIn { from { opacity:0; transform:translate(-50%, -8px);} to { opacity:1; transform:translate(-50%, 0);} }';
+    document.head.appendChild(style);
+}
+
 const miniChatDockStyles = `
 <style>
 .mini-chat-dock {
@@ -161,6 +275,7 @@ function handleChatNotification(currentCount) {
             localStorage.setItem('chatLastSeenMessageId', lastSeenMessageId);
 
             showToastNotification(data);
+            ChatNotifier.showUrgentPopup(data);
 
             if (document.hidden || window.location.pathname !== '/chat') {
                 if (Notification.permission === "granted") {
@@ -168,7 +283,7 @@ function handleChatNotification(currentCount) {
                 }
             }
             if (localStorage.getItem('chatSoundEnabled') === 'true') {
-                playChatBeep();
+                ChatNotifier.playIcqAlert();
             }
         });
 }
@@ -208,27 +323,7 @@ function showToastNotification(data) {
 }
 
 function playChatBeep() {
-    try {
-        if (!(window.AudioContext || window.webkitAudioContext)) {
-            console.warn("[ChatNotifier] WebAudio não disponível");
-            return;
-        }
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.1);
-    } catch (e) {
-        console.error("Erro ao tocar som:", e);
-    }
+    ChatNotifier.playIcqAlert();
 }
 
 function initChatNotifier() {
@@ -241,7 +336,9 @@ function initChatNotifier() {
             soundIcon.className = enabled ? 'bi bi-volume-up-fill text-success' : 'bi bi-volume-mute text-secondary';
         };
 
-        let enabled = localStorage.getItem('chatSoundEnabled') === 'true';
+        const savedSound = localStorage.getItem('chatSoundEnabled');
+        let enabled = savedSound === null ? true : savedSound === 'true';
+        if (savedSound === null) localStorage.setItem('chatSoundEnabled', 'true');
         updateIcon(enabled);
 
         soundToggle.onclick = (e) => {
