@@ -1255,13 +1255,14 @@ def update_note(note_id):
     try:
         note = Note.query.get_or_404(note_id)
 
-        if not current_user.is_doctor():
-            return jsonify({'success': False, 'error': 'Apenas médicos podem editar conteúdo clínico'}), 403
+        if not (current_user.is_doctor() or current_user.is_secretary()):
+            return jsonify({'success': False, 'error': 'Sem permissão para editar anotações'}), 403
 
-        from models import PatientDoctor
-        pd = PatientDoctor.query.filter_by(patient_id=note.patient_id, doctor_id=current_user.id).first()
-        if not pd and not getattr(current_user, 'is_admin', lambda: False)():
-            return jsonify({'success': False, 'error': 'Sem acesso a este paciente'}), 403
+        if current_user.is_doctor():
+            from models import PatientDoctor
+            pd = PatientDoctor.query.filter_by(patient_id=note.patient_id, doctor_id=current_user.id).first()
+            if not pd and not getattr(current_user, 'is_admin', lambda: False)():
+                return jsonify({'success': False, 'error': 'Sem acesso a este paciente'}), 403
 
         data = request.get_json() or {}
         
