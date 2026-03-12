@@ -196,6 +196,48 @@ def get_planned_procedures():
     
     return jsonify(result)
 
+
+@crm_bp.route('/api/crm/marcella-sales-funnel')
+@login_required
+def get_marcella_sales_funnel():
+    """Retorna pendências de procedimentos do Dr. Arthur Basile para a usuária Marcella."""
+    if (current_user.username or '').strip().lower() != 'marcella':
+        return jsonify({'error': 'Acesso restrito'}), 403
+
+    arthur_doctor = User.query.filter(
+        db.func.lower(User.name).like('%arthur basile%'),
+        User.role == 'medico'
+    ).first()
+
+    if not arthur_doctor:
+        return jsonify([])
+
+    plans = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    ).join(
+        Patient, Note.patient_id == Patient.id
+    ).filter(
+        CosmeticProcedurePlan.was_performed == False,
+        Note.doctor_id == arthur_doctor.id
+    ).order_by(
+        Patient.name.asc(),
+        CosmeticProcedurePlan.created_at.asc()
+    ).all()
+
+    result = []
+    for plan, note, patient in plans:
+        planned_date = plan.created_at.date().isoformat() if plan.created_at else None
+        result.append({
+            'plan_id': plan.id,
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'procedure_name': plan.procedure_name,
+            'planned_date': planned_date,
+            'dp_id': _get_dp_id(patient.id, note.doctor_id)
+        })
+
+    return jsonify(result)
+
 @crm_bp.route('/api/crm/records/<int:plan_id>', methods=['PATCH'])
 @login_required
 def update_cosmetic_plan(plan_id):
