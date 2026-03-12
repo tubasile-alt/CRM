@@ -2660,20 +2660,22 @@ def finalizar_atendimento(patient_id):
             from services.commercial import detect_medical_record_source, extract_derma_planning_snapshot, upsert_task_from_consultation
             appt_for_source = db.session.get(Appointment, int(appointment_id)) if appointment_id else None
             source_type = detect_medical_record_source(category, doctor=current_user, appointment=appt_for_source)
-            is_cosmiatria = (category or '').strip().lower() == 'cosmiatria'
-            if source_type == 'derma' and is_cosmiatria:
-                planning_snapshot = extract_derma_planning_snapshot(data.get('cosmetic_procedures', []))
-                consultation_dt = None
-                if appt_for_source:
-                    consultation_dt = (appt_for_source.consultation_date or appt_for_source.start_time).date()
-                if planning_snapshot and appointment_id:
-                    upsert_task_from_consultation(
-                        patient_id=patient_id,
-                        doctor_id=current_user.id,
-                        consultation_id=int(appointment_id),
-                        planning_snapshot=planning_snapshot,
-                        consultation_dt=consultation_dt,
-                    )
+            
+            # Criar tarefa se: source_type é 'derma' E tem planejamento cosmético
+            planning_snapshot = extract_derma_planning_snapshot(data.get('cosmetic_procedures', []))
+            consultation_dt = None
+            if appt_for_source:
+                consultation_dt = (appt_for_source.consultation_date or appt_for_source.start_time).date()
+            
+            # Criar tarefa comercial se tem planejamento cosmético e é derma
+            if source_type == 'derma' and planning_snapshot and appointment_id:
+                upsert_task_from_consultation(
+                    patient_id=patient_id,
+                    doctor_id=current_user.id,
+                    consultation_id=int(appointment_id),
+                    planning_snapshot=planning_snapshot,
+                    consultation_dt=consultation_dt,
+                )
         except Exception as commercial_err:
             print(f"Erro ao criar tarefa comercial (não-crítico): {commercial_err}")
 

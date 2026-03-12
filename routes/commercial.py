@@ -23,6 +23,57 @@ commercial_bp = Blueprint('commercial', __name__, url_prefix='/commercial')
 commercial_api_bp = Blueprint('commercial_api', __name__, url_prefix='/api/commercial')
 
 
+@commercial_api_bp.route('/sync-snapshots', methods=['POST'])
+@login_required
+def sync_snapshots():
+    """Sincroniza planning_snapshot para todas as tarefas DERMA baseado em CosmeticProcedurePlan"""
+    from models import CommercialTask, Appointment, Note, CosmeticProcedurePlan
+    from services.commercial import DERMA_SOURCE_TYPE
+    import json
+    
+    if not can_access_commercial(current_user):
+        abort(403)
+    
+    count = 0
+    tasks = CommercialTask.query.filter_by(source_type=DERMA_SOURCE_TYPE).all()
+    
+    for task in tasks:
+        if not task.consultation_id:
+            continue
+        
+        app = db.session.get(Appointment, task.consultation_id) if task.consultation_id else None
+        if not app:
+            continue
+        
+        note = Note.query.filter_by(appointment_id=app.id, note_type='prontuario').first()
+        if not note:
+            continue
+        
+        plans = CosmeticProcedurePlan.query.filter_by(note_id=note.id).all()
+        if not plans:
+            continue
+        
+        items = [{
+            'name': p.procedure_name,
+            'planned_value': float(p.planned_value),
+            'budget_value': float(p.final_budget),
+            'performed': p.was_performed,
+            'performed_date': p.performed_date.isoformat() if p.performed_date else None,
+            'follow_up_months': p.follow_up_months,
+            'observations': p.observations
+        } for p in plans]
+        
+        if items:
+            snapshot = {'items': items, 'generated_at': datetime.now(db.session.get(Appointment, 1).start_time.tzinfo if db.session.get(Appointment, 1) else None).isoformat() if db.session.get(Appointment, 1) else ''}
+            task.planning_snapshot_json = json.dumps(snapshot, ensure_ascii=False)
+            task.total_value = sum(i.get('budget_value', 0) for i in items)
+            db.session.add(task)
+            count += 1
+    
+    db.session.commit()
+    return jsonify({'synced': count, 'message': f'{count} tarefas sincronizadas'})
+
+
 def _ensure_commercial_access():
     if not can_access_commercial(current_user):
         abort(403)
