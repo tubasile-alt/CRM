@@ -25,7 +25,7 @@
 
   function renderProcedures(task) {
     const procedures = task.procedures || [];
-    if (!procedures.length) return '';
+    if (!procedures.length) return '<p class="text-muted small">Sem procedimentos planejados</p>';
     
     const planned = procedures.filter(p => !p.performed).map(p => p.name);
     const performed = procedures.filter(p => p.performed).map(p => p.name);
@@ -37,7 +37,7 @@
     if (performed.length > 0) {
       html += `<p class="mb-1"><strong>Realizados:</strong> ${performed.join(', ')}</p>`;
     }
-    return html;
+    return html || '<p class="text-muted small">Sem procedimentos planejados</p>';
   }
 
   function cardActions(task) {

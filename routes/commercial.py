@@ -100,18 +100,9 @@ def _whatsapp_url(task, template):
 
 
 def _task_has_cosmiatria_payload(task):
-    # Aceitar tarefas importadas (sem procedures específicas) e tarefas com procedures
-    items = task.snapshot_items or []
-    if not items:
-        # Tarefas importadas sem procedures ainda contam como válidas
-        return True
-    for item in items:
-        name = (item.get('name') or '').strip()
-        planned = float(item.get('planned_value') or 0)
-        budget = float(item.get('budget_value') or 0)
-        if name or planned > 0 or budget > 0 or bool(item.get('performed')):
-            return True
-    return False
+    # Aceitar todas as tarefas (com ou sem procedimentos)
+    # O frontend mostrará procedimentos quando existirem, ou "Sem procedimentos" quando não
+    return True
 
 
 def _base_derma_query():
