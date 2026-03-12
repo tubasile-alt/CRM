@@ -1,0 +1,18 @@
+commit 029cb2fa7c200fe99a31976ac3c097262edffd24
+Merge: 6c97688 08f5e04
+Author: tubasile-alt <tubasile@gmail.com>
+Date:   Thu Mar 12 22:02:02 2026 +0000
+
+    Merge: Remove commercial module and routes
+
+ app.py                              |  32 +---
+ models.py                           |  41 -----
+ routes/commercial.py                | 357 ------------------------------------
+ services/commercial.py              | 180 ------------------
+ static/css/commercial.css           |  55 ------
+ static/js/commercial_dashboard.js   | 123 -------------
+ static/js/commercial_task.js        |  47 -----
+ templates/base.html                 |   5 -
+ templates/commercial_dashboard.html |  39 ----
+ templates/commercial_task.html      |  82 ---------
+ 10 files changed, 3 insertions(+), 958 deletions(-)

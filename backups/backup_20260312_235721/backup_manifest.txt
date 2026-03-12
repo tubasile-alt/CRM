@@ -1,0 +1,17 @@
+BACKUP MANIFEST
+===============
+Data: $(date)
+Branch: main
+Commits à frente: 3
+Arquivos: código Python, templates, assets estáticos
+
+Conteúdo do backup:
+- code_backup.tar.gz: Snapshot completo do repositório
+- git_history.txt: Últimos 10 commits
+- git_status.txt: Status atual do repositório
+- latest_commit.txt: Detalhes do último commit
+- config.py: Configuração da aplicação
+- backup_manifest.txt: Este arquivo
+
+Restauração:
+tar -xzf code_backup.tar.gz -C /destino

@@ -1,0 +1,10 @@
+029cb2f Merge: Remove commercial module and routes
+6c97688 Task #1: Unlock Git rebase
+08f5e04 Remover aba SALES e desvincular fluxo comercial (#15)
+baecddd Improve system to automatically create sales tasks for cosmetic procedures
+ff4e103 Simplify Comercial into SALES workflow for Dr. Arthur (#14)
+37609ab Update task filtering to use real appointment dates
+0a13f6e Update commercial dashboard to display all cosmetic patients
+4cf7cb1 Filter commercial tasks to only include those with cosmetic procedures
+f170679 Display all patient tasks on the dashboard with or without procedures
+78d8490 Update commercial dashboard to show cosmetic procedures and remove segment
