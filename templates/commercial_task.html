@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Ficha Comercial{% endblock %}
+
+{% block extra_css %}
+<link href="{{ url_for('static', filename='css/commercial.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="commercial-page">
+  <a href="{{ url_for('commercial.dashboard_page') }}" class="btn btn-outline-secondary btn-sm mb-3">
+    <i class="bi bi-arrow-left"></i> Voltar ao dashboard
+  </a>
+
+  <div class="commercial-block">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <h1 class="h4 mb-1">{{ task.patient_name_snapshot }}</h1>
+        <p class="text-muted mb-0">Médico: {{ task.doctor_name_snapshot }}</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="#" class="btn btn-success btn-sm" id="taskWhatsAppBtn"><i class="bi bi-whatsapp"></i> WhatsApp</a>
+        <button class="btn btn-outline-primary btn-sm" id="taskPrintBtn"><i class="bi bi-printer"></i> Imprimir orçamento</button>
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label class="form-label">Status comercial</label>
+        <select id="statusField" class="form-select">
+          {% for st in ['novo','conversado','aguardando','fechado','perdido'] %}
+            <option value="{{ st }}" {% if task.status == st %}selected{% endif %}>{{ st|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Prioridade</label>
+        <select id="priorityField" class="form-select">
+          {% for p in ['alta','media','baixa'] %}
+            <option value="{{ p }}" {% if task.priority == p %}selected{% endif %}>{{ p|capitalize }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Próximo contato</label>
+        <input id="followupField" type="date" class="form-control" value="{{ task.next_followup_date.isoformat() if task.next_followup_date else '' }}">
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Observações da vendedora</label>
+      <textarea id="notesField" class="form-control" rows="4">{{ task.seller_notes or '' }}</textarea>
+    </div>
+
+    <h2 class="h6">Procedimentos planejados</h2>
+    <ul class="list-group mb-3">
+      {% for item in task.snapshot_items %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>{{ item.name }}</span>
+          <strong>R$ {{ '%.2f'|format(item.budget_value or 0) }}</strong>
+        </li>
+      {% else %}
+        <li class="list-group-item text-muted">Sem itens planejados.</li>
+      {% endfor %}
+    </ul>
+
+    <div class="d-flex justify-content-between align-items-center">
+      <strong>Total: R$ {{ '%.2f'|format(task.total_value_float) }}</strong>
+      <button class="btn btn-primary" id="saveTaskBtn">Salvar ficha comercial</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.COMMERCIAL_TASK_ID = {{ task.id }};
+</script>
+<script src="{{ url_for('static', filename='js/commercial_task.js') }}"></script>
+{% endblock %}

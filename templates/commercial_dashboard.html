@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard Comercial DERMA{% endblock %}
+
+{% block extra_css %}
+<link href="{{ url_for('static', filename='css/commercial.css') }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="commercial-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Dashboard Comercial DERMA</h1>
+      <p class="text-muted mb-0">Visão simples para abordagem dos pacientes pós-consulta.</p>
+    </div>
+    <div class="doctor-filter-box">
+      <label for="doctorFilter" class="form-label mb-1">Filtrar por médico</label>
+      <select id="doctorFilter" class="form-select">
+        <option value="">Todos</option>
+        {% for doctor in doctors %}
+          <option value="{{ doctor.id }}">{{ doctor.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div class="commercial-grid">
+    <section class="commercial-block">
+      <h2 class="h5">Tarefas de hoje</h2>
+      <div id="todayTasks" class="cards-wrap"></div>
+    </section>
+
+    <section class="commercial-block">
+      <h2 class="h5">Tarefas da semana</h2>
+      <div id="weekTasks" class="cards-wrap"></div>
+    </section>
+
+    <section class="commercial-block">
+      <h2 class="h5">Pacientes pendentes</h2>
+      <div id="pendingTasks" class="cards-wrap"></div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/commercial_dashboard.js') }}"></script>
+{% endblock %}
