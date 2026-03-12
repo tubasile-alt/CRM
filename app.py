@@ -51,7 +51,6 @@ from routes.patient import patient_bp
 from routes.crm import crm_bp
 from routes.dermascribe import dermascribe_bp
 from routes.cp import cp_bp
-from routes.commercial import commercial_bp, commercial_api_bp
 
 app.register_blueprint(surgical_map_bp)
 app.register_blueprint(waiting_room_bp)
@@ -59,8 +58,6 @@ app.register_blueprint(settings_bp)
 app.register_blueprint(crm_bp)
 app.register_blueprint(dermascribe_bp)
 app.register_blueprint(cp_bp)
-app.register_blueprint(commercial_bp)
-app.register_blueprint(commercial_api_bp)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -2655,28 +2652,6 @@ def finalizar_atendimento(patient_id):
                     patient.has_transplant_indication = True
                     db.session.add(patient)
         
-        # Gerar/atualizar tarefa comercial DERMA de forma isolada (não inclui CP)
-        try:
-            from services.commercial import detect_medical_record_source, extract_derma_planning_snapshot, upsert_task_from_consultation
-            appt_for_source = db.session.get(Appointment, int(appointment_id)) if appointment_id else None
-            source_type = detect_medical_record_source(category, doctor=current_user, appointment=appt_for_source)
-            is_cosmiatria = (category or '').strip().lower() == 'cosmiatria'
-            if source_type == 'derma' and is_cosmiatria:
-                planning_snapshot = extract_derma_planning_snapshot(data.get('cosmetic_procedures', []))
-                consultation_dt = None
-                if appt_for_source:
-                    consultation_dt = (appt_for_source.consultation_date or appt_for_source.start_time).date()
-                if planning_snapshot and appointment_id:
-                    upsert_task_from_consultation(
-                        patient_id=patient_id,
-                        doctor_id=current_user.id,
-                        consultation_id=int(appointment_id),
-                        planning_snapshot=planning_snapshot,
-                        consultation_dt=consultation_dt,
-                    )
-        except Exception as commercial_err:
-            print(f"Erro ao criar tarefa comercial (não-crítico): {commercial_err}")
-
         # Atualizar status do agendamento para "atendido"
         print(f"DEBUG finalizar: appointment_id={appointment_id}, patient_id={patient_id}, doctor_id={current_user.id}")
         
