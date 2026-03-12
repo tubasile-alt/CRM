@@ -46,3 +46,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+.task-card-priority {
+  border: 2px solid #ffc107;
+  background: #fffdf2;
+  box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.2);
+}

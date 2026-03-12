@@ -85,7 +85,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link {% if 'commercial.' in (request.endpoint or '') %}active{% endif %}" href="{{ url_for('commercial.dashboard_page') }}">
-                            <i class="bi bi-kanban"></i> Comercial DERMA
+                            <i class="bi bi-kanban"></i> Comercial
                         </a>
                     </li>
                     {% if current_user.is_doctor() %}

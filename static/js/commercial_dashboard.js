@@ -16,6 +16,23 @@
     }[status] || 'bg-secondary';
   }
 
+  function formatDate(dateLike) {
+    if (!dateLike) return '-';
+    const d = new Date(`${dateLike}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return dateLike;
+    return d.toLocaleDateString('pt-BR');
+  }
+
+  function renderProcedures(task) {
+    const planned = task.procedures.filter(p => !p.performed).map(p => p.name);
+    const performed = task.procedures.filter(p => p.performed).map(p => p.name);
+
+    return `
+      <p class="mb-1"><strong>Planejados:</strong> ${planned.join(', ') || 'Nenhum'}</p>
+      <p class="mb-1"><strong>Realizados:</strong> ${performed.join(', ') || 'Nenhum'}</p>
+    `;
+  }
+
   function cardActions(task) {
     const wa = task.whatsapp_templates.pos_consulta;
     const budgetPayload = encodeURIComponent(JSON.stringify({ procedures: task.procedures.map(p => ({ name: p.name, budget: p.budget_value, value: p.planned_value })) }));
@@ -36,12 +53,12 @@
     }
 
     container.innerHTML = tasks.map(task => {
-      const procedures = task.procedures.map(p => p.name).join(', ') || 'Sem procedimentos';
-      const extra = variant === 'week'
-        ? `<p class="mb-1"><strong>Follow-up:</strong> ${task.next_followup_date || '-'}</p>`
+      const isHighPriority = task.priority === 'alta';
+      const extra = variant === 'today'
+        ? `<p class="mb-1"><strong>Consulta:</strong> ${formatDate(task.consultation_date)}</p>`
         : `<p class="mb-1"><strong>Último contato:</strong> ${task.last_contact_at || '-'}</p>`;
       return `
-      <article class="task-card">
+      <article class="task-card ${isHighPriority ? 'task-card-priority' : ''}">
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
             <h3 class="h6 mb-1">${task.patient_name}</h3>
@@ -49,8 +66,8 @@
           </div>
           <span class="badge ${badgeClass(task.status)}">${task.status}</span>
         </div>
-        <p class="mb-1"><strong>Procedimentos:</strong> ${procedures}</p>
-        <p class="mb-1"><strong>Valor:</strong> R$ ${Number(task.total_value).toFixed(2)}</p>
+        ${renderProcedures(task)}
+        <p class="mb-1"><strong>Orçamento:</strong> R$ ${Number(task.total_value).toFixed(2)}</p>
         <p class="mb-1"><strong>Prioridade:</strong> ${task.priority}</p>
         ${extra}
         ${cardActions(task)}

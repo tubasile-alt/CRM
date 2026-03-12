@@ -2660,7 +2660,8 @@ def finalizar_atendimento(patient_id):
             from services.commercial import detect_medical_record_source, extract_derma_planning_snapshot, upsert_task_from_consultation
             appt_for_source = db.session.get(Appointment, int(appointment_id)) if appointment_id else None
             source_type = detect_medical_record_source(category, doctor=current_user, appointment=appt_for_source)
-            if source_type == 'derma':
+            is_cosmiatria = (category or '').strip().lower() == 'cosmiatria'
+            if source_type == 'derma' and is_cosmiatria:
                 planning_snapshot = extract_derma_planning_snapshot(data.get('cosmetic_procedures', []))
                 consultation_dt = None
                 if appt_for_source:
@@ -4008,3 +4009,14 @@ def create_patient_surgery(patient_id):
 
 # ==================== SALA DE ESPERA / CHECK-IN ====================
 # Rotas movidas para routes/waiting_room.py (blueprint)
+
+@app.context_processor
+def inject_asset_version():
+    def asset_version(filename):
+        try:
+            return int(os.path.getmtime(os.path.join(app.static_folder, filename)))
+        except OSError:
+            return 1
+
+    return {'asset_version': asset_version}
+
