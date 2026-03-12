@@ -158,7 +158,7 @@ def delete_surgery_evolution(evolution_id):
 @login_required
 def schedule_transplant_surgery(patient_id):
     """Agenda uma cirurgia baseada no último planejamento"""
-    from models import Patient, HairTransplant, TransplantSurgeryRecord, Note
+    from models import Patient, HairTransplant, TransplantSurgeryRecord, Note, PatientDoctor
     from services.calendar_service import create_transplant_surgery_event
     
     data = request.get_json()
@@ -175,6 +175,10 @@ def schedule_transplant_surgery(patient_id):
     
     patient = Patient.query.get_or_404(patient_id)
     
+    # Buscar o médico correspondente do paciente (PatientDoctor)
+    patient_doctor = PatientDoctor.query.filter_by(patient_id=patient_id).first()
+    doctor_id = patient_doctor.doctor_id if patient_doctor else current_user.id
+    
     # Buscar último planejamento
     planning = (HairTransplant.query
                .join(Note, HairTransplant.note_id == Note.id)
@@ -187,7 +191,7 @@ def schedule_transplant_surgery(patient_id):
     # Criar ou atualizar registro de cirurgia
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"Scheduling surgery for patient {patient_id} on {surgery_date}")
+    logger.info(f"Scheduling surgery for patient {patient_id} on {surgery_date} with doctor_id={doctor_id}")
     
     surgery = TransplantSurgeryRecord.query.filter_by(
         patient_id=patient_id, 
@@ -198,7 +202,7 @@ def schedule_transplant_surgery(patient_id):
         logger.info("Creating new surgery record")
         surgery = TransplantSurgeryRecord(
             patient_id=patient_id,
-            doctor_id=current_user.id,
+            doctor_id=doctor_id,
             surgery_date=surgery_date,
             surgery_type="transplante_capilar",
             surgical_data=planning_text
@@ -207,6 +211,7 @@ def schedule_transplant_surgery(patient_id):
     else:
         logger.info("Updating existing surgery record")
         surgery.surgical_data = planning_text
+        surgery.doctor_id = doctor_id
     
     db.session.commit()
     
