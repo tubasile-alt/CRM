@@ -100,9 +100,15 @@ def _whatsapp_url(task, template):
 
 
 def _task_has_cosmiatria_payload(task):
-    # Aceitar todas as tarefas (com ou sem procedimentos)
-    # O frontend mostrará procedimentos quando existirem, ou "Sem procedimentos" quando não
-    return True
+    # Mostrar APENAS tarefas com procedimentos reais (planejamento cosmético)
+    items = task.snapshot_items or []
+    for item in items:
+        name = (item.get('name') or '').strip()
+        planned = float(item.get('planned_value') or 0)
+        budget = float(item.get('budget_value') or 0)
+        if name or planned > 0 or budget > 0 or bool(item.get('performed')):
+            return True
+    return False
 
 
 def _base_derma_query():
