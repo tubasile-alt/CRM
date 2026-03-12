@@ -1427,6 +1427,25 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="scheduleTransplantSurgeryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-calendar-event"></i> Agendar cirurgia</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <label for="scheduleTransplantSurgeryDate" class="form-label">Selecione a data da cirurgia</label>
+        <input type="date" id="scheduleTransplantSurgeryDate" class="form-control" required>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirmScheduleTransplantSurgery">Salvar agendamento</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
 

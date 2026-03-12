@@ -163,6 +163,7 @@ def schedule_transplant_surgery(patient_id):
     
     data = request.get_json()
     surgery_date_str = data.get('surgery_date')
+    right_card_snapshot = (data.get('right_card_snapshot') or '').strip()
     
     if not surgery_date_str:
         return jsonify({'success': False, 'error': 'Data da cirurgia é obrigatória'}), 400
@@ -217,7 +218,8 @@ def schedule_transplant_surgery(patient_id):
         surgery_date=surgery_date,
         planning_snapshot=planning_text,
         phone=patient.phone,
-        cpf=patient.cpf
+        cpf=patient.cpf,
+        right_card_snapshot=right_card_snapshot
     )
     
     if cal_ok:
@@ -284,4 +286,3 @@ def get_transplant_planning_summary(patient_id):
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-

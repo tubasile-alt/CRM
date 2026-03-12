@@ -2902,8 +2902,10 @@ async function scheduleTransplantSurgery(button) {
     return;
   }
 
-  const date = prompt("Data da cirurgia (YYYY-MM-DD):", new Date().toISOString().split("T")[0]);
+  const date = await openSurgeryScheduleDatePicker();
   if (!date) return;
+
+  const rightCardSnapshot = getFixedRightCardSnapshot();
 
   button.disabled = true;
   const originalText = button.innerHTML;
@@ -2916,7 +2918,10 @@ async function scheduleTransplantSurgery(button) {
         "Content-Type": "application/json",
         "X-CSRFToken": getCSRFToken()
       },
-      body: JSON.stringify({ surgery_date: date })
+      body: JSON.stringify({
+        surgery_date: date,
+        right_card_snapshot: rightCardSnapshot
+      })
     });
 
     if (!out || !out.success) {
@@ -2941,6 +2946,61 @@ async function scheduleTransplantSurgery(button) {
     button.disabled = false;
     button.innerHTML = originalText;
   }
+}
+
+function getFixedRightCardSnapshot() {
+  const panel = document.getElementById("clinicalRightPanel") || document.getElementById("cosmeticRightColumn");
+  if (!panel) return "Painel lateral não encontrado no momento do agendamento.";
+
+  return panel.innerText
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function openSurgeryScheduleDatePicker() {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById("scheduleTransplantSurgeryModal");
+    const dateInput = document.getElementById("scheduleTransplantSurgeryDate");
+    const confirmBtn = document.getElementById("confirmScheduleTransplantSurgery");
+
+    if (!modalEl || !dateInput || !confirmBtn || !window.bootstrap) {
+      const fallback = prompt("Data da cirurgia (YYYY-MM-DD):", new Date().toISOString().split("T")[0]);
+      resolve(fallback || null);
+      return;
+    }
+
+    dateInput.value = new Date().toISOString().split("T")[0];
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    let settled = false;
+    const cleanup = () => {
+      confirmBtn.removeEventListener("click", onConfirm);
+      modalEl.removeEventListener("hidden.bs.modal", onHidden);
+    };
+
+    const onConfirm = () => {
+      const selectedDate = dateInput.value;
+      if (!selectedDate) {
+        alert("Selecione uma data para a cirurgia.");
+        return;
+      }
+      settled = true;
+      cleanup();
+      modal.hide();
+      resolve(selectedDate);
+    };
+
+    const onHidden = () => {
+      if (!settled) {
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    confirmBtn.addEventListener("click", onConfirm);
+    modalEl.addEventListener("hidden.bs.modal", onHidden);
+    modal.show();
+  });
 }
 
 /* =========================
