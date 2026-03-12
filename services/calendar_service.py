@@ -2,7 +2,22 @@ import os
 import datetime
 from services.google_calendar import _get_calendar_service
 
-DEFAULT_TRANSPLANT_CALENDAR_ID = os.getenv('TRANSPLANT_CALENDAR_ID', 'implantecapilaremribeirao@gmail.com')
+TRANSPLANT_CALENDAR_ID = os.getenv('TRANSPLANT_CALENDAR_ID', 'primary')
+
+
+def _find_calendar_by_email(service, email):
+    """
+    Procura um calendário pelo email da conta.
+    Retorna o ID do calendário ou None.
+    """
+    try:
+        calendars = service.calendarList().list().execute()
+        for cal in calendars.get('items', []):
+            if cal.get('id') == email or cal.get('summary') == email:
+                return cal.get('id')
+        return None
+    except Exception:
+        return None
 
 
 def create_transplant_surgery_event(patient_name, surgery_date, planning_snapshot, phone=None, cpf=None, right_card_snapshot=None):
@@ -11,6 +26,13 @@ def create_transplant_surgery_event(patient_name, surgery_date, planning_snapsho
     """
     try:
         service = _get_calendar_service()
+        
+        # Tenta encontrar o calendário específico, senão usa 'primary'
+        calendar_id = TRANSPLANT_CALENDAR_ID
+        if calendar_id != 'primary':
+            found_id = _find_calendar_by_email(service, calendar_id)
+            if found_id:
+                calendar_id = found_id
         
         # Título do evento
         summary = f"Transplante Capilar — {patient_name}"
@@ -44,7 +66,7 @@ def create_transplant_surgery_event(patient_name, surgery_date, planning_snapsho
             }
         }
 
-        created = service.events().insert(calendarId=DEFAULT_TRANSPLANT_CALENDAR_ID, body=event).execute()
+        created = service.events().insert(calendarId=calendar_id, body=event).execute()
         
         return True, created.get('id')
     except Exception as e:
