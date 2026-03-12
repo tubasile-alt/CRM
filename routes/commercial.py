@@ -14,7 +14,6 @@ from services.commercial import (
     VALID_STATUSES,
     build_whatsapp_message,
     can_access_commercial,
-    get_commercial_filter_doctors,
     get_cp_doctors,
     get_derma_dashboard_doctors,
     monday_and_sunday,
@@ -37,8 +36,7 @@ def _allowed_derma_doctor_ids():
 @login_required
 def dashboard_page():
     _ensure_commercial_access()
-    doctors = get_commercial_filter_doctors()
-    return render_template('commercial_dashboard.html', doctors=doctors)
+    return render_template('commercial_dashboard.html')
 
 
 @commercial_bp.route('/task/<int:task_id>')
@@ -51,14 +49,9 @@ def task_page(task_id):
     return render_template('commercial_task.html', task=task)
 
 
-def _doctor_filter(query):
+def _doctor_scope_filter(query):
     allowed_ids = _allowed_derma_doctor_ids()
-    query = query.filter(CommercialTask.doctor_id.in_(allowed_ids))
-
-    doctor_id = request.args.get('doctor_id', type=int)
-    if doctor_id and doctor_id in allowed_ids:
-        query = query.filter(CommercialTask.doctor_id == doctor_id)
-    return query
+    return query.filter(CommercialTask.doctor_id.in_(allowed_ids))
 
 
 def _serialize_task(task):
@@ -100,9 +93,8 @@ def _whatsapp_url(task, template):
 
 
 def _task_has_cosmiatria_payload(task):
-    # Mostrar TODOS os pacientes de cosmética (com ou sem procedimentos)
-    # O comercial acompanha desde o planejamento inicial
-    return True
+    # Regra SALES: é obrigatório existir planejamento com ao menos 1 item
+    return len(task.snapshot_items) > 0
 
 
 def _base_derma_query():
@@ -119,87 +111,46 @@ def _priority_ordering():
 
 
 def _list_today_tasks():
-    # Buscar tarefas cujos pacientes têm APPOINTMENTS (consultas reais) para HOJE
-    from models import Appointment
-    
+    # Consulta realizada HOJE e com tarefa ainda aberta
     today = date.today()
-    
-    # Buscar appointments de hoje
-    today_appointments = Appointment.query.filter(
-        db.func.date(Appointment.start_time) == today,
-        Appointment.status.in_(['agendado', 'concluída'])
-    ).all()
-    
-    today_patient_ids = [app.patient_id for app in today_appointments]
-    
-    if not today_patient_ids:
-        return []
-    
-    # Buscar tarefas desses pacientes
+
     query = _base_derma_query().filter(
-        CommercialTask.patient_id.in_(today_patient_ids),
+        CommercialTask.consultation_date == today,
         CommercialTask.status != 'fechado',
         CommercialTask.status != 'perdido',
     )
-    query = _doctor_filter(query)
+    query = _doctor_scope_filter(query)
     tasks = query.order_by(_priority_ordering().asc(), CommercialTask.created_at.desc()).all()
     return [t for t in tasks if _task_has_cosmiatria_payload(t)]
 
 
 def _list_week_tasks():
-    # Buscar tarefas cujos pacientes têm APPOINTMENTS na semana (mas não hoje)
-    from models import Appointment
-    
+    # Consulta nesta semana (antes de hoje) e com tarefa ainda aberta
     today = date.today()
     start, end = monday_and_sunday()
-    
-    # Buscar appointments da semana (exceto hoje)
-    week_appointments = Appointment.query.filter(
-        db.func.date(Appointment.start_time) >= start,
-        db.func.date(Appointment.start_time) <= end,
-        db.func.date(Appointment.start_time) < today,
-        Appointment.status.in_(['agendado', 'concluída'])
-    ).all()
-    
-    week_patient_ids = [app.patient_id for app in week_appointments]
-    
-    if not week_patient_ids:
-        return []
-    
-    # Buscar tarefas desses pacientes
+
     query = _base_derma_query().filter(
-        CommercialTask.patient_id.in_(week_patient_ids),
+        CommercialTask.consultation_date >= start,
+        CommercialTask.consultation_date <= end,
+        CommercialTask.consultation_date < today,
         CommercialTask.status != 'fechado',
         CommercialTask.status != 'perdido',
     )
-    query = _doctor_filter(query)
+    query = _doctor_scope_filter(query)
     tasks = query.order_by(_priority_ordering().asc(), CommercialTask.created_at.desc()).all()
     return [t for t in tasks if _task_has_cosmiatria_payload(t)]
 
 
 def _list_pending_tasks():
-    # Buscar tarefas cujos pacientes têm APPOINTMENTS antes da semana atual
-    from models import Appointment
-    
+    # Consulta anterior ao início da semana e com tarefa ainda aberta
     start, _ = monday_and_sunday()
-    
-    # Buscar appointments antes da semana
-    pending_appointments = Appointment.query.filter(
-        db.func.date(Appointment.start_time) < start,
-        Appointment.status.in_(['agendado', 'concluída'])
-    ).all()
-    
-    pending_patient_ids = [app.patient_id for app in pending_appointments]
-    
-    if not pending_patient_ids:
-        return []
-    
-    # Buscar tarefas desses pacientes
+
     query = _base_derma_query().filter(
-        CommercialTask.patient_id.in_(pending_patient_ids),
-        CommercialTask.status.in_(['novo', 'conversado', 'aguardando']),
+        CommercialTask.consultation_date < start,
+        CommercialTask.status != 'fechado',
+        CommercialTask.status != 'perdido',
     )
-    query = _doctor_filter(query)
+    query = _doctor_scope_filter(query)
     tasks = query.order_by(_priority_ordering().asc(), CommercialTask.updated_at.desc()).all()
     return [t for t in tasks if _task_has_cosmiatria_payload(t)]
 

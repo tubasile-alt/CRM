@@ -27,7 +27,7 @@
         seller_notes: notesField.value
       })
     });
-    alert('Ficha comercial atualizada.');
+    alert('Ficha Sales atualizada.');
   });
 
   printBtn.addEventListener('click', async () => {

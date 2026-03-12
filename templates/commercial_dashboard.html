@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Dashboard Comercial{% endblock %}
+{% block title %}SALES{% endblock %}
 
 {% block extra_css %}
 <link href="{{ url_for('static', filename='css/commercial.css') }}" rel="stylesheet">
@@ -10,17 +10,8 @@
 <div class="commercial-page">
   <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
     <div>
-      <h1 class="h3 mb-1">Dashboard Comercial</h1>
-      <p class="text-muted mb-0">Sistema enxuto para gestão dos leads de cosmiatria pós-consulta.</p>
-    </div>
-    <div class="doctor-filter-box">
-      <label for="doctorFilter" class="form-label mb-1">Filtrar por médico</label>
-      <select id="doctorFilter" class="form-select">
-        <option value="">Todos</option>
-        {% for doctor in doctors %}
-          <option value="{{ doctor.id }}">{{ doctor.name }}</option>
-        {% endfor %}
-      </select>
+      <h1 class="h3 mb-1">SALES</h1>
+      <p class="text-muted mb-0">Gestão comercial de cosmiatria DERMA do Dr. Arthur.</p>
     </div>
   </div>
 

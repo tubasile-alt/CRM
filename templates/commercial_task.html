@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Ficha Comercial{% endblock %}
+{% block title %}Ficha Sales{% endblock %}
 
 {% block extra_css %}
 <link href="{{ url_for('static', filename='css/commercial.css') }}" rel="stylesheet">
@@ -68,7 +68,7 @@
 
     <div class="d-flex justify-content-between align-items-center">
       <strong>Total: R$ {{ '%.2f'|format(task.total_value_float) }}</strong>
-      <button class="btn btn-primary" id="saveTaskBtn">Salvar ficha comercial</button>
+      <button class="btn btn-primary" id="saveTaskBtn">Salvar ficha Sales</button>
     </div>
   </div>
 </div>
