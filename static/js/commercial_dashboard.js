@@ -24,8 +24,20 @@
   }
 
   function renderProcedures(task) {
-    // Dados importados não têm procedures, usar planejamento do snapshot
-    return '';
+    const procedures = task.procedures || [];
+    if (!procedures.length) return '';
+    
+    const planned = procedures.filter(p => !p.performed).map(p => p.name);
+    const performed = procedures.filter(p => p.performed).map(p => p.name);
+    
+    let html = '';
+    if (planned.length > 0) {
+      html += `<p class="mb-1"><strong>Pendentes:</strong> ${planned.join(', ')}</p>`;
+    }
+    if (performed.length > 0) {
+      html += `<p class="mb-1"><strong>Realizados:</strong> ${performed.join(', ')}</p>`;
+    }
+    return html;
   }
 
   function cardActions(task) {
@@ -45,22 +57,22 @@
 
     container.innerHTML = tasks.map(task => {
       const isHighPriority = task.priority === 'alta';
-      const segmento = task.source_type === 'cp' ? 'CP' : 'DERM';
       const extra = variant === 'today'
         ? `<p class="mb-1"><strong>Consulta:</strong> ${formatDate(task.consultation_date)}</p>`
         : `<p class="mb-1"><strong>Último contato:</strong> ${task.last_contact_at || '-'}</p>`;
       return `
       <article class="task-card ${isHighPriority ? 'task-card-priority' : ''}">
         <div class="d-flex justify-content-between align-items-start gap-2">
-          <div>
+          <div class="flex-grow-1">
             <h3 class="h6 mb-1">${task.patient_name_snapshot}</h3>
-            <p class="mb-1 text-muted">${task.doctor_name_snapshot}</p>
-            <p class="mb-1"><small class="badge bg-secondary">${segmento}</small></p>
+            <p class="mb-2 text-muted small">${task.doctor_name_snapshot}</p>
           </div>
           <span class="badge ${badgeClass(task.status)}">${task.status}</span>
         </div>
+        <div class="mb-2 p-2 bg-light rounded">
+          ${renderProcedures(task)}
+        </div>
         <p class="mb-1"><strong>Orçamento:</strong> R$ ${Number(task.total_value).toFixed(2)}</p>
-        <p class="mb-1"><strong>Prioridade:</strong> ${task.priority}</p>
         ${extra}
         ${cardActions(task)}
       </article>`;

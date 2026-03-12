@@ -70,7 +70,6 @@ def _serialize_task(task):
         'doctor_name_snapshot': task.doctor_name_snapshot,
         'consultation_id': task.consultation_id,
         'consultation_date': task.consultation_date.isoformat() if task.consultation_date else None,
-        'source_type': task.source_type,
         'procedures': task.snapshot_items,
         'total_value': task.total_value_float,
         'status': task.status,
