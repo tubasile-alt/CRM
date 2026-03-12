@@ -83,11 +83,6 @@
                             <i class="bi bi-graph-up"></i> CRM
                         </a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'commercial.' in (request.endpoint or '') %}active{% endif %}" href="{{ url_for('commercial.dashboard_page') }}">
-                            <i class="bi bi-kanban"></i> SALES
-                        </a>
-                    </li>
                     {% if current_user.is_doctor() %}
                     <li class="nav-item">
                         <a class="nav-link {% if 'dermascribe' in request.endpoint %}active{% endif %}" href="{{ url_for('dermascribe.index') }}">
