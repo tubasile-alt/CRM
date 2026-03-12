@@ -25,10 +25,10 @@
 
   function renderProcedures(task) {
     const procedures = task.procedures || [];
-    if (!procedures.length) return '<p class="text-muted small">Sem procedimentos planejados</p>';
+    if (!procedures.length) return '';
     
-    const planned = procedures.filter(p => !p.performed).map(p => p.name);
-    const performed = procedures.filter(p => p.performed).map(p => p.name);
+    const planned = procedures.filter(p => !p.performed).map(p => `${p.name} (R$ ${Number(p.planned_value).toFixed(2)})`);
+    const performed = procedures.filter(p => p.performed).map(p => `${p.name} (R$ ${Number(p.budget_value).toFixed(2)})`);
     
     let html = '';
     if (planned.length > 0) {
@@ -37,7 +37,7 @@
     if (performed.length > 0) {
       html += `<p class="mb-1"><strong>Realizados:</strong> ${performed.join(', ')}</p>`;
     }
-    return html || '<p class="text-muted small">Sem procedimentos planejados</p>';
+    return html;
   }
 
   function cardActions(task) {
