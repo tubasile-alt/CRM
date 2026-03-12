@@ -65,9 +65,9 @@ def _serialize_task(task):
     return {
         'id': task.id,
         'patient_id': task.patient_id,
-        'patient_name': task.patient_name_snapshot,
+        'patient_name_snapshot': task.patient_name_snapshot,
         'doctor_id': task.doctor_id,
-        'doctor_name': task.doctor_name_snapshot,
+        'doctor_name_snapshot': task.doctor_name_snapshot,
         'consultation_id': task.consultation_id,
         'consultation_date': task.consultation_date.isoformat() if task.consultation_date else None,
         'procedures': task.snapshot_items,
@@ -100,7 +100,11 @@ def _whatsapp_url(task, template):
 
 
 def _task_has_cosmiatria_payload(task):
+    # Aceitar tarefas importadas (sem procedures específicas) e tarefas com procedures
     items = task.snapshot_items or []
+    if not items:
+        # Tarefas importadas sem procedures ainda contam como válidas
+        return True
     for item in items:
         name = (item.get('name') or '').strip()
         planned = float(item.get('planned_value') or 0)
