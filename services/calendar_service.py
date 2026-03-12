@@ -1,13 +1,16 @@
 import os
 import datetime
-from replit.integrations.google_calendar import GoogleCalendar
+from services.google_calendar import _get_calendar_service
 
-def create_transplant_surgery_event(patient_name, surgery_date, planning_snapshot, phone=None, cpf=None):
+DEFAULT_TRANSPLANT_CALENDAR_ID = os.getenv('TRANSPLANT_CALENDAR_ID', 'implantecapilaremribeirao@gmail.com')
+
+
+def create_transplant_surgery_event(patient_name, surgery_date, planning_snapshot, phone=None, cpf=None, right_card_snapshot=None):
     """
     Cria um evento no Google Calendar via Replit Connector.
     """
     try:
-        calendar = GoogleCalendar()
+        service = _get_calendar_service()
         
         # Título do evento
         summary = f"Transplante Capilar — {patient_name}"
@@ -19,20 +22,31 @@ def create_transplant_surgery_event(patient_name, surgery_date, planning_snapsho
         description += f"\n--------------------------------------------------\n"
         description += f"PLANEJAMENTO CIRÚRGICO (snapshot):\n{planning_snapshot}"
         
+        if right_card_snapshot:
+            description += "\n\n--------------------------------------------------\n"
+            description += f"INFORMAÇÕES DO CARD FIXO (lado direito):\n{right_card_snapshot}"
+        
         # Horário: 08:00 às 13:00 (5h de duração padrão para transplante)
         start_time = datetime.datetime.combine(surgery_date, datetime.time(8, 0))
         end_time = datetime.datetime.combine(surgery_date, datetime.time(13, 0))
         
         # Criar evento
-        event = calendar.create_event(
-            summary=summary,
-            description=description,
-            start=start_time.isoformat(),
-            end=end_time.isoformat(),
-            timezone="America/Sao_Paulo"
-        )
+        event = {
+            'summary': summary,
+            'description': description,
+            'start': {
+                'dateTime': start_time.isoformat(),
+                'timeZone': 'America/Sao_Paulo'
+            },
+            'end': {
+                'dateTime': end_time.isoformat(),
+                'timeZone': 'America/Sao_Paulo'
+            }
+        }
+
+        created = service.events().insert(calendarId=DEFAULT_TRANSPLANT_CALENDAR_ID, body=event).execute()
         
-        return True, event.get('id')
+        return True, created.get('id')
     except Exception as e:
         print(f"Erro ao criar evento no Google Calendar: {e}")
         return False, str(e)
