@@ -24,23 +24,14 @@
   }
 
   function renderProcedures(task) {
-    const planned = task.procedures.filter(p => !p.performed).map(p => p.name);
-    const performed = task.procedures.filter(p => p.performed).map(p => p.name);
-
-    return `
-      <p class="mb-1"><strong>Planejados:</strong> ${planned.join(', ') || 'Nenhum'}</p>
-      <p class="mb-1"><strong>Realizados:</strong> ${performed.join(', ') || 'Nenhum'}</p>
-    `;
+    // Dados importados não têm procedures, usar planejamento do snapshot
+    return '';
   }
 
   function cardActions(task) {
-    const wa = task.whatsapp_templates.pos_consulta;
-    const budgetPayload = encodeURIComponent(JSON.stringify({ procedures: task.procedures.map(p => ({ name: p.name, budget: p.budget_value, value: p.planned_value })) }));
     return `
       <div class="d-flex flex-wrap gap-2 mt-2">
         <a class="btn btn-outline-primary btn-sm" href="/commercial/task/${task.id}">Abrir planejamento</a>
-        <button class="btn btn-outline-secondary btn-sm" data-budget-patient="${task.patient_id}" data-budget='${budgetPayload}'>Imprimir orçamento</button>
-        <a class="btn btn-success btn-sm" href="${wa}" target="_blank">WhatsApp</a>
         <button class="btn btn-outline-success btn-sm" data-conversado="${task.id}">Marcar como conversado</button>
       </div>
     `;
@@ -61,12 +52,11 @@
       <article class="task-card ${isHighPriority ? 'task-card-priority' : ''}">
         <div class="d-flex justify-content-between align-items-start gap-2">
           <div>
-            <h3 class="h6 mb-1">${task.patient_name}</h3>
-            <p class="mb-1 text-muted">${task.doctor_name}</p>
+            <h3 class="h6 mb-1">${task.patient_name_snapshot}</h3>
+            <p class="mb-1 text-muted">${task.doctor_name_snapshot}</p>
           </div>
           <span class="badge ${badgeClass(task.status)}">${task.status}</span>
         </div>
-        ${renderProcedures(task)}
         <p class="mb-1"><strong>Orçamento:</strong> R$ ${Number(task.total_value).toFixed(2)}</p>
         <p class="mb-1"><strong>Prioridade:</strong> ${task.priority}</p>
         ${extra}
