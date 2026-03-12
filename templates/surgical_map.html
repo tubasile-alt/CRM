@@ -175,17 +175,6 @@
             </div>
             <div class="modal-body">
                 <form id="surgeryForm">
-
-<!-- Modal Editar Cirurgia -->
-<div class="modal fade" id="editSurgeryModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Editar Cirurgia</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editSurgeryForm">
                     <div class="mb-3">
                         <label class="form-label">Nome do Paciente</label>
                         <input type="text" class="form-control" name="patient_name" required>
@@ -238,7 +227,16 @@
     </div>
 </div>
 
-<!-- Modal Editar Cirurgia (continuação) -->
+<!-- Modal Editar Cirurgia -->
+<div class="modal fade" id="editSurgeryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar Cirurgia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editSurgeryForm">
                     <div class="mb-3">
                         <label class="form-label">Data</label>
                         <input type="date" class="form-control" name="date" required>
@@ -262,8 +260,12 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                <button type="button" class="btn btn-danger" onclick="deleteSurgery()">Deletar</button>
-                <button type="button" class="btn btn-primary" onclick="updateSurgery()">Atualizar</button>
+                <button type="button" class="btn btn-danger" onclick="deleteSurgery()">
+                    <i class="bi bi-trash"></i> Deletar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="updateSurgery()">
+                    <i class="bi bi-check-lg"></i> Atualizar
+                </button>
             </div>
         </div>
     </div>
@@ -275,8 +277,12 @@
 let currentWeekStart = '{{ week_start }}';
 
 let weekData = null;
-let expandedDays = {}; // Track quais dias estão expandidos
+let expandedDays = {};
 let currentEditingSurgeryId = null;
+
+function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+}
 
 function loadWeeklyMap() {
     fetch(`/mapa-cirurgico/api/weekly?week_start=${currentWeekStart}`)
@@ -701,22 +707,13 @@ function showError(message) {
     showAlert(message, 'danger');
 }
 
-function deleteSurgery(id) {
-    if (!confirm('Deseja realmente excluir esta cirurgia?')) return;
-    
-    fetch(`/mapa-cirurgico/api/surgery/${id}`, {
-        method: 'DELETE',
-        headers: {'X-CSRFToken': getCSRFToken()}
-    })
-    .then(r => r.json())
-    .then(result => {
-        if (result.success) {
-            loadWeeklyMap();
-            showSuccess('Cirurgia excluída!');
-        } else {
-            showError(result.error);
-        }
-    });
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 4000);
 }
 
 function exportPDF() {
@@ -763,7 +760,10 @@ function updateSurgery() {
     
     fetch(`/mapa-cirurgico/api/surgery/${currentEditingSurgeryId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
         body: JSON.stringify(data)
     })
     .then(r => r.json())
@@ -779,11 +779,12 @@ function updateSurgery() {
     .catch(err => showAlert('Erro: ' + err.message, 'danger'));
 }
 
-// Deletar cirurgia
+// Deletar cirurgia (chamado pelo botão Deletar no modal de edição)
 function deleteSurgery() {
-    if (confirm('Tem certeza que deseja deletar esta cirurgia?')) {
+    if (confirm('Tem certeza que deseja deletar esta cirurgia? Esta ação não pode ser desfeita.')) {
         fetch(`/mapa-cirurgico/api/surgery/${currentEditingSurgeryId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCSRFToken() }
         })
         .then(r => r.json())
         .then(result => {
@@ -799,42 +800,27 @@ function deleteSurgery() {
     }
 }
 
-// Confirmar cancelamento
+// Cancelar cirurgia diretamente (botão X em cada item da lista)
 function confirmCancelSurgery(surgeryId) {
     if (confirm('Deseja cancelar esta cirurgia? A vaga será liberada para outro agendamento.')) {
-        const form = document.getElementById('editSurgeryForm');
-        form.querySelector('[name="status"]').value = 'cancelada';
-        
-        // Encontrar dados da cirurgia
-        let surgery = null;
-        if (weekData && weekData.rooms) {
-            for (const room of weekData.rooms) {
-                surgery = room.surgeries.find(s => s.id === surgeryId);
-                if (surgery) break;
+        fetch(`/mapa-cirurgico/api/surgery/${surgeryId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({ status: 'cancelada' })
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                loadWeeklyMap();
+                showAlert('Cirurgia cancelada. Vaga liberada.', 'success');
+            } else {
+                showAlert(result.error || 'Erro ao cancelar', 'danger');
             }
-        }
-        
-        if (surgery) {
-            const data = {
-                status: 'cancelada'
-            };
-            
-            fetch(`/mapa-cirurgico/api/surgery/${surgeryId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(result => {
-                if (result.success) {
-                    loadWeeklyMap();
-                    showAlert('Cirurgia cancelada com sucesso!', 'success');
-                } else {
-                    showAlert(result.error || 'Erro ao cancelar', 'danger');
-                }
-            })
-            .catch(err => showAlert('Erro: ' + err.message, 'danger'));
-        }
+        })
+        .catch(err => showAlert('Erro: ' + err.message, 'danger'));
     }
 }
 
