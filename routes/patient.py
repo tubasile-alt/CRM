@@ -200,14 +200,13 @@ def schedule_transplant_surgery(patient_id):
             patient_id=patient_id,
             doctor_id=current_user.id,
             surgery_date=surgery_date,
-            status="scheduled",
-            planning_snapshot=planning_text
+            surgery_type="transplante_capilar",
+            surgical_data=planning_text
         )
         db.session.add(surgery)
     else:
         logger.info("Updating existing surgery record")
-        surgery.status = "scheduled"
-        surgery.planning_snapshot = planning_text
+        surgery.surgical_data = planning_text
     
     db.session.commit()
     
