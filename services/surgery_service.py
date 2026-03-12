@@ -195,12 +195,20 @@ class SurgeryService:
         Returns:
             dict: Mapa cirúrgico organizado
         """
+        from models import TransplantSurgeryRecord, Patient
         week_end = week_start_date + timedelta(days=6)
         
+        # Cirurgias normais
         surgeries = Surgery.query.filter(
             Surgery.date >= week_start_date,
             Surgery.date <= week_end
         ).order_by(Surgery.date, Surgery.start_time).all()
+        
+        # Agendamentos de transplante
+        transplants = TransplantSurgeryRecord.query.filter(
+            TransplantSurgeryRecord.surgery_date >= week_start_date,
+            TransplantSurgeryRecord.surgery_date <= week_end
+        ).all()
         
         rooms = OperatingRoom.query.order_by(OperatingRoom.name).all()
         
@@ -209,18 +217,25 @@ class SurgeryService:
         for room in rooms:
             map_data[room.id] = {
                 'room': room,
-                'surgeries': []
+                'surgeries': [],
+                'transplants': []
             }
         
         for surgery in surgeries:
             if surgery.operating_room_id in map_data:
                 map_data[surgery.operating_room_id]['surgeries'].append(surgery)
         
+        # Adicionar agendamentos de transplante na sala padrão (id 1, geralmente a primeira)
+        if transplants and 1 in map_data:
+            for transplant in transplants:
+                map_data[1]['transplants'].append(transplant)
+        
         return {
             'week_start': week_start_date,
             'week_end': week_end,
             'rooms': map_data,
-            'all_surgeries': surgeries
+            'all_surgeries': surgeries,
+            'transplants': transplants
         }
     
     def get_doctor_surgeries(self, doctor_id, start_date=None, end_date=None):

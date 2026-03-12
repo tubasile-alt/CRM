@@ -31,6 +31,7 @@ def index():
 @login_required
 def get_weekly_map():
     """Retorna mapa cirúrgico semanal"""
+    from models import TransplantSurgeryRecord, Patient
     week_start_str = request.args.get('week_start')
     
     if week_start_str:
@@ -74,6 +75,24 @@ def get_weekly_map():
                 'duration_minutes': duration_minutes,
                 'status': surgery.status,
                 'notes': surgery.notes
+            })
+        
+        # Adicionar agendamentos de transplante
+        for transplant in data.get('transplants', []):
+            patient = Patient.query.get(transplant.patient_id)
+            room_data['surgeries'].append({
+                'id': transplant.id,
+                'doctor_id': transplant.doctor_id,
+                'doctor_name': transplant.doctor.name,
+                'patient_name': patient.name if patient else 'Desconhecido',
+                'procedure_name': 'Transplante Capilar',
+                'date': transplant.surgery_date.isoformat(),
+                'start_time': '08:00',
+                'end_time': '13:00',
+                'duration_minutes': 300,
+                'status': 'scheduled',
+                'notes': 'Agendamento de cirurgia de transplante',
+                'is_transplant': True
             })
         
         result['rooms'].append(room_data)
