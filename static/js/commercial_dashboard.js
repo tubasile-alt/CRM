@@ -1,5 +1,4 @@
 (async function () {
-  const doctorFilter = document.getElementById('doctorFilter');
   const sections = {
     today: document.getElementById('todayTasks'),
     week: document.getElementById('weekTasks'),
@@ -107,9 +106,7 @@
   }
 
   async function load(endpoint) {
-    const doctorId = doctorFilter.value;
-    const qs = doctorId ? `?doctor_id=${doctorId}` : '';
-    const resp = await fetch(`/commercial/api/tasks/${endpoint}${qs}`);
+    const resp = await fetch(`/commercial/api/tasks/${endpoint}`);
     return resp.json();
   }
 
@@ -122,6 +119,5 @@
     renderCards(pending, sections.pending, 'pending');
   }
 
-  doctorFilter.addEventListener('change', loadAll);
   loadAll();
 })();
