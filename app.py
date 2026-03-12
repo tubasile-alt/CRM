@@ -2769,8 +2769,9 @@ def save_cosmetic_plan(patient_id):
 @login_required
 def generate_budget_pdf(patient_id):
     """Gera orçamento PDF de procedimentos cosméticos"""
-    from services.commercial import can_access_commercial
-    if not can_access_commercial(current_user):
+    role = (getattr(current_user, 'role', '') or '').lower()
+    role_clinico = (getattr(current_user, 'role_clinico', '') or '').upper()
+    if role not in {'secretaria', 'medico'} and role_clinico not in {'SECRETARY', 'ADMIN'}:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
     
     from utils.exports.budget_export import BudgetExporter

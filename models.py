@@ -409,47 +409,6 @@ class Payment(db.Model):
     patient = db.relationship('Patient', backref='payments')
 
 
-class CommercialTask(db.Model):
-    __tablename__ = 'commercial_task'
-
-    id = db.Column(db.Integer, primary_key=True)
-    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, index=True)
-    patient_name_snapshot = db.Column(db.String(100), nullable=False)
-    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False, index=True)
-    doctor_name_snapshot = db.Column(db.String(100), nullable=False)
-    consultation_id = db.Column(db.Integer, db.ForeignKey('appointment.id'), nullable=False, index=True)
-    source_type = db.Column(db.String(20), nullable=False, default='derma', index=True)
-    planning_snapshot_json = db.Column(db.Text, nullable=False)
-    total_value = db.Column(db.Numeric(10, 2), default=0)
-    status = db.Column(db.String(20), nullable=False, default='novo', index=True)
-    priority = db.Column(db.String(20), nullable=False, default='media')
-    seller_notes = db.Column(db.Text)
-    next_followup_date = db.Column(db.Date, index=True)
-    last_contact_at = db.Column(db.DateTime)
-    consultation_date = db.Column(db.Date, index=True)
-    created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
-    updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time)
-
-    __table_args__ = (
-        db.UniqueConstraint('consultation_id', 'source_type', name='uq_commercial_task_consultation_source'),
-    )
-
-    patient = db.relationship('Patient', backref='commercial_tasks')
-    doctor = db.relationship('User', backref='commercial_tasks')
-    consultation = db.relationship('Appointment', backref='commercial_tasks')
-
-    @property
-    def total_value_float(self):
-        return float(self.total_value or 0)
-
-    @property
-    def snapshot_items(self):
-        import json
-        try:
-            payload = json.loads(self.planning_snapshot_json or '{}')
-            return payload.get('items', [])
-        except Exception:
-            return []
 
 class Prescription(db.Model):
     __tablename__ = 'prescription'
