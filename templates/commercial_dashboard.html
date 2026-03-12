@@ -3,7 +3,7 @@
 {% block title %}Dashboard Comercial{% endblock %}
 
 {% block extra_css %}
-<link href="{{ url_for('static', filename='css/commercial.css', v=asset_version('css/commercial.css')) }}" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/commercial.css') }}" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
@@ -44,5 +44,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/commercial_dashboard.js', v=asset_version('js/commercial_dashboard.js')) }}"></script>
+<script src="{{ url_for('static', filename='js/commercial_dashboard.js') }}"></script>
 {% endblock %}
