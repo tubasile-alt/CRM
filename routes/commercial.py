@@ -3,6 +3,7 @@ from urllib.parse import quote
 
 from flask import Blueprint, abort, jsonify, render_template, request
 from flask_login import current_user, login_required
+from sqlalchemy import case
 
 from models import CommercialTask, PlasticSurgeryEncounter, User, db, get_brazil_time
 from services.commercial import (
@@ -13,6 +14,7 @@ from services.commercial import (
     VALID_STATUSES,
     build_whatsapp_message,
     can_access_commercial,
+    get_commercial_filter_doctors,
     get_cp_doctors,
     get_derma_dashboard_doctors,
     monday_and_sunday,
@@ -35,7 +37,7 @@ def _allowed_derma_doctor_ids():
 @login_required
 def dashboard_page():
     _ensure_commercial_access()
-    doctors = get_derma_dashboard_doctors()
+    doctors = get_commercial_filter_doctors()
     return render_template('commercial_dashboard.html', doctors=doctors)
 
 
@@ -44,7 +46,7 @@ def dashboard_page():
 def task_page(task_id):
     _ensure_commercial_access()
     task = CommercialTask.query.filter_by(id=task_id, source_type=DERMA_SOURCE_TYPE).first_or_404()
-    if task.doctor_id not in _allowed_derma_doctor_ids():
+    if task.doctor_id not in _allowed_derma_doctor_ids() or not _task_has_cosmiatria_payload(task):
         abort(404)
     return render_template('commercial_task.html', task=task)
 
@@ -54,7 +56,7 @@ def _doctor_filter(query):
     query = query.filter(CommercialTask.doctor_id.in_(allowed_ids))
 
     doctor_id = request.args.get('doctor_id', type=int)
-    if doctor_id:
+    if doctor_id and doctor_id in allowed_ids:
         query = query.filter(CommercialTask.doctor_id == doctor_id)
     return query
 
@@ -97,8 +99,28 @@ def _whatsapp_url(task, template):
     return f'{base}?text={quote(message)}'
 
 
+def _task_has_cosmiatria_payload(task):
+    items = task.snapshot_items or []
+    for item in items:
+        name = (item.get('name') or '').strip()
+        planned = float(item.get('planned_value') or 0)
+        budget = float(item.get('budget_value') or 0)
+        if name or planned > 0 or budget > 0 or bool(item.get('performed')):
+            return True
+    return False
+
+
 def _base_derma_query():
     return CommercialTask.query.filter(CommercialTask.source_type == DERMA_SOURCE_TYPE)
+
+
+def _priority_ordering():
+    return case(
+        (CommercialTask.priority == 'alta', 0),
+        (CommercialTask.priority == 'media', 1),
+        (CommercialTask.priority == 'baixa', 2),
+        else_=3,
+    )
 
 
 def _list_today_tasks():
@@ -109,27 +131,34 @@ def _list_today_tasks():
         CommercialTask.status != 'perdido',
     )
     query = _doctor_filter(query)
-    return query.order_by(CommercialTask.priority.asc(), CommercialTask.created_at.desc()).all()
+    tasks = query.order_by(_priority_ordering().asc(), CommercialTask.created_at.desc()).all()
+    return [t for t in tasks if _task_has_cosmiatria_payload(t)]
 
 
 def _list_week_tasks():
+    today = date.today()
     start, end = monday_and_sunday()
     query = _base_derma_query().filter(
-        CommercialTask.next_followup_date >= start,
-        CommercialTask.next_followup_date <= end,
+        CommercialTask.consultation_date >= start,
+        CommercialTask.consultation_date <= end,
+        CommercialTask.consultation_date < today,
         CommercialTask.status != 'fechado',
         CommercialTask.status != 'perdido',
     )
     query = _doctor_filter(query)
-    return query.order_by(CommercialTask.next_followup_date.asc(), CommercialTask.created_at.desc()).all()
+    tasks = query.order_by(_priority_ordering().asc(), CommercialTask.consultation_date.desc(), CommercialTask.created_at.desc()).all()
+    return [t for t in tasks if _task_has_cosmiatria_payload(t)]
 
 
 def _list_pending_tasks():
+    start, _ = monday_and_sunday()
     query = _base_derma_query().filter(
         CommercialTask.status.in_(['novo', 'conversado', 'aguardando']),
+        CommercialTask.consultation_date < start,
     )
     query = _doctor_filter(query)
-    return query.order_by(CommercialTask.updated_at.desc()).all()
+    tasks = query.order_by(_priority_ordering().asc(), CommercialTask.updated_at.desc()).all()
+    return [t for t in tasks if _task_has_cosmiatria_payload(t)]
 
 
 @commercial_bp.route('/api/tasks/today')
@@ -158,7 +187,7 @@ def get_pending_tasks():
 def get_task(task_id):
     _ensure_commercial_access()
     task = CommercialTask.query.filter_by(id=task_id, source_type=DERMA_SOURCE_TYPE).first_or_404()
-    if task.doctor_id not in _allowed_derma_doctor_ids():
+    if task.doctor_id not in _allowed_derma_doctor_ids() or not _task_has_cosmiatria_payload(task):
         abort(404)
     return jsonify(_serialize_task(task))
 

@@ -59,6 +59,13 @@ def get_derma_dashboard_doctors():
     ).order_by(User.name.asc()).all()
 
 
+def get_commercial_filter_doctors():
+    """Lista todos os médicos para o filtro visual do comercial."""
+    return User.query.filter(
+        User.role == 'medico',
+    ).order_by(User.name.asc()).all()
+
+
 def get_cp_doctors():
     return User.query.filter(
         User.role == 'medico',
@@ -72,16 +79,22 @@ def extract_derma_planning_snapshot(cosmetic_procedures_data):
 
     planned_items = []
     for proc in cosmetic_procedures_data:
-        if proc.get('performed', False):
-            continue
-
+        name = (proc.get('name') or '').strip()
         planned_value = _to_float(proc.get('value'))
         budget_value = _to_float(proc.get('budget', planned_value))
+        performed = bool(proc.get('performed', False))
+
+        # Evita tarefas vazias (ex.: linha em branco no front)
+        has_meaningful_payload = bool(name) or planned_value > 0 or budget_value > 0 or performed
+        if not has_meaningful_payload:
+            continue
 
         planned_items.append({
-            'name': proc.get('name', 'Procedimento'),
+            'name': name or 'Procedimento',
             'planned_value': planned_value,
             'budget_value': budget_value,
+            'performed': performed,
+            'performed_date': proc.get('performedDate') or proc.get('performed_date') or None,
             'follow_up_months': int(proc.get('months') or proc.get('follow_up_months') or 0),
             'observations': proc.get('observations', ''),
         })
