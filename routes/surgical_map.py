@@ -138,8 +138,8 @@ def create_surgery():
         )
         
         try:
-            from services.google_calendar import create_surgery_event
-            create_surgery_event(
+            from services.calendar_service import create_normal_surgery_event
+            create_normal_surgery_event(
                 patient_name=surgery.patient_name,
                 procedure_name=surgery.procedure_name,
                 surgery_date=surgery.date,

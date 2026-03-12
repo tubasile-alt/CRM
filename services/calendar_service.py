@@ -3,6 +3,10 @@ import datetime
 from services.google_calendar import _get_calendar_service
 
 TRANSPLANT_CALENDAR_ID = os.getenv('TRANSPLANT_CALENDAR_ID', 'primary')
+SURGERY_CALENDAR_ID = os.getenv('SURGERY_CALENDAR_ID', 'primary')
+
+# Para cirurgias normais, se precisar de um conector diferente
+SURGERY_GOOGLE_CALENDAR_EMAIL = os.getenv('SURGERY_GOOGLE_CALENDAR_EMAIL', 'tubasile@gmail.com')
 
 
 def _find_calendar_by_email(service, email):
@@ -70,5 +74,55 @@ def create_transplant_surgery_event(patient_name, surgery_date, planning_snapsho
         
         return True, created.get('id')
     except Exception as e:
-        print(f"Erro ao criar evento no Google Calendar: {e}")
+        print(f"Erro ao criar evento no Google Calendar (Transplante): {e}")
+        return False, str(e)
+
+
+def create_normal_surgery_event(patient_name, procedure_name, surgery_date, start_time, end_time, notes=''):
+    """
+    Cria um evento no Google Calendar para cirurgias normais (Mapa Cirúrgico).
+    Pode usar conector diferente do transplante.
+    """
+    try:
+        service = _get_calendar_service()
+        
+        # Tenta encontrar o calendário para cirurgias, senão usa 'primary'
+        calendar_id = SURGERY_CALENDAR_ID
+        if calendar_id != 'primary':
+            found_id = _find_calendar_by_email(service, calendar_id)
+            if found_id:
+                calendar_id = found_id
+        
+        # Título do evento
+        summary = f"Cirurgia — {patient_name}"
+        
+        # Descrição detalhada
+        description = f"Paciente: {patient_name}\n"
+        description += f"Procedimento: {procedure_name}\n"
+        description += f"\n--------------------------------------------------\n"
+        description += f"Notas: {notes}" if notes else "Sem notas adicionais"
+        
+        # Horário da cirurgia
+        start_dt = datetime.datetime.combine(surgery_date, start_time)
+        end_dt = datetime.datetime.combine(surgery_date, end_time)
+        
+        # Criar evento
+        event = {
+            'summary': summary,
+            'description': description,
+            'start': {
+                'dateTime': start_dt.isoformat(),
+                'timeZone': 'America/Sao_Paulo'
+            },
+            'end': {
+                'dateTime': end_dt.isoformat(),
+                'timeZone': 'America/Sao_Paulo'
+            }
+        }
+
+        created = service.events().insert(calendarId=calendar_id, body=event).execute()
+        
+        return True, created.get('id')
+    except Exception as e:
+        print(f"Erro ao criar evento no Google Calendar (Cirurgia Normal): {e}")
         return False, str(e)
