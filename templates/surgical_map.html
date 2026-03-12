@@ -175,6 +175,17 @@
             </div>
             <div class="modal-body">
                 <form id="surgeryForm">
+
+<!-- Modal Editar Cirurgia -->
+<div class="modal fade" id="editSurgeryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Cirurgia</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editSurgeryForm">
                     <div class="mb-3">
                         <label class="form-label">Nome do Paciente</label>
                         <input type="text" class="form-control" name="patient_name" required>
@@ -226,6 +237,37 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Editar Cirurgia (continuação) -->
+                    <div class="mb-3">
+                        <label class="form-label">Data</label>
+                        <input type="date" class="form-control" name="date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Horário</label>
+                        <input type="time" class="form-control" name="start_time" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observações</label>
+                        <textarea class="form-control" name="notes" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Status</label>
+                        <select class="form-select" name="status" required>
+                            <option value="agendada">Agendada</option>
+                            <option value="cancelada">Cancelada</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-danger" onclick="deleteSurgery()">Deletar</button>
+                <button type="button" class="btn btn-primary" onclick="updateSurgery()">Atualizar</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -234,6 +276,7 @@ let currentWeekStart = '{{ week_start }}';
 
 let weekData = null;
 let expandedDays = {}; // Track quais dias estão expandidos
+let currentEditingSurgeryId = null;
 
 function loadWeeklyMap() {
     fetch(`/mapa-cirurgico/api/weekly?week_start=${currentWeekStart}`)
@@ -365,11 +408,24 @@ function renderWeeklyOverview(dayStats, numRooms) {
             sortedTimes.forEach(timeKey => {
                 surgeryGroups[timeKey].forEach(s => {
                     surgeryListHtml += `
-                        <div class="surgery-item">
-                            <span class="surgery-time">${s.start_time}</span>
-                            <span class="surgery-patient">${s.patient_name}</span><br>
-                            <div class="surgery-procedure">📋 ${s.procedure_name}</div>
-                            <div class="surgery-doctor">👨‍⚕️ ${s.doctor_name} • ${s.room_name}</div>
+                        <div class="surgery-item" id="surgery-${s.id}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div style="flex: 1;">
+                                    <span class="surgery-time">${s.start_time}</span>
+                                    <span class="surgery-patient">${s.patient_name}</span><br>
+                                    <div class="surgery-procedure">📋 ${s.procedure_name}</div>
+                                    <div class="surgery-doctor">👨‍⚕️ ${s.doctor_name} • ${s.room_name}</div>
+                                    ${s.status === 'cancelada' ? '<span class="badge bg-danger mt-1">Cancelada</span>' : ''}
+                                </div>
+                                <div class="btn-group-vertical btn-group-sm ms-2">
+                                    <button class="btn btn-sm btn-outline-primary" title="Editar" onclick="editSurgery(${s.id})">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" title="Cancelar" onclick="confirmCancelSurgery(${s.id})">
+                                        <i class="bi bi-x"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     `;
                 });
@@ -669,6 +725,117 @@ function exportPDF() {
 
 function exportExcel() {
     window.location.href = `/mapa-cirurgico/export/excel?week_start=${currentWeekStart}`;
+}
+
+// Editar cirurgia
+function editSurgery(surgeryId) {
+    const modal = new bootstrap.Modal(document.getElementById('editSurgeryModal'));
+    currentEditingSurgeryId = surgeryId;
+    
+    // Encontrar a cirurgia nos dados
+    let surgery = null;
+    if (weekData && weekData.rooms) {
+        for (const room of weekData.rooms) {
+            surgery = room.surgeries.find(s => s.id === surgeryId);
+            if (surgery) break;
+        }
+    }
+    
+    if (surgery) {
+        document.querySelector('#editSurgeryForm [name="date"]').value = surgery.date;
+        document.querySelector('#editSurgeryForm [name="start_time"]').value = surgery.start_time;
+        document.querySelector('#editSurgeryForm [name="notes"]').value = surgery.notes || '';
+        document.querySelector('#editSurgeryForm [name="status"]').value = surgery.status || 'agendada';
+    }
+    
+    modal.show();
+}
+
+// Atualizar cirurgia
+function updateSurgery() {
+    const form = document.getElementById('editSurgeryForm');
+    const data = {
+        date: form.querySelector('[name="date"]').value,
+        start_time: form.querySelector('[name="start_time"]').value,
+        notes: form.querySelector('[name="notes"]').value,
+        status: form.querySelector('[name="status"]').value
+    };
+    
+    fetch(`/mapa-cirurgico/api/surgery/${currentEditingSurgeryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('editSurgeryModal')).hide();
+            loadWeeklyMap();
+            showAlert('Cirurgia atualizada com sucesso!', 'success');
+        } else {
+            showAlert(result.error || 'Erro ao atualizar', 'danger');
+        }
+    })
+    .catch(err => showAlert('Erro: ' + err.message, 'danger'));
+}
+
+// Deletar cirurgia
+function deleteSurgery() {
+    if (confirm('Tem certeza que deseja deletar esta cirurgia?')) {
+        fetch(`/mapa-cirurgico/api/surgery/${currentEditingSurgeryId}`, {
+            method: 'DELETE'
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('editSurgeryModal')).hide();
+                loadWeeklyMap();
+                showAlert('Cirurgia deletada com sucesso!', 'success');
+            } else {
+                showAlert(result.error || 'Erro ao deletar', 'danger');
+            }
+        })
+        .catch(err => showAlert('Erro: ' + err.message, 'danger'));
+    }
+}
+
+// Confirmar cancelamento
+function confirmCancelSurgery(surgeryId) {
+    if (confirm('Deseja cancelar esta cirurgia? A vaga será liberada para outro agendamento.')) {
+        const form = document.getElementById('editSurgeryForm');
+        form.querySelector('[name="status"]').value = 'cancelada';
+        
+        // Encontrar dados da cirurgia
+        let surgery = null;
+        if (weekData && weekData.rooms) {
+            for (const room of weekData.rooms) {
+                surgery = room.surgeries.find(s => s.id === surgeryId);
+                if (surgery) break;
+            }
+        }
+        
+        if (surgery) {
+            const data = {
+                status: 'cancelada'
+            };
+            
+            fetch(`/mapa-cirurgico/api/surgery/${surgeryId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.success) {
+                    loadWeeklyMap();
+                    showAlert('Cirurgia cancelada com sucesso!', 'success');
+                } else {
+                    showAlert(result.error || 'Erro ao cancelar', 'danger');
+                }
+            })
+            .catch(err => showAlert('Erro: ' + err.message, 'danger'));
+        }
+    }
 }
 
 // Load initial data
