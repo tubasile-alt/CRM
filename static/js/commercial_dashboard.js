@@ -45,6 +45,7 @@
 
     container.innerHTML = tasks.map(task => {
       const isHighPriority = task.priority === 'alta';
+      const segmento = task.source_type === 'cp' ? 'CP' : 'DERM';
       const extra = variant === 'today'
         ? `<p class="mb-1"><strong>Consulta:</strong> ${formatDate(task.consultation_date)}</p>`
         : `<p class="mb-1"><strong>Último contato:</strong> ${task.last_contact_at || '-'}</p>`;
@@ -54,6 +55,7 @@
           <div>
             <h3 class="h6 mb-1">${task.patient_name_snapshot}</h3>
             <p class="mb-1 text-muted">${task.doctor_name_snapshot}</p>
+            <p class="mb-1"><small class="badge bg-secondary">${segmento}</small></p>
           </div>
           <span class="badge ${badgeClass(task.status)}">${task.status}</span>
         </div>
