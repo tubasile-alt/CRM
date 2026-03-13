@@ -1064,8 +1064,13 @@ function renderPanelToday(data) {
     body.innerHTML = patients.map(p => {
         const wpp = wppLink(p.patient_phone);
         patientDataMap[p.patient_id] = p; // Store for retrieval
-        // Get planned date from first procedure
-        const plannedDate = (p.procedures && p.procedures.length > 0) ? formatDate(p.procedures[0].planned_date) : '—';
+        // Get planned date from first procedure, fallback to next_contact_date
+        let plannedDate = '—';
+        if (p.procedures && p.procedures.length > 0) {
+            plannedDate = formatDate(p.procedures[0].planned_date) || 'Sem data';
+        } else if (p.next_contact_date) {
+            plannedDate = formatDate(p.next_contact_date);
+        }
         return `
             <div class="fq-chip today-chip">
                 <div style="flex:1;">
@@ -1127,8 +1132,13 @@ function renderPanelOverdue(data) {
         const attBadge = p.contact_attempts > 0
             ? `<span class="chip-attempts">${p.contact_attempts}x</span>` : '';
         patientDataMap[p.patient_id] = p; // Store for retrieval
-        // Get planned date from first procedure
-        const plannedDate = (p.procedures && p.procedures.length > 0) ? formatDate(p.procedures[0].planned_date) : '—';
+        // Get planned date from first procedure, fallback to next_contact_date
+        let plannedDate = '—';
+        if (p.procedures && p.procedures.length > 0) {
+            plannedDate = formatDate(p.procedures[0].planned_date) || 'Sem data';
+        } else if (p.next_contact_date) {
+            plannedDate = formatDate(p.next_contact_date);
+        }
 
         return `
             <div class="fq-chip overdue-chip ${extraClass}">
