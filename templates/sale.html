@@ -898,6 +898,7 @@ body { font-family: 'Figtree', sans-serif !important; }
 <script>
 // ── Estado ─────────────────────────────────────────────────
 let allData = [];
+let patientDataMap = {}; // Map patient_id to full patient object
 let currentPatient = null;
 let compactMode = false;
 let followupOpen = true;
@@ -1059,10 +1060,10 @@ function renderPanelToday(data) {
 
     body.innerHTML = patients.map(p => {
         const wpp = wppLink(p.patient_phone);
-        const safePatient = JSON.stringify(p).replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
+        patientDataMap[p.patient_id] = p; // Store for retrieval
         return `
             <div class="fq-chip today-chip">
-                <span class="chip-name" onclick="openPatientModal(${safePatient})" style="cursor:pointer;">${firstName(p.patient_name)}</span>
+                <span class="chip-name" onclick="openPatientModal(patientDataMap[${p.patient_id}])" style="cursor:pointer;">${firstName(p.patient_name)}</span>
                 <span class="chip-val">${formatBRL(p.total_value)}</span>
                 ${p.funnel_status ? `<span class="chip-status">${p.funnel_status}</span>` : ''}
                 ${wpp ? `<a class="chip-wpp-btn" href="${wpp}" target="_blank"><i class="bi bi-whatsapp"></i> WA</a>` : ''}
@@ -1117,11 +1118,11 @@ function renderPanelOverdue(data) {
 
         const attBadge = p.contact_attempts > 0
             ? `<span class="chip-attempts">${p.contact_attempts}x</span>` : '';
-        const safePatient = JSON.stringify(p).replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
+        patientDataMap[p.patient_id] = p; // Store for retrieval
 
         return `
             <div class="fq-chip overdue-chip ${extraClass}">
-                <span class="chip-name" onclick="openPatientModal(${safePatient})" style="cursor:pointer;">${firstName(p.patient_name)}</span>
+                <span class="chip-name" onclick="openPatientModal(patientDataMap[${p.patient_id}])" style="cursor:pointer;">${firstName(p.patient_name)}</span>
                 <span class="chip-val-sm">${formatBRL(p.total_value)}</span>
                 <span class="chip-delay">⏰ ${days}d atraso</span>
                 ${tempBadge}
