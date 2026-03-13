@@ -307,16 +307,58 @@ def save_patient_funnel_status(patient_id):
     return jsonify({'success': True})
 
 
+def _get_google_sheets_token():
+    """Obtém access token do Google da integração Replit."""
+    try:
+        # Tentar ler das variáveis de ambiente configuradas pela integração
+        token = os.environ.get('GOOGLE_SHEETS_ACCESS_TOKEN')
+        if token:
+            return token
+        
+        # Alternativa: procurar em arquivo de credenciais da integração
+        import json
+        from pathlib import Path
+        
+        # Caminhos possíveis de credenciais da integração
+        creds_paths = [
+            Path.home() / '.replit' / 'integrations' / 'google-sheet.json',
+            Path('/tmp/replit_integrations/google-sheet.json'),
+            Path('/replit/integrations/google-sheet.json'),
+        ]
+        
+        for path in creds_paths:
+            if path.exists():
+                with open(path) as f:
+                    data = json.load(f)
+                    if data.get('access_token'):
+                        return data['access_token']
+                    if data.get('oauth', {}).get('credentials', {}).get('access_token'):
+                        return data['oauth']['credentials']['access_token']
+        
+        return None
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return None
+
+
 @crm_bp.route('/api/crm/export-to-sheets', methods=['POST'])
 @login_required
 def export_sales_funnel_to_sheets():
-    """Exporta funil de vendas para CSV (importar em Google Sheets)."""
+    """Exporta funil de vendas para Google Sheets automaticamente."""
     if (current_user.username or '').strip().lower() != 'marcella':
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
-        import csv
-        import io
+        import requests
+        
+        # Obter access token
+        access_token = _get_google_sheets_token()
+        if not access_token:
+            return jsonify({
+                'error': 'Token Google não encontrado',
+                'message': 'A integração Google Drive pode não estar corretamente conectada no Replit'
+            }), 500
         
         # Buscar dados
         month = request.args.get('month', type=int)
@@ -369,14 +411,12 @@ def export_sales_funnel_to_sheets():
             })
             patients_dict[patient_key]['total_value'] += planned_value
 
-        # Montar CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações'])
+        # Montar dados para Google Sheets
+        rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações']]
         
         for patient_data in patients_dict.values():
             procs_str = '; '.join([f"{p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
-            writer.writerow([
+            rows.append([
                 patient_data['patient_name'],
                 patient_data['patient_phone'],
                 patient_data['funnel_status'],
@@ -385,14 +425,34 @@ def export_sales_funnel_to_sheets():
                 f"{patient_data['total_value']:.2f}",
                 patient_data['doctor_notes'][:100] if patient_data['doctor_notes'] else ''
             ])
+
+        # Criar spreadsheet via Google Sheets API
+        spreadsheet_title = f"Funil de Vendas - Dr. Arthur Basile - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        headers = {'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json'}
         
-        csv_data = output.getvalue()
+        # Criar spreadsheet
+        create_url = 'https://sheets.googleapis.com/v4/spreadsheets'
+        create_body = {
+            'properties': {'title': spreadsheet_title},
+            'sheets': [{'properties': {'title': 'Dados'}}]
+        }
+        
+        response = requests.post(create_url, json=create_body, headers=headers)
+        if response.status_code != 200:
+            return jsonify({'error': f'Erro ao criar planilha: {response.text}'}), 500
+        
+        spreadsheet_id = response.json()['spreadsheetId']
+        sheet_url = f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}'
+        
+        # Inserir dados na planilha
+        update_url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/Dados!A1'
+        update_body = {'values': rows}
+        requests.put(update_url, json=update_body, headers=headers)
         
         return jsonify({
             'success': True, 
-            'message': '✅ CSV gerado! Copie os dados para importar no Google Sheets.',
-            'csv_data': csv_data,
-            'instructions': '1. Crie uma nova planilha em https://sheets.google.com\n2. Clique em Arquivo > Importar > Cole aqui\n3. Cole o conteúdo do CSV'
+            'message': 'Dados exportados com sucesso para Google Sheets!',
+            'sheet_url': sheet_url
         })
         
     except Exception as e:
