@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Acesso ao Prontuário{% endblock %}
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 text-center">
+                <div class="card-body p-5">
+                    <div class="mb-4">
+                        <i class="bi bi-person-badge text-primary" style="font-size: 4rem;"></i>
+                    </div>
+                    <h2 class="h4 mb-3">Acesso ao Prontuário</h2>
+                    <p class="text-muted mb-4">
+                        Como secretária, você tem permissão para visualizar e editar as informações iniciais dos prontuários.
+                        <br><br>
+                        Para abrir o prontuário de um paciente, utilize a <strong>busca na agenda</strong> 
+                        e selecione o paciente através do médico vinculado.
+                    </p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('agenda') }}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-calendar-event me-2"></i>Ir para a Agenda
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

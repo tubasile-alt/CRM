@@ -1,0 +1,1140 @@
+{% extends "base.html" %}
+
+{% block title %}Agenda - Clínica Basile{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css" rel="stylesheet">
+<style>
+.daily-agenda-container {
+    display: flex;
+    gap: 0;
+    margin-top: 20px;
+    align-items: flex-start;
+}
+
+.sidebar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 280px;
+    flex-shrink: 0;
+}
+
+.daily-agenda-divider {
+    width: 2px;
+    background: linear-gradient(to bottom, #d9d9d9, #f0f0f0);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+    margin: 0 15px;
+    flex-shrink: 0;
+}
+
+.mini-calendar {
+    width: 100%;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 
+                0 4px 8px rgba(0, 0, 0, 0.08),
+                inset 1px 1px 0 rgba(255, 255, 255, 0.8);
+    height: fit-content;
+    border: 1px solid rgba(200, 210, 220, 0.5);
+    transition: all 0.3s ease;
+}
+
+.mini-calendar:hover {
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15),
+                0 6px 12px rgba(0, 0, 0, 0.1),
+                inset 1px 1px 0 rgba(255, 255, 255, 0.9);
+    transform: translateY(-2px);
+}
+
+.mini-calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.mini-calendar-header button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0;
+}
+
+.mini-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.mini-calendar-day {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 2px;
+    color: #666;
+    word-wrap: break-word;
+}
+
+.mini-calendar-date {
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #f8f9fa;
+    transition: all 0.2s;
+    word-break: break-word;
+}
+
+.mini-calendar-date:hover {
+    background: #e9ecef;
+}
+
+.mini-calendar-date.selected {
+    background: #0d6efd;
+    color: white;
+    font-weight: bold;
+}
+
+.mini-calendar-date.today {
+    border: 2px solid #0d6efd;
+}
+
+.daily-schedule {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    overflow: hidden;
+    flex: 1;
+    min-width: 0;
+}
+
+.schedule-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 2px solid #f0f0f0;
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+}
+
+.schedule-header h3 {
+    margin: 0;
+}
+
+.schedule-nav {
+    display: flex;
+    gap: 10px;
+}
+
+.schedule-nav button {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.schedule-nav button:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.view-toggle {
+    display: flex;
+    gap: 5px;
+}
+
+.view-toggle button {
+    padding: 6px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+
+.view-toggle button.active {
+    background: rgba(255, 255, 255, 0.4);
+    border-color: white;
+}
+
+.hourly-grid {
+    display: grid;
+    grid-template-columns: 60px 1fr;
+    gap: 0;
+    height: 600px;
+    overflow-y: auto;
+}
+
+.time-column {
+    border-right: 2px solid #f0f0f0;
+    background: #f8f9fa;
+    padding: 0;
+}
+
+.hour-slot {
+    height: 30px;
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #666;
+    font-weight: 500;
+}
+
+.appointments-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.appointment-block {
+    position: relative;
+    padding: 10px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    border-left: 4px solid;
+    transition: all 0.2s;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    min-height: 40px;
+    flex-shrink: 0;
+}
+
+.appointment-block:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.appointment-time {
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.appointment-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.appointment-info-line {
+    display: flex;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: bold;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow: hidden;
+}
+
+.appointment-time-badge {
+    background: rgba(0,0,0,0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.appointment-name {
+    font-weight: bold;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.appointment-code {
+    font-weight: bold;
+    font-size: 13px;
+    opacity: 0.9;
+}
+
+.appointment-type-label {
+    font-size: 13px;
+    font-weight: bold;
+    opacity: 0.85;
+}
+
+.appointment-consult-label {
+    font-size: 13px;
+    font-weight: bold;
+    opacity: 0.85;
+}
+
+.appointment-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    font-size: 11px;
+}
+
+.appointment-cell {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.appointment-patient-type {
+    font-size: 10px;
+    opacity: 0.85;
+}
+
+.appointment-consult-type {
+    font-size: 10px;
+    opacity: 0.85;
+}
+
+/* Cores por tipo de consulta */
+.appointment-particular {
+    background: #fff3cd;
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+.appointment-botox {
+    background: #e7d4f5;
+    border-left-color: #6f42c1;
+    color: #3d1f66;
+}
+
+.appointment-retorno-botox {
+    background: #d8c5e8;
+    border-left-color: #5a32a3;
+    color: #2d1a4d;
+}
+
+.appointment-laser {
+    background: #ffe0b6;
+    border-left-color: #fd7e14;
+    color: #664d1a;
+}
+
+.appointment-preenchimento {
+    background: #fdd5e5;
+    border-left-color: #e83e8c;
+    color: #7a1f42;
+}
+
+.appointment-ulthera {
+    background: #d4e7f5;
+    border-left-color: #0056b3;
+    color: #002855;
+}
+
+.appointment-infiltração-capilar {
+    background: #d5e8d4;
+    border-left-color: #28a745;
+    color: #145323;
+}
+
+.appointment-soroterapia {
+    background: #d1ecf1;
+    border-left-color: #17a2b8;
+    color: #0c5460;
+}
+
+.appointment-pequena-cirurgia {
+    background: #f5d9e8;
+    border-left-color: #c2185b;
+    color: #6a0d2c;
+}
+
+.appointment-retirada-de-ponto {
+    background: #e8d7f1;
+    border-left-color: #7b1fa2;
+    color: #3d0d51;
+}
+
+.appointment-nitrogênio-líquido {
+    background: #d4f1f9;
+    border-left-color: #0097a7;
+    color: #004d54;
+}
+
+.appointment-transplante {
+    background: #f8d7da;
+    border-left-color: #dc3545;
+    color: #842029;
+}
+
+.appointment-transplante-capilar {
+    background: #f8d7da;
+    border-left-color: #dc3545;
+    color: #842029;
+}
+
+.appointment-cirurgia {
+    background: #dc3545 !important;
+    border-left-color: #842029 !important;
+    color: #ffffff !important;
+    font-weight: bold !important;
+    box-shadow: 0 0 15px rgba(220, 53, 69, 0.4) !important;
+    border: 2px solid #842029 !important;
+}
+
+.appointment-cirurgia .appointment-time-badge {
+    background: rgba(255, 255, 255, 0.3) !important;
+    color: white !important;
+}
+
+.appointment-cirurgia .appointment-name {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.appointment-cirurgia::after {
+    content: ' ✂️ CIRURGIA';
+    font-size: 10px;
+    background: white;
+    color: #dc3545;
+    padding: 1px 5px;
+    border-radius: 10px;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.appointment-retorno {
+    background: #cfe2ff;
+    border-left-color: #0d6efd;
+    color: #084298;
+}
+
+.appointment-unimed {
+    background: #d1e7dd;
+    border-left-color: #198754;
+    color: #0f5132;
+}
+
+.appointment-cortesia {
+    background: #e2e3e5;
+    border-left-color: #6c757d;
+    color: #383d41;
+}
+
+.status-confirmado {
+    opacity: 1;
+}
+
+.status-agendado {
+    opacity: 0.8;
+}
+
+.status-faltou {
+    opacity: 0.5;
+    text-decoration: line-through;
+}
+
+.status-atendido {
+    opacity: 1;
+    font-style: italic;
+    border-width: 3px !important;
+    box-shadow: 0 0 0 1px rgba(25, 135, 84, 0.5) inset;
+}
+
+.empty-schedule {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    color: #999;
+    font-size: 16px;
+}
+
+@media (max-width: 1024px) {
+    .daily-agenda-container {
+        gap: 10px;
+    }
+    
+    .sidebar-container {
+        width: 260px;
+    }
+    
+    .schedule-nav {
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 768px) {
+    .daily-agenda-container {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .sidebar-container {
+        width: 100%;
+        order: 2;
+        flex-direction: row;
+        gap: 10px;
+    }
+    
+    .mini-calendar {
+        flex: 1;
+    }
+    
+    .waiting-room-panel {
+        flex: 1;
+    }
+    
+    .daily-schedule {
+        order: 1;
+    }
+    
+    .daily-agenda-divider {
+        display: none;
+    }
+    
+    .schedule-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .schedule-nav {
+        width: 100%;
+    }
+    
+    .view-toggle {
+        width: 100%;
+    }
+}
+
+#calendar {
+    display: none;
+}
+    .waiting-patient-item {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    
+    .waiting-patient-item:hover {
+        background-color: #f0f7ff;
+        border-left: 4px solid #0d6efd;
+    }
+    
+    .waiting-patient-item:last-child {
+        border-bottom: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- TAB NAVIGATION FOR SECRETARY -->
+{% if not current_user.is_doctor() %}
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda-content" type="button" role="tab">
+            <i class="bi bi-calendar-event"></i> Agenda
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link position-relative" id="checkout-tab" data-bs-toggle="tab" data-bs-target="#checkout-content" type="button" role="tab">
+            <i class="bi bi-credit-card"></i> Checkout
+            <span id="pendingCheckoutBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none; font-size: 0.65rem;">
+                0
+            </span>
+        </button>
+    </li>
+</ul>
+{% endif %}
+
+<div class="tab-content">
+    <div class="tab-pane fade show active" id="agenda-content" role="tabpanel">
+
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-4">Agenda Médica</h2>
+        <div id="waitingCounter" class="badge bg-warning text-dark mb-3" style="font-size: 1.1rem;">
+            <i class="bi bi-people"></i> <span id="waitingCount">0</span> aguardando
+        </div>
+        {% if not current_user.is_doctor() %}
+        <div class="btn-group w-100 mb-3 doctor-filter-btns" style="display: flex; flex-wrap: wrap;">
+            <button class="btn btn-sm btn-outline-primary active" onclick="filterByDoctor('all', this)">Todos</button>
+            {% for doctor in doctors %}
+            <button class="btn btn-sm btn-outline-primary" id="btn-doc-{{ doctor.id }}" onclick="filterByDoctor({{ doctor.id }}, this)">{{ doctor.name }}</button>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="d-flex gap-2 flex-wrap mb-3">
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newAppointmentModal">
+                <i class="bi bi-plus-circle"></i> <span class="d-none d-md-inline">Novo Agendamento</span><span class="d-md-none">Novo</span>
+            </button>
+            <div class="btn-group">
+                <button class="btn btn-success btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-download"></i> <span class="d-none d-md-inline">Exportar</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="exportAgenda('pdf')"><i class="bi bi-file-pdf"></i> PDF</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="exportAgenda('excel')"><i class="bi bi-file-excel"></i> Excel</a></li>
+                </ul>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
+                <i class="bi bi-printer"></i> <span class="d-none d-md-inline">Imprimir</span>
+            </button>
+            {% if not current_user.is_doctor() %}
+            <button class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#searchPatientModal">
+                <i class="bi bi-search"></i> Procurar Paciente
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Procurar Paciente -->
+<div class="modal fade" id="searchPatientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Procurar Paciente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group mb-3">
+                    <input type="text" id="patientSearchInput" class="form-control" placeholder="Digite nome ou CPF do paciente...">
+                    <button class="btn btn-primary" onclick="searchPatientsDetailed()">Buscar</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Prontuário</th>
+                                <th>Última Consulta</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientSearchResults">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Digite algo para buscar</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Detalhes/Edição Paciente (Secretaria) -->
+<div class="modal fade" id="patientDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="patientDetailTitle">Ficha do Paciente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Coluna Edição Cadastro -->
+                    <div class="col-md-5 border-end">
+                        <h6 class="mb-3">Dados Cadastrais (Editável)</h6>
+                        <form id="patientEditForm">
+                            <input type="hidden" id="detailPatientId">
+                            <div class="mb-2">
+                                <label class="form-label small">Nome</label>
+                                <input type="text" id="detailPatientName" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">CPF</label>
+                                <input type="text" id="detailPatientCPF" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Telefone</label>
+                                <input type="tel" id="detailPatientPhone" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Nascimento</label>
+                                <input type="date" id="detailPatientBirth" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label small">Endereço</label>
+                                <input type="text" id="detailPatientAddress" class="form-control form-control-sm">
+                            </div>
+                            <div class="mb-3">
+                                <button type="button" class="btn btn-primary btn-sm w-100" onclick="savePatientChanges()">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                    <!-- Coluna Histórico (Somente Leitura) -->
+                    <div class="col-md-7">
+                        <h6 class="mb-3">Histórico de Consultas (Leitura)</h6>
+                        <div id="patientHistoryList" style="max-height: 500px; overflow-y: auto;">
+                            <!-- Histórico será carregado aqui -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="daily-agenda-container">
+    <!-- LEFT SIDEBAR: MINI CALENDAR + WAITING ROOM -->
+    <div class="sidebar-container">
+        <!-- MINI CALENDAR -->
+        <div class="mini-calendar" id="miniCalendar"></div>
+        
+        <!-- SALA DE ESPERA -->
+        <div class="waiting-room-panel" id="waitingRoomPanel">
+            <div class="waiting-room-header">
+                <i class="bi bi-hourglass-split"></i> Sala de Espera
+                <span class="waiting-count-badge" id="waitingCountBadge">0</span>
+            </div>
+            <div class="waiting-room-list" id="waitingRoomList">
+                <div class="waiting-empty">Nenhum paciente aguardando</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- DIVIDER -->
+    <div class="daily-agenda-divider"></div>
+    
+    <!-- DAILY SCHEDULE -->
+    <div class="daily-schedule">
+        <div class="schedule-header">
+            <h3 id="scheduleDate"></h3>
+            <div class="schedule-nav">
+                <button onclick="previousDay()"><i class="bi bi-chevron-left"></i> Anterior</button>
+                <button onclick="todayDay()">Hoje</button>
+                <button onclick="nextDay()">Próximo <i class="bi bi-chevron-right"></i></button>
+            </div>
+            <div class="view-toggle">
+                <button class="active" id="dayViewBtn" onclick="switchView('day')">Dia</button>
+                <button id="monthViewBtn" onclick="switchView('month')">Mês</button>
+            </div>
+        </div>
+        <div id="dayViewContent" class="hourly-grid">
+            <div class="time-column" id="timeColumn"></div>
+            <div class="appointments-grid" id="appointmentsGrid"></div>
+        </div>
+        <div id="monthViewContent" style="display: none;">
+            <div id="calendar"></div>
+        </div>
+    </div>
+</div>
+
+    </div>
+
+    <!-- CHECKOUT TAB FOR SECRETARY -->
+    {% if not current_user.is_doctor() %}
+    <div class="tab-pane fade" id="checkout-content" role="tabpanel">
+        <div class="container-fluid mt-4">
+            <h3 class="mb-4">
+                <i class="bi bi-credit-card"></i> Checkout - Cobrança de Consultas
+            </h3>
+            
+            <div id="checkoutList" class="row">
+                <div class="col-12">
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-hourglass-split"></i> Carregando checkouts pendentes...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="modal fade" id="newAppointmentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable" style="max-width: 900px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Agendamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 15px;">
+                <form id="appointmentForm">
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label d-block text-center"><strong>Foto do Paciente</strong></label>
+                            <div class="d-flex flex-column align-items-center">
+                                <div id="webcam-container" style="width: 240px; height: 180px; background: #eee; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; position: relative; margin-bottom: 10px;">
+                                    <video id="webcam-video" width="240" height="180" autoplay playsinline style="display: none; object-fit: cover;"></video>
+                                    <canvas id="photo-canvas" width="240" height="180" style="display: none;"></canvas>
+                                    <img id="patient-photo-preview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                                    <div id="webcam-placeholder" class="d-flex align-items-center justify-content-center h-100">
+                                        <i class="bi bi-camera-fill" style="font-size: 3rem; color: #ccc;"></i>
+                                    </div>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-primary" id="start-webcam-btn">
+                                        <i class="bi bi-camera"></i> Abrir Webcam
+                                    </button>
+                                    <button type="button" class="btn btn-success" id="capture-photo-btn" style="display: none;">
+                                        <i class="bi bi-camera-fill"></i> Tirar Foto
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="retake-photo-btn" style="display: none;">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Nova Foto
+                                    </button>
+                                </div>
+                                <input type="hidden" id="patientPhotoData" name="photo_data">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if not current_user.is_doctor() %}
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Médico</label>
+                            <select class="form-select form-select-sm" id="appointmentDoctor" required>
+                                <option value="">-- Selecione o médico --</option>
+                                {% for doctor in doctors %}
+                                <option value="{{ doctor.id }}">{{ doctor.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="row mb-2">
+                        <div class="col-7">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;"><strong>Nome Paciente *</strong></label>
+                            <div class="position-relative">
+                                <input type="text" class="form-control form-control-sm" id="patientName" required autocomplete="off" placeholder="Digite nome ou clique para ver cadastrados">
+                                <div id="patientSuggestions" class="position-absolute bg-white border border-secondary rounded mt-1 w-100" style="display:none; z-index: 1000; max-height: 200px; overflow-y: auto; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                </div>
+                                <input type="hidden" id="selectedPatientId">
+                            </div>
+                        </div>
+                        <div class="col-2">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Código</label>
+                            <input type="text" class="form-control form-control-sm" id="patientCode" readonly style="background-color: #f5f5f5;">
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">CPF</label>
+                            <input type="text" class="form-control form-control-sm" id="patientCPF" placeholder="000.000.000-00">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Nascimento</label>
+                            <input type="date" class="form-control form-control-sm" id="patientBirthDate">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Telefone</label>
+                            <input type="tel" class="form-control form-control-sm" id="patientPhone">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Endereço</label>
+                            <input type="text" class="form-control form-control-sm" id="patientAddress">
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Cidade</label>
+                            <input type="text" class="form-control form-control-sm" id="patientCity">
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Paciente</label>
+                            <select class="form-select form-select-sm" id="patientType" onchange="toggleSurgeryNameField()">
+                                <option value="particular" selected>Particular</option>
+                                <option value="retorno">Retorno</option>
+                                <option value="unimed">Unimed</option>
+                                <option value="cortesia">Cortesia</option>
+                                <option value="cirurgia">Cirurgia</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2">
+                        <div class="col-4">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Mãe</label>
+                            <input type="text" class="form-control form-control-sm" id="patientMotherName" placeholder="Nome da mãe">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Indicação</label>
+                            <input type="text" class="form-control form-control-sm" id="patientIndicationSource" placeholder="Quem indicou">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Ocupação</label>
+                            <input type="text" class="form-control form-control-sm" id="patientOccupation">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;"><strong>Tipo Consulta *</strong></label>
+                            <select class="form-select form-select-sm" id="appointmentType" required>
+                                <option value="">-- Selecione --</option>
+                                <option value="Particular" selected>Particular</option>
+                                <option value="Botox">Botox</option>
+                                <option value="Retorno Botox">Retorno Botox</option>
+                                <option value="Laser">Laser</option>
+                                <option value="Preenchimento">Preenchimento</option>
+                                <option value="Ulthera">Ulthera</option>
+                                <option value="Infiltração Capilar">Infiltração Capilar</option>
+                                <option value="Soroterapia">Soroterapia</option>
+                                <option value="Pequena Cirurgia">Pequena Cirurgia</option>
+                                <option value="Retirada de Ponto">Retirada de Ponto</option>
+                                <option value="Nitrogênio Líquido">Nitrogênio Líquido</option>
+                                <option value="Transplante Capilar">Transplante Capilar</option>
+                                <option value="Retorno">Retorno</option>
+                                <option value="Retorno 1 semana TX">Retorno 1 semana TX</option>
+                                <option value="UNIMED">UNIMED</option>
+                                <option value="Cortesia">Cortesia</option>
+                            </select>
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Duração</label>
+                            <select class="form-select form-select-sm" id="appointmentDuration">
+                                <option value="15" selected>15 min</option>
+                                <option value="30">30 min</option>
+                                <option value="60">60 min</option>
+                                <option value="90">90 min</option>
+                                <option value="120">120 min</option>
+                            </select>
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Status</label>
+                            <select class="form-select form-select-sm" id="appointmentStatus">
+                                <option value="agendado">Agendado</option>
+                                <option value="confirmado">Confirmado</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2" id="surgeryNameRow" style="display: none;">
+                        <div class="col-12">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;"><strong>Nome da Cirurgia *</strong></label>
+                            <input type="text" class="form-control form-control-sm" id="surgeryName" placeholder="Digite o nome da cirurgia">
+                            <small class="text-muted">Esta cirurgia será adicionada automaticamente ao Mapa Cirúrgico</small>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2">
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;"><strong>Data *</strong></label>
+                            <input type="date" class="form-control form-control-sm" id="appointmentDate" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;"><strong>Hora *</strong></label>
+                            <input type="time" class="form-control form-control-sm" id="appointmentTime" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-2">
+                        <div class="col-12">
+                            <label class="form-label" style="font-size: 0.9rem; margin-bottom: 0.3rem;">Observações</label>
+                            <textarea class="form-control form-control-sm" id="appointmentNotes" rows="2" style="font-size: 0.85rem;"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" style="padding: 10px;">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="saveAppointment()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Pagamento do Checkout -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-credit-card"></i> Registrar Pagamento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Paciente:</strong> <span id="patientNamePayment"></span></p>
+                <p><strong>Valor:</strong> <span id="paymentAmount" class="text-success fs-4"></span></p>
+                
+                <div class="mb-3">
+                    <label class="form-label">Forma de Pagamento *</label>
+                    <select class="form-select" id="paymentMethod" onchange="updateInstallments()">
+                        <option value="">Selecione...</option>
+                        <option value="dinheiro">Dinheiro</option>
+                        <option value="pix">PIX</option>
+                        <option value="cartao_debito">Cartão de Débito</option>
+                        <option value="cartao">Cartão de Crédito</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3" id="installmentsDiv" style="display: none;">
+                    <label class="form-label">Parcelas</label>
+                    <select class="form-select" id="installments">
+                        <option value="1">1x (à vista)</option>
+                        <option value="2">2x</option>
+                        <option value="3">3x</option>
+                        <option value="4">4x</option>
+                        <option value="5">5x</option>
+                        <option value="6">6x</option>
+                        <option value="10">10x</option>
+                        <option value="12">12x</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="completePayment()">
+                    <i class="bi bi-check-circle"></i> Confirmar Pagamento
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="eventDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes do Agendamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="eventDetails">
+            </div>
+            <div class="modal-footer">
+                {% if not current_user.is_doctor() %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                {% else %}
+                <button type="button" class="btn btn-danger" onclick="deleteEvent()">Excluir</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-primary" onclick="openPatientChart()">Abrir Prontuário</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE EDIÇÃO PARA SECRETÁRIA -->
+<div class="modal fade" id="editAppointmentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar Agendamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editAppointmentId">
+                
+                <div class="mb-3 text-center">
+                    <label class="form-label d-block"><strong>Foto do Paciente</strong></label>
+                    <div class="d-flex flex-column align-items-center">
+                        <div id="edit-webcam-container" style="width: 200px; height: 150px; background: #eee; border: 2px solid #ddd; border-radius: 8px; overflow: hidden; position: relative; margin-bottom: 10px;">
+                            <video id="edit-webcam-video" width="200" height="150" autoplay playsinline style="display: none; object-fit: cover;"></video>
+                            <canvas id="edit-photo-canvas" width="200" height="150" style="display: none;"></canvas>
+                            <img id="edit-patient-photo-preview" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                            <div id="edit-webcam-placeholder" class="d-flex align-items-center justify-content-center h-100">
+                                <i class="bi bi-person-bounding-box" style="font-size: 2.5rem; color: #ccc;"></i>
+                            </div>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-primary" id="edit-start-webcam-btn">
+                                <i class="bi bi-camera"></i> Câmera
+                            </button>
+                            <button type="button" class="btn btn-primary" id="edit-capture-photo-btn" style="display: none;">
+                                <i class="bi bi-camera-fill"></i> Tirar
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="edit-retake-photo-btn" style="display: none;">
+                                <i class="bi bi-arrow-counterclockwise"></i> Nova
+                            </button>
+                        </div>
+                        <input type="hidden" id="edit-patientPhotoData">
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Nome do Paciente</label>
+                    <input type="text" class="form-control" id="editPatientName">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Telefone</label>
+                    <input type="text" class="form-control" id="editPatientPhone">
+                </div>
+                
+                <div class="row">
+                    <div class="col-6">
+                        <label class="form-label">Tipo Paciente</label>
+                        <select class="form-select" id="editPatientType">
+                            <option value="Particular">Particular</option>
+                            <option value="Retorno">Retorno</option>
+                            <option value="UNIMED">UNIMED</option>
+                            <option value="Cortesia">Cortesia</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Tipo Consulta</label>
+                        <select class="form-select" id="editAppointmentType">
+                            <option value="Particular">Particular</option>
+                            <option value="Botox">Botox</option>
+                            <option value="Retorno Botox">Retorno Botox</option>
+                            <option value="Laser">Laser</option>
+                            <option value="Preenchimento">Preenchimento</option>
+                            <option value="Ulthera">Ulthera</option>
+                            <option value="Infiltração Capilar">Infiltração Capilar</option>
+                            <option value="Soroterapia">Soroterapia</option>
+                            <option value="Pequena Cirurgia">Pequena Cirurgia</option>
+                            <option value="Retirada de Ponto">Retirada de Ponto</option>
+                            <option value="Nitrogênio Líquido">Nitrogênio Líquido</option>
+                            <option value="Transplante Capilar">Transplante Capilar</option>
+                            <option value="Retorno">Retorno</option>
+                            <option value="Retorno 1 semana TX">Retorno 1 semana TX</option>
+                            <option value="UNIMED">UNIMED</option>
+                            <option value="Cortesia">Cortesia</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-6">
+                        <label class="form-label">Data</label>
+                        <input type="date" class="form-control" id="editAppointmentDate">
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">Hora</label>
+                        <input type="time" class="form-control" id="editAppointmentTime">
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label">Duração (min)</label>
+                        <input type="number" class="form-control" id="editAppointmentDuration" value="15">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" onclick="deleteAppointment()">
+                    <i class="bi bi-trash"></i> Deletar
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="updateAppointmentFromEdit()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.isSecretary = {% if not current_user.is_doctor() %}true{% else %}false{% endif %};
+window.isDoctor = {% if current_user.is_doctor() %}true{% else %}false{% endif %};
+window.currentDoctorId = {{ current_user.id if current_user.is_doctor() else 'null' }};
+const doctors = {{ doctors | tojson }};
+let currentDoctorFilter = null;
+let currentEvent = null;
+let calendar;
+let selectedDate = new Date();
+let currentView = 'day';
+</script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/locales/pt-br.global.min.js"></script>
+<script src="{{ url_for('static', filename='js/agenda.js') }}"></script>
+<script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,100 @@
+(function () {
+  "use strict";
+
+  function cfg() {
+    return window.__PRONTUARIO_CONFIG || {};
+  }
+
+  function getPatientId() {
+    return cfg().patientId || null;
+  }
+
+  function getAppointmentId() {
+    return cfg().appointmentId || null;
+  }
+
+  function getCSRFToken() {
+    return (
+      cfg().csrfToken ||
+      document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") ||
+      document.querySelector('input[name="csrf_token"]')?.value ||
+      ""
+    );
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  async function fetchJson(url, options = {}) {
+    const headers = {
+      ...(options.headers || {})
+    };
+
+    if (!headers["Content-Type"] && options.body && !(options.body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    const method = (options.method || "GET").toUpperCase();
+    const csrf = getCSRFToken();
+    if (csrf && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      headers["X-CSRFToken"] = csrf;
+    }
+
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      ...options,
+      method,
+      headers
+    });
+
+    const text = await response.text();
+
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (_) {
+      data = null;
+    }
+
+    if (!response.ok) {
+      const msg =
+        (data && (data.error || data.message)) ||
+        text ||
+        `Erro HTTP ${response.status}`;
+      throw new Error(msg);
+    }
+
+    return data;
+  }
+
+  function showAppAlert(message, type = "info") {
+    if (typeof window.showAlert === "function") {
+      window.showAlert(message, type);
+      return;
+    }
+    alert(message);
+  }
+
+  function refreshProntuarioScreen() {
+    if (typeof window.loadTimeline === "function") {
+      window.loadTimeline();
+    }
+  }
+
+  window.ProntuarioCore = {
+    cfg,
+    getPatientId,
+    getAppointmentId,
+    getCSRFToken,
+    escapeHtml,
+    fetchJson,
+    showAppAlert,
+    refreshProntuarioScreen
+  };
+})();
