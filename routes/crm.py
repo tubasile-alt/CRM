@@ -321,6 +321,8 @@ def get_marcella_sales_funnel():
                 'doctor_notes': note.content or '',
                 'funnel_status': funnel_entry.funnel_status if funnel_entry else '',
                 'funnel_temperature': funnel_entry.funnel_temperature if funnel_entry else '',
+                'next_contact_date': funnel_entry.next_contact_date.isoformat() if (funnel_entry and funnel_entry.next_contact_date) else None,
+                'contact_attempts': funnel_entry.contact_attempts if funnel_entry else 0,
                 'procedures': [],
                 'total_value': 0.0
             }
