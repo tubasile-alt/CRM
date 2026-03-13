@@ -804,6 +804,9 @@ body { font-family: 'Figtree', sans-serif !important; }
                     <div style="font-size:.72rem; color:#5a7a96; margin-top:.15rem;">
                         <i class="bi bi-telephone me-1"></i><span id="modalPatientPhone">—</span>
                     </div>
+                    <div style="font-size:.72rem; color:#5a7a96; margin-top:.25rem;">
+                        <i class="bi bi-calendar2-event me-1"></i><span id="modalConsultDate">—</span>
+                    </div>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -1272,6 +1275,16 @@ function openPatientModal(patient) {
 
     document.getElementById('modalPatientName').textContent  = patient.patient_name;
     document.getElementById('modalPatientPhone').textContent = patient.patient_phone || '—';
+    
+    // Determine consultation date: use planned_date from first procedure or next_contact_date
+    let consultDate = '—';
+    if (patient.procedures && patient.procedures.length > 0) {
+        consultDate = formatDate(patient.procedures[0].planned_date) || '—';
+    } else if (patient.next_contact_date) {
+        consultDate = formatDate(patient.next_contact_date);
+    }
+    document.getElementById('modalConsultDate').textContent = consultDate;
+    
     document.getElementById('modalDoctorNotes').textContent  = patient.doctor_notes || 'Nenhuma observação registrada.';
 
     const tbody = document.getElementById('modalProceduresBody');
