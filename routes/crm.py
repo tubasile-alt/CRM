@@ -21,6 +21,15 @@ def crm_page():
     is_marcella = (current_user.username or '').strip().lower() == 'marcella'
     return render_template('crm.html', is_marcella=is_marcella)
 
+@crm_bp.route('/sale')
+@login_required
+def sales_funnel():
+    """Sales funnel page for Marcella"""
+    is_marcella = (current_user.username or '').strip().lower() == 'marcella'
+    if not is_marcella:
+        return redirect(url_for('crm.crm_page'))
+    return render_template('sale.html')
+
 @crm_bp.route('/api/crm/transplant-stats')
 @login_required
 def get_transplant_stats():
