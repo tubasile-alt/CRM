@@ -494,26 +494,26 @@
                 actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
             } else if (status === 'faltou') {
                 actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
-                    <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+                    <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
             } else if (isWaiting) {
                 actionBadgeHtml = `
                     <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
-                    <button class="btn btn-sm btn-success ms-2" onclick="event.stopPropagation(); doCheckout(${app.id})" title="Finalizar atendimento">
+                    <button class="btn btn-sm btn-success ms-2" onclick="event.stopPropagation(); doCheckout('${app.id}')" title="Finalizar atendimento">
                         <i class="bi bi-check2-circle"></i> Finalizar
                     </button>
-                    <button class="btn btn-sm btn-outline-danger ms-1" onclick="event.stopPropagation(); removeFromWaiting(${app.id})" title="Remover da espera (sem finalizar)">
+                    <button class="btn btn-sm btn-outline-danger ms-1" onclick="event.stopPropagation(); removeFromWaiting('${app.id}')" title="Remover da espera (sem finalizar)">
                         <i class="bi bi-x-circle"></i> Remover
                     </button>
                 `;
             } else {
-                actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin(${app.id})" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+                actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
             }
 
             block.innerHTML = `
                 <div class="appointment-content">
                     <div class="appointment-info-line">
                         <span class="appointment-time-badge">${timeStr}</span>
-                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId}) { goToPatientChart(${patientId}, '${app.id}') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }" style="cursor:${patientId ? 'pointer' : 'default'}; text-decoration:${patientId ? 'underline' : 'none'};">${patientName}${starsHtml}</span>
+                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId || 0}) { goToPatientChart(${patientId || 0}, '${app.id}') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }" style="cursor:${patientId ? 'pointer' : 'default'}; text-decoration:${patientId ? 'underline' : 'none'};">${patientName}${starsHtml}</span>
                         <span class="appointment-code">cod:${patientCode}</span>
                         <span class="appointment-type-label">pac:${patientType}</span>
                         <span class="appointment-consult-label">cons:${appointmentType}</span>
