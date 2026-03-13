@@ -455,7 +455,14 @@ function exportToGoogleSheets() {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                alert('✅ Dados exportados com sucesso para o Google Sheets!');
+                let msg = '✅ Dados exportados com sucesso para o Google Sheets!';
+                if (data.sheet_url) {
+                    msg += '\n\n📊 Abrir planilha:\n' + data.sheet_url;
+                }
+                alert(msg);
+                if (data.sheet_url) {
+                    window.open(data.sheet_url, '_blank');
+                }
             } else {
                 alert('❌ Erro: ' + (data.error || data.message));
             }

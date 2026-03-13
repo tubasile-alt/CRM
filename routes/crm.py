@@ -402,7 +402,14 @@ def export_sales_funnel_to_sheets():
         sheet.title = f"Funil de Vendas - Dr. Arthur Basile - {datetime.now().strftime('%d/%m/%Y')}"
         sheet.update()
         
-        return jsonify({'success': True, 'message': 'Dados exportados para Google Sheets!'})
+        # Construir URL da planilha
+        sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet.id}" if hasattr(sheet, 'id') and sheet.id else None
+        
+        return jsonify({
+            'success': True, 
+            'message': 'Dados exportados para Google Sheets!',
+            'sheet_url': sheet_url
+        })
     except Exception as e:
         import traceback
         traceback.print_exc()
