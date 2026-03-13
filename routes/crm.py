@@ -247,20 +247,31 @@ def get_marcella_sales_funnel():
         CosmeticProcedurePlan.created_at.asc()
     ).all()
 
-    result = []
+    # Agrupar procedimentos por paciente
+    patients_dict = {}
     for plan, note, patient in plans:
+        patient_key = patient.id
+        if patient_key not in patients_dict:
+            patients_dict[patient_key] = {
+                'patient_id': patient.id,
+                'patient_name': patient.name,
+                'dp_id': _get_dp_id(patient.id, note.doctor_id),
+                'procedures': [],
+                'total_value': 0.0
+            }
+        
         planned_date = plan.created_at.date().isoformat() if plan.created_at else None
         planned_value = float(plan.planned_value) if plan.planned_value else 0.0
-        result.append({
+        
+        patients_dict[patient_key]['procedures'].append({
             'plan_id': plan.id,
-            'patient_id': patient.id,
-            'patient_name': patient.name,
             'procedure_name': plan.procedure_name,
             'planned_date': planned_date,
-            'planned_value': planned_value,
-            'dp_id': _get_dp_id(patient.id, note.doctor_id)
+            'planned_value': planned_value
         })
+        patients_dict[patient_key]['total_value'] += planned_value
 
+    result = list(patients_dict.values())
     return jsonify(result)
 
 @crm_bp.route('/api/crm/records/<int:plan_id>', methods=['PATCH'])

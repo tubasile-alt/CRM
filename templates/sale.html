@@ -76,28 +76,38 @@ function loadMarcellaSalesFunnel() {
             const count = document.getElementById('funnelCount');
             if (!tbody || !count) return;
 
-            count.textContent = data.length;
+            // Contar total de procedimentos
+            const totalProcedures = data.reduce((sum, patient) => sum + patient.procedures.length, 0);
+            count.textContent = totalProcedures;
+            
             if (data.length === 0) {
                 tbody.innerHTML = '<div class="col-12 text-center py-4 text-muted">Nenhum procedimento pendente neste período.</div>';
                 return;
             }
 
-            tbody.innerHTML = data.map(item => `
+            tbody.innerHTML = data.map(patient => `
                 <div class="col-md-6 col-lg-4">
                     <div class="card h-100 border-0 shadow-sm" style="border-left: 4px solid #0d6efd;">
                         <div class="card-body">
-                            <h6 class="card-title text-primary fw-bold mb-2">${item.patient_name}</h6>
+                            <h6 class="card-title text-primary fw-bold mb-3">${patient.patient_name}</h6>
+                            
                             <div class="mb-3">
-                                <small class="text-muted d-block">Procedimento</small>
-                                <span class="badge bg-info text-dark">${item.procedure_name || '-'}</span>
+                                <small class="text-muted d-block mb-2">Procedimentos Pendentes (${patient.procedures.length})</small>
+                                <div class="border rounded p-2" style="background: #f8f9fa;">
+                                    ${patient.procedures.map((proc, idx) => `
+                                        <div class="mb-2 ${idx > 0 ? 'border-top pt-2' : ''}">
+                                            <span class="badge bg-info text-dark me-2">${proc.procedure_name}</span>
+                                            <small class="text-muted d-block mt-1">
+                                                R$ ${proc.planned_value ? proc.planned_value.toFixed(2).replace('.', ',') : '0,00'} • ${formatDate(proc.planned_date)}
+                                            </small>
+                                        </div>
+                                    `).join('')}
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <small class="text-muted d-block">Valor Planejado</small>
-                                <strong class="text-success fs-5">R$ ${item.planned_value ? item.planned_value.toFixed(2).replace('.', ',') : '0,00'}</strong>
-                            </div>
-                            <div>
-                                <small class="text-muted d-block">Data do Planejamento</small>
-                                <small class="text-secondary">${formatDate(item.planned_date)}</small>
+                            
+                            <div class="pt-2 border-top">
+                                <small class="text-muted d-block">Valor Total Planejado</small>
+                                <strong class="text-success fs-5">R$ ${patient.total_value ? patient.total_value.toFixed(2).replace('.', ',') : '0,00'}</strong>
                             </div>
                         </div>
                     </div>
