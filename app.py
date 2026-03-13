@@ -767,21 +767,14 @@ def delete_appointment_api(appointment_id):
             return jsonify({'success': False, 'error': 'Não autorizado'}), 403
         
         # Delete associated records first (foreign key constraints)
-        commercial_deleted = CommercialTask.query.filter_by(consultation_id=appointment_id).delete()
-        print(f"DEBUG DELETE: Deleted {commercial_deleted} CommercialTask records")
-        
-        evolution_deleted = Evolution.query.filter_by(consultation_id=appointment_id).delete()
-        print(f"DEBUG DELETE: Deleted {evolution_deleted} Evolution records")
+        CommercialTask.query.filter_by(consultation_id=appointment_id).delete()
+        Evolution.query.filter_by(consultation_id=appointment_id).delete()
         
         db.session.delete(appointment)
-        print(f"DEBUG DELETE: Marked appointment {appointment_id} for deletion")
-        
         db.session.commit()
-        print(f"DEBUG DELETE: Successfully committed deletion of appointment {appointment_id}")
         
         return jsonify({'success': True})
     except Exception as e:
-        print(f"ERROR DELETE: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
