@@ -760,15 +760,22 @@ def get_patient_history(id):
 def delete_appointment_api(appointment_id):
     """Deleta um agendamento"""
     try:
-        appointment = Appointment.query.get_or_404(appointment_id)
+        appointment = Appointment.query.filter_by(id=appointment_id).first()
+        if appointment is None:
+            return jsonify({'success': False, 'error': 'Agendamento não encontrado'}), 404
         
         # Se médico, só pode deletar seus próprios
         if current_user.is_doctor() and appointment.doctor_id != current_user.id:
             return jsonify({'success': False, 'error': 'Não autorizado'}), 403
         
-        # Delete associated records first (foreign key constraints)
+        # Deletar registros com FK NOT NULL (commercial_task)
         CommercialTask.query.filter_by(consultation_id=appointment_id).delete()
-        Evolution.query.filter_by(consultation_id=appointment_id).delete()
+        
+        # Desvincula registros com FK nullable (preserva os dados, apenas remove o vínculo)
+        Evolution.query.filter_by(consultation_id=appointment_id).update({'consultation_id': None})
+        Note.query.filter_by(appointment_id=appointment_id).update({'appointment_id': None})
+        Payment.query.filter_by(appointment_id=appointment_id).update({'appointment_id': None})
+        Prescription.query.filter_by(appointment_id=appointment_id).update({'appointment_id': None})
         
         db.session.delete(appointment)
         db.session.commit()
