@@ -10,7 +10,7 @@ import os
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask
 from utils.database_backup import backup_manager
 
 app = Flask(__name__)
@@ -766,6 +766,7 @@ def delete_appointment_api(appointment_id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     # Delete associated records first (foreign key constraints)
+    CommercialTask.query.filter_by(consultation_id=appointment_id).delete()
     Evolution.query.filter_by(consultation_id=appointment_id).delete()
     
     db.session.delete(appointment)

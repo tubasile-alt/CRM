@@ -593,3 +593,28 @@ class Attachment(db.Model):
 
     doctor = db.relationship('User', backref='attachments')
     doctor_patient = db.relationship('PatientDoctor', backref='attachments')
+
+
+class CommercialTask(db.Model):
+    __tablename__ = 'commercial_task'
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False)
+    patient_name_snapshot = db.Column(db.String(100), nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    doctor_name_snapshot = db.Column(db.String(100), nullable=False)
+    consultation_id = db.Column(db.Integer, db.ForeignKey('appointment.id'), nullable=False)
+    source_type = db.Column(db.String(20), nullable=False)
+    planning_snapshot_json = db.Column(db.Text, nullable=False)
+    total_value = db.Column(db.Numeric(10, 2))
+    status = db.Column(db.String(20), nullable=False)
+    priority = db.Column(db.String(20), nullable=False)
+    seller_notes = db.Column(db.Text)
+    next_followup_date = db.Column(db.Date)
+    last_contact_at = db.Column(db.DateTime)
+    consultation_date = db.Column(db.Date)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time)
+
+    patient = db.relationship('Patient', backref='commercial_tasks')
+    doctor = db.relationship('User', backref='commercial_tasks')
+    appointment = db.relationship('Appointment', backref='commercial_tasks')
