@@ -213,14 +213,28 @@ def get_marcella_sales_funnel():
     if not arthur_doctor:
         return jsonify([])
 
-    plans = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
+    # Filtros de mês/ano opcionais
+    month = request.args.get('month', type=int)
+    year = request.args.get('year', type=int)
+
+    query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
         Note, CosmeticProcedurePlan.note_id == Note.id
     ).join(
         Patient, Note.patient_id == Patient.id
     ).filter(
         CosmeticProcedurePlan.was_performed == False,
         Note.doctor_id == arthur_doctor.id
-    ).order_by(
+    )
+
+    # Aplicar filtros de data se fornecidos
+    if month and year:
+        from sqlalchemy import extract
+        query = query.filter(
+            extract('month', CosmeticProcedurePlan.created_at) == month,
+            extract('year', CosmeticProcedurePlan.created_at) == year
+        )
+
+    plans = query.order_by(
         Patient.name.asc(),
         CosmeticProcedurePlan.created_at.asc()
     ).all()
