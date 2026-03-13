@@ -255,6 +255,7 @@ def get_marcella_sales_funnel():
             patients_dict[patient_key] = {
                 'patient_id': patient.id,
                 'patient_name': patient.name,
+                'patient_phone': patient.phone or 'N/A',
                 'dp_id': _get_dp_id(patient.id, note.doctor_id),
                 'procedures': [],
                 'total_value': 0.0

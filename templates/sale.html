@@ -89,7 +89,12 @@ function loadMarcellaSalesFunnel() {
                 <div class="col-md-6 col-lg-4">
                     <div class="card h-100 border-0 shadow-sm" style="border-left: 4px solid #0d6efd;">
                         <div class="card-body">
-                            <h6 class="card-title text-primary fw-bold mb-3">${patient.patient_name}</h6>
+                            <div class="mb-3">
+                                <h6 class="card-title text-primary fw-bold mb-2">${patient.patient_name}</h6>
+                                <small class="text-muted d-block">
+                                    <i class="bi bi-telephone"></i> ${patient.patient_phone}
+                                </small>
+                            </div>
                             
                             <div class="mb-3">
                                 <small class="text-muted d-block mb-2">Procedimentos Pendentes (${patient.procedures.length})</small>
