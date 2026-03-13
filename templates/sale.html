@@ -1,148 +1,715 @@
 {% extends "base.html" %}
 
-{% block title %}Sales Funnel - Clínica Basile{% endblock %}
+{% block title %}Funil de Vendas — Clínica Basile{% endblock %}
 
 {% block extra_css %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700;800&display=swap" rel="stylesheet">
+
 <style>
-    .sale-container { padding: 2rem 0; }
+/* ── Reset & Base ─────────────────────────────────────── */
+body { font-family: 'Figtree', sans-serif !important; }
 
-    .patient-card {
-        cursor: pointer;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    .patient-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0,0,0,0.12) !important;
-    }
+.sale-page {
+    background: #16222f;
+    min-height: 100vh;
+    padding: 1.5rem 1rem 3rem;
+}
 
-    /* Cores por temperatura */
-    .temp-quente   { border-left-color: #dc3545 !important; }
-    .temp-morno    { border-left-color: #fd7e14 !important; }
-    .temp-frio     { border-left-color: #0d6efd !important; }
-    .temp-caro     { border-left-color: #6f42c1 !important; }
-    .temp-default  { border-left-color: #0d6efd !important; }
+/* ── Header ───────────────────────────────────────────── */
+.sale-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
 
-    /* Badge de temperatura */
-    .badge-quente        { background-color: #dc3545; color: #fff; }
-    .badge-morno         { background-color: #fd7e14; color: #fff; }
-    .badge-frio          { background-color: #0dcaf0; color: #000; }
-    .badge-caro          { background-color: #6f42c1; color: #fff; }
+.sale-header h1 {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #e2eaf4;
+    letter-spacing: -0.3px;
+    margin: 0;
+}
 
-    /* Badge de status */
-    .badge-agendado       { background-color: #198754; color: #fff; }
-    .badge-realizado      { background-color: #0d6efd; color: #fff; }
-    .badge-semorcamento   { background-color: #ffc107; color: #000; }
-    .badge-pensando       { background-color: #6c757d; color: #fff; }
-    .badge-seminteresse   { background-color: #dee2e6; color: #495057; }
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    flex-wrap: wrap;
+}
 
-    /* Print */
-    @media print {
-        body * { visibility: hidden; }
-        #printArea, #printArea * { visibility: visible; }
-        #printArea {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%;
-            padding: 2rem;
-            background: white;
-        }
-    }
+.ctrl-select {
+    background: #1e3248;
+    border: 1px solid rgba(255,255,255,.12);
+    color: #c9d8e8;
+    border-radius: 8px;
+    padding: .3rem .65rem;
+    font-size: .78rem;
+    font-family: 'Figtree', sans-serif;
+    cursor: pointer;
+    transition: border-color .2s;
+}
+.ctrl-select:focus { outline: none; border-color: rgba(255,255,255,.35); }
+
+.btn-compact {
+    background: #1e3248;
+    border: 1px solid rgba(255,255,255,.12);
+    color: #c9d8e8;
+    border-radius: 8px;
+    padding: .3rem .75rem;
+    font-size: .78rem;
+    font-family: 'Figtree', sans-serif;
+    cursor: pointer;
+    transition: background .2s, border-color .2s;
+    white-space: nowrap;
+}
+.btn-compact:hover { background: #253447; border-color: rgba(255,255,255,.25); }
+.btn-compact.active { background: #2c4a6e; border-color: rgba(99,162,255,.5); color: #89b8ff; }
+
+.badge-unclassified {
+    background: rgba(244,63,94,.15);
+    border: 1px solid rgba(244,63,94,.35);
+    color: #f87171;
+    border-radius: 20px;
+    padding: .25rem .65rem;
+    font-size: .72rem;
+    font-weight: 700;
+    animation: pulse-rose 2.5s infinite;
+}
+@keyframes pulse-rose {
+    0%,100% { box-shadow: 0 0 0 0 rgba(244,63,94,.3); }
+    50%      { box-shadow: 0 0 0 5px rgba(244,63,94,0); }
+}
+
+/* ── KPI Bar ──────────────────────────────────────────── */
+.kpi-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: .75rem;
+    margin-bottom: 1.25rem;
+}
+
+.kpi-card {
+    background: linear-gradient(145deg, #3a4e68, #2c3e52);
+    border-radius: 12px;
+    padding: .85rem 1rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.06);
+    transition: transform .2s, box-shadow .2s;
+}
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.10), transparent);
+}
+.kpi-card::after {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 12px 0 0 12px;
+}
+.kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.06); }
+.kpi-card.kpi-green::after  { background: #34d399; }
+.kpi-card.kpi-red::after    { background: #f87171; }
+.kpi-card.kpi-blue::after   { background: #60a5fa; }
+.kpi-card.kpi-amber::after  { background: #fbbf24; }
+
+.kpi-icon {
+    position: absolute;
+    right: .85rem; top: 50%;
+    transform: translateY(-50%);
+    font-size: 2rem;
+    opacity: .12;
+    color: #fff;
+}
+.kpi-label {
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #7fa3c4;
+    margin-bottom: .2rem;
+}
+.kpi-value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #e2eaf4;
+    letter-spacing: -0.3px;
+    line-height: 1;
+    margin-bottom: .15rem;
+}
+.kpi-sub {
+    font-size: .68rem;
+    color: #5a7a96;
+}
+
+/* ── Follow-up Queue ──────────────────────────────────── */
+.followup-queue {
+    background: linear-gradient(145deg, #3a4e68, #2c3e52);
+    border-radius: 12px;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 4px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
+    overflow: hidden;
+}
+.followup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .75rem 1rem;
+    cursor: pointer;
+    user-select: none;
+}
+.followup-header h6 {
+    font-size: .78rem;
+    font-weight: 700;
+    color: #fbbf24;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+.live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #fbbf24;
+    display: inline-block;
+    animation: pulse-amber 2s infinite;
+}
+@keyframes pulse-amber {
+    0%,100% { box-shadow: 0 0 0 0 rgba(251,191,36,.4); }
+    50%      { box-shadow: 0 0 0 6px rgba(251,191,36,0); }
+}
+.followup-chevron {
+    color: #7fa3c4;
+    font-size: .75rem;
+    transition: transform .25s;
+}
+.followup-chevron.open { transform: rotate(180deg); }
+.followup-body {
+    padding: 0 1rem .85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+.followup-chip {
+    background: rgba(251,191,36,.12);
+    border: 1px solid rgba(251,191,36,.3);
+    border-radius: 20px;
+    padding: .25rem .75rem;
+    font-size: .72rem;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+.followup-chip a { color: #fbbf24; text-decoration: none; }
+.followup-chip a:hover { text-decoration: underline; }
+.overdue-tag { color: #f87171; font-weight: 700; }
+
+/* ── Group Section ────────────────────────────────────── */
+.group-section { margin-bottom: 1rem; }
+.group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .55rem .85rem;
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: .6rem;
+    transition: background .2s;
+}
+.group-header:hover { background: rgba(255,255,255,.04); }
+.group-title {
+    font-size: .78rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+.group-strip {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+.group-strip.quente  { background: #f87171; }
+.group-strip.morno   { background: #fb923c; }
+.group-strip.caro    { background: #c084fc; }
+.group-strip.frio    { background: #60a5fa; }
+.group-strip.sem     { background: #475569; }
+
+.group-meta {
+    font-size: .68rem;
+    color: #5a7a96;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+.group-chevron {
+    color: #5a7a96;
+    font-size: .7rem;
+    transition: transform .25s;
+}
+.group-chevron.open { transform: rotate(180deg); }
+.group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: .65rem;
+    transition: all .25s;
+}
+.group-grid.compact { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+
+/* ── Patient Card ─────────────────────────────────────── */
+.patient-card {
+    background: linear-gradient(145deg, #3a4e68, #2c3e52);
+    border-radius: 12px;
+    padding: .85rem .9rem;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.06);
+    transition: transform .15s, box-shadow .15s;
+    border-left: 3px solid;
+}
+.patient-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.10), transparent);
+}
+.patient-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.patient-card:hover .card-quick-actions { opacity: 1; pointer-events: all; }
+
+.patient-card.temp-quente { border-left-color: #f87171; }
+.patient-card.temp-morno  { border-left-color: #fb923c; }
+.patient-card.temp-caro   { border-left-color: #c084fc; }
+.patient-card.temp-frio   { border-left-color: #60a5fa; }
+.patient-card.temp-sem    { border-left-color: #475569; }
+
+@keyframes blink-border {
+    0%,100% { border-left-color: #ef4444; }
+    50%      { border-left-color: rgba(239,68,68,.08); }
+}
+.patient-card.temp-sem { animation: blink-border 2.5s ease-in-out infinite; }
+
+.card-quick-actions {
+    position: absolute;
+    top: .6rem; right: .6rem;
+    display: flex;
+    gap: .35rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+}
+.quick-btn {
+    background: rgba(22,34,47,.72);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 7px;
+    color: #c9d8e8;
+    font-size: .7rem;
+    padding: .25rem .45rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    transition: background .15s, color .15s;
+    white-space: nowrap;
+}
+.quick-btn:hover { background: rgba(32,56,88,.85); color: #fff; }
+.quick-btn.wpp:hover { color: #4ade80; }
+.quick-btn.classify:hover { color: #93c5fd; }
+
+.card-name {
+    font-size: .88rem;
+    font-weight: 700;
+    color: #e2eaf4;
+    margin-bottom: .15rem;
+    padding-right: 4.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.card-phone {
+    font-size: .68rem;
+    color: #5a7a96;
+    margin-bottom: .5rem;
+}
+.card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .3rem;
+    margin-bottom: .5rem;
+}
+
+/* Translucent badges */
+.chip {
+    border-radius: 20px;
+    padding: .15rem .55rem;
+    font-size: .65rem;
+    font-weight: 600;
+    border-width: 1px;
+    border-style: solid;
+}
+.chip-quente  { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.35); color: #f87171; }
+.chip-morno   { background: rgba(251,146,60,.12);  border-color: rgba(251,146,60,.35);  color: #fb923c; }
+.chip-caro    { background: rgba(192,132,252,.12); border-color: rgba(192,132,252,.35); color: #c084fc; }
+.chip-frio    { background: rgba(96,165,250,.12);  border-color: rgba(96,165,250,.35);  color: #60a5fa; }
+.chip-agendado   { background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.35); color: #34d399; }
+.chip-realizado  { background: rgba(96,165,250,.12); border-color: rgba(96,165,250,.35); color: #60a5fa; }
+.chip-sem-orc    { background: rgba(251,191,36,.12); border-color: rgba(251,191,36,.35); color: #fbbf24; }
+.chip-pensando   { background: rgba(100,116,139,.12);border-color: rgba(100,116,139,.35);color: #94a3b8; }
+.chip-sem-int    { background: rgba(100,116,139,.08);border-color: rgba(100,116,139,.2); color: #64748b; }
+
+.card-procedures { margin-bottom: .5rem; }
+.proc-label { font-size: .65rem; color: #5a7a96; margin-bottom: .3rem; }
+.proc-list {
+    background: rgba(0,0,0,.18);
+    border-radius: 7px;
+    padding: .4rem .55rem;
+    font-size: .7rem;
+}
+.proc-item { color: #8fadc8; display: flex; justify-content: space-between; align-items: center; }
+.proc-item + .proc-item { border-top: 1px solid rgba(255,255,255,.05); margin-top: .25rem; padding-top: .25rem; }
+.proc-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%; }
+.proc-val  { font-weight: 600; color: #34d399; flex-shrink: 0; }
+
+.compact .card-procedures { display: none; }
+.compact .card-hint        { display: none; }
+
+.card-footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid rgba(255,255,255,.07);
+    padding-top: .45rem;
+    margin-top: .4rem;
+}
+.card-total-label { font-size: .65rem; color: #5a7a96; }
+.card-total-val   { font-size: .82rem; font-weight: 700; color: #34d399; }
+.card-hint        { font-size: .62rem; color: #334d65; }
+
+.card-next-contact {
+    margin-top: .35rem;
+    font-size: .65rem;
+    display: flex;
+    justify-content: space-between;
+    color: #5a7a96;
+}
+.next-contact-overdue { color: #fbbf24; font-weight: 600; }
+.next-contact-today   { color: #34d399; font-weight: 600; }
+.contact-attempts-badge {
+    background: rgba(100,116,139,.15);
+    border: 1px solid rgba(100,116,139,.25);
+    border-radius: 10px;
+    padding: .05rem .4rem;
+    font-size: .62rem;
+    color: #7a9ab4;
+}
+
+/* ── Modal ────────────────────────────────────────────── */
+#patientFunnelModal .modal-content {
+    background: #253447;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 16px;
+    color: #c9d8e8;
+}
+#patientFunnelModal .modal-header {
+    background: linear-gradient(145deg, #3a4e68, #2c3e52);
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    border-radius: 16px 16px 0 0;
+    padding: 1rem 1.25rem;
+}
+#patientFunnelModal .modal-title { font-weight: 800; font-size: 1rem; color: #e2eaf4; }
+#patientFunnelModal .modal-body  { background: #253447; }
+#patientFunnelModal .modal-footer { background: #253447; border-top: 1px solid rgba(255,255,255,.08); }
+
+.modal-section-label {
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #5a7a96;
+    margin-bottom: .5rem;
+}
+.modal-doctor-notes {
+    background: rgba(0,0,0,.2);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 8px;
+    padding: .65rem .8rem;
+    font-size: .78rem;
+    color: #8fadc8;
+    white-space: pre-wrap;
+    min-height: 50px;
+    font-style: italic;
+}
+.modal-table th { background: rgba(0,0,0,.25); color: #5a7a96; font-size: .7rem; font-weight: 700; border-color: rgba(255,255,255,.07) !important; }
+.modal-table td { border-color: rgba(255,255,255,.06) !important; font-size: .78rem; color: #c9d8e8; }
+.modal-table tfoot td { background: rgba(96,165,250,.08); color: #34d399; font-weight: 700; }
+
+.modal-form-label { font-size: .72rem; font-weight: 700; color: #7fa3c4; margin-bottom: .3rem; }
+.modal-select {
+    background: #1e3248;
+    border: 1px solid rgba(255,255,255,.12);
+    color: #c9d8e8;
+    border-radius: 8px;
+    font-family: 'Figtree', sans-serif;
+    font-size: .82rem;
+    padding: .45rem .7rem;
+    width: 100%;
+    color-scheme: dark;
+    transition: border-color .2s;
+}
+.modal-select:focus { outline: none; border-color: rgba(96,165,250,.5); }
+
+.modal-input {
+    background: rgba(251,191,36,.05);
+    border: 1px solid rgba(251,191,36,.2);
+    color: #fbbf24;
+    border-radius: 8px;
+    font-family: 'Figtree', sans-serif;
+    font-size: .82rem;
+    padding: .45rem .7rem;
+    width: 100%;
+    color-scheme: dark;
+    transition: border-color .2s;
+}
+.modal-input:focus { outline: none; border-color: rgba(251,191,36,.5); }
+.modal-input::placeholder { color: rgba(251,191,36,.35); }
+
+.attempts-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    background: rgba(0,0,0,.15);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 8px;
+    padding: .35rem .65rem;
+}
+.attempts-count { font-size: 1.1rem; font-weight: 800; color: #e2eaf4; min-width: 2ch; text-align: center; }
+.attempts-btn {
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.12);
+    color: #c9d8e8;
+    border-radius: 6px;
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: .9rem; font-weight: 700;
+    transition: background .15s;
+    user-select: none;
+}
+.attempts-btn:hover { background: rgba(255,255,255,.16); }
+
+.btn-modal-save {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: .5rem 1.1rem;
+    font-size: .82rem;
+    font-weight: 700;
+    font-family: 'Figtree', sans-serif;
+    cursor: pointer;
+    transition: opacity .2s;
+}
+.btn-modal-save:hover { opacity: .88; }
+.btn-modal-wpp {
+    background: rgba(74,222,128,.12);
+    color: #4ade80;
+    border: 1px solid rgba(74,222,128,.3);
+    border-radius: 8px;
+    padding: .5rem 1rem;
+    font-size: .82rem;
+    font-weight: 700;
+    font-family: 'Figtree', sans-serif;
+    cursor: pointer;
+    transition: background .2s;
+}
+.btn-modal-wpp:hover { background: rgba(74,222,128,.2); }
+.btn-modal-print {
+    background: rgba(148,163,184,.1);
+    color: #94a3b8;
+    border: 1px solid rgba(148,163,184,.2);
+    border-radius: 8px;
+    padding: .5rem 1rem;
+    font-size: .82rem;
+    font-family: 'Figtree', sans-serif;
+    cursor: pointer;
+    transition: background .2s;
+}
+.btn-modal-print:hover { background: rgba(148,163,184,.2); }
+.btn-modal-close {
+    background: transparent;
+    color: #5a7a96;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px;
+    padding: .5rem 1rem;
+    font-size: .82rem;
+    font-family: 'Figtree', sans-serif;
+    cursor: pointer;
+    transition: background .2s;
+}
+.btn-modal-close:hover { background: rgba(255,255,255,.06); }
+
+/* ── Responsive ───────────────────────────────────────── */
+@media (max-width: 640px) {
+    .kpi-bar { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 380px) {
+    .kpi-bar { grid-template-columns: 1fr; }
+}
+
+/* ── Print ────────────────────────────────────────────── */
+@media print {
+    body * { visibility: hidden; }
+    #printArea, #printArea * { visibility: visible; }
+    #printArea { position: fixed; top: 0; left: 0; width: 100%; padding: 2rem; background: white; }
+}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="sale-container">
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h4 class="mb-0 fw-bold text-primary"><i class="bi bi-funnel"></i> Funil de Vendas — Dr. Arthur Basile</h4>
-            <div class="d-flex gap-2 align-items-center flex-wrap">
-                <small class="text-success"><i class="bi bi-cloud-check"></i> Sincronizando com Google Sheets...</small>
-                <select id="funnelMonthFilter" class="form-select form-select-sm" style="width: auto;">
-                    <option value="">Todos os meses</option>
-                    <option value="1">Janeiro</option>
-                    <option value="2">Fevereiro</option>
-                    <option value="3">Março</option>
-                    <option value="4">Abril</option>
-                    <option value="5">Maio</option>
-                    <option value="6">Junho</option>
-                    <option value="7">Julho</option>
-                    <option value="8">Agosto</option>
-                    <option value="9">Setembro</option>
-                    <option value="10">Outubro</option>
-                    <option value="11">Novembro</option>
-                    <option value="12">Dezembro</option>
-                </select>
-                <select id="funnelYearFilter" class="form-select form-select-sm" style="width: auto;">
-                    <option value="">Todos os anos</option>
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                    <option value="2026">2026</option>
-                </select>
-                <span class="badge bg-primary fs-6" id="funnelCount">0</span>
-            </div>
+<div class="sale-page">
+
+    <!-- ── Header ─────────────────────────────────────────── -->
+    <div class="sale-header">
+        <div style="display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;">
+            <h1><i class="bi bi-funnel-fill" style="color:#60a5fa;"></i> Funil de Vendas — Dr. Arthur Basile</h1>
+            <span class="badge-unclassified" id="unclassifiedBadge" style="display:none;">
+                <i class="bi bi-exclamation-circle-fill"></i> <span id="unclassifiedCount">0</span> sem classificação
+            </span>
         </div>
-        <div class="card-body p-3">
-            <div id="marcellaFunnelTable" class="row g-3">
-                <div class="col-12 text-center py-4">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="text-muted mt-2">Carregando...</p>
-                </div>
-            </div>
+        <div class="header-controls">
+            <select id="funnelMonthFilter" class="ctrl-select">
+                <option value="">Todos os meses</option>
+                <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+                <option value="3">Março</option><option value="4">Abril</option>
+                <option value="5">Maio</option><option value="6">Junho</option>
+                <option value="7">Julho</option><option value="8">Agosto</option>
+                <option value="9">Setembro</option><option value="10">Outubro</option>
+                <option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+            <select id="funnelYearFilter" class="ctrl-select">
+                <option value="">Todos os anos</option>
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+            </select>
+            <select id="funnelSort" class="ctrl-select">
+                <option value="default">Ordem padrão</option>
+                <option value="value_desc">Maior valor</option>
+                <option value="value_asc">Menor valor</option>
+                <option value="followup">Follow-up urgente</option>
+            </select>
+            <button class="btn-compact" id="btnCompact" onclick="toggleCompact()">
+                <i class="bi bi-grid-3x3-gap"></i> Compacto
+            </button>
         </div>
     </div>
+
+    <!-- ── KPI Bar ─────────────────────────────────────────── -->
+    <div class="kpi-bar">
+        <div class="kpi-card kpi-green">
+            <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+            <div class="kpi-label">Valor Total em Aberto</div>
+            <div class="kpi-value" id="kpiTotal">R$ —</div>
+            <div class="kpi-sub">todos os pacientes</div>
+        </div>
+        <div class="kpi-card kpi-red">
+            <div class="kpi-icon"><i class="bi bi-fire"></i></div>
+            <div class="kpi-label">Pacientes Quentes</div>
+            <div class="kpi-value" id="kpiHot">—</div>
+            <div class="kpi-sub">prontos para fechar</div>
+        </div>
+        <div class="kpi-card kpi-blue">
+            <div class="kpi-icon"><i class="bi bi-calendar-check"></i></div>
+            <div class="kpi-label">Agendados</div>
+            <div class="kpi-value" id="kpiScheduled">—</div>
+            <div class="kpi-sub">consultas marcadas</div>
+        </div>
+        <div class="kpi-card kpi-amber">
+            <div class="kpi-icon"><i class="bi bi-question-circle"></i></div>
+            <div class="kpi-label">Sem Classificação</div>
+            <div class="kpi-value" id="kpiUnclass">—</div>
+            <div class="kpi-sub">precisam de atenção</div>
+        </div>
+    </div>
+
+    <!-- ── Follow-up Queue ─────────────────────────────────── -->
+    <div class="followup-queue" id="followupQueue" style="display:none;">
+        <div class="followup-header" onclick="toggleFollowup()">
+            <h6>
+                <span class="live-dot"></span>
+                Follow-up Pendente
+                <span id="followupCount" style="font-size:.65rem; color:#fbbf24; font-weight:400;"></span>
+            </h6>
+            <i class="bi bi-chevron-up followup-chevron open" id="followupChevron"></i>
+        </div>
+        <div class="followup-body" id="followupBody"></div>
+    </div>
+
+    <!-- ── Funnel Content ──────────────────────────────────── -->
+    <div id="funnelContent">
+        <div style="text-align:center; padding: 3rem; color: #3a5068;">
+            <div class="spinner-border text-primary" role="status" style="width:2rem; height:2rem;"></div>
+            <p style="margin-top:.75rem; font-size:.8rem;">Carregando dados...</p>
+        </div>
+    </div>
+
 </div>
 
-<!-- ───── MODAL DETALHE DO PACIENTE ───── -->
-<div class="modal fade" id="patientFunnelModal" tabindex="-1" aria-labelledby="patientFunnelModalLabel" aria-hidden="true">
+<!-- ── Modal ────────────────────────────────────────────── -->
+<div class="modal fade" id="patientFunnelModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
 
-            <div class="modal-header bg-primary text-white">
+            <div class="modal-header">
                 <div>
-                    <h5 class="modal-title mb-0" id="modalPatientName">—</h5>
-                    <small id="modalPatientPhone" class="opacity-75"><i class="bi bi-telephone me-1"></i>—</small>
+                    <div class="modal-title" id="modalPatientName">—</div>
+                    <div style="font-size:.72rem; color:#5a7a96; margin-top:.15rem;">
+                        <i class="bi bi-telephone me-1"></i><span id="modalPatientPhone">—</span>
+                    </div>
                 </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
 
-            <div class="modal-body">
+            <div class="modal-body p-3">
 
-                <!-- Observações do Médico -->
-                <div class="mb-4">
-                    <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-journal-text me-1"></i> Observações do Médico</h6>
-                    <div id="modalDoctorNotes" class="bg-light border rounded p-3 text-muted fst-italic" style="white-space: pre-wrap; min-height: 60px;">—</div>
+                <!-- Observações do médico -->
+                <div class="mb-3">
+                    <div class="modal-section-label"><i class="bi bi-journal-text me-1"></i>Observações do Médico</div>
+                    <div class="modal-doctor-notes" id="modalDoctorNotes">—</div>
                 </div>
 
-                <!-- Procedimentos Propostos -->
-                <div class="mb-4">
-                    <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-list-check me-1"></i> Procedimentos Propostos</h6>
-                    <div id="modalProcedures" class="table-responsive">
-                        <table class="table table-sm table-bordered mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Procedimento</th>
-                                    <th class="text-end">Valor</th>
-                                    <th>Data</th>
-                                    <th>Obs.</th>
-                                </tr>
-                            </thead>
+                <!-- Procedimentos -->
+                <div class="mb-3">
+                    <div class="modal-section-label"><i class="bi bi-list-check me-1"></i>Procedimentos Propostos</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm modal-table mb-0">
+                            <thead><tr><th>Procedimento</th><th class="text-end">Valor</th><th>Data</th><th>Obs.</th></tr></thead>
                             <tbody id="modalProceduresBody"></tbody>
-                            <tfoot>
-                                <tr class="table-primary fw-bold">
-                                    <td>Total</td>
-                                    <td class="text-end" id="modalTotalValue">—</td>
-                                    <td colspan="2"></td>
-                                </tr>
-                            </tfoot>
+                            <tfoot><tr><td><strong>Total</strong></td><td class="text-end" id="modalTotalValue">—</td><td colspan="2"></td></tr></tfoot>
                         </table>
                     </div>
                 </div>
 
                 <!-- Dropdowns de classificação -->
-                <div class="row g-3">
+                <div class="row g-3 mb-3">
                     <div class="col-md-6">
-                        <label class="form-label fw-bold"><i class="bi bi-flag me-1"></i>Status</label>
-                        <select id="modalStatus" class="form-select">
+                        <div class="modal-form-label"><i class="bi bi-flag me-1"></i>Status</div>
+                        <select id="modalStatus" class="modal-select">
                             <option value="">Selecione o status...</option>
                             <option value="Falta o orçamento">Falta o orçamento</option>
                             <option value="Já tem o orçamento mas vai pensar">Já tem o orçamento mas vai pensar</option>
@@ -152,8 +719,8 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label fw-bold"><i class="bi bi-thermometer-half me-1"></i>Temperatura</label>
-                        <select id="modalTemperature" class="form-select">
+                        <div class="modal-form-label"><i class="bi bi-thermometer-half me-1"></i>Temperatura</div>
+                        <select id="modalTemperature" class="modal-select">
                             <option value="">Selecione a temperatura...</option>
                             <option value="Quente">🔴 Quente</option>
                             <option value="Morno">🟠 Morno</option>
@@ -163,304 +730,483 @@
                     </div>
                 </div>
 
-            </div><!-- /modal-body -->
+                <!-- Próximo contato + tentativas -->
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <div class="modal-form-label"><i class="bi bi-calendar-event me-1" style="color:#fbbf24;"></i>Próximo Contato</div>
+                        <input type="date" id="modalNextContact" class="modal-input" placeholder="Selecione a data">
+                    </div>
+                    <div class="col-md-5">
+                        <div class="modal-form-label"><i class="bi bi-telephone-forward me-1"></i>Tentativas de Contato</div>
+                        <div class="attempts-row">
+                            <div class="attempts-btn" onclick="changeAttempts(-1)">−</div>
+                            <div class="attempts-count" id="attemptsCount">0</div>
+                            <div class="attempts-btn" onclick="changeAttempts(1)">+</div>
+                            <span style="font-size:.68rem; color:#5a7a96; margin-left:.3rem;">tentativas registradas</span>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="modal-footer flex-wrap gap-2">
-                <button type="button" class="btn btn-success" onclick="saveFunnelStatus()">
-                    <i class="bi bi-check-lg me-1"></i> Salvar Classificação
+            </div>
+
+            <div class="modal-footer gap-2 flex-wrap">
+                <button class="btn-modal-save" onclick="saveFunnelStatus()">
+                    <i class="bi bi-check-lg me-1"></i> Salvar
                 </button>
-                <button type="button" class="btn btn-outline-success" onclick="openWhatsApp()">
-                    <i class="bi bi-whatsapp me-1"></i> Abrir WhatsApp
+                <button class="btn-modal-wpp" onclick="openWhatsApp()">
+                    <i class="bi bi-whatsapp me-1"></i> WhatsApp
                 </button>
-                <button type="button" class="btn btn-outline-secondary" onclick="printBudget()">
-                    <i class="bi bi-printer me-1"></i> Imprimir Orçamento
+                <button class="btn-modal-print" onclick="printBudget()">
+                    <i class="bi bi-printer me-1"></i> Orçamento
                 </button>
-                <button type="button" class="btn btn-light ms-auto" data-bs-dismiss="modal">Fechar</button>
+                <button class="btn-modal-close ms-auto" data-bs-dismiss="modal">Fechar</button>
             </div>
 
         </div>
     </div>
 </div>
 
-<!-- Área de impressão oculta -->
 <div id="printArea" style="display:none;"></div>
 
 <script>
-// ── Helpers ──────────────────────────────────────────────────
-function formatDate(dateStr) {
-    if (!dateStr) return '—';
-    const parts = dateStr.split('T')[0].split('-');
-    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
-}
+// ── Estado ─────────────────────────────────────────────────
+let allData = [];
+let currentPatient = null;
+let compactMode = false;
+let followupOpen = true;
 
-function formatBRL(val) {
-    const n = parseFloat(val) || 0;
+const GROUPS = [
+    { key: 'quente', label: 'Quentes',             strip: 'quente', color: '#f87171' },
+    { key: 'morno',  label: 'Mornos',              strip: 'morno',  color: '#fb923c' },
+    { key: 'caro',   label: 'Achou Caro',          strip: 'caro',   color: '#c084fc' },
+    { key: 'frio',   label: 'Frios',               strip: 'frio',   color: '#60a5fa' },
+    { key: 'sem',    label: 'Sem Temperatura',      strip: 'sem',    color: '#475569' },
+];
+
+// ── Helpers ────────────────────────────────────────────────
+function formatDate(d) {
+    if (!d) return '—';
+    const p = d.split('T')[0].split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+}
+function formatBRL(v) {
+    const n = parseFloat(v) || 0;
     return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-
-function tempClass(temp) {
-    if (!temp) return 'temp-default';
-    const t = temp.toLowerCase();
-    if (t === 'quente') return 'temp-quente';
-    if (t === 'morno')  return 'temp-morno';
-    if (t === 'frio')   return 'temp-frio';
-    if (t.includes('caro')) return 'temp-caro';
-    return 'temp-default';
+function tempKey(t) {
+    if (!t) return 'sem';
+    const l = t.toLowerCase();
+    if (l === 'quente') return 'quente';
+    if (l === 'morno')  return 'morno';
+    if (l === 'frio')   return 'frio';
+    if (l.includes('caro')) return 'caro';
+    return 'sem';
+}
+function tempChip(t) {
+    if (!t) return '';
+    return `<span class="chip chip-${tempKey(t)}">${t}</span>`;
+}
+function statusChip(s) {
+    if (!s) return '';
+    const l = s.toLowerCase();
+    let cls = 'chip-pensando';
+    if (l.includes('agendado'))       cls = 'chip-agendado';
+    else if (l.includes('realizado')) cls = 'chip-realizado';
+    else if (l.includes('falta'))     cls = 'chip-sem-orc';
+    else if (l.includes('interesse')) cls = 'chip-sem-int';
+    return `<span class="chip ${cls}">${s}</span>`;
+}
+function contactLabel(dateStr) {
+    if (!dateStr) return '';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(dateStr + 'T00:00:00');
+    const diff = Math.round((d - today) / 86400000);
+    if (diff < 0)  return `<span class="next-contact-overdue">${Math.abs(diff)}d em atraso</span>`;
+    if (diff === 0) return `<span class="next-contact-today">hoje</span>`;
+    return `<span style="color:#5a7a96;">em ${diff}d</span>`;
 }
 
-function tempBadge(temp) {
-    if (!temp) return '';
-    const t = temp.toLowerCase();
-    let cls = 'badge-frio';
-    if (t === 'quente') cls = 'badge-quente';
-    else if (t === 'morno') cls = 'badge-morno';
-    else if (t.includes('caro')) cls = 'badge-caro';
-    return `<span class="badge ${cls} me-1">${temp}</span>`;
-}
-
-function statusBadge(status) {
-    if (!status) return '';
-    const s = status.toLowerCase();
-    let cls = 'badge-pensando';
-    if (s.includes('agendado'))       cls = 'badge-agendado';
-    else if (s.includes('realizado')) cls = 'badge-realizado';
-    else if (s.includes('falta'))     cls = 'badge-semorcamento';
-    else if (s.includes('interesse')) cls = 'badge-seminteresse';
-    return `<span class="badge ${cls}">${status}</span>`;
-}
-
-// ── Estado global ─────────────────────────────────────────────
-let currentPatient = null;
-
-// ── Carregar funil ────────────────────────────────────────────
-function loadMarcellaSalesFunnel() {
-    const monthFilter = document.getElementById('funnelMonthFilter')?.value || '';
-    const yearFilter  = document.getElementById('funnelYearFilter')?.value  || '';
-
+// ── Carregar ────────────────────────────────────────────────
+function loadFunnel() {
+    const month = document.getElementById('funnelMonthFilter').value;
+    const year  = document.getElementById('funnelYearFilter').value;
     let url = '/api/crm/marcella-sales-funnel';
-    const params = new URLSearchParams();
-    if (monthFilter) params.append('month', monthFilter);
-    if (yearFilter)  params.append('year', yearFilter);
-    if (params.toString()) url += '?' + params.toString();
+    const p = new URLSearchParams();
+    if (month) p.append('month', month);
+    if (year)  p.append('year', year);
+    if (p.toString()) url += '?' + p;
 
-    const tbody = document.getElementById('marcellaFunnelTable');
-    const count = document.getElementById('funnelCount');
-    tbody.innerHTML = '<div class="col-12 text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    document.getElementById('funnelContent').innerHTML = `
+        <div style="text-align:center;padding:3rem;color:#3a5068;">
+            <div class="spinner-border text-primary" role="status" style="width:2rem;height:2rem;"></div>
+            <p style="margin-top:.75rem;font-size:.8rem;">Carregando...</p>
+        </div>`;
 
     fetch(url)
         .then(r => { if (!r.ok) throw new Error(); return r.json(); })
         .then(data => {
-            const totalProcedures = data.reduce((s, p) => s + p.procedures.length, 0);
-            count.textContent = totalProcedures;
-
-            if (data.length === 0) {
-                tbody.innerHTML = '<div class="col-12 text-center py-4 text-muted">Nenhum procedimento pendente neste período.</div>';
-                return;
-            }
-
-            tbody.innerHTML = data.map(patient => `
-                <div class="col-md-6 col-lg-4">
-                    <div class="card h-100 border-0 shadow-sm patient-card ${tempClass(patient.funnel_temperature)}"
-                         style="border-left: 4px solid;"
-                         onclick="openPatientModal(${JSON.stringify(patient).replace(/"/g, '&quot;')})">
-                        <div class="card-body">
-                            <div class="mb-2 d-flex justify-content-between align-items-start">
-                                <h6 class="card-title text-primary fw-bold mb-0">${patient.patient_name}</h6>
-                            </div>
-                            <small class="text-muted d-block mb-2">
-                                <i class="bi bi-telephone me-1"></i>${patient.patient_phone || '—'}
-                            </small>
-
-                            <!-- Badges de status/temperatura -->
-                            <div class="mb-2">
-                                ${statusBadge(patient.funnel_status)}
-                                ${tempBadge(patient.funnel_temperature)}
-                            </div>
-
-                            <div class="mb-3">
-                                <small class="text-muted d-block mb-1">Procedimentos Pendentes (${patient.procedures.length})</small>
-                                <div class="border rounded p-2" style="background:#f8f9fa; font-size:0.82rem;">
-                                    ${patient.procedures.map((proc, idx) => `
-                                        <div class="mb-1 ${idx > 0 ? 'border-top pt-1' : ''}">
-                                            <span class="badge bg-info text-dark">${proc.procedure_name}</span>
-                                            <span class="text-muted ms-1">${formatBRL(proc.planned_value)}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>
-
-                            <div class="pt-2 border-top d-flex justify-content-between align-items-center">
-                                <small class="text-muted">Valor Total</small>
-                                <strong class="text-success">${formatBRL(patient.total_value)}</strong>
-                            </div>
-
-                            <div class="mt-2 text-end">
-                                <small class="text-primary"><i class="bi bi-arrows-angle-expand me-1"></i>Clique para detalhar</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
+            allData = data;
+            renderAll();
+            syncToGoogleSheets();
         })
         .catch(() => {
-            tbody.innerHTML = '<div class="col-12 text-center py-4 text-danger"><i class="bi bi-exclamation-triangle me-2"></i>Erro ao carregar dados.</div>';
+            document.getElementById('funnelContent').innerHTML =
+                `<div style="text-align:center;padding:3rem;color:#ef4444;">
+                    <i class="bi bi-exclamation-triangle" style="font-size:1.5rem;"></i>
+                    <p style="margin-top:.5rem;font-size:.8rem;">Erro ao carregar dados.</p>
+                </div>`;
         });
 }
 
-// ── Abrir modal ───────────────────────────────────────────────
+// ── Renderizar tudo ─────────────────────────────────────────
+function renderAll() {
+    const sortVal = document.getElementById('funnelSort').value;
+    let data = [...allData];
+
+    // Ordenar
+    if (sortVal === 'value_desc') data.sort((a, b) => b.total_value - a.total_value);
+    else if (sortVal === 'value_asc') data.sort((a, b) => a.total_value - b.total_value);
+    else if (sortVal === 'followup') {
+        data.sort((a, b) => {
+            if (!a.next_contact_date && !b.next_contact_date) return 0;
+            if (!a.next_contact_date) return 1;
+            if (!b.next_contact_date) return -1;
+            return a.next_contact_date.localeCompare(b.next_contact_date);
+        });
+    }
+
+    updateKPIs(data);
+    renderFollowupQueue(data);
+    renderGroups(data);
+}
+
+// ── KPIs ────────────────────────────────────────────────────
+function updateKPIs(data) {
+    const total = data.reduce((s, p) => s + (parseFloat(p.total_value) || 0), 0);
+    const hot   = data.filter(p => p.funnel_temperature === 'Quente').length;
+    const sched = data.filter(p => p.funnel_status === 'Agendado').length;
+    const unclass = data.filter(p => !p.funnel_temperature).length;
+
+    document.getElementById('kpiTotal').textContent    = formatBRL(total);
+    document.getElementById('kpiHot').textContent      = hot;
+    document.getElementById('kpiScheduled').textContent= sched;
+    document.getElementById('kpiUnclass').textContent  = unclass;
+    document.getElementById('unclassifiedCount').textContent = unclass;
+
+    const badge = document.getElementById('unclassifiedBadge');
+    badge.style.display = unclass > 0 ? '' : 'none';
+}
+
+// ── Follow-up Queue ─────────────────────────────────────────
+function renderFollowupQueue(data) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const overdue = data.filter(p => {
+        if (!p.next_contact_date) return false;
+        const d = new Date(p.next_contact_date + 'T00:00:00');
+        return d <= today;
+    });
+
+    const queue = document.getElementById('followupQueue');
+    const body  = document.getElementById('followupBody');
+    const cnt   = document.getElementById('followupCount');
+
+    if (overdue.length === 0) { queue.style.display = 'none'; return; }
+    queue.style.display = '';
+    cnt.textContent = `— ${overdue.length} paciente${overdue.length > 1 ? 's' : ''}`;
+
+    body.innerHTML = overdue.map(p => {
+        const d = new Date(p.next_contact_date + 'T00:00:00');
+        const diff = Math.round((today - d) / 86400000);
+        const label = diff === 0 ? 'hoje' : `${diff}d atraso`;
+        const raw = (p.patient_phone || '').replace(/\D/g, '');
+        const wpp = raw ? `https://wa.me/${raw.startsWith('55') ? raw : '55'+raw}` : '#';
+        return `
+            <div class="followup-chip">
+                <span>${p.patient_name}</span>
+                <span class="overdue-tag">${label}</span>
+                ${raw ? `<a href="${wpp}" target="_blank"><i class="bi bi-whatsapp"></i></a>` : ''}
+            </div>`;
+    }).join('');
+}
+
+function toggleFollowup() {
+    followupOpen = !followupOpen;
+    const body = document.getElementById('followupBody');
+    const chev = document.getElementById('followupChevron');
+    body.style.display = followupOpen ? '' : 'none';
+    chev.classList.toggle('open', followupOpen);
+}
+
+// ── Grupos ──────────────────────────────────────────────────
+function renderGroups(data) {
+    const container = document.getElementById('funnelContent');
+
+    if (data.length === 0) {
+        container.innerHTML = `<div style="text-align:center;padding:3rem;color:#3a5068;font-size:.82rem;">Nenhum procedimento pendente neste período.</div>`;
+        return;
+    }
+
+    const grouped = {};
+    GROUPS.forEach(g => grouped[g.key] = []);
+    data.forEach(p => { const k = tempKey(p.funnel_temperature); grouped[k].push(p); });
+
+    container.innerHTML = GROUPS
+        .filter(g => grouped[g.key].length > 0)
+        .map(g => {
+            const patients = grouped[g.key];
+            const totalGroup = patients.reduce((s, p) => s + (parseFloat(p.total_value) || 0), 0);
+            return `
+                <div class="group-section" id="grp-${g.key}">
+                    <div class="group-header" onclick="toggleGroup('${g.key}')">
+                        <div class="group-title" style="color:${g.color}">
+                            <span class="group-strip ${g.strip}"></span>
+                            ${g.label}
+                            <span style="font-size:.7rem; font-weight:600; color:${g.color}; opacity:.7;">${patients.length}</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:.75rem;">
+                            <div class="group-meta">
+                                <span>${formatBRL(totalGroup)}</span>
+                            </div>
+                            <i class="bi bi-chevron-up group-chevron open" id="chev-${g.key}"></i>
+                        </div>
+                    </div>
+                    <div class="group-grid${compactMode ? ' compact' : ''}" id="grid-${g.key}">
+                        ${patients.map(p => renderCard(p)).join('')}
+                    </div>
+                </div>`;
+        }).join('');
+}
+
+function toggleGroup(key) {
+    const grid = document.getElementById('grid-' + key);
+    const chev = document.getElementById('chev-' + key);
+    const isOpen = chev.classList.contains('open');
+    grid.style.display = isOpen ? 'none' : '';
+    chev.classList.toggle('open', !isOpen);
+}
+
+// ── Card ────────────────────────────────────────────────────
+function renderCard(p) {
+    const tk = tempKey(p.funnel_temperature);
+    const procs = (p.procedures || []).slice(0, 4);
+    const moreCount = (p.procedures || []).length - 4;
+
+    const nextContactHtml = p.next_contact_date ? `
+        <div class="card-next-contact">
+            <span>${contactLabel(p.next_contact_date)}</span>
+            ${p.contact_attempts > 0 ? `<span class="contact-attempts-badge">${p.contact_attempts}× tentativas</span>` : ''}
+        </div>` : (p.contact_attempts > 0 ? `
+        <div class="card-next-contact">
+            <span></span>
+            <span class="contact-attempts-badge">${p.contact_attempts}× tentativas</span>
+        </div>` : '');
+
+    const safePatient = JSON.stringify(p).replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
+
+    return `
+        <div class="patient-card temp-${tk}" onclick="openPatientModal(${safePatient})">
+            <div class="card-quick-actions">
+                <button class="quick-btn wpp" onclick="event.stopPropagation(); quickWhatsApp('${(p.patient_phone||'').replace(/\D/g,'')}')">
+                    <i class="bi bi-whatsapp"></i>
+                </button>
+                <button class="quick-btn classify" onclick="event.stopPropagation(); openPatientModal(${safePatient}); focusClassify()">
+                    <i class="bi bi-tag"></i> Classificar
+                </button>
+            </div>
+            <div class="card-name">${p.patient_name}</div>
+            <div class="card-phone"><i class="bi bi-telephone" style="font-size:.6rem;"></i> ${p.patient_phone || '—'}</div>
+            <div class="card-badges">
+                ${statusChip(p.funnel_status)}
+                ${tempChip(p.funnel_temperature)}
+            </div>
+            <div class="card-procedures">
+                <div class="proc-label">Procedimentos Pendentes (${p.procedures.length})</div>
+                <div class="proc-list">
+                    ${procs.map(pr => `
+                        <div class="proc-item">
+                            <span class="proc-name">${pr.procedure_name}</span>
+                            <span class="proc-val">${formatBRL(pr.planned_value)}</span>
+                        </div>`).join('')}
+                    ${moreCount > 0 ? `<div style="font-size:.62rem;color:#334d65;padding-top:.25rem;">+${moreCount} mais...</div>` : ''}
+                </div>
+            </div>
+            ${nextContactHtml}
+            <div class="card-footer-row">
+                <span class="card-total-label">Total</span>
+                <span class="card-total-val">${formatBRL(p.total_value)}</span>
+            </div>
+            <div class="card-hint"><i class="bi bi-arrows-angle-expand" style="font-size:.55rem;"></i> Clique para detalhar</div>
+        </div>`;
+}
+
+// ── Compact Mode ────────────────────────────────────────────
+function toggleCompact() {
+    compactMode = !compactMode;
+    const btn = document.getElementById('btnCompact');
+    btn.classList.toggle('active', compactMode);
+
+    document.querySelectorAll('.group-grid').forEach(g => {
+        g.classList.toggle('compact', compactMode);
+    });
+}
+
+// ── Quick WhatsApp ──────────────────────────────────────────
+function quickWhatsApp(raw) {
+    if (!raw) { return; }
+    const num = raw.startsWith('55') ? raw : '55' + raw;
+    window.open(`https://wa.me/${num}`, '_blank');
+}
+
+let focusClassifyOnOpen = false;
+function focusClassify() {
+    focusClassifyOnOpen = true;
+}
+
+// ── Modal ───────────────────────────────────────────────────
 function openPatientModal(patient) {
     currentPatient = patient;
 
     document.getElementById('modalPatientName').textContent  = patient.patient_name;
-    document.getElementById('modalPatientPhone').innerHTML   = `<i class="bi bi-telephone me-1"></i>${patient.patient_phone || '—'}`;
+    document.getElementById('modalPatientPhone').textContent = patient.patient_phone || '—';
     document.getElementById('modalDoctorNotes').textContent  = patient.doctor_notes || 'Nenhuma observação registrada.';
 
-    // Procedimentos
     const tbody = document.getElementById('modalProceduresBody');
-    tbody.innerHTML = patient.procedures.map(proc => `
+    tbody.innerHTML = (patient.procedures || []).map(proc => `
         <tr>
-            <td><span class="badge bg-info text-dark">${proc.procedure_name}</span></td>
+            <td>${proc.procedure_name}</td>
             <td class="text-end fw-bold">${formatBRL(proc.planned_value)}</td>
             <td>${formatDate(proc.planned_date)}</td>
-            <td><small class="text-muted">${proc.observations || '—'}</small></td>
-        </tr>
-    `).join('');
+            <td><small>${proc.observations || '—'}</small></td>
+        </tr>`).join('');
     document.getElementById('modalTotalValue').textContent = formatBRL(patient.total_value);
 
-    // Dropdowns
     document.getElementById('modalStatus').value      = patient.funnel_status || '';
     document.getElementById('modalTemperature').value = patient.funnel_temperature || '';
+    document.getElementById('modalNextContact').value = patient.next_contact_date || '';
+    document.getElementById('attemptsCount').textContent = patient.contact_attempts || 0;
 
     const modal = new bootstrap.Modal(document.getElementById('patientFunnelModal'));
     modal.show();
+
+    if (focusClassifyOnOpen) {
+        setTimeout(() => {
+            document.getElementById('modalStatus').focus();
+            focusClassifyOnOpen = false;
+        }, 400);
+    }
 }
 
-// ── Salvar status ─────────────────────────────────────────────
+// ── Tentativas ──────────────────────────────────────────────
+function changeAttempts(delta) {
+    const el = document.getElementById('attemptsCount');
+    const v = Math.max(0, (parseInt(el.textContent) || 0) + delta);
+    el.textContent = v;
+}
+
+// ── Salvar ──────────────────────────────────────────────────
 function saveFunnelStatus() {
     if (!currentPatient) return;
-    const status      = document.getElementById('modalStatus').value;
-    const temperature = document.getElementById('modalTemperature').value;
+    const payload = {
+        funnel_status:      document.getElementById('modalStatus').value,
+        funnel_temperature: document.getElementById('modalTemperature').value,
+        next_contact_date:  document.getElementById('modalNextContact').value || null,
+        contact_attempts:   parseInt(document.getElementById('attemptsCount').textContent) || 0,
+    };
 
     fetch(`/api/crm/patient-funnel-status/${currentPatient.patient_id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ funnel_status: status, funnel_temperature: temperature })
+        body: JSON.stringify(payload)
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            // Fechar modal, atualizar card
             bootstrap.Modal.getInstance(document.getElementById('patientFunnelModal')).hide();
-            loadMarcellaSalesFunnel();
+            // Atualizar em memória
+            const idx = allData.findIndex(p => p.patient_id === currentPatient.patient_id);
+            if (idx !== -1) {
+                allData[idx].funnel_status      = payload.funnel_status;
+                allData[idx].funnel_temperature = payload.funnel_temperature;
+                allData[idx].next_contact_date  = payload.next_contact_date;
+                allData[idx].contact_attempts   = payload.contact_attempts;
+            }
+            renderAll();
+            syncToGoogleSheets();
         }
     })
     .catch(() => alert('Erro ao salvar. Tente novamente.'));
 }
 
-// ── WhatsApp ──────────────────────────────────────────────────
+// ── WhatsApp ────────────────────────────────────────────────
 function openWhatsApp() {
     if (!currentPatient) return;
     const raw = (currentPatient.patient_phone || '').replace(/\D/g, '');
-    if (!raw) { alert('Nenhum número cadastrado para este paciente.'); return; }
-    const number = raw.startsWith('55') ? raw : '55' + raw;
-    window.open(`https://wa.me/${number}`, '_blank');
+    if (!raw) { alert('Nenhum número cadastrado.'); return; }
+    window.open(`https://wa.me/${raw.startsWith('55') ? raw : '55'+raw}`, '_blank');
 }
 
-// ── Imprimir Orçamento ────────────────────────────────────────
+// ── Imprimir ────────────────────────────────────────────────
 function printBudget() {
     if (!currentPatient) return;
     const today = new Date().toLocaleDateString('pt-BR');
-
-    const proceduresRows = currentPatient.procedures.map(proc => `
+    const rows = (currentPatient.procedures || []).map(p => `
         <tr>
-            <td style="padding:6px 8px; border:1px solid #dee2e6;">${proc.procedure_name}</td>
-            <td style="padding:6px 8px; border:1px solid #dee2e6; text-align:right;">${formatBRL(proc.planned_value)}</td>
-            <td style="padding:6px 8px; border:1px solid #dee2e6;">${formatDate(proc.planned_date)}</td>
-        </tr>
-    `).join('');
-
+            <td style="padding:6px 8px;border:1px solid #dee2e6;">${p.procedure_name}</td>
+            <td style="padding:6px 8px;border:1px solid #dee2e6;text-align:right;">${formatBRL(p.planned_value)}</td>
+            <td style="padding:6px 8px;border:1px solid #dee2e6;">${formatDate(p.planned_date)}</td>
+        </tr>`).join('');
     const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 24px;">
-            <div style="text-align:center; margin-bottom:24px; border-bottom:2px solid #0d6efd; padding-bottom:16px;">
-                <h2 style="color:#0d6efd; margin:0;">Clínica Basile</h2>
-                <p style="margin:4px 0; color:#666;">Orçamento de Procedimentos Cosméticos</p>
+        <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto;padding:24px;">
+            <div style="text-align:center;margin-bottom:24px;border-bottom:2px solid #0d6efd;padding-bottom:16px;">
+                <h2 style="color:#0d6efd;margin:0;">Clínica Basile</h2>
+                <p style="margin:4px 0;color:#666;">Orçamento de Procedimentos Cosméticos</p>
             </div>
-
             <div style="margin-bottom:20px;">
-                <table style="width:100%; border-collapse:collapse;">
-                    <tr>
-                        <td style="padding:4px 0;"><strong>Paciente:</strong> ${currentPatient.patient_name}</td>
-                        <td style="padding:4px 0; text-align:right;"><strong>Data:</strong> ${today}</td>
-                    </tr>
-                    ${currentPatient.patient_phone ? `<tr><td><strong>Contato:</strong> ${currentPatient.patient_phone}</td></tr>` : ''}
-                </table>
+                <strong>Paciente:</strong> ${currentPatient.patient_name}<br>
+                ${currentPatient.patient_phone ? `<strong>Contato:</strong> ${currentPatient.patient_phone}<br>` : ''}
+                <strong>Data:</strong> ${today}
             </div>
-
-            <h4 style="color:#495057; margin-bottom:12px;">Procedimentos Propostos</h4>
-            <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
-                <thead>
-                    <tr style="background:#f0f4ff;">
-                        <th style="padding:8px; border:1px solid #dee2e6; text-align:left;">Procedimento</th>
-                        <th style="padding:8px; border:1px solid #dee2e6; text-align:right;">Valor</th>
-                        <th style="padding:8px; border:1px solid #dee2e6; text-align:left;">Data</th>
-                    </tr>
-                </thead>
-                <tbody>${proceduresRows}</tbody>
-                <tfoot>
-                    <tr style="background:#e8f4fd; font-weight:bold;">
-                        <td style="padding:8px; border:1px solid #dee2e6;">TOTAL</td>
-                        <td style="padding:8px; border:1px solid #dee2e6; text-align:right;">${formatBRL(currentPatient.total_value)}</td>
-                        <td style="padding:8px; border:1px solid #dee2e6;"></td>
-                    </tr>
-                </tfoot>
+            <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+                <thead><tr style="background:#f0f4ff;">
+                    <th style="padding:8px;border:1px solid #dee2e6;text-align:left;">Procedimento</th>
+                    <th style="padding:8px;border:1px solid #dee2e6;text-align:right;">Valor</th>
+                    <th style="padding:8px;border:1px solid #dee2e6;text-align:left;">Data</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+                <tfoot><tr style="background:#e8f4fd;font-weight:bold;">
+                    <td style="padding:8px;border:1px solid #dee2e6;">TOTAL</td>
+                    <td style="padding:8px;border:1px solid #dee2e6;text-align:right;">${formatBRL(currentPatient.total_value)}</td>
+                    <td style="padding:8px;border:1px solid #dee2e6;"></td>
+                </tr></tfoot>
             </table>
-
-            ${currentPatient.doctor_notes ? `
-            <div style="margin-top:20px; padding:12px; background:#fffbe6; border:1px solid #ffe58f; border-radius:4px;">
-                <strong>Observações do Médico:</strong>
-                <p style="margin:8px 0 0; white-space:pre-wrap; color:#555;">${currentPatient.doctor_notes}</p>
-            </div>` : ''}
-
-            <div style="margin-top:40px; text-align:center; color:#999; font-size:12px; border-top:1px solid #eee; padding-top:12px;">
-                Este orçamento foi gerado em ${today} e tem validade de 30 dias.
-            </div>
-        </div>
-    `;
-
-    const printArea = document.getElementById('printArea');
-    printArea.innerHTML = html;
-    printArea.style.display = 'block';
+            ${currentPatient.doctor_notes ? `<div style="padding:12px;background:#fffbe6;border:1px solid #ffe58f;border-radius:4px;"><strong>Obs. Médico:</strong><p style="margin:6px 0 0;white-space:pre-wrap;color:#555;">${currentPatient.doctor_notes}</p></div>` : ''}
+            <div style="margin-top:40px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee;padding-top:12px;">Válido por 30 dias a partir de ${today}.</div>
+        </div>`;
+    const area = document.getElementById('printArea');
+    area.innerHTML = html;
+    area.style.display = 'block';
     window.print();
-    printArea.style.display = 'none';
+    area.style.display = 'none';
 }
 
-// ── Sincronizar com Google Sheets ───────────────────────────
+// ── Google Sheets Sync ──────────────────────────────────────
 function syncToGoogleSheets() {
-    const monthFilter = document.getElementById('funnelMonthFilter')?.value || '';
-    const yearFilter  = document.getElementById('funnelYearFilter')?.value  || '';
-
+    const month = document.getElementById('funnelMonthFilter').value;
+    const year  = document.getElementById('funnelYearFilter').value;
     let url = '/api/crm/sync-to-google-sheets';
-    const params = new URLSearchParams();
-    if (monthFilter) params.append('month', monthFilter);
-    if (yearFilter)  params.append('year', yearFilter);
-    if (params.toString()) url += '?' + params.toString();
-
-    // Sincronizar silenciosamente
+    const p = new URLSearchParams();
+    if (month) p.append('month', month);
+    if (year)  p.append('year', year);
+    if (p.toString()) url += '?' + p;
     fetch(url, { method: 'POST' }).catch(() => {});
 }
 
-// ── Init ──────────────────────────────────────────────────────
+// ── Init ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    loadMarcellaSalesFunnel();
-    syncToGoogleSheets();  // Sincronizar ao carregar
-    document.getElementById('funnelMonthFilter').addEventListener('change', () => {
-        loadMarcellaSalesFunnel();
-        syncToGoogleSheets();
-    });
-    document.getElementById('funnelYearFilter').addEventListener('change', () => {
-        loadMarcellaSalesFunnel();
-        syncToGoogleSheets();
-    });
+    loadFunnel();
+    document.getElementById('funnelMonthFilter').addEventListener('change', loadFunnel);
+    document.getElementById('funnelYearFilter').addEventListener('change', loadFunnel);
+    document.getElementById('funnelSort').addEventListener('change', renderAll);
 });
 </script>
 {% endblock %}

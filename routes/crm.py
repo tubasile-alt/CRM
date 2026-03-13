@@ -47,12 +47,19 @@ def _get_funnel_data(month=None, year=None):
         patient_key = patient.id
         if patient_key not in patients_dict:
             funnel_entry = PatientFunnelStatus.query.filter_by(patient_id=patient.id).first()
+            next_contact_date = None
+            contact_attempts = 0
+            if funnel_entry:
+                next_contact_date = funnel_entry.next_contact_date.isoformat() if funnel_entry.next_contact_date else None
+                contact_attempts = funnel_entry.contact_attempts or 0
             patients_dict[patient_key] = {
                 'patient_name': patient.name,
                 'patient_phone': patient.phone or '',
                 'doctor_notes': note.content or '',
                 'funnel_status': funnel_entry.funnel_status if funnel_entry else '',
                 'funnel_temperature': funnel_entry.funnel_temperature if funnel_entry else '',
+                'next_contact_date': next_contact_date,
+                'contact_attempts': contact_attempts,
                 'procedures': [],
                 'total_value': 0.0
             }
@@ -353,6 +360,18 @@ def save_patient_funnel_status(patient_id):
         funnel_entry.funnel_status = data['funnel_status']
     if 'funnel_temperature' in data:
         funnel_entry.funnel_temperature = data['funnel_temperature']
+    if 'next_contact_date' in data:
+        from datetime import date as date_type
+        raw_date = data['next_contact_date']
+        if raw_date:
+            try:
+                funnel_entry.next_contact_date = datetime.strptime(raw_date, '%Y-%m-%d').date()
+            except Exception:
+                funnel_entry.next_contact_date = None
+        else:
+            funnel_entry.next_contact_date = None
+    if 'contact_attempts' in data:
+        funnel_entry.contact_attempts = int(data['contact_attempts'] or 0)
 
     funnel_entry.updated_at = datetime.now()
     db.session.commit()

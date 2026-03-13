@@ -1,0 +1,62 @@
+## Estética
+
+**Paleta e superfícies**
+O fundo da página é `#16222f` — um azul-marinho quase preto que serve de base para todos os elementos flutuarem com profundidade real. Todos os cards usam gradiente ardósia `#3a4e68 → #2c3e52` em diagonal 145°, com sombra multicamadas (difusa + profunda + reflexo interno sutil) que cria sensação de material físico elevado. Cada card tem uma linha de 1px no topo com gradiente `transparent → rgba(255,255,255,.10) → transparent` simulando reflexo de luz.
+
+**Tipografia**
+Figtree em toda a interface — 800 nos títulos e KPIs, 700 nos nomes de pacientes e labels, 600 nos valores e badges, 400 no texto secundário. Letter-spacing negativo nos títulos (`-0.3px`) para compactação elegante. Tamanhos deliberadamente pequenos nos metadados (`.68rem` a `.78rem`) para criar hierarquia clara sem ocupar espaço.
+
+**Barra de KPIs**
+Quatro cards em grid 4 colunas com acento vertical colorido à esquerda (3px, cor semântica por métrica), ícone fantasma à direita com `opacity: 0.12`, e três camadas de informação: label uppercase pequeno, valor grande em 800, subtexto cinza. Hover com `translateY(-2px)` e sombra expandida.
+
+**Cards de paciente**
+Faixa lateral esquerda de 3px colorida por temperatura (rosa/laranja/sky/violeta/cinza). Cards dos pacientes sem classificação têm animação `blink-border` — a faixa pulsa de vermelho para quase transparente em 2.5s, criando urgência visual sem ser agressivo. Quick actions aparecem no hover com `backdrop-filter: blur(8px)` no fundo semi-transparente, dando efeito de vidro fosco sobre o card.
+
+**Badges**
+Todos os badges são chips translúcidos: `background rgba` + `border rgba colorida` + texto na cor correspondente. Sem nenhum `bg-primary` ou cor sólida do Bootstrap. Cada estado tem sua própria tríade de cores (fundo, borda, texto) consistente com a temperatura ou status.
+
+**Follow-up queue**
+Fundo ardósia com header colapsável. Os chips de follow-up têm fundo âmbar translúcido com borda âmbar, e o indicador "ao vivo" é um círculo de 8px com animação `pulse-amber` — box-shadow expandindo de 0 a 6px e desvanecendo, semelhante a um sinal de radar.
+
+**Badge "Sem classificação" no header**
+Fundo rose translúcido com `pulse-rose` — mesma lógica do radar mas em vermelho. Chama atenção perifericamente sem ser intrusivo.
+
+**Modal**
+Fundo `#253447`, header com gradiente ardósia, linha separadora `rgba(255,255,255,.08)`. Selects com `color-scheme: dark` para estilizar o picker nativo de data. Tabela com thead escuro, linhas com separador suave, tfoot em azul translúcido com valor em verde esmeralda. Campo de próximo contato tem fundo âmbar-tinted para destacar visualmente a seção de follow-up dentro do modal.
+
+---
+
+## Funcional
+
+**KPI bar (nova)**
+Calculada em runtime a partir dos dados reais: valor total em aberto somado de todos os pacientes, contagem de quentes, contagem de agendados, contagem de sem classificação. Atualiza toda vez que o usuário salva uma classificação no modal, refletindo o estado atual instantaneamente.
+
+**Fila de follow-up (nova)**
+Filtra todos os pacientes com `next_contact_date <= hoje`. Exibe em chips com nome, dias de atraso e link direto para WhatsApp. Colapsável via chevron. Se não houver ninguém para contatar, o componente inteiro some do DOM. É o primeiro elemento visual que o time vê ao abrir a página — design deliberado para que o fluxo de trabalho comece pelos contatos pendentes.
+
+**Agrupamento por temperatura (novo)**
+Os cards deixaram de ser um grid plano e passam a ser organizados em seções colapsáveis por temperatura, na ordem de prioridade comercial: Quentes → Mornos → Caro → Frios → Sem temperatura. Cada grupo mostra contagem de pacientes e soma total em R$. Cada grupo pode ser colapsado individualmente clicando no header, com animação de chevron.
+
+**Quick actions no hover (novo)**
+Dois botões aparecem no canto superior direito do card ao passar o mouse, sem precisar abrir modal: botão WhatsApp abre `wa.me` diretamente, botão Classificar abre o modal já com foco no select de status. `event.stopPropagation()` garante que o clique no botão não propague para o `onclick` do card pai.
+
+**Indicador de próximo contato no card (novo)**
+Se o paciente tiver `next_contact_date` preenchido, aparece uma linha no card mostrando "em Xd", "hoje" ou "Xd em atraso" com cor amarela para overdue e cinza para futuros. Também exibe o número de tentativas já realizadas à direita.
+
+**Contador de tentativas no modal (novo)**
+Botões `+` e `−` para registrar quantas vezes o time já tentou contato com o paciente. Salvo junto com os demais campos. Exibido no card como informação contextual para evitar que um lead seja contactado repetidamente sem registro.
+
+**Campo "Próximo Contato" no modal (novo)**
+Input de data nativo estilizado. Permite ao time programar quando revisitar o lead. Alimenta tanto o indicador no card quanto a fila de follow-up da página.
+
+**Modo compacto (novo)**
+Toggle no header alterna `grid-template-columns` de `minmax(280px, 1fr)` para `minmax(210px, 1fr)` e oculta via CSS a lista de procedimentos e o hint de "clique para detalhar". Resultado: mais cards visíveis na tela sem scroll, útil para reuniões de pipeline ou telas menores.
+
+**Ordenação (nova)**
+Select com 4 opções: padrão (ordem da API), maior valor, menor valor, follow-up mais urgente. A ordenação por follow-up coloca no topo quem tem data mais antiga ou vencida, e joga para o fim quem não tem data preenchida — incentivando indiretamente o preenchimento.
+
+**Salvar atualiza estado local (demo)**
+Na versão demo, salvar no modal atualiza o objeto em memória e re-renderiza todo o funil, incluindo KPIs, fila de follow-up e grupos — sem reload de página. Na versão Flask, o mesmo comportamento ocorre via fetch ao endpoint existente, com os novos campos `next_contact_date` e `contact_attempts` adicionados ao payload do POST.
+
+**Banner de modo demo**
+Faixa informativa discreta no topo indicando que os dados são fictícios, para distinguir claramente o arquivo de demonstração do sistema em produção.

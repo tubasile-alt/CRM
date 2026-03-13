@@ -571,8 +571,10 @@ class PatientFunnelStatus(db.Model):
     __tablename__ = 'patient_funnel_status'
     id = db.Column(db.Integer, primary_key=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False, unique=True)
-    funnel_status = db.Column(db.String(100))   # Falta o orçamento / Já tem o orçamento mas vai pensar / Agendado / Realizado / Não tem interesse
-    funnel_temperature = db.Column(db.String(100))  # Quente / Frio / Morno / Quer muito fazer mas achou caro
+    funnel_status = db.Column(db.String(100))
+    funnel_temperature = db.Column(db.String(100))
+    next_contact_date = db.Column(db.Date, nullable=True)
+    contact_attempts = db.Column(db.Integer, default=0)
     updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time)
 
     patient = db.relationship('Patient', backref=db.backref('funnel_status_entry', uselist=False))
