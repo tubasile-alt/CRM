@@ -1038,7 +1038,7 @@ function renderPanelToday(data) {
     const now = new Date(); now.setHours(0,0,0,0);
     const todayStr = now.toISOString().split('T')[0];
 
-    const patients = data.filter(p => p.next_contact_date === todayStr);
+    const patients = data.filter(p => p.next_contact_date && p.next_contact_date.startsWith(todayStr));
 
     const panel = document.getElementById('panelToday');
     const body  = document.getElementById('bodyToday');
