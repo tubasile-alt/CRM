@@ -241,12 +241,14 @@ def get_marcella_sales_funnel():
     result = []
     for plan, note, patient in plans:
         planned_date = plan.created_at.date().isoformat() if plan.created_at else None
+        planned_value = float(plan.planned_value) if plan.planned_value else 0.0
         result.append({
             'plan_id': plan.id,
             'patient_id': patient.id,
             'patient_name': patient.name,
             'procedure_name': plan.procedure_name,
             'planned_date': planned_date,
+            'planned_value': planned_value,
             'dp_id': _get_dp_id(patient.id, note.doctor_id)
         })
 
