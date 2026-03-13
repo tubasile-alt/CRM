@@ -454,15 +454,15 @@ function exportToGoogleSheets() {
     fetch(url, { method: 'POST' })
         .then(r => r.json())
         .then(data => {
-            if (data.success) {
-                let msg = '✅ Dados exportados com sucesso para o Google Sheets!';
-                if (data.sheet_url) {
-                    msg += '\n\n📊 Abrir planilha:\n' + data.sheet_url;
-                }
-                alert(msg);
-                if (data.sheet_url) {
-                    window.open(data.sheet_url, '_blank');
-                }
+            if (data.success && data.csv_content) {
+                // Copiar CSV para clipboard
+                navigator.clipboard.writeText(data.csv_content).then(() => {
+                    alert('✅ CSV copiado para a área de transferência!\n\nAgora:\n1. Acesse https://sheets.google.com\n2. Crie uma nova planilha\n3. Cole os dados (Ctrl+V)\n\nOs dados já estão prontos para colar!');
+                    window.open('https://sheets.google.com', '_blank');
+                }).catch(() => {
+                    alert('✅ CSV gerado! Copie e cole em https://sheets.google.com');
+                    window.open('https://sheets.google.com', '_blank');
+                });
             } else {
                 alert('❌ Erro: ' + (data.error || data.message));
             }
