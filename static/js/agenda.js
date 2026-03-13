@@ -1339,4 +1339,42 @@
         };
     }
 
+    // ── Check-in do paciente
+    window.doCheckin = async function(appointmentId) {
+        if (!appointmentId) {
+            showAlert('ID do agendamento não encontrado', 'danger');
+            return;
+        }
+        try {
+            const response = await fetch(`/api/checkin/${appointmentId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            if (response.ok) {
+                showAlert('Check-in realizado com sucesso!', 'success');
+                loadAppointments();
+            } else {
+                const data = await response.json();
+                showAlert(data.error || 'Erro ao fazer check-in', 'danger');
+            }
+        } catch (err) {
+            console.error('Erro ao fazer check-in:', err);
+            showAlert('Erro ao fazer check-in: ' + err.message, 'danger');
+        }
+    };
+
+    // ── Abrir prontuário do paciente
+    window.goToPatientChart = function(patientId, appointmentId) {
+        if (!patientId) {
+            showAlert('Paciente não vinculado ao prontuário', 'warning');
+            return;
+        }
+        let url = `/prontuario/${patientId}`;
+        if (appointmentId) {
+            url += `?appointment_id=${appointmentId}`;
+        }
+        window.location.href = url;
+    };
+
 })();
