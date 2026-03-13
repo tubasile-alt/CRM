@@ -687,10 +687,17 @@ body { font-family: 'Figtree', sans-serif !important; }
 
             <div class="modal-body p-3">
 
-                <!-- Observações do médico -->
-                <div class="mb-3">
-                    <div class="modal-section-label"><i class="bi bi-journal-text me-1"></i>Observações do Médico</div>
-                    <div class="modal-doctor-notes" id="modalDoctorNotes">—</div>
+                <!-- Tentativas de Contato (no topo) -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-12">
+                        <div class="modal-form-label"><i class="bi bi-telephone-forward me-1"></i>Tentativas de Contato</div>
+                        <div class="attempts-row">
+                            <div class="attempts-btn" onclick="changeAttempts(-1)">−</div>
+                            <div class="attempts-count" id="attemptsCount">0</div>
+                            <div class="attempts-btn" onclick="changeAttempts(1)">+</div>
+                            <span style="font-size:.68rem; color:#5a7a96; margin-left:.3rem;">tentativas registradas</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Procedimentos -->
@@ -730,21 +737,18 @@ body { font-family: 'Figtree', sans-serif !important; }
                     </div>
                 </div>
 
-                <!-- Próximo contato + tentativas -->
-                <div class="row g-3">
-                    <div class="col-md-7">
+                <!-- Próximo contato -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-12">
                         <div class="modal-form-label"><i class="bi bi-calendar-event me-1" style="color:#fbbf24;"></i>Próximo Contato</div>
                         <input type="date" id="modalNextContact" class="modal-input" placeholder="Selecione a data">
                     </div>
-                    <div class="col-md-5">
-                        <div class="modal-form-label"><i class="bi bi-telephone-forward me-1"></i>Tentativas de Contato</div>
-                        <div class="attempts-row">
-                            <div class="attempts-btn" onclick="changeAttempts(-1)">−</div>
-                            <div class="attempts-count" id="attemptsCount">0</div>
-                            <div class="attempts-btn" onclick="changeAttempts(1)">+</div>
-                            <span style="font-size:.68rem; color:#5a7a96; margin-left:.3rem;">tentativas registradas</span>
-                        </div>
-                    </div>
+                </div>
+
+                <!-- Observações do médico (no final) -->
+                <div class="mb-3">
+                    <div class="modal-section-label"><i class="bi bi-journal-text me-1"></i>Observações do Médico</div>
+                    <div class="modal-doctor-notes" id="modalDoctorNotes">—</div>
                 </div>
 
             </div>
