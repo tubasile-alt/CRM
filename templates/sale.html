@@ -1039,6 +1039,7 @@ function renderPanelToday(data) {
     const todayStr = now.toISOString().split('T')[0];
 
     const patients = data.filter(p => p.next_contact_date && p.next_contact_date.startsWith(todayStr));
+    console.log('[renderPanelToday] todayStr:', todayStr, 'patients count:', patients.length, 'data:', data.slice(0,2));
 
     const panel = document.getElementById('panelToday');
     const body  = document.getElementById('bodyToday');
@@ -1078,6 +1079,8 @@ function renderPanelOverdue(data) {
         })
         .sort((a, b) => parseFloat(b.total_value) - parseFloat(a.total_value))
         .slice(0, 6);
+    
+    console.log('[renderPanelOverdue] patients count:', patients.length, 'filtered from:', data.length);
 
     const panel = document.getElementById('panelOverdue');
     const body  = document.getElementById('bodyOverdue');
