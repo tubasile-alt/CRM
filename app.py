@@ -765,9 +765,8 @@ def delete_appointment_api(appointment_id):
     if current_user.is_doctor() and appointment.doctor_id != current_user.id:
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
-    # Delete associated commercial tasks first (foreign key constraint)
-    from models import CommercialTask
-    CommercialTask.query.filter_by(consultation_id=appointment_id).delete()
+    # Delete associated records first (foreign key constraints)
+    Evolution.query.filter_by(consultation_id=appointment_id).delete()
     
     db.session.delete(appointment)
     db.session.commit()
