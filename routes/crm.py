@@ -5,6 +5,7 @@ from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, extract
 import pytz
+import os
 
 
 def _get_dp_id(patient_id, doctor_id):
@@ -309,14 +310,25 @@ def save_patient_funnel_status(patient_id):
 @crm_bp.route('/api/crm/export-to-sheets', methods=['POST'])
 @login_required
 def export_sales_funnel_to_sheets():
-    """Exporta funil de vendas para Google Sheets."""
+    """Exporta funil de vendas para Google Sheets via API."""
     if (current_user.username or '').strip().lower() != 'marcella':
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
-        from google_sheet import Sheet
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        import json
         
-        # Buscar todos os dados do funil
+        # Buscar token do Google das variáveis de ambiente
+        google_creds_json = os.environ.get('GOOGLE_CREDENTIALS')
+        if not google_creds_json:
+            return jsonify({
+                'success': False,
+                'message': 'Google não configurado. Use: POST /api/crm/export-to-sheets-csv para fazer download em CSV.',
+                'error': 'Credenciais Google não encontradas'
+            }), 500
+        
+        # Buscar dados
         month = request.args.get('month', type=int)
         year = request.args.get('year', type=int)
         
@@ -363,53 +375,55 @@ def export_sales_funnel_to_sheets():
             planned_value = float(plan.planned_value) if plan.planned_value else 0.0
             patients_dict[patient_key]['procedures'].append({
                 'procedure_name': plan.procedure_name,
-                'planned_value': planned_value,
-                'created_at': plan.created_at.strftime('%d/%m/%Y') if plan.created_at else ''
+                'planned_value': planned_value
             })
             patients_dict[patient_key]['total_value'] += planned_value
 
-        # Criar planilha no Google Sheets
-        sheet = Sheet()
+        # Montar dados
+        rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações']]
         
-        # Headers
-        headers = [
-            'Paciente',
-            'Telefone',
-            'Status',
-            'Temperatura',
-            'Procedimentos',
-            'Valor (R$)',
-            'Total por Paciente (R$)',
-            'Observações do Médico'
-        ]
-        sheet.rows.append(headers)
-
-        # Dados
         for patient_data in patients_dict.values():
             procs_str = '; '.join([f"{p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
-            sheet.rows.append([
+            rows.append([
                 patient_data['patient_name'],
                 patient_data['patient_phone'],
                 patient_data['funnel_status'],
                 patient_data['funnel_temperature'],
                 procs_str,
-                '',  # Coluna de valores individuais deixada vazia
-                f"{patient_data['total_value']:.2f}".replace('.', ','),
+                f"{patient_data['total_value']:.2f}",
                 patient_data['doctor_notes'][:100] if patient_data['doctor_notes'] else ''
             ])
 
-        # Salvar na planilha
-        sheet.title = f"Funil de Vendas - Dr. Arthur Basile - {datetime.now().strftime('%d/%m/%Y')}"
-        sheet.update()
+        # Criar spreadsheet com Sheets API
+        creds = service_account.Credentials.from_service_account_info(json.loads(google_creds_json))
+        sheets_service = build('sheets', 'v4', credentials=creds)
+        drive_service = build('drive', 'v3', credentials=creds)
         
-        # Construir URL da planilha
-        sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet.id}" if hasattr(sheet, 'id') and sheet.id else None
+        spreadsheet_title = f"Funil de Vendas - Dr. Arthur Basile - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        body = {
+            'properties': {'title': spreadsheet_title},
+            'sheets': [{'properties': {'title': 'Dados'}}]
+        }
+        
+        result = sheets_service.spreadsheets().create(body=body, fields='spreadsheetId').execute()
+        spreadsheet_id = result['spreadsheetId']
+        sheet_url = f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}'
+        
+        # Inserir dados
+        value_input_body = {'values': rows}
+        sheets_service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range='Dados!A1',
+            valueInputOption='RAW',
+            body=value_input_body
+        ).execute()
         
         return jsonify({
             'success': True, 
-            'message': 'Dados exportados para Google Sheets!',
+            'message': 'Dados exportados com sucesso!',
             'sheet_url': sheet_url
         })
+        
     except Exception as e:
         import traceback
         traceback.print_exc()
