@@ -1117,10 +1117,11 @@ function renderPanelOverdue(data) {
 
         const attBadge = p.contact_attempts > 0
             ? `<span class="chip-attempts">${p.contact_attempts}x</span>` : '';
+        const safePatient = JSON.stringify(p).replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
 
         return `
             <div class="fq-chip overdue-chip ${extraClass}">
-                <span class="chip-name">${firstName(p.patient_name)}</span>
+                <span class="chip-name" onclick="openPatientModal(${safePatient})" style="cursor:pointer;">${firstName(p.patient_name)}</span>
                 <span class="chip-val-sm">${formatBRL(p.total_value)}</span>
                 <span class="chip-delay">⏰ ${days}d atraso</span>
                 ${tempBadge}
