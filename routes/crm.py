@@ -205,7 +205,7 @@ def get_marcella_sales_funnel():
         return jsonify({'error': 'Acesso restrito'}), 403
 
     arthur_doctor = User.query.filter(
-        db.func.lower(User.name).like('%arthur basile%'),
+        db.func.lower(User.name).like('%arthur%'),
         User.role == 'medico'
     ).first()
 
