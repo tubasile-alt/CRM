@@ -1064,18 +1064,13 @@ function renderPanelToday(data) {
     body.innerHTML = patients.map(p => {
         const wpp = wppLink(p.patient_phone);
         patientDataMap[p.patient_id] = p; // Store for retrieval
-        // Get consultation date
-        let consultDate = '—';
-        if (p.procedures && p.procedures.length > 0) {
-            consultDate = formatDate(p.procedures[0].planned_date) || '—';
-        } else if (p.next_contact_date) {
-            consultDate = formatDate(p.next_contact_date);
-        }
+        // Get planned date from first procedure
+        const plannedDate = (p.procedures && p.procedures.length > 0) ? formatDate(p.procedures[0].planned_date) : '—';
         return `
             <div class="fq-chip today-chip">
                 <div style="flex:1;">
                     <span class="chip-name" onclick="openPatientModal(patientDataMap[${p.patient_id}])" style="cursor:pointer;">${firstName(p.patient_name)}</span>
-                    <div style="font-size:.65rem; color:#5a7a96; margin-top:.3rem;"><i class="bi bi-calendar2 me-1"></i>${consultDate}</div>
+                    <div style="font-size:.65rem; color:#5a7a96; margin-top:.3rem;"><i class="bi bi-calendar2 me-1"></i>${plannedDate}</div>
                 </div>
                 <span class="chip-val">${formatBRL(p.total_value)}</span>
                 ${p.funnel_status ? `<span class="chip-status">${p.funnel_status}</span>` : ''}
@@ -1132,19 +1127,14 @@ function renderPanelOverdue(data) {
         const attBadge = p.contact_attempts > 0
             ? `<span class="chip-attempts">${p.contact_attempts}x</span>` : '';
         patientDataMap[p.patient_id] = p; // Store for retrieval
-        // Get consultation date
-        let consultDate = '—';
-        if (p.procedures && p.procedures.length > 0) {
-            consultDate = formatDate(p.procedures[0].planned_date) || '—';
-        } else if (p.next_contact_date) {
-            consultDate = formatDate(p.next_contact_date);
-        }
+        // Get planned date from first procedure
+        const plannedDate = (p.procedures && p.procedures.length > 0) ? formatDate(p.procedures[0].planned_date) : '—';
 
         return `
             <div class="fq-chip overdue-chip ${extraClass}">
                 <div style="flex:1;">
                     <span class="chip-name" onclick="openPatientModal(patientDataMap[${p.patient_id}])" style="cursor:pointer;">${firstName(p.patient_name)}</span>
-                    <div style="font-size:.65rem; color:#5a7a96; margin-top:.3rem;"><i class="bi bi-calendar2 me-1"></i>${consultDate}</div>
+                    <div style="font-size:.65rem; color:#5a7a96; margin-top:.3rem;"><i class="bi bi-calendar2 me-1"></i>${plannedDate}</div>
                 </div>
                 <span class="chip-val-sm">${formatBRL(p.total_value)}</span>
                 <span class="chip-delay">⏰ ${days}d atraso</span>
