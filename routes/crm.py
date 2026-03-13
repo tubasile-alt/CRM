@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request, send_file
+from flask import Blueprint, render_template, jsonify, request, send_file, redirect, url_for
 from flask_login import login_required, current_user
 from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor, PatientFunnelStatus
 from datetime import datetime, date, timedelta
