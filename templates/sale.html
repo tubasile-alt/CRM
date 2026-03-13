@@ -56,6 +56,9 @@
         <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <h4 class="mb-0 fw-bold text-primary"><i class="bi bi-funnel"></i> Funil de Vendas — Dr. Arthur Basile</h4>
             <div class="d-flex gap-2 align-items-center flex-wrap">
+                <button class="btn btn-success btn-sm" onclick="exportToGoogleSheets()">
+                    <i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar para Google Sheets
+                </button>
                 <select id="funnelMonthFilter" class="form-select form-select-sm" style="width: auto;">
                     <option value="">Todos os meses</option>
                     <option value="1">Janeiro</option>
@@ -431,6 +434,39 @@ function printBudget() {
     printArea.style.display = 'block';
     window.print();
     printArea.style.display = 'none';
+}
+
+// ── Exportar para Google Sheets ───────────────────────────────
+function exportToGoogleSheets() {
+    const monthFilter = document.getElementById('funnelMonthFilter')?.value || '';
+    const yearFilter  = document.getElementById('funnelYearFilter')?.value  || '';
+
+    let url = '/api/crm/export-to-sheets';
+    const params = new URLSearchParams();
+    if (monthFilter) params.append('month', monthFilter);
+    if (yearFilter)  params.append('year', yearFilter);
+    if (params.toString()) url += '?' + params.toString();
+
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Exportando...';
+
+    fetch(url, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Dados exportados com sucesso para o Google Sheets!');
+            } else {
+                alert('❌ Erro: ' + (data.error || data.message));
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar para Google Sheets';
+        })
+        .catch(() => {
+            alert('❌ Erro ao exportar. Tente novamente.');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-file-earmark-spreadsheet me-1"></i> Exportar para Google Sheets';
+        });
 }
 
 // ── Init ──────────────────────────────────────────────────────

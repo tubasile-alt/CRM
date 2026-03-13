@@ -305,6 +305,109 @@ def save_patient_funnel_status(patient_id):
     db.session.commit()
     return jsonify({'success': True})
 
+
+@crm_bp.route('/api/crm/export-to-sheets', methods=['POST'])
+@login_required
+def export_sales_funnel_to_sheets():
+    """Exporta funil de vendas para Google Sheets."""
+    if (current_user.username or '').strip().lower() != 'marcella':
+        return jsonify({'error': 'Acesso restrito'}), 403
+
+    try:
+        from google_sheet import Sheet
+        
+        # Buscar todos os dados do funil
+        month = request.args.get('month', type=int)
+        year = request.args.get('year', type=int)
+        
+        arthur_doctor = User.query.filter(
+            db.func.lower(User.name).like('%arthur%'),
+            User.role == 'medico'
+        ).first()
+        
+        if not arthur_doctor:
+            return jsonify({'error': 'Médico não encontrado'}), 404
+
+        query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
+            Note, CosmeticProcedurePlan.note_id == Note.id
+        ).join(
+            Patient, Note.patient_id == Patient.id
+        ).filter(
+            CosmeticProcedurePlan.was_performed == False,
+            Note.doctor_id == arthur_doctor.id
+        )
+
+        if month:
+            query = query.filter(extract('month', CosmeticProcedurePlan.created_at) == month)
+        if year:
+            query = query.filter(extract('year', CosmeticProcedurePlan.created_at) == year)
+
+        plans = query.order_by(Patient.name.asc(), CosmeticProcedurePlan.created_at.asc()).all()
+
+        # Agrupar dados
+        patients_dict = {}
+        for plan, note, patient in plans:
+            patient_key = patient.id
+            if patient_key not in patients_dict:
+                funnel_entry = PatientFunnelStatus.query.filter_by(patient_id=patient.id).first()
+                patients_dict[patient_key] = {
+                    'patient_name': patient.name,
+                    'patient_phone': patient.phone or '',
+                    'doctor_notes': note.content or '',
+                    'funnel_status': funnel_entry.funnel_status if funnel_entry else '',
+                    'funnel_temperature': funnel_entry.funnel_temperature if funnel_entry else '',
+                    'procedures': [],
+                    'total_value': 0.0
+                }
+            
+            planned_value = float(plan.planned_value) if plan.planned_value else 0.0
+            patients_dict[patient_key]['procedures'].append({
+                'procedure_name': plan.procedure_name,
+                'planned_value': planned_value,
+                'created_at': plan.created_at.strftime('%d/%m/%Y') if plan.created_at else ''
+            })
+            patients_dict[patient_key]['total_value'] += planned_value
+
+        # Criar planilha no Google Sheets
+        sheet = Sheet()
+        
+        # Headers
+        headers = [
+            'Paciente',
+            'Telefone',
+            'Status',
+            'Temperatura',
+            'Procedimentos',
+            'Valor (R$)',
+            'Total por Paciente (R$)',
+            'Observações do Médico'
+        ]
+        sheet.rows.append(headers)
+
+        # Dados
+        for patient_data in patients_dict.values():
+            procs_str = '; '.join([f"{p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
+            sheet.rows.append([
+                patient_data['patient_name'],
+                patient_data['patient_phone'],
+                patient_data['funnel_status'],
+                patient_data['funnel_temperature'],
+                procs_str,
+                '',  # Coluna de valores individuais deixada vazia
+                f"{patient_data['total_value']:.2f}".replace('.', ','),
+                patient_data['doctor_notes'][:100] if patient_data['doctor_notes'] else ''
+            ])
+
+        # Salvar na planilha
+        sheet.title = f"Funil de Vendas - Dr. Arthur Basile - {datetime.now().strftime('%d/%m/%Y')}"
+        sheet.update()
+        
+        return jsonify({'success': True, 'message': 'Dados exportados para Google Sheets!'})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 @crm_bp.route('/api/crm/records/<int:plan_id>', methods=['PATCH'])
 @login_required
 def update_cosmetic_plan(plan_id):
