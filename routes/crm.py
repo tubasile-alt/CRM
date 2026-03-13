@@ -226,13 +226,12 @@ def get_marcella_sales_funnel():
         Note.doctor_id == arthur_doctor.id
     )
 
-    # Aplicar filtros de data se fornecidos
-    if month and year:
-        from sqlalchemy import extract
-        query = query.filter(
-            extract('month', CosmeticProcedurePlan.created_at) == month,
-            extract('year', CosmeticProcedurePlan.created_at) == year
-        )
+    # Aplicar filtros de data independentemente
+    from sqlalchemy import extract
+    if month:
+        query = query.filter(extract('month', CosmeticProcedurePlan.created_at) == month)
+    if year:
+        query = query.filter(extract('year', CosmeticProcedurePlan.created_at) == year)
 
     plans = query.order_by(
         Patient.name.asc(),
