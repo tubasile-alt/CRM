@@ -1218,6 +1218,15 @@ function renderCard(p) {
     const tk = tempKey(p.funnel_temperature);
     const procs = (p.procedures || []).slice(0, 4);
     const moreCount = (p.procedures || []).length - 4;
+    
+    // Store in map and get planned date
+    patientDataMap[p.patient_id] = p;
+    let plannedDate = '—';
+    if (p.procedures && p.procedures.length > 0) {
+        plannedDate = formatDate(p.procedures[0].planned_date) || 'Sem data';
+    } else if (p.next_contact_date) {
+        plannedDate = formatDate(p.next_contact_date);
+    }
 
     const nextContactHtml = p.next_contact_date ? `
         <div class="card-next-contact">
@@ -1229,19 +1238,18 @@ function renderCard(p) {
             <span class="contact-attempts-badge">${p.contact_attempts}× tentativas</span>
         </div>` : '');
 
-    const safePatient = JSON.stringify(p).replace(/\\/g, '\\\\').replace(/"/g, '&quot;');
-
     return `
-        <div class="patient-card temp-${tk}" onclick="openPatientModal(${safePatient})">
+        <div class="patient-card temp-${tk}" onclick="openPatientModal(patientDataMap[${p.patient_id}])">
             <div class="card-quick-actions">
                 <button class="quick-btn wpp" onclick="event.stopPropagation(); quickWhatsApp('${(p.patient_phone||'').replace(/\D/g,'')}')">
                     <i class="bi bi-whatsapp"></i>
                 </button>
-                <button class="quick-btn classify" onclick="event.stopPropagation(); openPatientModal(${safePatient}); focusClassify()">
+                <button class="quick-btn classify" onclick="event.stopPropagation(); openPatientModal(patientDataMap[${p.patient_id}]); focusClassify()">
                     <i class="bi bi-tag"></i> Classificar
                 </button>
             </div>
             <div class="card-name">${p.patient_name}</div>
+            <div style="font-size:.68rem; color:#34d399; margin-bottom:.35rem; font-weight:500;"><i class="bi bi-calendar2 me-1"></i>${plannedDate}</div>
             <div class="card-phone"><i class="bi bi-telephone" style="font-size:.6rem;"></i> ${p.patient_phone || '—'}</div>
             <div class="card-badges">
                 ${statusChip(p.funnel_status)}
