@@ -18,7 +18,8 @@ crm_bp = Blueprint('crm', __name__)
 @crm_bp.route('/crm')
 @login_required
 def crm_page():
-    return render_template('crm.html')
+    is_marcella = (current_user.username or '').strip().lower() == 'marcella'
+    return render_template('crm.html', is_marcella=is_marcella)
 
 @crm_bp.route('/api/crm/transplant-stats')
 @login_required
