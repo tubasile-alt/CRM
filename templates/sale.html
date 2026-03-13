@@ -1038,7 +1038,15 @@ function renderPanelToday(data) {
     const now = new Date(); now.setHours(0,0,0,0);
     const todayStr = now.toISOString().split('T')[0];
 
-    const patients = data.filter(p => p.next_contact_date && p.next_contact_date.startsWith(todayStr));
+    const patients = data.filter(p => {
+        // Mostra se próximo contato é hoje
+        if (p.next_contact_date && p.next_contact_date.startsWith(todayStr)) return true;
+        
+        // Mostra se teve procedimento indicado hoje (planned_date === today)
+        if (p.procedures && p.procedures.some(proc => proc.planned_date && proc.planned_date === todayStr)) return true;
+        
+        return false;
+    });
     console.log('[renderPanelToday] todayStr:', todayStr, 'patients count:', patients.length, 'data:', data.slice(0,2));
 
     const panel = document.getElementById('panelToday');
