@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, send_file
 from flask_login import login_required, current_user
 from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor, PatientFunnelStatus
 from datetime import datetime, date, timedelta
@@ -407,6 +407,111 @@ def populate_google_sheets():
         })
         
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@crm_bp.route('/api/crm/export-excel', methods=['GET'])
+@login_required
+def export_excel():
+    """Exporta dados do funil para arquivo Excel."""
+    if (current_user.username or '').strip().lower() != 'marcella':
+        return jsonify({'error': 'Acesso restrito'}), 403
+
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from datetime import datetime
+        
+        # Buscar dados
+        month = request.args.get('month', type=int)
+        year = request.args.get('year', type=int)
+        
+        patients_dict = _get_funnel_data(month=month, year=year)
+        
+        if not patients_dict:
+            return jsonify({'error': 'Nenhum dado encontrado'}), 404
+        
+        # Criar workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Funil de Vendas"
+        
+        # Estilos
+        header_fill = PatternFill(start_color="0D6EFD", end_color="0D6EFD", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        left_align = Alignment(horizontal='left', vertical='center', wrap_text=True)
+        
+        # Headers
+        headers = ['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações']
+        ws.append(headers)
+        
+        # Aplicar estilos ao header
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center_align
+            cell.border = border
+        
+        # Preencher dados
+        row_num = 2
+        for patient_data in patients_dict.values():
+            procs_str = '\n'.join([f"• {p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
+            
+            ws.append([
+                patient_data['patient_name'],
+                patient_data['patient_phone'],
+                patient_data['funnel_status'],
+                patient_data['funnel_temperature'],
+                procs_str,
+                f"{patient_data['total_value']:.2f}",
+                patient_data['doctor_notes'][:100] if patient_data['doctor_notes'] else ''
+            ])
+            
+            # Aplicar estilos às linhas de dados
+            for cell in ws[row_num]:
+                cell.border = border
+                if row_num % 2 == 0:
+                    cell.fill = PatternFill(start_color="F0F4FF", end_color="F0F4FF", fill_type="solid")
+            
+            ws[row_num][4].alignment = left_align  # Procedimentos com quebra
+            row_num += 1
+        
+        # Ajustar largura das colunas
+        ws.column_dimensions['A'].width = 20
+        ws.column_dimensions['B'].width = 15
+        ws.column_dimensions['C'].width = 25
+        ws.column_dimensions['D'].width = 25
+        ws.column_dimensions['E'].width = 40
+        ws.column_dimensions['F'].width = 12
+        ws.column_dimensions['G'].width = 30
+        
+        # Altura das linhas
+        ws.row_dimensions[1].height = 25
+        for i in range(2, row_num):
+            ws.row_dimensions[i].height = None  # Auto
+        
+        # Salvar em arquivo temporário
+        filename = f'/tmp/funil_vendas_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        wb.save(filename)
+        
+        # Enviar arquivo para download
+        return send_file(
+            filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'Funil_Vendas_{datetime.now().strftime("%d_%m_%Y")}.xlsx'
+        )
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
