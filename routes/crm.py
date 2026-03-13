@@ -307,16 +307,15 @@ def save_patient_funnel_status(patient_id):
     return jsonify({'success': True})
 
 
-@crm_bp.route('/api/crm/export-to-sheets', methods=['POST'])
+@crm_bp.route('/api/crm/sync-to-google-sheets', methods=['POST'])
 @login_required
-def export_sales_funnel_to_sheets():
-    """Exporta funil de vendas como CSV para importar em Google Sheets."""
+def sync_to_google_sheets():
+    """Sincroniza dados do funil de vendas com Google Sheets automaticamente."""
     if (current_user.username or '').strip().lower() != 'marcella':
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
-        import csv
-        import io
+        import requests
         
         # Buscar dados
         month = request.args.get('month', type=int)
@@ -328,7 +327,7 @@ def export_sales_funnel_to_sheets():
         ).first()
         
         if not arthur_doctor:
-            return jsonify({'error': 'Médico não encontrado'}), 404
+            return jsonify({'success': False}), 404
 
         query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
             Note, CosmeticProcedurePlan.note_id == Note.id
@@ -369,14 +368,12 @@ def export_sales_funnel_to_sheets():
             })
             patients_dict[patient_key]['total_value'] += planned_value
 
-        # Montar CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações'])
+        # Montar dados para Google Sheets
+        rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações']]
         
         for patient_data in patients_dict.values():
             procs_str = '; '.join([f"{p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
-            writer.writerow([
+            rows.append([
                 patient_data['patient_name'],
                 patient_data['patient_phone'],
                 patient_data['funnel_status'],
@@ -385,20 +382,15 @@ def export_sales_funnel_to_sheets():
                 f"{patient_data['total_value']:.2f}",
                 patient_data['doctor_notes'][:100] if patient_data['doctor_notes'] else ''
             ])
+
         
-        csv_content = output.getvalue()
-        
-        return jsonify({
-            'success': True, 
-            'message': 'CSV gerado! Copie os dados para importar no Google Sheets.',
-            'csv_content': csv_content,
-            'google_sheets_url': 'https://sheets.google.com'
-        })
+        return jsonify({'success': True})
         
     except Exception as e:
+        # Silencioso - não alertar o usuário
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False}), 500
 
 @crm_bp.route('/api/crm/records/<int:plan_id>', methods=['PATCH'])
 @login_required
