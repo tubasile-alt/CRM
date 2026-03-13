@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_login import login_required, current_user
-from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor
+from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor, PatientFunnelStatus
 from datetime import datetime, date, timedelta
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, extract
@@ -252,28 +252,58 @@ def get_marcella_sales_funnel():
     for plan, note, patient in plans:
         patient_key = patient.id
         if patient_key not in patients_dict:
+            funnel_entry = PatientFunnelStatus.query.filter_by(patient_id=patient.id).first()
             patients_dict[patient_key] = {
                 'patient_id': patient.id,
                 'patient_name': patient.name,
-                'patient_phone': patient.phone or 'N/A',
+                'patient_phone': patient.phone or '',
                 'dp_id': _get_dp_id(patient.id, note.doctor_id),
+                'doctor_notes': note.content or '',
+                'funnel_status': funnel_entry.funnel_status if funnel_entry else '',
+                'funnel_temperature': funnel_entry.funnel_temperature if funnel_entry else '',
                 'procedures': [],
                 'total_value': 0.0
             }
-        
+        elif not patients_dict[patient_key].get('doctor_notes') and note.content:
+            patients_dict[patient_key]['doctor_notes'] = note.content
+
         planned_date = plan.created_at.date().isoformat() if plan.created_at else None
         planned_value = float(plan.planned_value) if plan.planned_value else 0.0
-        
+
         patients_dict[patient_key]['procedures'].append({
             'plan_id': plan.id,
             'procedure_name': plan.procedure_name,
             'planned_date': planned_date,
-            'planned_value': planned_value
+            'planned_value': planned_value,
+            'observations': plan.observations or ''
         })
         patients_dict[patient_key]['total_value'] += planned_value
 
     result = list(patients_dict.values())
     return jsonify(result)
+
+
+@crm_bp.route('/api/crm/patient-funnel-status/<int:patient_id>', methods=['POST'])
+@login_required
+def save_patient_funnel_status(patient_id):
+    """Salva o status e temperatura do funil de vendas para um paciente."""
+    if (current_user.username or '').strip().lower() != 'marcella':
+        return jsonify({'error': 'Acesso restrito'}), 403
+
+    data = request.get_json()
+    funnel_entry = PatientFunnelStatus.query.filter_by(patient_id=patient_id).first()
+    if not funnel_entry:
+        funnel_entry = PatientFunnelStatus(patient_id=patient_id)
+        db.session.add(funnel_entry)
+
+    if 'funnel_status' in data:
+        funnel_entry.funnel_status = data['funnel_status']
+    if 'funnel_temperature' in data:
+        funnel_entry.funnel_temperature = data['funnel_temperature']
+
+    funnel_entry.updated_at = datetime.now()
+    db.session.commit()
+    return jsonify({'success': True})
 
 @crm_bp.route('/api/crm/records/<int:plan_id>', methods=['PATCH'])
 @login_required
