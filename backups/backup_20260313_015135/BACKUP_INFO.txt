@@ -1,0 +1,30 @@
+🔄 BACKUP - Clínica Basile App
+
+Data: $(date)
+Versão do App: Sales Funnel com Google Sheets Sync
+
+CONTEÚDO:
+✅ Código Python (Flask)
+✅ Templates HTML
+✅ Modelos de Banco de Dados
+✅ Rotas da API
+✅ Configurações
+✅ Arquivos estáticos
+✅ Banco de dados (schema + dados)
+
+ESTATÍSTICAS:
+- 67 pacientes únicos
+- 118 procedimentos pendentes
+- Todas as classificações de status/temperatura
+
+COMO RESTAURAR:
+1. Copiar arquivos do backup para workspace
+2. Reinstalar dependências: pip install -r requirements.txt
+3. Executar migrations: python -c "from app import app, db; app.app_context().push(); db.create_all()"
+4. Restaurar banco: psql $DATABASE_URL < database_backup.sql
+
+BRANCHES GIT:
+$(git branch -a 2>/dev/null || echo "Sem histórico Git")
+
+COMMITS RECENTES:
+$(git log --oneline -10 2>/dev/null || echo "Sem histórico Git")
