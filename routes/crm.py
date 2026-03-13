@@ -310,23 +310,13 @@ def save_patient_funnel_status(patient_id):
 @crm_bp.route('/api/crm/export-to-sheets', methods=['POST'])
 @login_required
 def export_sales_funnel_to_sheets():
-    """Exporta funil de vendas para Google Sheets via API."""
+    """Exporta funil de vendas para CSV (importar em Google Sheets)."""
     if (current_user.username or '').strip().lower() != 'marcella':
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-        import json
-        
-        # Buscar token do Google das variáveis de ambiente
-        google_creds_json = os.environ.get('GOOGLE_CREDENTIALS')
-        if not google_creds_json:
-            return jsonify({
-                'success': False,
-                'message': 'Google não configurado. Use: POST /api/crm/export-to-sheets-csv para fazer download em CSV.',
-                'error': 'Credenciais Google não encontradas'
-            }), 500
+        import csv
+        import io
         
         # Buscar dados
         month = request.args.get('month', type=int)
@@ -379,12 +369,14 @@ def export_sales_funnel_to_sheets():
             })
             patients_dict[patient_key]['total_value'] += planned_value
 
-        # Montar dados
-        rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações']]
+        # Montar CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações'])
         
         for patient_data in patients_dict.values():
             procs_str = '; '.join([f"{p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
-            rows.append([
+            writer.writerow([
                 patient_data['patient_name'],
                 patient_data['patient_phone'],
                 patient_data['funnel_status'],
@@ -393,35 +385,14 @@ def export_sales_funnel_to_sheets():
                 f"{patient_data['total_value']:.2f}",
                 patient_data['doctor_notes'][:100] if patient_data['doctor_notes'] else ''
             ])
-
-        # Criar spreadsheet com Sheets API
-        creds = service_account.Credentials.from_service_account_info(json.loads(google_creds_json))
-        sheets_service = build('sheets', 'v4', credentials=creds)
-        drive_service = build('drive', 'v3', credentials=creds)
         
-        spreadsheet_title = f"Funil de Vendas - Dr. Arthur Basile - {datetime.now().strftime('%d/%m/%Y %H:%M')}"
-        body = {
-            'properties': {'title': spreadsheet_title},
-            'sheets': [{'properties': {'title': 'Dados'}}]
-        }
-        
-        result = sheets_service.spreadsheets().create(body=body, fields='spreadsheetId').execute()
-        spreadsheet_id = result['spreadsheetId']
-        sheet_url = f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}'
-        
-        # Inserir dados
-        value_input_body = {'values': rows}
-        sheets_service.spreadsheets().values().update(
-            spreadsheetId=spreadsheet_id,
-            range='Dados!A1',
-            valueInputOption='RAW',
-            body=value_input_body
-        ).execute()
+        csv_data = output.getvalue()
         
         return jsonify({
             'success': True, 
-            'message': 'Dados exportados com sucesso!',
-            'sheet_url': sheet_url
+            'message': '✅ CSV gerado! Copie os dados para importar no Google Sheets.',
+            'csv_data': csv_data,
+            'instructions': '1. Crie uma nova planilha em https://sheets.google.com\n2. Clique em Arquivo > Importar > Cole aqui\n3. Cole o conteúdo do CSV'
         })
         
     except Exception as e:
