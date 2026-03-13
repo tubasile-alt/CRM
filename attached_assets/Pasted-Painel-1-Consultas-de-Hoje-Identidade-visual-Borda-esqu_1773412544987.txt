@@ -1,0 +1,38 @@
+Painel 1 — Consultas de Hoje
+Identidade visual
+Borda esquerda de 3px sólida na cor esmeralda var(--emerald) — verde médico, remete a “ativo hoje”. O dot animado no header também é esmeralda com pulse-emerald, box-shadow expandindo de 0 a 5px e desvanecendo em 2s — ritmo mais lento que o âmbar, transmite presença sem urgência. O ícone ao lado é bi-calendar-check-fill em #6ee7b7. O badge de contagem tem fundo rgba(26,158,110,.2) com borda e texto esmeralda.
+Critério de entrada
+next_contact_date exatamente igual a hoje — comparação com setHours(0,0,0,0) nos dois lados para zerar horário e comparar só o dia. Ou seja, são pacientes que o médico ou a secretária programaram para receber contato neste dia específico — tipicamente pacientes que vieram à consulta e precisam de acompanhamento comercial no mesmo dia.
+O que cada chip mostra
+	∙	Nome (primeiro nome apenas)
+	∙	Valor total do orçamento em verde #6ee7b7
+	∙	Status atual do funil (ex: “Falta o orçamento”, “Agendado”) em cinza ardósia
+	∙	Botão WA em verde translúcido abrindo wa.me diretamente
+Estado vazio
+Se nenhum paciente tiver consulta hoje, o painel não some — exibe a mensagem em itálico “Nenhuma consulta agendada para hoje.” Isso é diferente do painel de atrasados: aqui a ausência é informação positiva, o time precisa saber que a agenda está limpa.
+Comportamento de colapso
+Clicando no header, toggleFQ('today') alterna display: flex / none no corpo dos chips e adiciona/remove a classe collapsed no chevron, que rotaciona 90° via CSS transition. Começa aberto.
+
+Painel 2 — Follow-ups Atrasados Prioritários
+Identidade visual
+Borda esquerda âmbar var(--amber). Dot com pulse-amber em 1.5s — ritmo mais rápido que o esmeralda, transmite urgência. Ícone bi-exclamation-triangle-fill em var(--amber-lt). Badge de contagem em âmbar translúcido.
+Legenda de critérios
+Uma faixa fina de background: rgba(0,0,0,.1) abaixo do header, antes dos chips, com três itens em .65rem: ponto vermelho indicando Quente/Morno, ponto verde indicando acima de R$10k, e texto cinza “Ordenado por maior valor”. Serve para qualquer membro do time entender a lógica de priorização sem precisar perguntar.
+Critério de entrada — duplo filtro
+Primeiro filtro: next_contact_date anterior a hoje (estritamente menor, não inclui hoje). Segundo filtro: o paciente precisa satisfazer pelo menos uma das duas condições de prioridade — temperatura Quente ou Morno, ou valor total igual ou superior a R$10.000. Leads frios com valor baixo são excluídos deliberadamente para não inflar a fila com casos que não convertem.
+Ordenação
+.sort((a,b) => total_value_b - total_value_a) — maior valor no início da fila horizontal. A lógica é que o time deve atacar primeiro o maior potencial de receita do dia.
+O que cada chip mostra — até 6 elementos
+	∙	Nome (primeiro nome)
+	∙	Valor total em var(--s300) — cinza claro, tamanho menor que o nome
+	∙	Dias de atraso com ícone ⏰ (ex: “3d atraso”) — calculado por Math.abs(daysFromNow())
+	∙	Badge 🔥 com a temperatura se Quente ou Morno — fundo rose translúcido, texto #fca5a5, borda rose
+	∙	Badge 💰 “Alto valor” em esmeralda — aparece apenas se for alto valor mas não for quente/morno, para evitar dois badges simultâneos no mesmo chip
+	∙	Contagem de tentativas já feitas (ex: “3x”) em cinza ardósia — aparece só se contact_attempts > 0, para o time saber o histórico de esforço sem abrir o modal
+	∙	Botão WA direto
+Diferenciação visual por tipo de prioridade
+Chips com temperatura Quente ou Morno recebem a classe is-hot — borda rgba(220,38,38,.4) e fundo rgba(220,38,38,.1), levemente avermelhado. Chips de alto valor sem temperatura prioritária mantêm o fundo âmbar padrão com borda esmeralda mais clara via is-highval. A diferenciação visual permite ao time scanear a fila e separar “quem quer muito fazer” de “quem tem orçamento alto mas está frio”.
+Estado vazio
+Se não houver atrasados prioritários, exibe “Nenhum atrasado prioritário no momento.” em itálico — e o grid inteiro some do DOM via display: none apenas se ambos os painéis estiverem vazios simultaneamente.
+Comportamento de colapso
+Idêntico ao painel 1 — toggleFQ('overdue'), mesmo chevron com rotação CSS. Os dois painéis colapsam independentemente, permitindo que o time feche o que não está usando no momento.​​​​​​​​​​​​​​​​

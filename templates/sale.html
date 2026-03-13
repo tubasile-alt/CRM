@@ -88,7 +88,7 @@ body { font-family: 'Figtree', sans-serif !important; }
 /* ── KPI Bar ──────────────────────────────────────────── */
 .kpi-bar {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: .75rem;
     margin-bottom: 1.25rem;
 }
@@ -151,48 +151,157 @@ body { font-family: 'Figtree', sans-serif !important; }
     color: #5a7a96;
 }
 
-/* ── Follow-up Queue ──────────────────────────────────── */
-.followup-queue {
+/* ── Follow-up Panels ─────────────────────────────────── */
+:root {
+    --emerald: #10b981;
+    --emerald-lt: #6ee7b7;
+    --amber: #f59e0b;
+    --amber-lt: #fcd34d;
+    --s300: #94a3b8;
+}
+.fq-panel {
     background: linear-gradient(145deg, #3a4e68, #2c3e52);
     border-radius: 12px;
-    margin-bottom: 1.25rem;
+    margin-bottom: .85rem;
     box-shadow: 0 4px 16px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06);
     overflow: hidden;
 }
-.followup-header {
+.fq-panel.fq-today  { border-left: 3px solid var(--emerald); }
+.fq-panel.fq-overdue { border-left: 3px solid var(--amber); }
+
+.fq-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: .75rem 1rem;
+    padding: .65rem 1rem;
     cursor: pointer;
     user-select: none;
 }
-.followup-header h6 {
+.fq-header h6 {
     font-size: .78rem;
     font-weight: 700;
-    color: #fbbf24;
     margin: 0;
     display: flex;
     align-items: center;
-    gap: .4rem;
+    gap: .45rem;
 }
+.fq-today .fq-header h6  { color: var(--emerald-lt); }
+.fq-overdue .fq-header h6 { color: var(--amber-lt); }
+
 .live-dot {
     width: 8px; height: 8px;
     border-radius: 50%;
-    background: #fbbf24;
     display: inline-block;
-    animation: pulse-amber 2s infinite;
+    flex-shrink: 0;
+}
+.fq-today  .live-dot { background: var(--emerald); animation: pulse-emerald 2s infinite; }
+.fq-overdue .live-dot { background: var(--amber);   animation: pulse-amber 1.5s infinite; }
+@keyframes pulse-emerald {
+    0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,.4); }
+    50%      { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
 }
 @keyframes pulse-amber {
-    0%,100% { box-shadow: 0 0 0 0 rgba(251,191,36,.4); }
-    50%      { box-shadow: 0 0 0 6px rgba(251,191,36,0); }
+    0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,.4); }
+    50%      { box-shadow: 0 0 0 5px rgba(245,158,11,0); }
 }
-.followup-chevron {
-    color: #7fa3c4;
-    font-size: .75rem;
+
+.fq-count-badge {
+    border-radius: 20px;
+    padding: .1rem .5rem;
+    font-size: .65rem;
+    font-weight: 700;
+    border-width: 1px;
+    border-style: solid;
+}
+.fq-today  .fq-count-badge { background: rgba(16,185,129,.2);  border-color: var(--emerald); color: var(--emerald-lt); }
+.fq-overdue .fq-count-badge { background: rgba(245,158,11,.15); border-color: var(--amber);   color: var(--amber-lt); }
+
+.fq-chevron {
+    color: #5a7a96;
+    font-size: .7rem;
     transition: transform .25s;
 }
-.followup-chevron.open { transform: rotate(180deg); }
+.fq-chevron.collapsed { transform: rotate(-90deg); }
+
+.fq-legend {
+    background: rgba(0,0,0,.1);
+    padding: .3rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: .65rem;
+    color: #5a7a96;
+}
+.fq-legend-dot {
+    width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: .25rem;
+}
+.fq-legend-dot.red   { background: #f87171; }
+.fq-legend-dot.green { background: #34d399; }
+
+.fq-body {
+    padding: .6rem 1rem .85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+}
+.fq-body[style*="display: none"] { padding: 0; }
+
+.fq-chip {
+    border-radius: 22px;
+    padding: .3rem .75rem;
+    font-size: .72rem;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    flex-shrink: 0;
+}
+.fq-chip.today-chip {
+    background: rgba(16,185,129,.1);
+    border: 1px solid rgba(16,185,129,.3);
+    color: #c9d8e8;
+}
+.fq-chip.overdue-chip {
+    background: rgba(245,158,11,.1);
+    border: 1px solid rgba(245,158,11,.3);
+    color: #c9d8e8;
+}
+.fq-chip.is-hot {
+    background: rgba(220,38,38,.1);
+    border: 1px solid rgba(220,38,38,.4);
+}
+.fq-chip.is-highval {
+    border-color: rgba(16,185,129,.4);
+}
+.chip-name { font-weight: 700; color: #e2eaf4; }
+.chip-val  { color: var(--emerald-lt); font-size: .68rem; }
+.chip-val-sm { color: var(--s300); font-size: .65rem; }
+.chip-status { color: #5a7a96; font-size: .65rem; }
+.chip-delay { color: var(--amber-lt); font-size: .65rem; }
+.chip-temp-badge {
+    background: rgba(252,165,165,.1); border: 1px solid rgba(252,165,165,.3);
+    border-radius: 10px; padding: .05rem .35rem; font-size: .62rem; color: #fca5a5;
+}
+.chip-highval-badge {
+    background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.3);
+    border-radius: 10px; padding: .05rem .35rem; font-size: .62rem; color: var(--emerald-lt);
+}
+.chip-attempts { color: #5a7a96; font-size: .62rem; }
+.chip-wpp-btn {
+    background: rgba(74,222,128,.12);
+    border: 1px solid rgba(74,222,128,.3);
+    border-radius: 8px;
+    color: #4ade80;
+    font-size: .65rem;
+    padding: .1rem .4rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex; align-items: center; gap: .2rem;
+    transition: background .15s;
+}
+.chip-wpp-btn:hover { background: rgba(74,222,128,.22); color: #4ade80; }
+
+.fq-empty { font-size: .75rem; color: #3a5068; font-style: italic; padding: 0 0 .6rem; }
+
 .followup-body {
     padding: 0 1rem .85rem;
     display: flex;
@@ -621,17 +730,11 @@ body { font-family: 'Figtree', sans-serif !important; }
 
     <!-- ── KPI Bar ─────────────────────────────────────────── -->
     <div class="kpi-bar">
-        <div class="kpi-card kpi-green">
-            <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
-            <div class="kpi-label">Valor Total em Aberto</div>
-            <div class="kpi-value" id="kpiTotal">R$ —</div>
-            <div class="kpi-sub">todos os pacientes</div>
-        </div>
         <div class="kpi-card kpi-red">
             <div class="kpi-icon"><i class="bi bi-fire"></i></div>
-            <div class="kpi-label">Pacientes Quentes</div>
+            <div class="kpi-label">Leads Quentes</div>
             <div class="kpi-value" id="kpiHot">—</div>
-            <div class="kpi-sub">prontos para fechar</div>
+            <div class="kpi-sub">para fechar agora</div>
         </div>
         <div class="kpi-card kpi-blue">
             <div class="kpi-icon"><i class="bi bi-calendar-check"></i></div>
@@ -647,17 +750,37 @@ body { font-family: 'Figtree', sans-serif !important; }
         </div>
     </div>
 
-    <!-- ── Follow-up Queue ─────────────────────────────────── -->
-    <div class="followup-queue" id="followupQueue" style="display:none;">
-        <div class="followup-header" onclick="toggleFollowup()">
+    <!-- ── Painel 1: Consultas de Hoje ────────────────────── -->
+    <div class="fq-panel fq-today" id="panelToday" style="display:none;">
+        <div class="fq-header" onclick="toggleFQ('today')">
             <h6>
                 <span class="live-dot"></span>
-                Follow-up Pendente
-                <span id="followupCount" style="font-size:.65rem; color:#fbbf24; font-weight:400;"></span>
+                <i class="bi bi-calendar-check-fill" style="color:#6ee7b7;"></i>
+                Consultas de Hoje
+                <span class="fq-count-badge" id="todayCount">0</span>
             </h6>
-            <i class="bi bi-chevron-up followup-chevron open" id="followupChevron"></i>
+            <i class="bi bi-chevron-up fq-chevron" id="chevToday"></i>
         </div>
-        <div class="followup-body" id="followupBody"></div>
+        <div class="fq-body" id="bodyToday"></div>
+    </div>
+
+    <!-- ── Painel 2: Follow-ups Atrasados ─────────────────── -->
+    <div class="fq-panel fq-overdue" id="panelOverdue" style="display:none;">
+        <div class="fq-header" onclick="toggleFQ('overdue')">
+            <h6>
+                <span class="live-dot"></span>
+                <i class="bi bi-exclamation-triangle-fill" style="color:#fcd34d;"></i>
+                Follow-ups Atrasados Prioritários
+                <span class="fq-count-badge" id="overdueCount">0</span>
+            </h6>
+            <i class="bi bi-chevron-up fq-chevron" id="chevOverdue"></i>
+        </div>
+        <div class="fq-legend">
+            <span><span class="fq-legend-dot red"></span>Quente/Morno</span>
+            <span><span class="fq-legend-dot green"></span>Acima de R$10k</span>
+            <span>Ordenado por maior valor</span>
+        </div>
+        <div class="fq-body" id="bodyOverdue"></div>
     </div>
 
     <!-- ── Funnel Content ──────────────────────────────────── -->
@@ -880,65 +1003,128 @@ function renderAll() {
     }
 
     updateKPIs(data);
-    renderFollowupQueue(data);
+    renderPanelToday(data);
+    renderPanelOverdue(data);
     renderGroups(data);
 }
 
 // ── KPIs ────────────────────────────────────────────────────
 function updateKPIs(data) {
-    const total = data.reduce((s, p) => s + (parseFloat(p.total_value) || 0), 0);
-    const hot   = data.filter(p => p.funnel_temperature === 'Quente').length;
-    const sched = data.filter(p => p.funnel_status === 'Agendado').length;
+    const hot     = data.filter(p => p.funnel_temperature === 'Quente').length;
+    const sched   = data.filter(p => p.funnel_status === 'Agendado').length;
     const unclass = data.filter(p => !p.funnel_temperature).length;
 
-    document.getElementById('kpiTotal').textContent    = formatBRL(total);
-    document.getElementById('kpiHot').textContent      = hot;
-    document.getElementById('kpiScheduled').textContent= sched;
-    document.getElementById('kpiUnclass').textContent  = unclass;
+    document.getElementById('kpiHot').textContent       = hot;
+    document.getElementById('kpiScheduled').textContent = sched;
+    document.getElementById('kpiUnclass').textContent   = unclass;
     document.getElementById('unclassifiedCount').textContent = unclass;
 
     const badge = document.getElementById('unclassifiedBadge');
     badge.style.display = unclass > 0 ? '' : 'none';
 }
 
-// ── Follow-up Queue ─────────────────────────────────────────
-function renderFollowupQueue(data) {
-    const today = new Date(); today.setHours(0,0,0,0);
-    const overdue = data.filter(p => {
-        if (!p.next_contact_date) return false;
-        const d = new Date(p.next_contact_date + 'T00:00:00');
-        return d <= today;
-    });
+// ── Helper: first name ──────────────────────────────────────
+function firstName(name) { return (name || '').split(' ')[0]; }
 
-    const queue = document.getElementById('followupQueue');
-    const body  = document.getElementById('followupBody');
-    const cnt   = document.getElementById('followupCount');
+// ── Helper: wpp link ────────────────────────────────────────
+function wppLink(phone) {
+    const raw = (phone || '').replace(/\D/g, '');
+    if (!raw) return null;
+    return `https://wa.me/${raw.startsWith('55') ? raw : '55'+raw}`;
+}
 
-    if (overdue.length === 0) { queue.style.display = 'none'; return; }
-    queue.style.display = '';
-    cnt.textContent = `— ${overdue.length} paciente${overdue.length > 1 ? 's' : ''}`;
+// ── Painel 1: Consultas de Hoje ─────────────────────────────
+function renderPanelToday(data) {
+    const now = new Date(); now.setHours(0,0,0,0);
+    const todayStr = now.toISOString().split('T')[0];
 
-    body.innerHTML = overdue.map(p => {
-        const d = new Date(p.next_contact_date + 'T00:00:00');
-        const diff = Math.round((today - d) / 86400000);
-        const label = diff === 0 ? 'hoje' : `${diff}d atraso`;
-        const raw = (p.patient_phone || '').replace(/\D/g, '');
-        const wpp = raw ? `https://wa.me/${raw.startsWith('55') ? raw : '55'+raw}` : '#';
+    const patients = data.filter(p => p.next_contact_date === todayStr);
+
+    const panel = document.getElementById('panelToday');
+    const body  = document.getElementById('bodyToday');
+    const cnt   = document.getElementById('todayCount');
+
+    if (patients.length === 0) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    cnt.textContent = patients.length;
+
+    body.innerHTML = patients.map(p => {
+        const wpp = wppLink(p.patient_phone);
         return `
-            <div class="followup-chip">
-                <span>${p.patient_name}</span>
-                <span class="overdue-tag">${label}</span>
-                ${raw ? `<a href="${wpp}" target="_blank"><i class="bi bi-whatsapp"></i></a>` : ''}
+            <div class="fq-chip today-chip">
+                <span class="chip-name">${firstName(p.patient_name)}</span>
+                <span class="chip-val">${formatBRL(p.total_value)}</span>
+                ${p.funnel_status ? `<span class="chip-status">${p.funnel_status}</span>` : ''}
+                ${wpp ? `<a class="chip-wpp-btn" href="${wpp}" target="_blank"><i class="bi bi-whatsapp"></i> WA</a>` : ''}
             </div>`;
     }).join('');
 }
 
-function toggleFollowup() {
-    followupOpen = !followupOpen;
-    const body = document.getElementById('followupBody');
-    const chev = document.getElementById('followupChevron');
-    body.style.display = followupOpen ? '' : 'none';
-    chev.classList.toggle('open', followupOpen);
+// ── Painel 2: Follow-ups Atrasados Prioritários ─────────────
+function renderPanelOverdue(data) {
+    const now = new Date(); now.setHours(0,0,0,0);
+
+    const HIGH_VALUE = 10000;
+
+    const patients = data
+        .filter(p => {
+            if (!p.next_contact_date) return false;
+            const d = new Date(p.next_contact_date + 'T00:00:00');
+            if (d >= now) return false; // só estritamente antes de hoje
+            const temp = (p.funnel_temperature || '').toLowerCase();
+            const isHot = temp === 'quente' || temp === 'morno';
+            const isHighVal = parseFloat(p.total_value) >= HIGH_VALUE;
+            return isHot || isHighVal;
+        })
+        .sort((a, b) => parseFloat(b.total_value) - parseFloat(a.total_value))
+        .slice(0, 6);
+
+    const panel = document.getElementById('panelOverdue');
+    const body  = document.getElementById('bodyOverdue');
+    const cnt   = document.getElementById('overdueCount');
+
+    if (patients.length === 0) { panel.style.display = 'none'; return; }
+    panel.style.display = '';
+    cnt.textContent = patients.length;
+
+    body.innerHTML = patients.map(p => {
+        const d    = new Date(p.next_contact_date + 'T00:00:00');
+        const days = Math.abs(Math.round((now - d) / 86400000));
+        const temp = (p.funnel_temperature || '').toLowerCase();
+        const isHot     = temp === 'quente' || temp === 'morno';
+        const isHighVal = parseFloat(p.total_value) >= HIGH_VALUE;
+        const wpp = wppLink(p.patient_phone);
+
+        let extraClass = '';
+        if (isHot) extraClass = 'is-hot';
+        else if (isHighVal) extraClass = 'is-highval';
+
+        const tempBadge = isHot
+            ? `<span class="chip-temp-badge">🔥 ${p.funnel_temperature}</span>`
+            : (isHighVal ? `<span class="chip-highval-badge">💰 Alto valor</span>` : '');
+
+        const attBadge = p.contact_attempts > 0
+            ? `<span class="chip-attempts">${p.contact_attempts}x</span>` : '';
+
+        return `
+            <div class="fq-chip overdue-chip ${extraClass}">
+                <span class="chip-name">${firstName(p.patient_name)}</span>
+                <span class="chip-val-sm">${formatBRL(p.total_value)}</span>
+                <span class="chip-delay">⏰ ${days}d atraso</span>
+                ${tempBadge}
+                ${attBadge}
+                ${wpp ? `<a class="chip-wpp-btn" href="${wpp}" target="_blank"><i class="bi bi-whatsapp"></i></a>` : ''}
+            </div>`;
+    }).join('');
+}
+
+// ── Toggle painéis ──────────────────────────────────────────
+function toggleFQ(type) {
+    const body = document.getElementById('body' + (type === 'today' ? 'Today' : 'Overdue'));
+    const chev = document.getElementById('chev' + (type === 'today' ? 'Today' : 'Overdue'));
+    const isOpen = !chev.classList.contains('collapsed');
+    body.style.display = isOpen ? 'none' : 'flex';
+    chev.classList.toggle('collapsed', isOpen);
 }
 
 // ── Grupos ──────────────────────────────────────────────────
