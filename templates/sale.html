@@ -88,10 +88,12 @@ body { font-family: 'Figtree', sans-serif !important; }
 /* ── KPI Bar ──────────────────────────────────────────── */
 .kpi-bar {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: .75rem;
     margin-bottom: 1.25rem;
 }
+.kpi-card.kpi-clickable { cursor: pointer; }
+.kpi-card.kpi-clickable:active { transform: scale(.97); }
 
 .kpi-card {
     background: linear-gradient(145deg, #3a4e68, #2c3e52);
@@ -695,7 +697,7 @@ body { font-family: 'Figtree', sans-serif !important; }
 .btn-modal-close:hover { background: rgba(255,255,255,.06); }
 
 /* ── Responsive ───────────────────────────────────────── */
-@media (max-width: 640px) {
+@media (max-width: 800px) {
     .kpi-bar { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 380px) {
@@ -769,6 +771,33 @@ body { font-family: 'Figtree', sans-serif !important; }
             <div class="kpi-label">Sem Classificação</div>
             <div class="kpi-value" id="kpiUnclass">—</div>
             <div class="kpi-sub">precisam de atenção</div>
+        </div>
+        <div class="kpi-card kpi-green kpi-clickable" onclick="openFeitos()">
+            <div class="kpi-icon"><i class="bi bi-patch-check-fill"></i></div>
+            <div class="kpi-label">Procedimentos Feitos</div>
+            <div class="kpi-value" id="kpiDone">—</div>
+            <div class="kpi-sub">saíram do funil</div>
+        </div>
+    </div>
+
+    <!-- ── Modal: Procedimentos Realizados ──────────────────────── -->
+    <div id="modalFeitos" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);overflow-y:auto;" onclick="if(event.target===this)closeFeitos()">
+        <div style="max-width:560px;margin:60px auto 40px;background:#1e2d3d;border-radius:16px;border:1px solid rgba(52,211,153,.25);box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.4rem;border-bottom:1px solid rgba(255,255,255,.08);background:linear-gradient(135deg,rgba(52,211,153,.08),transparent);">
+                <div style="display:flex;align-items:center;gap:.6rem;">
+                    <i class="bi bi-patch-check-fill" style="color:#34d399;font-size:1.2rem;"></i>
+                    <span style="font-weight:700;font-size:1rem;color:#e2e8f0;">Procedimentos Realizados</span>
+                    <span id="feitosCountBadge" style="background:rgba(52,211,153,.15);color:#34d399;border:1px solid rgba(52,211,153,.3);border-radius:20px;padding:2px 10px;font-size:.75rem;font-weight:700;">0</span>
+                </div>
+                <button onclick="closeFeitos()" style="background:none;border:none;color:#94a3b8;font-size:1.3rem;cursor:pointer;padding:4px 8px;border-radius:8px;">×</button>
+            </div>
+            <div style="padding:.75rem 1rem .5rem;border-bottom:1px solid rgba(255,255,255,.05);">
+                <input id="feitosSearch" type="text" placeholder="Buscar paciente ou procedimento…" oninput="filterFeitos()"
+                    style="width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:.45rem .8rem;color:#e2e8f0;font-size:.85rem;outline:none;">
+            </div>
+            <div id="feitosListBody" style="padding:.75rem 1rem 1.25rem;max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:.5rem;">
+                <div style="color:#5a7a96;text-align:center;padding:2rem;">Carregando…</div>
+            </div>
         </div>
     </div>
 
@@ -1048,6 +1077,71 @@ function updateKPIs(data) {
     const badge = document.getElementById('unclassifiedBadge');
     badge.style.display = unclass > 0 ? '' : 'none';
 }
+
+// ── Procedimentos Feitos ─────────────────────────────────────
+let feitosData = [];
+
+function loadFeitos() {
+    fetch('/api/crm/performed')
+        .then(r => r.json())
+        .then(data => {
+            feitosData = data;
+            document.getElementById('kpiDone').textContent = data.length;
+        })
+        .catch(() => { document.getElementById('kpiDone').textContent = '?'; });
+}
+
+function openFeitos() {
+    document.getElementById('modalFeitos').style.display = 'block';
+    document.getElementById('feitosSearch').value = '';
+    renderFeitosCards(feitosData);
+}
+
+function closeFeitos() {
+    document.getElementById('modalFeitos').style.display = 'none';
+}
+
+function filterFeitos() {
+    const q = document.getElementById('feitosSearch').value.toLowerCase();
+    const filtered = feitosData.filter(p =>
+        p.patient_name.toLowerCase().includes(q) ||
+        p.procedure_name.toLowerCase().includes(q)
+    );
+    renderFeitosCards(filtered);
+}
+
+function renderFeitosCards(list) {
+    const body = document.getElementById('feitosListBody');
+    document.getElementById('feitosCountBadge').textContent = list.length;
+
+    if (!list.length) {
+        body.innerHTML = '<div style="color:#5a7a96;text-align:center;padding:2rem;">Nenhum procedimento encontrado.</div>';
+        return;
+    }
+
+    body.innerHTML = list.map(p => {
+        const rawDate = p.performed_date ? p.performed_date.split('T')[0] : null;
+        const dateStr = rawDate
+            ? new Date(rawDate + 'T12:00:00').toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' })
+            : 'Data não registrada';
+
+        return `
+        <div style="background:rgba(255,255,255,.04);border:1px solid rgba(52,211,153,.12);border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;gap:.9rem;">
+            <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;">
+                <i class="bi bi-check-lg" style="color:#34d399;font-size:1.1rem;"></i>
+            </div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:.88rem;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.patient_name}</div>
+                <div style="font-size:.78rem;color:#6ee7b7;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.procedure_name}</div>
+                <div style="font-size:.72rem;color:#5a7a96;margin-top:2px;"><i class="bi bi-calendar3" style="margin-right:3px;"></i>${dateStr}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeFeitos();
+});
 
 // ── Helper: first name ──────────────────────────────────────
 function firstName(name) { return (name || '').split(' ')[0]; }
@@ -1525,6 +1619,7 @@ function syncToGoogleSheets() {
 // ── Init ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     loadFunnel();
+    loadFeitos();
     document.getElementById('funnelMonthFilter').addEventListener('change', loadFunnel);
     document.getElementById('funnelYearFilter').addEventListener('change', loadFunnel);
     document.getElementById('funnelSort').addEventListener('change', renderAll);
