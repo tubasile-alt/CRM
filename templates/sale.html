@@ -965,6 +965,19 @@ const GROUPS = [
     { key: 'sem',    label: 'Sem Temperatura',      strip: 'sem',    color: '#475569' },
 ];
 
+// ── CSRF helper ─────────────────────────────────────────────
+function csrfToken() {
+    const m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute('content') : '';
+}
+function postJSON(url, payload) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
+        body: payload !== undefined ? JSON.stringify(payload) : undefined
+    });
+}
+
 // ── Helpers ────────────────────────────────────────────────
 function formatDate(d) {
     if (!d) return '—';
@@ -1473,7 +1486,7 @@ function getProcedureValue(planId) {
 function patchProcedure(planId, payload) {
     return fetch(`/api/crm/records/${planId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken() },
         body: JSON.stringify(payload)
     }).then(r => {
         if (!r.ok) throw new Error('Erro ao atualizar procedimento');
@@ -1528,11 +1541,7 @@ function saveFunnelStatus() {
         contact_attempts:   parseInt(document.getElementById('attemptsCount').textContent) || 0,
     };
 
-    fetch(`/api/crm/patient-funnel-status/${currentPatient.patient_id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
+    postJSON(`/api/crm/patient-funnel-status/${currentPatient.patient_id}`, payload)
     .then(r => r.json())
     .then(data => {
         if (data.success) {
@@ -1613,7 +1622,7 @@ function syncToGoogleSheets() {
     if (month) p.append('month', month);
     if (year)  p.append('year', year);
     if (p.toString()) url += '?' + p;
-    fetch(url, { method: 'POST' }).catch(() => {});
+    postJSON(url).catch(() => {});
 }
 
 // ── Init ────────────────────────────────────────────────────
