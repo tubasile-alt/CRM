@@ -568,6 +568,27 @@ body { font-family: 'Figtree', sans-serif !important; }
 .modal-table th { background: rgba(0,0,0,.25); color: #5a7a96; font-size: .7rem; font-weight: 700; border-color: rgba(255,255,255,.07) !important; }
 .modal-table td { border-color: rgba(255,255,255,.06) !important; font-size: .78rem; color: #c9d8e8; }
 .modal-table tfoot td { background: rgba(96,165,250,.08); color: #34d399; font-weight: 700; }
+.modal-value-input {
+    width: 120px;
+    background: rgba(15,23,42,.65);
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 6px;
+    color: #e2eaf4;
+    font-size: .74rem;
+    padding: .25rem .45rem;
+    text-align: right;
+}
+.modal-value-input:focus { outline: none; border-color: rgba(96,165,250,.6); }
+.btn-proc-action {
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 6px;
+    padding: .22rem .45rem;
+    font-size: .66rem;
+    cursor: pointer;
+    font-weight: 700;
+}
+.btn-proc-save { background: rgba(96,165,250,.14); color: #93c5fd; }
+.btn-proc-done { background: rgba(74,222,128,.14); color: #4ade80; margin-left: .25rem; }
 
 .modal-form-label { font-size: .72rem; font-weight: 700; color: #7fa3c4; margin-bottom: .3rem; }
 .modal-select {
@@ -832,9 +853,9 @@ body { font-family: 'Figtree', sans-serif !important; }
                     <div class="modal-section-label"><i class="bi bi-list-check me-1"></i>Procedimentos Propostos</div>
                     <div class="table-responsive">
                         <table class="table table-sm modal-table mb-0">
-                            <thead><tr><th>Procedimento</th><th class="text-end">Valor</th><th>Data</th><th>Obs.</th></tr></thead>
+                            <thead><tr><th>Procedimento</th><th class="text-end">Valor</th><th>Data</th><th>Obs.</th><th style="min-width:170px;">Ações</th></tr></thead>
                             <tbody id="modalProceduresBody"></tbody>
-                            <tfoot><tr><td><strong>Total</strong></td><td class="text-end" id="modalTotalValue">—</td><td colspan="2"></td></tr></tfoot>
+                            <tfoot><tr><td><strong>Total pendente</strong></td><td class="text-end" id="modalTotalValue">—</td><td colspan="3"></td></tr></tfoot>
                         </table>
                     </div>
                 </div>
@@ -1320,9 +1341,15 @@ function openPatientModal(patient) {
     tbody.innerHTML = (patient.procedures || []).map(proc => `
         <tr>
             <td>${proc.procedure_name}</td>
-            <td class="text-end fw-bold">${formatBRL(proc.planned_value)}</td>
+            <td class="text-end fw-bold">
+                <input type="number" step="0.01" min="0" class="modal-value-input" id="procValue_${proc.plan_id}" value="${parseFloat(proc.planned_value || 0).toFixed(2)}">
+            </td>
             <td>${formatDate(proc.planned_date)}</td>
             <td><small>${proc.observations || '—'}</small></td>
+            <td>
+                <button class="btn-proc-action btn-proc-save" onclick="saveProcedureValue(${proc.plan_id})">Salvar valor</button>
+                <button class="btn-proc-action btn-proc-done" onclick="markProcedureDone(${proc.plan_id})">Indicação pendente → Feito</button>
+            </td>
         </tr>`).join('');
     document.getElementById('modalTotalValue').textContent = formatBRL(patient.total_value);
 
@@ -1340,6 +1367,54 @@ function openPatientModal(patient) {
             focusClassifyOnOpen = false;
         }, 400);
     }
+}
+
+function getProcedureValue(planId) {
+    const input = document.getElementById(`procValue_${planId}`);
+    if (!input) return null;
+    const parsed = parseFloat(input.value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function patchProcedure(planId, payload) {
+    return fetch(`/api/crm/records/${planId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(r => {
+        if (!r.ok) throw new Error('Erro ao atualizar procedimento');
+        return r.json();
+    });
+}
+
+
+function saveProcedureValue(planId) {
+    const plannedValue = getProcedureValue(planId);
+    if (plannedValue === null || plannedValue < 0) {
+        alert('Digite um valor válido para o procedimento.');
+        return;
+    }
+
+    patchProcedure(planId, { planned_value: plannedValue })
+        .then(() => loadFunnel())
+        .catch(() => alert('Erro ao salvar valor do procedimento.'));
+}
+
+function markProcedureDone(planId) {
+    const plannedValue = getProcedureValue(planId);
+    if (plannedValue === null || plannedValue < 0) {
+        alert('Digite um valor válido para o procedimento.');
+        return;
+    }
+
+    patchProcedure(planId, { was_performed: true, planned_value: plannedValue })
+        .then(() => {
+            const modalEl = document.getElementById('patientFunnelModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+            loadFunnel();
+        })
+        .catch(() => alert('Erro ao marcar procedimento como feito.'));
 }
 
 // ── Tentativas ──────────────────────────────────────────────
