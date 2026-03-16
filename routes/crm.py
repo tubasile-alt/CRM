@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, jsonify, request, send_file, redir
 from flask_login import login_required, current_user
 from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor, PatientFunnelStatus
 from datetime import datetime, date, timedelta
+from decimal import Decimal, InvalidOperation
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, extract
 import pytz
@@ -613,12 +614,32 @@ def update_cosmetic_plan(plan_id):
         plan.was_performed = data['was_performed']
         if data['was_performed'] and not plan.performed_date:
             plan.performed_date = datetime.now()
+        elif not data['was_performed']:
+            plan.performed_date = None
+
+    if 'planned_value' in data:
+        raw_value = data['planned_value']
+        if raw_value in (None, ''):
+            plan.planned_value = None
+        else:
+            try:
+                plan.planned_value = Decimal(str(raw_value))
+            except (InvalidOperation, ValueError):
+                return jsonify({'success': False, 'error': 'planned_value inválido'}), 400
     
     if 'observations' in data:
         plan.observations = data['observations']
     
     db.session.commit()
-    return jsonify({'success': True})
+    return jsonify({
+        'success': True,
+        'plan': {
+            'id': plan.id,
+            'was_performed': plan.was_performed,
+            'planned_value': float(plan.planned_value) if plan.planned_value is not None else None,
+            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
+        }
+    })
 
 @crm_bp.route('/api/crm/stats')
 @login_required
