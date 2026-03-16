@@ -10,7 +10,7 @@ import os
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask
 from utils.database_backup import backup_manager
 
 app = Flask(__name__)
@@ -101,26 +101,18 @@ def format_brazil_datetime(dt):
 @app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
 @login_required
 def perform_cosmetic_plan(plan_id):
-    from models import CosmeticProcedurePlan, Evolution
+    """Atalho legado: registrar execução realizada para um plano."""
     plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
-    
     data = request.json or {}
-    performed_date_str = data.get('performed_date')
-    
-    # Marcar como realizado
-    plan.was_performed = True
-    plan.performed_date = performed_date_str or get_brazil_time().strftime('%Y-%m-%d')
-    
-    # Data para a evolução (converter string AAAA-MM-DD para objeto date)
-    try:
-        if performed_date_str:
-            evo_date = datetime.strptime(performed_date_str, '%Y-%m-%d').date()
-        else:
-            evo_date = get_brazil_time().date()
-    except:
-        evo_date = get_brazil_time().date()
 
-    # Criar uma evolução automática
+    execution = _build_execution_from_payload(plan, data, force_performed=True)
+    db.session.add(execution)
+
+    # Compatibilidade com legado D0 (será removido em fase posterior)
+    plan.was_performed = True
+    plan.performed_date = execution.performed_date
+
+    evo_date = execution.performed_date.date() if execution.performed_date else get_brazil_time().date()
     evolution = Evolution(
         patient_id=plan.note.patient_id if plan.note else None,
         doctor_id=current_user.id,
@@ -130,8 +122,159 @@ def perform_cosmetic_plan(plan_id):
     )
     db.session.add(evolution)
     db.session.commit()
-    
-    return jsonify({'success': True, 'evolution_id': evolution.id})
+
+    return jsonify({
+        'success': True,
+        'evolution_id': evolution.id,
+        'execution': _serialize_execution(execution)
+    })
+
+
+def _parse_date_or_datetime(value):
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        value_str = str(value).strip()
+        if len(value_str) == 10:
+            return datetime.strptime(value_str, '%Y-%m-%d')
+        return datetime.fromisoformat(value_str.replace('Z', ''))
+    except Exception:
+        return None
+
+
+def _serialize_execution(execution):
+    return {
+        'id': execution.id,
+        'plan_id': execution.plan_id,
+        'scheduled_date': execution.scheduled_date.isoformat() if execution.scheduled_date else None,
+        'performed_date': execution.performed_date.isoformat() if execution.performed_date else None,
+        'was_performed': execution.was_performed,
+        'charged_value': float(execution.charged_value) if execution.charged_value is not None else None,
+        'notes': execution.notes,
+        'followup_date': execution.followup_date.isoformat() if execution.followup_date else None,
+        'followup_status': execution.followup_status,
+        'created_at': execution.created_at.isoformat() if execution.created_at else None,
+    }
+
+
+def _build_execution_from_payload(plan, data, force_performed=False):
+    scheduled_date = _parse_date_or_datetime(data.get('scheduled_date'))
+    performed_date = _parse_date_or_datetime(data.get('performed_date'))
+
+    if force_performed:
+        was_performed = True
+    else:
+        was_performed = bool(data.get('was_performed', bool(performed_date)))
+
+    if was_performed and not performed_date:
+        performed_date = get_brazil_time().replace(tzinfo=None)
+
+    charged_raw = data.get('charged_value', data.get('planned_value', plan.final_budget or plan.planned_value))
+    charged_value = None
+    if charged_raw not in (None, ''):
+        try:
+            charged_value = float(charged_raw)
+        except (TypeError, ValueError):
+            charged_value = None
+
+    followup_date = _parse_date_or_datetime(data.get('followup_date'))
+    followup_status = (data.get('followup_status') or 'pendente').strip().lower()
+    if followup_status not in {'pendente', 'contatado', 'agendado', 'sem_resposta'}:
+        followup_status = 'pendente'
+
+    return ProcedureExecution(
+        plan_id=plan.id,
+        scheduled_date=scheduled_date,
+        performed_date=performed_date,
+        was_performed=was_performed,
+        charged_value=charged_value,
+        notes=data.get('notes') or data.get('observations'),
+        followup_date=followup_date,
+        followup_status=followup_status,
+    )
+
+
+@app.route('/api/cosmetic-plans/<int:plan_id>/executions', methods=['POST'])
+@login_required
+def create_plan_execution(plan_id):
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    data = request.get_json(silent=True) or {}
+
+    execution = _build_execution_from_payload(plan, data)
+    db.session.add(execution)
+
+    if execution.was_performed:
+        plan.was_performed = True
+        plan.performed_date = execution.performed_date
+
+    db.session.commit()
+    return jsonify({'success': True, 'execution': _serialize_execution(execution)}), 201
+
+
+@app.route('/api/cosmetic-plans/<int:plan_id>/executions', methods=['GET'])
+@login_required
+def list_plan_executions(plan_id):
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    executions = ProcedureExecution.query.filter_by(plan_id=plan.id).order_by(
+        ProcedureExecution.performed_date.desc().nullslast(),
+        ProcedureExecution.created_at.desc()
+    ).all()
+    return jsonify({'success': True, 'executions': [_serialize_execution(e) for e in executions]})
+
+
+@app.route('/api/executions/<int:execution_id>', methods=['PUT'])
+@login_required
+def update_execution(execution_id):
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    execution = ProcedureExecution.query.get_or_404(execution_id)
+    data = request.get_json(silent=True) or {}
+
+    if 'scheduled_date' in data:
+        execution.scheduled_date = _parse_date_or_datetime(data.get('scheduled_date'))
+    if 'performed_date' in data:
+        execution.performed_date = _parse_date_or_datetime(data.get('performed_date'))
+    if 'was_performed' in data:
+        execution.was_performed = bool(data.get('was_performed'))
+    if 'charged_value' in data:
+        raw = data.get('charged_value')
+        execution.charged_value = float(raw) if raw not in (None, '') else None
+    if 'notes' in data:
+        execution.notes = data.get('notes')
+    if 'followup_date' in data:
+        execution.followup_date = _parse_date_or_datetime(data.get('followup_date'))
+    if 'followup_status' in data:
+        status = (data.get('followup_status') or '').strip().lower()
+        if status not in {'pendente', 'contatado', 'agendado', 'sem_resposta'}:
+            return jsonify({'success': False, 'error': 'followup_status inválido'}), 400
+        execution.followup_status = status
+
+    if execution.was_performed and not execution.performed_date:
+        execution.performed_date = get_brazil_time().replace(tzinfo=None)
+
+    db.session.commit()
+    return jsonify({'success': True, 'execution': _serialize_execution(execution)})
+
+
+@app.route('/api/executions/<int:execution_id>', methods=['DELETE'])
+@login_required
+def delete_execution(execution_id):
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    execution = ProcedureExecution.query.get_or_404(execution_id)
+    db.session.delete(execution)
+    db.session.commit()
+    return jsonify({'success': True})
 
 @app.route('/health')
 def health():
@@ -3156,15 +3299,22 @@ def get_cosmetic_plans(patient_id):
     
     plans_data = []
     for plan, note in plans:
+        executions = ProcedureExecution.query.filter_by(plan_id=plan.id).order_by(
+            ProcedureExecution.performed_date.desc().nullslast(),
+            ProcedureExecution.created_at.desc()
+        ).all()
+
         plans_data.append({
             'id': plan.id,
             'procedure_name': plan.procedure_name,
+            'status': plan.status,
             'planned_value': plan.planned_value,
             'final_budget': plan.final_budget,
             'was_performed': plan.was_performed,
             'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_months': plan.follow_up_months,
-            'created_at': note.created_at.isoformat() if note else None
+            'created_at': note.created_at.isoformat() if note else None,
+            'executions': [_serialize_execution(execution) for execution in executions]
         })
     
     return jsonify({'success': True, 'plans': plans_data})
@@ -3203,15 +3353,22 @@ def get_cosmetic_plans_grouped(patient_id):
                 'display_date': note.created_at.strftime('%d/%m/%Y %H:%M')
             }
         
+        executions = ProcedureExecution.query.filter_by(plan_id=plan.id).order_by(
+            ProcedureExecution.performed_date.desc().nullslast(),
+            ProcedureExecution.created_at.desc()
+        ).all()
+
         grouped_plans[consultation_key].append({
             'id': plan.id,
             'procedure_name': plan.procedure_name,
+            'status': plan.status,
             'planned_value': float(plan.planned_value) if plan.planned_value else 0,
             'final_budget': float(plan.final_budget) if plan.final_budget else 0,
             'was_performed': plan.was_performed,
             'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_months': plan.follow_up_months,
-            'created_at': plan.created_at.isoformat() if plan.created_at else None
+            'created_at': plan.created_at.isoformat() if plan.created_at else None,
+            'executions': [_serialize_execution(execution) for execution in executions]
         })
     
     result = []
@@ -3251,6 +3408,11 @@ def update_cosmetic_plan(plan_id):
             plan.performed_date = get_brazil_time().date()
     if 'follow_up_months' in data:
         plan.follow_up_months = int(data['follow_up_months'])
+    if 'status' in data:
+        status = (data.get('status') or '').strip().lower()
+        if status not in {'ativo', 'pausado', 'concluido', 'cancelado'}:
+            return jsonify({'success': False, 'error': 'status inválido'}), 400
+        plan.status = status
     
     db.session.commit()
     
@@ -4011,4 +4173,3 @@ def inject_asset_version():
             return 1
 
     return {'asset_version': asset_version}
-

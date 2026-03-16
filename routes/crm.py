@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, jsonify, request, send_file, redirect, url_for
 from flask_login import login_required, current_user
-from models import db, Patient, CosmeticProcedurePlan, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor, PatientFunnelStatus
+from models import db, Patient, CosmeticProcedurePlan, ProcedureExecution, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor, PatientFunnelStatus
 from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation
 from dateutil.relativedelta import relativedelta
@@ -159,33 +159,37 @@ def get_pending_surgeries():
 @crm_bp.route('/api/crm/performed')
 @login_required
 def get_performed_procedures():
-    # Pega procedimentos realizados do planejamento de cosmiatria
-    query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
+    # D1: prioriza execuções realizadas; fallback legado para planos sem execução.
+    query = db.session.query(ProcedureExecution, CosmeticProcedurePlan, Note, Patient).join(
+        CosmeticProcedurePlan, ProcedureExecution.plan_id == CosmeticProcedurePlan.id
+    ).join(
         Note, CosmeticProcedurePlan.note_id == Note.id
     ).join(
         Patient, Note.patient_id == Patient.id
-    ).filter(CosmeticProcedurePlan.was_performed == True)
+    ).filter(ProcedureExecution.was_performed == True)
     
     if current_user.is_doctor():
         query = query.filter(Note.doctor_id == current_user.id)
     
-    plans = query.order_by(CosmeticProcedurePlan.performed_date.desc()).limit(100).all()
+    rows = query.order_by(ProcedureExecution.performed_date.desc()).limit(100).all()
     
     result = []
-    for plan, note, patient in plans:
+    for execution, plan, note, patient in rows:
         follow_up_due_at = None
-        if plan.performed_date and plan.follow_up_months:
-            follow_up_due_at = (plan.performed_date + relativedelta(months=plan.follow_up_months)).date()
+        execution_date = execution.performed_date or plan.performed_date
+        if execution_date and plan.follow_up_months:
+            follow_up_due_at = (execution_date + relativedelta(months=plan.follow_up_months)).date()
         dp_id = _get_dp_id(patient.id, note.doctor_id)
         result.append({
-            'id': plan.id,
+            'id': execution.id,
+            'plan_id': plan.id,
             'patient_id': patient.id,
             'patient_name': patient.name,
             'procedure_name': plan.procedure_name,
-            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
+            'performed_date': execution_date.isoformat() if execution_date else None,
             'follow_up_due_at': follow_up_due_at.isoformat() if follow_up_due_at else None,
             'follow_up_months': plan.follow_up_months or 6,
-            'observations': plan.observations,
+            'observations': execution.notes or plan.observations,
             'dp_id': dp_id
         })
     
@@ -196,36 +200,40 @@ def get_performed_procedures():
 def get_followups():
     today = date.today()
     
-    # Pega procedimentos realizados que precisam de follow-up
-    query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
+    # D1: follow-up por execução realizada
+    query = db.session.query(ProcedureExecution, CosmeticProcedurePlan, Note, Patient).join(
+        CosmeticProcedurePlan, ProcedureExecution.plan_id == CosmeticProcedurePlan.id
+    ).join(
         Note, CosmeticProcedurePlan.note_id == Note.id
     ).join(
         Patient, Note.patient_id == Patient.id
-    ).filter(CosmeticProcedurePlan.was_performed == True)
+    ).filter(ProcedureExecution.was_performed == True)
     
     if current_user.is_doctor():
         query = query.filter(Note.doctor_id == current_user.id)
     
-    plans = query.all()
+    rows = query.all()
     
     result = []
-    for plan, note, patient in plans:
-        if not plan.performed_date or not plan.follow_up_months:
+    for execution, plan, note, patient in rows:
+        execution_date = execution.performed_date or plan.performed_date
+        if not execution_date or not plan.follow_up_months:
             continue
         
-        follow_up_due_at = (plan.performed_date + relativedelta(months=plan.follow_up_months)).date()
+        follow_up_due_at = (execution_date + relativedelta(months=plan.follow_up_months)).date()
         days_until = (follow_up_due_at - today).days
         
         status_label = 'Vencido' if days_until < 0 else ('Próximo' if days_until <= 30 else 'Futuro')
         
         dp_id = _get_dp_id(patient.id, note.doctor_id)
         result.append({
-            'id': plan.id,
+            'id': execution.id,
+            'plan_id': plan.id,
             'patient_id': patient.id,
             'patient_name': patient.name,
             'patient_phone': patient.phone,
             'procedure_name': plan.procedure_name,
-            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
+            'performed_date': execution_date.isoformat() if execution_date else None,
             'follow_up_due_at': follow_up_due_at.isoformat(),
             'days_until': days_until,
             'urgency': status_label,
@@ -238,12 +246,17 @@ def get_followups():
 @crm_bp.route('/api/crm/planned')
 @login_required
 def get_planned_procedures():
-    # Pega procedimentos planejados mas NÃO realizados
+    # D1: planejados são planos sem execução realizada
     query = db.session.query(CosmeticProcedurePlan, Note, Patient).join(
         Note, CosmeticProcedurePlan.note_id == Note.id
     ).join(
         Patient, Note.patient_id == Patient.id
-    ).filter(CosmeticProcedurePlan.was_performed == False)
+    ).outerjoin(
+        ProcedureExecution,
+        ProcedureExecution.plan_id == CosmeticProcedurePlan.id
+    ).group_by(CosmeticProcedurePlan.id, Note.id, Patient.id).having(
+        db.func.sum(db.case((ProcedureExecution.was_performed == True, 1), else_=0)) == 0
+    )
     
     if current_user.is_doctor():
         query = query.filter(Note.doctor_id == current_user.id)

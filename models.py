@@ -300,6 +300,7 @@ class CosmeticProcedurePlan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
     procedure_name = db.Column(db.String(100), nullable=False)  # Botox, Sculptra, Morpheus, etc
+    status = db.Column(db.String(20), default='ativo', nullable=False, index=True)  # ativo, pausado, concluido, cancelado
     planned_value = db.Column(db.Numeric(10, 2))  # Valor planejado (precisão decimal para valores monetários)
     final_budget = db.Column(db.Numeric(10, 2))  # Orçamento final ajustado
     was_performed = db.Column(db.Boolean, default=False)  # Se foi realizado
@@ -307,9 +308,31 @@ class CosmeticProcedurePlan(db.Model):
     follow_up_months = db.Column(db.Integer)  # Intervalo de retorno em meses
     observations = db.Column(db.Text)  # Observações sobre o procedimento
     created_at = db.Column(db.DateTime, default=get_brazil_time)
+
+    executions = db.relationship(
+        'ProcedureExecution',
+        backref='plan',
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+
+class ProcedureExecution(db.Model):
+    __tablename__ = 'procedure_execution'
+
+    id = db.Column(db.Integer, primary_key=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey('cosmetic_procedure_plan.id'), nullable=False, index=True)
+    scheduled_date = db.Column(db.DateTime, nullable=True, index=True)
+    performed_date = db.Column(db.DateTime, nullable=True, index=True)
+    was_performed = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    charged_value = db.Column(db.Numeric(10, 2), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    followup_date = db.Column(db.DateTime, nullable=True, index=True)
+    followup_status = db.Column(db.String(20), default='pendente', nullable=False, index=True)  # pendente, contatado, agendado, sem_resposta
+    created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
 
 # Modelos para Transplante Capilar
 class HairTransplant(db.Model):
