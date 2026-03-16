@@ -545,64 +545,85 @@ def sync_to_google_sheets():
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
-        import requests
-        
+        from services.google_sheets import _get_access_token, _get_sheets_service
+        import requests as req
+
         # Buscar dados com filtros opcionais
         month = request.args.get('month', type=int)
-        year = request.args.get('year', type=int)
-        
-        patients_dict = _get_funnel_data(month=month, year=year)
-        
-        if not patients_dict:
-            return jsonify({'success': False}), 404
+        year  = request.args.get('year',  type=int)
 
-        # Montar dados para Google Sheets
-        rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações']]
-        
-        for patient_data in patients_dict.values():
-            procs_str = '; '.join([f"{p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
+        patients_dict = _get_funnel_data(month=month, year=year)
+
+        if not patients_dict:
+            return jsonify({'success': False, 'error': 'Sem dados para sincronizar'}), 404
+
+        # Montar linhas para planilha
+        rows = [['Paciente', 'Telefone', 'Status', 'Temperatura',
+                 'Procedimentos', 'Total (R$)', 'Próx. Contato', 'Observações']]
+
+        for pd in patients_dict.values():
+            procs_str = '; '.join([
+                f"{p['procedure_name']} (R$ {float(p['planned_value']):.2f})"
+                for p in pd['procedures']
+            ])
+            next_contact = pd.get('next_contact_date') or ''
             rows.append([
-                patient_data['patient_name'],
-                patient_data['patient_phone'],
-                patient_data['funnel_status'],
-                patient_data['funnel_temperature'],
+                pd['patient_name'],
+                pd.get('patient_phone', ''),
+                pd.get('funnel_status', ''),
+                pd.get('funnel_temperature', ''),
                 procs_str,
-                f"{patient_data['total_value']:.2f}",
-                patient_data['doctor_notes'][:100] if patient_data['doctor_notes'] else ''
+                f"{float(pd['total_value']):.2f}",
+                str(next_contact),
+                (pd.get('doctor_notes') or '')[:200],
             ])
 
-        # Obter token via arquivo de cache
-        token_file = '/tmp/replit_google_sheet_token.txt'
-        spreadsheet_id_file = '/tmp/replit_google_sheet_id.txt'
-        
-        access_token = None
-        spreadsheet_id = None
-        
-        if os.path.exists(token_file):
-            with open(token_file, 'r') as f:
-                access_token = f.read().strip()
-        
-        if os.path.exists(spreadsheet_id_file):
-            with open(spreadsheet_id_file, 'r') as f:
-                spreadsheet_id = f.read().strip()
-        
-        # Se temos credenciais, sincronizar
-        if access_token and spreadsheet_id:
-            headers = {'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json'}
-            
-            # Limpar range anterior
-            clear_url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/Dados!A1:Z1000:clear'
-            requests.post(clear_url, headers=headers)
-            
-            # Atualizar dados
-            update_url = f'https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}/values/Dados!A1'
-            update_body = {'values': rows}
-            requests.put(update_url, json=update_body, headers=headers)
-        
-        return jsonify({'success': True})
-        
+        # Obter credenciais via integração Replit
+        SPREADSHEET_ID = '1IUNWhBRzt5u6_ttfzjfTKckhSMOMx1l_s7uGnIom66o'
+        SHEET_NAME     = 'Funil de Vendas'
+
+        access_token = _get_access_token()
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+
+        base = f'https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}'
+
+        # Garantir que a aba existe — lista abas
+        meta = req.get(f'{base}?fields=sheets.properties.title', headers=headers, timeout=10)
+        if meta.status_code == 200:
+            sheet_titles = [s['properties']['title'] for s in meta.json().get('sheets', [])]
+        else:
+            sheet_titles = []
+
+        if SHEET_NAME not in sheet_titles:
+            # Criar aba
+            req.post(f'{base}:batchUpdate', headers=headers, timeout=10, json={
+                'requests': [{'addSheet': {'properties': {'title': SHEET_NAME}}}]
+            })
+
+        # Limpar aba
+        req.post(f'{base}/values/{SHEET_NAME}!A1:Z2000:clear', headers=headers, timeout=10)
+
+        # Escrever dados
+        resp = req.put(
+            f'{base}/values/{SHEET_NAME}!A1',
+            headers=headers,
+            timeout=15,
+            params={'valueInputOption': 'USER_ENTERED'},
+            json={'values': rows}
+        )
+
+        if resp.status_code not in (200, 201):
+            return jsonify({'success': False, 'error': f'Google Sheets API: {resp.status_code}'}), 500
+
+        total_rows = len(rows) - 1  # descontando cabeçalho
+        return jsonify({'success': True, 'rows_written': total_rows})
+
     except Exception as e:
-        return jsonify({'success': False}), 500
+        print(f'[sync_to_google_sheets] Erro: {e}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @crm_bp.route('/api/crm/records/<int:plan_id>', methods=['PATCH'])
 @login_required
