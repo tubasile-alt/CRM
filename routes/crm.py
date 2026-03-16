@@ -711,3 +711,36 @@ def get_crm_stats():
         'overdue': overdue_count,
         'due_soon': due_soon_count
     })
+
+
+@crm_bp.route('/api/cosmetic-plans/<int:plan_id>/executions', methods=['POST'])
+@login_required
+def create_execution(plan_id):
+    """Cria uma nova execução para um plano de procedimento cosmético."""
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    
+    data = request.get_json() or {}
+    
+    execution = ProcedureExecution(
+        plan_id=plan_id,
+        scheduled_date=data.get('scheduled_date'),
+        performed_date=data.get('performed_date'),
+        was_performed=data.get('was_performed', False),
+        charged_value=data.get('charged_value'),
+        notes=data.get('notes'),
+        followup_date=data.get('followup_date'),
+        followup_status=data.get('followup_status', 'pendente')
+    )
+    
+    db.session.add(execution)
+    db.session.commit()
+    
+    return jsonify({
+        'id': execution.id,
+        'plan_id': execution.plan_id,
+        'scheduled_date': execution.scheduled_date.isoformat() if execution.scheduled_date else None,
+        'performed_date': execution.performed_date.isoformat() if execution.performed_date else None,
+        'was_performed': execution.was_performed,
+        'notes': execution.notes,
+        'created_at': execution.created_at.isoformat()
+    }), 201
