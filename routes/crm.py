@@ -559,7 +559,7 @@ def sync_to_google_sheets():
 
         # Montar linhas para planilha
         rows = [['Paciente', 'Telefone', 'Status', 'Temperatura',
-                 'Procedimentos', 'Total (R$)', 'Próx. Contato', 'Observações']]
+                 'Procedimentos', 'Total (R$)', 'Próx. Contato']]
 
         for pd in patients_dict.values():
             procs_str = '; '.join([
@@ -575,7 +575,6 @@ def sync_to_google_sheets():
                 procs_str,
                 f"{float(pd['total_value']):.2f}",
                 str(next_contact),
-                (pd.get('doctor_notes') or '')[:200],
             ])
 
         # Obter credenciais via integração Replit
