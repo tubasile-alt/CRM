@@ -1162,41 +1162,6 @@
                 </div>
                 {% endif %}
 
-                {% if consultation.cosmetic_plans %}
-                <div class="mb-3">
-                  <h6 class="text-success mb-2">
-                    <i class="bi bi-heart-pulse"></i> Planejamento e Execução
-                  </h6>
-                  <div class="list-group">
-                    {% for plan in consultation.cosmetic_plans %}
-                    <div class="list-group-item d-flex justify-content-between align-items-center py-2">
-                      <div class="d-flex align-items-center">
-                        <i class="bi bi-{% if plan.was_performed %}check-circle-fill text-success{% else %}x-circle-fill text-danger{% endif %} me-2 fs-5"></i>
-                        <div>
-                          <strong>{{ plan.procedure_name }}</strong> -
-                          <span class="text-muted">
-                            R$ {{ "{:,.2f}".format((plan.final_budget or plan.planned_value)|float).replace(',', 'X').replace('.', ',').replace('X', '.') }}
-                          </span>
-                          {% if plan.was_performed and plan.performed_date %}
-                          <br><small class="text-muted">Realizado em: {{ plan.performed_date.strftime('%d/%m/%Y') }}</small>
-                          {% endif %}
-                        </div>
-                      </div>
-                      <div>
-                        {% if plan.was_performed %}
-                        <span class="badge bg-success">FEITO</span>
-                        {% else %}
-                        <button class="btn btn-sm btn-danger py-0 px-2 fw-bold" onclick="performCosmeticProcedure({{ plan.id }}, '{{ plan.procedure_name|escape }}', {{ plan.appointment_id or 'null' }})">
-                          PENDENTE
-                        </button>
-                        {% endif %}
-                      </div>
-                    </div>
-                    {% endfor %}
-                  </div>
-                </div>
-                {% endif %}
-
                 {% if 'conduta' in consultation.notes_by_type %}
                   {% set conduta_text = consultation.notes_by_type['conduta'].content %}
                   {% set conduta_note = consultation.notes_by_type['conduta'] %}
