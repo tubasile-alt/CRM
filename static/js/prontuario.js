@@ -2612,43 +2612,6 @@ async function saveEvolution() {
   }
 }
 
-async function saveQuickEvolution(consultationId) {
-  if (!ensureClinicalEditAllowed()) return;
-  const patientId = getPatientId();
-  const textarea = document.getElementById(`newEvoText${consultationId}`);
-  const content = textarea?.value.trim() || "";
-
-  if (!content) {
-    showAlert("Por favor, digite o conteúdo da evolução.", "warning");
-    return;
-  }
-
-  try {
-    const result = await core.fetchJson(`/api/patient/${patientId}/evolution`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCSRFToken()
-      },
-      body: JSON.stringify({
-        content,
-        consultation_id: consultationId,
-        evolution_date: new Date().toISOString()
-      })
-    });
-
-    if (result.success) {
-      showAlert("Evolução salva com sucesso!", "success");
-      loadTimeline();
-    } else {
-      showAlert(result.error || "Erro ao salvar", "danger");
-    }
-  } catch (err) {
-    console.error(err);
-    showAlert("Erro ao salvar evolução", "danger");
-  }
-}
-
 async function deleteEvolution(evoId) {
   if (!ensureClinicalEditAllowed()) return;
   if (!confirm("Tem certeza que deseja deletar esta evolução?")) return;
@@ -2711,13 +2674,10 @@ function renderEvolutionsInAccordion(consultations = []) {
         quickEvoDiv.className = "mt-3 p-3 bg-light rounded border mb-3";
         quickEvoDiv.innerHTML = `
           <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Nova Evolução</h6>
-          <textarea class="form-control mb-2" rows="3" id="newEvoText${consultation.id}" placeholder="Descreva a evolução do paciente..." style="background-color: #fff;"></textarea>
-          <div class="d-flex justify-content-between">
-            <button class="btn btn-sm btn-success" onclick="saveQuickEvolution(${consultation.id})">
-              <i class="bi bi-save"></i> Salvar Evolução
-            </button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date || ""}')">
-              <i class="bi bi-arrows-fullscreen"></i> Tela Cheia
+          <p class="text-muted small mb-2">Para registrar evolução de retorno, use o botão abaixo (abre em pop-up dentro desta consulta).</p>
+          <div class="d-flex justify-content-end">
+            <button class="btn btn-sm btn-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date || ""}')">
+              <i class="bi bi-plus-circle"></i> Adicionar Evolução
             </button>
           </div>
         `;
@@ -3398,7 +3358,6 @@ function refreshSurgeryHistory() {
 
 window.openSurgeryEvolutionModal = openSurgeryEvolutionModal;
 window.saveEvolution = saveEvolution;
-window.saveQuickEvolution = saveQuickEvolution;
 window.deleteEvolution = deleteEvolution;
 window.deleteSurgeryEvolution = deleteSurgeryEvolution;
 
