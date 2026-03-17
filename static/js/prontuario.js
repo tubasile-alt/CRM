@@ -951,6 +951,9 @@ function renderProcedureCard(proc) {
               </div>
             </div>
           </div>
+          <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Deletar planejamento" onclick="deleteCosmeticPlan(${proc.id}, '${core.escapeHtml(proc.name)}')">
+            <i class="bi bi-trash"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -1796,6 +1799,37 @@ async function performCosmeticProcedure(planId, procedureName, consultationId = 
   if (!dateInput) return;
 
   await promptCreateExecution(planId);
+}
+
+async function deleteCosmeticPlan(planId, procedureName) {
+  if (!confirm(`Deletar o planejamento "${procedureName}"?\n\nEsta ação não pode ser desfeita.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/crm/plans/${planId}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCSRFToken()
+      }
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      showAlert(err.error || 'Erro ao deletar planejamento', 'danger');
+      return;
+    }
+
+    // Recarregar dados
+    await loadCosmeticPlans();
+    renderCosmeticConduct();
+    showAlert(`Planejamento "${procedureName}" deletado com sucesso`, 'success');
+  } catch (error) {
+    console.error('Erro ao deletar planejamento:', error);
+    showAlert('Erro ao deletar planejamento', 'danger');
+  }
 }
 
 window.toggleProcedurePerformed = async function (index) {

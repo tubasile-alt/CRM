@@ -711,3 +711,28 @@ def get_crm_stats():
         'overdue': overdue_count,
         'due_soon': due_soon_count
     })
+
+
+@crm_bp.route('/api/crm/plans/<int:plan_id>', methods=['DELETE'])
+@login_required
+def delete_cosmetic_plan(plan_id):
+    """Deleta um planejamento de procedimento cosmético."""
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    
+    # Verificar permissão: apenas médico ou secretária
+    if not (current_user.is_doctor() or current_user.is_secretary()):
+        return jsonify({'error': 'Acesso restrito'}), 403
+    
+    # Se usuário é médico, só pode deletar seus próprios planos
+    if current_user.is_doctor():
+        note = Note.query.get(plan.note_id)
+        if not note or note.doctor_id != current_user.id:
+            return jsonify({'error': 'Você não tem permissão para deletar este planejamento'}), 403
+    
+    try:
+        db.session.delete(plan)
+        db.session.commit()
+        return jsonify({'success': True, 'message': f'Planejamento "{plan.procedure_name}" deletado com sucesso'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
