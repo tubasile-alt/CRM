@@ -11,6 +11,8 @@ let planExecutionsByPlanId = {};
 let groupedCosmeticPlans = [];
 let editingCosmeticProcedureIndex = null;
 let expandedCosmeticPlans = new Set();
+let pendingByDateMap = {};
+let realizedByDateMap = {};
 let selectedNorwood = null;
 let activeCosmeticContext = null;
 let currentRightPanelMode = null;
@@ -1349,6 +1351,36 @@ function initializeRightPanelFromHistory() {
    COSMIATRIA - DADOS
 ========================= */
 
+
+function renderDateBucketPanel(targetId, buckets, emptyMessage) {
+  const panel = document.getElementById(targetId);
+  if (!panel) return;
+  const dates = Object.keys(buckets || {}).filter(Boolean).sort((a, b) => b.localeCompare(a));
+  if (!dates.length) {
+    panel.innerHTML = `<span class="text-muted">${emptyMessage}</span>`;
+    return;
+  }
+
+  panel.innerHTML = dates.map((dateKey) => {
+    const items = buckets[dateKey] || [];
+    const labels = items.map((item) => {
+      const color = item.color || '#6c757d';
+      const name = core.escapeHtml(item.procedure_name || item.name || 'Procedimento');
+      return `<span class="badge me-1 mb-1" style="background:${color};">${name}</span>`;
+    }).join('');
+    return `
+      <div class="mb-2">
+        <div class="fw-bold">${formatDateBR(`${dateKey}T00:00:00`)}</div>
+        <div>${labels || '<span class="text-muted">Sem itens</span>'}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderPlanDateClusters() {
+  renderDateBucketPanel('pendingByDatePanel', pendingByDateMap, 'Nenhum pendente.');
+  renderDateBucketPanel('realizedByDatePanel', realizedByDateMap, 'Nenhum realizado.');
+}
 async function loadExistingPlans() {
   const patientId = getPatientId();
   if (!patientId) return;
@@ -1359,9 +1391,13 @@ async function loadExistingPlans() {
     groupedCosmeticPlans = [];
     cosmeticPlans = [];
     planExecutionsByPlanId = {};
+    pendingByDateMap = {};
+    realizedByDateMap = {};
 
     if (data.success && data.grouped_plans && data.grouped_plans.length > 0) {
       groupedCosmeticPlans = data.grouped_plans;
+      pendingByDateMap = data.pending_by_date || {};
+      realizedByDateMap = data.realized_by_date || {};
 
       data.grouped_plans.forEach((group) => {
         group.procedures.forEach((plan) => {
@@ -1386,6 +1422,7 @@ async function loadExistingPlans() {
     }
 
     renderCosmeticProcedures();
+    renderPlanDateClusters();
     renderCosmeticConduct();
     updateCosmeticTotal();
     updateMainLayoutColumns();
@@ -1394,7 +1431,10 @@ async function loadExistingPlans() {
     groupedCosmeticPlans = [];
     cosmeticPlans = [];
     planExecutionsByPlanId = {};
+    pendingByDateMap = {};
+    realizedByDateMap = {};
     renderCosmeticProcedures();
+    renderPlanDateClusters();
     renderCosmeticConduct();
     updateCosmeticTotal();
     updateMainLayoutColumns();

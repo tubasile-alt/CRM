@@ -3362,8 +3362,6 @@ def get_cosmetic_plans(patient_id):
             'status': plan.status,
             'planned_value': plan.planned_value,
             'final_budget': plan.final_budget,
-            'was_performed': plan.was_performed,
-            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_months': plan.follow_up_months,
             'created_at': note.created_at.isoformat() if note else None,
             'executions': [_serialize_execution(execution) for execution in executions]
@@ -3416,8 +3414,6 @@ def get_cosmetic_plans_grouped(patient_id):
             'status': plan.status,
             'planned_value': float(plan.planned_value) if plan.planned_value else 0,
             'final_budget': float(plan.final_budget) if plan.final_budget else 0,
-            'was_performed': plan.was_performed,
-            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_months': plan.follow_up_months,
             'created_at': plan.created_at.isoformat() if plan.created_at else None,
             'executions': [_serialize_execution(execution) for execution in executions]
@@ -3461,7 +3457,7 @@ def get_cosmetic_plans_grouped(patient_id):
 @app.route('/api/prontuario/cosmetic-plan/<int:plan_id>', methods=['DELETE'])
 @login_required
 def delete_cosmetic_plan(plan_id):
-    if not current_user.is_doctor():
+    if not current_user.is_doctor() and not current_user.is_secretary():
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
 
     plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
