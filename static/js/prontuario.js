@@ -1435,6 +1435,14 @@ async function loadExistingPlans() {
       });
     }
 
+    // Limpar contexto se não houver procedimentos correspondentes
+    if (activeCosmeticContext && cosmeticPlans.length > 0) {
+      const matchingPlans = cosmeticPlans.filter((plan) => matchesContext(plan, activeCosmeticContext));
+      if (matchingPlans.length === 0) {
+        activeCosmeticContext = null;
+      }
+    }
+
     renderCosmeticProcedures();
     renderPlanDateClusters();
     renderCosmeticConduct();
@@ -1447,6 +1455,7 @@ async function loadExistingPlans() {
     planExecutionsByPlanId = {};
     pendingByDateMap = {};
     realizedByDateMap = {};
+    activeCosmeticContext = null;
     renderCosmeticProcedures();
     renderPlanDateClusters();
     renderCosmeticConduct();
