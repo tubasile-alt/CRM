@@ -2669,26 +2669,6 @@ function renderEvolutionsInAccordion(consultations = []) {
 
       container.innerHTML = "";
 
-      if (consultation.evolutions && consultation.evolutions.length > 0) {
-        const historyTitle = document.createElement("div");
-        historyTitle.className = "border-bottom pb-2 mb-3";
-        historyTitle.innerHTML = '<small class="text-muted fw-bold">Evoluções Anteriores:</small>';
-        container.appendChild(historyTitle);
-
-        consultation.evolutions.forEach((evo) => {
-          const evoDiv = document.createElement("div");
-          evoDiv.className = "mb-2 p-2 bg-white rounded border-start border-4 border-success shadow-sm";
-          evoDiv.innerHTML = `
-            <div class="d-flex justify-content-between">
-              <small class="text-muted fw-bold">${core.escapeHtml(evo.date)} - Dr. ${core.escapeHtml(evo.doctor)}</small>
-              ${canEditClinical() ? `<button class="btn btn-link btn-sm p-0 text-danger" onclick="deleteEvolution(${evo.id})"><i class="bi bi-trash"></i></button>` : ''}
-            </div>
-            <div class="mt-1" style="white-space: pre-wrap;">${core.escapeHtml(evo.content)}</div>
-          `;
-          container.appendChild(evoDiv);
-        });
-      }
-
       if (canEditClinical()) {
         const quickEvoDiv = document.createElement("div");
         quickEvoDiv.className = "mt-3 p-3 bg-light rounded border";
