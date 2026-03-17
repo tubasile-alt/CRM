@@ -2726,6 +2726,20 @@ def finalizar_atendimento(patient_id):
             
             cosmetic_procedures_data = data.get('cosmetic_procedures', [])
             conduta_note_id = note_ids.get('conduta')
+
+            # Regra de ciclo: cada finalização de consulta de cosmiatria reinicia o planejamento.
+            # Portanto, planos antigos ainda abertos (ativo/pausado) são encerrados automaticamente.
+            previous_open_plan_ids = [
+                plan.id
+                for plan in db.session.query(CosmeticProcedurePlan).join(Note, CosmeticProcedurePlan.note_id == Note.id).filter(
+                    Note.patient_id == patient_id,
+                    CosmeticProcedurePlan.status.in_(['ativo', 'pausado'])
+                ).all()
+            ]
+            if previous_open_plan_ids:
+                CosmeticProcedurePlan.query.filter(
+                    CosmeticProcedurePlan.id.in_(previous_open_plan_ids)
+                ).update({'status': 'cancelado'}, synchronize_session=False)
             
             if conduta_note_id and cosmetic_procedures_data:
                 # Batch update de lembretes ANTES do loop
@@ -3455,11 +3469,15 @@ def get_cosmetic_plans_grouped(patient_id):
         for procedure in item.get('procedures', []):
             executions = procedure.get('executions') or []
             if not executions:
+                if procedure.get('status') not in ('ativo', 'pausado'):
+                    continue
                 key = (procedure.get('created_at') or item['consultation_info']['date'] or '')[:10]
                 pending_by_date.setdefault(key, []).append(procedure)
                 continue
             for execution in executions:
                 status = execution.get('execution_status') or ('realizada' if execution.get('was_performed') else 'agendada')
+                if status not in ('realizada', 'agendada'):
+                    continue
                 base_date = execution.get('performed_date') if status == 'realizada' else execution.get('scheduled_date')
                 key = (base_date or procedure.get('created_at') or item['consultation_info']['date'] or '')[:10]
                 target = realized_by_date if status == 'realizada' else pending_by_date

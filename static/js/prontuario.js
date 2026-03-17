@@ -2215,9 +2215,10 @@ function buildFinalizePayload() {
   }
 
   if (currentCategory === "cosmiatria" && cosmeticPlans.length > 0) {
-    payload.cosmetic_procedures = cosmeticPlans;
+    const newCosmeticPlans = cosmeticPlans.filter((plan) => !plan.id);
+    payload.cosmetic_procedures = newCosmeticPlans;
 
-    const performedProcedures = cosmeticPlans.filter((p) => getPlanPerformed(p));
+    const performedProcedures = newCosmeticPlans.filter((p) => getPlanPerformed(p));
     const totalPerformed = performedProcedures.reduce((sum, p) => sum + getPlanRealizedValue(p), 0);
 
     if (totalPerformed > 0) {
