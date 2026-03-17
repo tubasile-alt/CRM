@@ -1828,7 +1828,7 @@ async function deleteCosmeticPlan(planId, procedureName) {
     }
 
     // Recarregar dados
-    await loadCosmeticPlans();
+    await loadExistingPlans();
     renderCosmeticConduct();
     showAlert(`Planejamento "${procedureName}" deletado com sucesso`, 'success');
   } catch (error) {
