@@ -1426,6 +1426,65 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="cosmeticExecutionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cosmeticExecutionModalTitle">
+          <i class="bi bi-journal-check"></i> Registrar sessão
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label" for="cosmeticExecutionStatus">Status</label>
+            <select id="cosmeticExecutionStatus" class="form-select">
+              <option value="agendada">Agendada</option>
+              <option value="realizada">Realizada</option>
+              <option value="cancelada">Cancelada</option>
+              <option value="faltou">Faltou</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="cosmeticExecutionScheduledDate">Data agendada</label>
+            <input type="date" id="cosmeticExecutionScheduledDate" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="cosmeticExecutionPerformedDate">Data realizada</label>
+            <input type="date" id="cosmeticExecutionPerformedDate" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="cosmeticExecutionCharged">Valor cobrado (R$)</label>
+            <input type="number" step="0.01" min="0" id="cosmeticExecutionCharged" class="form-control" placeholder="0,00">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="cosmeticExecutionFollowupDate">Data follow-up</label>
+            <input type="date" id="cosmeticExecutionFollowupDate" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="cosmeticExecutionFollowupStatus">Status follow-up</label>
+            <select id="cosmeticExecutionFollowupStatus" class="form-select">
+              <option value="pendente">Pendente</option>
+              <option value="realizado">Realizado</option>
+              <option value="atrasado">Atrasado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="cosmeticExecutionNotes">Observações</label>
+            <textarea id="cosmeticExecutionNotes" class="form-control" rows="3" placeholder="Adicione observações sobre a sessão"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="confirmCosmeticExecution">Salvar sessão</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endif %}
 {% endblock %}
 

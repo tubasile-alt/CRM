@@ -1649,23 +1649,130 @@ async function deleteExecution(executionId) {
   });
 }
 
-async function promptCreateExecution(planId) {
-  const execution_status = (prompt("Status da sessão (agendada, realizada, cancelada, faltou)", "agendada") || "agendada").toLowerCase();
-  const scheduled_date = prompt("Data agendada (AAAA-MM-DD)", "") || null;
-  const performed_date = prompt("Data realizada (AAAA-MM-DD)", "") || null;
-  const charged_raw = prompt("Valor cobrado (R$)", "") || "";
-  const notes = prompt("Observações", "") || "";
-  const followup_date = prompt("Data follow-up (AAAA-MM-DD)", "") || null;
+function normalizeCosmeticExecutionPayload(values) {
+  return {
+    execution_status: (values.execution_status || "agendada").toLowerCase(),
+    scheduled_date: values.scheduled_date || null,
+    performed_date: values.performed_date || null,
+    charged_value: values.charged_value === "" || values.charged_value === null || values.charged_value === undefined
+      ? null
+      : parseFloat(String(values.charged_value).replace(",", ".")),
+    notes: values.notes || "",
+    followup_date: values.followup_date || null,
+    followup_status: values.followup_status || "pendente"
+  };
+}
 
-  const payload = {
+
+function openCosmeticExecutionPromptFallback(defaults = {}) {
+  const statusDefault = defaults.execution_status || "agendada";
+  const execution_status = (prompt("Status da sessão (agendada, realizada, cancelada, faltou)", statusDefault) || "").toLowerCase();
+  if (!execution_status) return null;
+
+  const scheduledDefault = defaults.scheduled_date || "";
+  const performedDefault = defaults.performed_date || "";
+  const chargedDefault = defaults.charged_value ?? "";
+  const notesDefault = defaults.notes || "";
+  const followupDateDefault = defaults.followup_date || "";
+  const followupStatusDefault = defaults.followup_status || "pendente";
+
+  const scheduled_date = prompt("Data agendada (AAAA-MM-DD)", scheduledDefault);
+  if (scheduled_date === null) return null;
+  const performed_date = prompt("Data realizada (AAAA-MM-DD)", performedDefault);
+  if (performed_date === null) return null;
+  const charged_value = prompt("Valor cobrado (R$)", String(chargedDefault));
+  if (charged_value === null) return null;
+  const notes = prompt("Observações", notesDefault);
+  if (notes === null) return null;
+  const followup_date = prompt("Data follow-up (AAAA-MM-DD)", followupDateDefault);
+  if (followup_date === null) return null;
+  const followup_status = (prompt("Status follow-up (pendente, realizado, atrasado, cancelado)", followupStatusDefault) || "").toLowerCase();
+  if (!followup_status) return null;
+
+  return normalizeCosmeticExecutionPayload({
+    execution_status,
     scheduled_date,
     performed_date,
-    execution_status,
-    charged_value: charged_raw ? parseFloat(String(charged_raw).replace(',', '.')) : null,
+    charged_value,
     notes,
     followup_date,
-    followup_status: "pendente"
-  };
+    followup_status
+  });
+}
+function openCosmeticExecutionModal(config = {}) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById("cosmeticExecutionModal");
+    const titleEl = document.getElementById("cosmeticExecutionModalTitle");
+    const statusEl = document.getElementById("cosmeticExecutionStatus");
+    const scheduledEl = document.getElementById("cosmeticExecutionScheduledDate");
+    const performedEl = document.getElementById("cosmeticExecutionPerformedDate");
+    const chargedEl = document.getElementById("cosmeticExecutionCharged");
+    const followupDateEl = document.getElementById("cosmeticExecutionFollowupDate");
+    const followupStatusEl = document.getElementById("cosmeticExecutionFollowupStatus");
+    const notesEl = document.getElementById("cosmeticExecutionNotes");
+    const confirmBtn = document.getElementById("confirmCosmeticExecution");
+
+    if (!modalEl || !statusEl || !scheduledEl || !performedEl || !chargedEl || !followupDateEl || !followupStatusEl || !notesEl || !confirmBtn || !window.bootstrap) {
+      showAlert("Formulário avançado indisponível. Abrindo modo simplificado.", "warning");
+      resolve(openCosmeticExecutionPromptFallback(config.defaults || {}));
+      return;
+    }
+
+    if (titleEl) {
+      titleEl.innerHTML = config.title || '<i class="bi bi-journal-check"></i> Registrar sessão';
+    }
+
+    const defaults = config.defaults || {};
+    statusEl.value = defaults.execution_status || "agendada";
+    scheduledEl.value = defaults.scheduled_date || "";
+    performedEl.value = defaults.performed_date || "";
+    chargedEl.value = defaults.charged_value ?? "";
+    followupDateEl.value = defaults.followup_date || "";
+    followupStatusEl.value = defaults.followup_status || "pendente";
+    notesEl.value = defaults.notes || "";
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    let settled = false;
+    const cleanup = () => {
+      confirmBtn.removeEventListener("click", onConfirm);
+      modalEl.removeEventListener("hidden.bs.modal", onHidden);
+    };
+
+    const onConfirm = () => {
+      settled = true;
+      cleanup();
+      modal.hide();
+      resolve(normalizeCosmeticExecutionPayload({
+        execution_status: statusEl.value,
+        scheduled_date: scheduledEl.value,
+        performed_date: performedEl.value,
+        charged_value: chargedEl.value,
+        notes: notesEl.value,
+        followup_date: followupDateEl.value,
+        followup_status: followupStatusEl.value
+      }));
+    };
+
+    const onHidden = () => {
+      if (!settled) {
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    confirmBtn.addEventListener("click", onConfirm);
+    modalEl.addEventListener("hidden.bs.modal", onHidden);
+    modal.show();
+  });
+}
+
+async function promptCreateExecution(planId, defaults = {}) {
+  const payload = await openCosmeticExecutionModal({
+    title: '<i class="bi bi-journal-plus"></i> Registrar nova sessão',
+    defaults
+  });
+  if (!payload) return;
 
   try {
     const result = await createExecution(planId, payload);
@@ -1685,19 +1792,22 @@ async function promptEditExecution(executionId) {
   const entry = Object.values(planExecutionsByPlanId).flat().find((e) => Number(e.id) === Number(executionId));
   if (!entry) return;
 
-  const execution_status = (prompt("Status da sessão (agendada, realizada, cancelada, faltou)", entry.execution_status || (entry.was_performed ? "realizada" : "agendada")) || "agendada").toLowerCase();
-  const scheduled_date = prompt("Data agendada (AAAA-MM-DD)", entry.scheduled_date ? String(entry.scheduled_date).slice(0, 10) : "") || null;
-  const performed_date = prompt("Data realizada (AAAA-MM-DD)", entry.performed_date ? String(entry.performed_date).slice(0, 10) : "") || null;
-  const charged_raw = prompt("Valor cobrado (R$)", entry.charged_value ?? "") || "";
-  const notes = prompt("Observações", entry.notes || "") || "";
+  const payload = await openCosmeticExecutionModal({
+    title: '<i class="bi bi-pencil"></i> Editar sessão',
+    defaults: {
+      execution_status: entry.execution_status || (entry.was_performed ? "realizada" : "agendada"),
+      scheduled_date: entry.scheduled_date ? String(entry.scheduled_date).slice(0, 10) : "",
+      performed_date: entry.performed_date ? String(entry.performed_date).slice(0, 10) : "",
+      charged_value: entry.charged_value ?? "",
+      notes: entry.notes || "",
+      followup_date: entry.followup_date ? String(entry.followup_date).slice(0, 10) : "",
+      followup_status: entry.followup_status || "pendente"
+    }
+  });
+  if (!payload) return;
 
   try {
-    const result = await updateExecution(executionId, {
-      performed_date,
-      execution_status,
-      charged_value: charged_raw ? parseFloat(String(charged_raw).replace(',', '.')) : null,
-      notes
-    });
+    const result = await updateExecution(executionId, payload);
     if (!result.success) {
       showAlert(result.error || "Erro ao editar sessão", "danger");
       return;
@@ -1809,10 +1919,11 @@ function togglePlanSessions(planId) {
 
 async function performCosmeticProcedure(planId, procedureName, consultationId = null) {
   const today = new Date().toISOString().split("T")[0];
-  const dateInput = prompt(`Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`, today);
-  if (!dateInput) return;
-
-  await promptCreateExecution(planId);
+  await promptCreateExecution(planId, {
+    execution_status: "realizada",
+    performed_date: today,
+    followup_status: "pendente"
+  });
 }
 
 async function deleteCosmeticPlan(planId, procedureName) {
