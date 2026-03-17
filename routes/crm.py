@@ -31,7 +31,6 @@ def _get_funnel_data(month=None, year=None):
     ).join(
         Patient, Note.patient_id == Patient.id
     ).filter(
-        CosmeticProcedurePlan.was_performed == False,
         Note.doctor_id == arthur_doctor.id
     )
 
@@ -166,7 +165,7 @@ def get_performed_procedures():
         Note, CosmeticProcedurePlan.note_id == Note.id
     ).join(
         Patient, Note.patient_id == Patient.id
-    ).filter(ProcedureExecution.was_performed == True)
+    ).filter(ProcedureExecution.execution_status == 'realizada')
     
     if current_user.is_doctor():
         query = query.filter(Note.doctor_id == current_user.id)
@@ -176,7 +175,7 @@ def get_performed_procedures():
     result = []
     for execution, plan, note, patient in rows:
         follow_up_due_at = None
-        execution_date = execution.performed_date or plan.performed_date
+        execution_date = execution.performed_date
         if execution_date and plan.follow_up_months:
             follow_up_due_at = (execution_date + relativedelta(months=plan.follow_up_months)).date()
         dp_id = _get_dp_id(patient.id, note.doctor_id)
@@ -207,7 +206,7 @@ def get_followups():
         Note, CosmeticProcedurePlan.note_id == Note.id
     ).join(
         Patient, Note.patient_id == Patient.id
-    ).filter(ProcedureExecution.was_performed == True)
+    ).filter(ProcedureExecution.execution_status == 'realizada')
     
     if current_user.is_doctor():
         query = query.filter(Note.doctor_id == current_user.id)
@@ -216,7 +215,7 @@ def get_followups():
     
     result = []
     for execution, plan, note, patient in rows:
-        execution_date = execution.performed_date or plan.performed_date
+        execution_date = execution.performed_date
         if not execution_date or not plan.follow_up_months:
             continue
         
@@ -255,7 +254,7 @@ def get_planned_procedures():
         ProcedureExecution,
         ProcedureExecution.plan_id == CosmeticProcedurePlan.id
     ).group_by(CosmeticProcedurePlan.id, Note.id, Patient.id).having(
-        db.func.sum(db.case((ProcedureExecution.was_performed == True, 1), else_=0)) == 0
+        db.func.sum(db.case((ProcedureExecution.execution_status == 'realizada', 1), else_=0)) == 0
     )
     
     if current_user.is_doctor():
@@ -305,7 +304,6 @@ def get_marcella_sales_funnel():
     ).join(
         Patient, Note.patient_id == Patient.id
     ).filter(
-        CosmeticProcedurePlan.was_performed == False,
         Note.doctor_id == arthur_doctor.id
     )
 
@@ -641,14 +639,7 @@ def sync_to_google_sheets():
 @login_required
 def update_cosmetic_plan(plan_id):
     plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
-    data = request.get_json()
-    
-    if 'was_performed' in data:
-        plan.was_performed = data['was_performed']
-        if data['was_performed'] and not plan.performed_date:
-            plan.performed_date = datetime.now()
-        elif not data['was_performed']:
-            plan.performed_date = None
+    data = request.get_json() or {}
 
     if 'planned_value' in data:
         raw_value = data['planned_value']
@@ -659,18 +650,16 @@ def update_cosmetic_plan(plan_id):
                 plan.planned_value = Decimal(str(raw_value))
             except (InvalidOperation, ValueError):
                 return jsonify({'success': False, 'error': 'planned_value inválido'}), 400
-    
+
     if 'observations' in data:
         plan.observations = data['observations']
-    
+
     db.session.commit()
     return jsonify({
         'success': True,
         'plan': {
             'id': plan.id,
-            'was_performed': plan.was_performed,
             'planned_value': float(plan.planned_value) if plan.planned_value is not None else None,
-            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
         }
     })
 
@@ -678,69 +667,47 @@ def update_cosmetic_plan(plan_id):
 @login_required
 def get_crm_stats():
     today = date.today()
-    
-    # Conta procedimentos realizados e planejados
-    query = db.session.query(CosmeticProcedurePlan, Note).join(
+
+    plans_query = db.session.query(CosmeticProcedurePlan, Note).join(
         Note, CosmeticProcedurePlan.note_id == Note.id
     )
-    
+
     if current_user.is_doctor():
-        query = query.filter(Note.doctor_id == current_user.id)
-    
-    plans = query.all()
-    
-    performed_count = sum(1 for plan, note in plans if plan.was_performed)
-    planned_count = sum(1 for plan, note in plans if not plan.was_performed)
-    
+        plans_query = plans_query.filter(Note.doctor_id == current_user.id)
+
+    plans = plans_query.all()
+
+    executions_query = db.session.query(ProcedureExecution, CosmeticProcedurePlan, Note).join(
+        CosmeticProcedurePlan, ProcedureExecution.plan_id == CosmeticProcedurePlan.id
+    ).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    )
+
+    if current_user.is_doctor():
+        executions_query = executions_query.filter(Note.doctor_id == current_user.id)
+
+    execution_rows = executions_query.all()
+    performed_plan_ids = {plan.id for execution, plan, note in execution_rows if execution.execution_status == 'realizada'}
+
+    performed_count = len(performed_plan_ids)
+    planned_count = sum(1 for plan, note in plans if plan.id not in performed_plan_ids)
+
     overdue_count = 0
     due_soon_count = 0
-    
-    for plan, note in plans:
-        if plan.was_performed and plan.performed_date and plan.follow_up_months:
-            follow_up_due = (plan.performed_date + relativedelta(months=plan.follow_up_months)).date()
-            days_until = (follow_up_due - today).days
-            
-            if days_until < 0:
-                overdue_count += 1
-            elif days_until <= 30:
-                due_soon_count += 1
-    
+    for execution, plan, note in execution_rows:
+        if execution.execution_status != 'realizada' or not execution.performed_date or not plan.follow_up_months:
+            continue
+        follow_up_due = (execution.performed_date + relativedelta(months=plan.follow_up_months)).date()
+        days_until = (follow_up_due - today).days
+
+        if days_until < 0:
+            overdue_count += 1
+        elif days_until <= 30:
+            due_soon_count += 1
+
     return jsonify({
         'performed': performed_count,
         'planned': planned_count,
         'overdue': overdue_count,
         'due_soon': due_soon_count
     })
-
-
-@crm_bp.route('/api/cosmetic-plans/<int:plan_id>/executions', methods=['POST'])
-@login_required
-def create_execution(plan_id):
-    """Cria uma nova execução para um plano de procedimento cosmético."""
-    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
-    
-    data = request.get_json() or {}
-    
-    execution = ProcedureExecution(
-        plan_id=plan_id,
-        scheduled_date=data.get('scheduled_date'),
-        performed_date=data.get('performed_date'),
-        was_performed=data.get('was_performed', False),
-        charged_value=data.get('charged_value'),
-        notes=data.get('notes'),
-        followup_date=data.get('followup_date'),
-        followup_status=data.get('followup_status', 'pendente')
-    )
-    
-    db.session.add(execution)
-    db.session.commit()
-    
-    return jsonify({
-        'id': execution.id,
-        'plan_id': execution.plan_id,
-        'scheduled_date': execution.scheduled_date.isoformat() if execution.scheduled_date else None,
-        'performed_date': execution.performed_date.isoformat() if execution.performed_date else None,
-        'was_performed': execution.was_performed,
-        'notes': execution.notes,
-        'created_at': execution.created_at.isoformat()
-    }), 201
