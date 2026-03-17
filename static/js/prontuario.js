@@ -2686,15 +2686,11 @@ function renderEvolutionsInAccordion(consultations = []) {
 
       if (canEditClinical()) {
         const quickEvoDiv = document.createElement("div");
-        quickEvoDiv.className = "mt-3 p-3 bg-light rounded border";
+        quickEvoDiv.className = "mt-3";
         quickEvoDiv.innerHTML = `
-          <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Nova Evolução</h6>
-          <p class="text-muted small mb-2">Para registrar evolução de retorno, use o botão abaixo (abre em pop-up dentro desta consulta).</p>
-          <div class="d-flex justify-content-end">
-            <button class="btn btn-sm btn-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date || ""}')">
-              <i class="bi bi-plus-circle"></i> Adicionar Evolução
-            </button>
-          </div>
+          <button class="btn btn-sm btn-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date || ""}')">
+            <i class="bi bi-plus-circle"></i> Adicionar Evolução
+          </button>
         `;
         container.appendChild(quickEvoDiv);
       }
