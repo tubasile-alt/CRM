@@ -691,6 +691,21 @@
               <strong>Total Estimado:</strong> R$ <span id="cosmeticTotal">0,00</span>
             </div>
 
+            <div class="row g-2 mb-3">
+              <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100 bg-light">
+                  <h6 class="mb-2 text-warning"><i class="bi bi-hourglass-split"></i> Pendentes por data</h6>
+                  <div id="pendingByDatePanel" class="small text-muted">Nenhum pendente.</div>
+                </div>
+              </div>
+              <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100 bg-light">
+                  <h6 class="mb-2 text-success"><i class="bi bi-check2-circle"></i> Realizados por data</h6>
+                  <div id="realizedByDatePanel" class="small text-muted">Nenhum realizado.</div>
+                </div>
+              </div>
+            </div>
+
             <button class="btn btn-success" onclick="generateBudget()">
               <i class="bi bi-file-pdf"></i> Gerar Orçamento PDF
             </button>
