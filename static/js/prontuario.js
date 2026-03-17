@@ -951,9 +951,14 @@ function renderProcedureCard(proc) {
               </div>
             </div>
           </div>
-          <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Deletar planejamento" onclick="deleteCosmeticPlan(${proc.id}, '${core.escapeHtml(proc.name)}')">
-            <i class="bi bi-trash"></i>
-          </button>
+          <div class="d-flex gap-1">
+            ${!performed ? `<button class="btn btn-sm btn-outline-success py-1 px-2" title="Marcar como realizado" onclick="performCosmeticProcedure(${proc.id}, '${core.escapeHtml(proc.name)}')">
+              <i class="bi bi-check-lg"></i>
+            </button>` : ''}
+            <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Deletar planejamento" onclick="deleteCosmeticPlan(${proc.id}, '${core.escapeHtml(proc.name)}')">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
         </div>
       </div>
     </div>
