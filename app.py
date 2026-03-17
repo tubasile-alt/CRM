@@ -101,33 +101,12 @@ def format_brazil_datetime(dt):
 @app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
 @login_required
 def perform_cosmetic_plan(plan_id):
-    """Atalho legado: registrar execução realizada para um plano (compatibilidade com clientes antigos; front D2 usa /executions)."""
-    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
-    data = request.json or {}
-
-    execution = _build_execution_from_payload(plan, data, force_performed=True)
-    db.session.add(execution)
-
-    # Compatibilidade com legado D0 (será removido em fase posterior)
-    plan.was_performed = True
-    plan.performed_date = execution.performed_date
-
-    evo_date = execution.performed_date.date() if execution.performed_date else get_brazil_time().date()
-    evolution = Evolution(
-        patient_id=plan.note.patient_id if plan.note else None,
-        doctor_id=current_user.id,
-        content=f"Procedimento realizado: {plan.procedure_name} (Planejado em {plan.note.created_at.strftime('%d/%m/%Y') if plan.note else 'data desconhecida'})",
-        evolution_date=evo_date,
-        appointment_id=data.get('appointment_id')
-    )
-    db.session.add(evolution)
-    db.session.commit()
-
+    """Endpoint legado descontinuado no D3: use /api/cosmetic-plans/<id>/executions."""
     return jsonify({
-        'success': True,
-        'evolution_id': evolution.id,
-        'execution': _serialize_execution(execution)
-    })
+        'success': False,
+        'error': 'Endpoint legado removido. Use POST /api/cosmetic-plans/<id>/executions com execution_status=realizada.',
+        'deprecated': True
+    }), 410
 
 
 def _parse_date_or_datetime(value):
@@ -145,12 +124,14 @@ def _parse_date_or_datetime(value):
 
 
 def _serialize_execution(execution):
+    execution_status = (execution.execution_status or ('realizada' if execution.was_performed else 'agendada')).lower()
     return {
         'id': execution.id,
         'plan_id': execution.plan_id,
         'scheduled_date': execution.scheduled_date.isoformat() if execution.scheduled_date else None,
         'performed_date': execution.performed_date.isoformat() if execution.performed_date else None,
-        'was_performed': execution.was_performed,
+        'execution_status': execution_status,
+        'was_performed': execution_status == 'realizada',
         'charged_value': float(execution.charged_value) if execution.charged_value is not None else None,
         'notes': execution.notes,
         'followup_date': execution.followup_date.isoformat() if execution.followup_date else None,
@@ -160,16 +141,27 @@ def _serialize_execution(execution):
 
 
 def _build_execution_from_payload(plan, data, force_performed=False):
+    allowed_statuses = {'agendada', 'realizada', 'cancelada', 'faltou'}
+    allowed_followup = {'pendente', 'contatado', 'agendado', 'sem_resposta'}
+
     scheduled_date = _parse_date_or_datetime(data.get('scheduled_date'))
     performed_date = _parse_date_or_datetime(data.get('performed_date'))
 
     if force_performed:
-        was_performed = True
+        execution_status = 'realizada'
     else:
-        was_performed = bool(data.get('was_performed', bool(performed_date)))
+        raw_status = (data.get('execution_status') or '').strip().lower()
+        if raw_status in allowed_statuses:
+            execution_status = raw_status
+        else:
+            execution_status = 'realizada' if bool(data.get('was_performed', bool(performed_date))) else 'agendada'
 
-    if was_performed and not performed_date:
-        performed_date = get_brazil_time().replace(tzinfo=None)
+    if execution_status == 'realizada' and not performed_date:
+        raise ValueError('performed_date é obrigatório quando execution_status=realizada')
+    if execution_status == 'agendada' and not scheduled_date:
+        raise ValueError('scheduled_date é obrigatório quando execution_status=agendada')
+
+    was_performed = execution_status == 'realizada'
 
     charged_raw = data.get('charged_value', data.get('planned_value', plan.final_budget or plan.planned_value))
     charged_value = None
@@ -177,22 +169,28 @@ def _build_execution_from_payload(plan, data, force_performed=False):
         try:
             charged_value = float(charged_raw)
         except (TypeError, ValueError):
-            charged_value = None
+            raise ValueError('charged_value inválido')
+        if charged_value < 0:
+            raise ValueError('charged_value não pode ser negativo')
 
     followup_date = _parse_date_or_datetime(data.get('followup_date'))
     followup_status = (data.get('followup_status') or 'pendente').strip().lower()
-    if followup_status not in {'pendente', 'contatado', 'agendado', 'sem_resposta'}:
-        followup_status = 'pendente'
+    if followup_status not in allowed_followup:
+        raise ValueError('followup_status inválido')
 
     return ProcedureExecution(
         plan_id=plan.id,
         scheduled_date=scheduled_date,
         performed_date=performed_date,
+        execution_status=execution_status,
         was_performed=was_performed,
         charged_value=charged_value,
         notes=data.get('notes') or data.get('observations'),
         followup_date=followup_date,
         followup_status=followup_status,
+        created_by=current_user.id,
+        updated_by=current_user.id,
+        idempotency_key=(data.get('idempotency_key') or request.headers.get('X-Idempotency-Key') or '').strip() or None,
     )
 
 
@@ -205,14 +203,20 @@ def create_plan_execution(plan_id):
     plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
     data = request.get_json(silent=True) or {}
 
-    execution = _build_execution_from_payload(plan, data)
+    idempotency_key = (data.get('idempotency_key') or request.headers.get('X-Idempotency-Key') or '').strip()
+    if idempotency_key:
+        existing = ProcedureExecution.query.filter_by(idempotency_key=idempotency_key, plan_id=plan.id).first()
+        if existing:
+            return jsonify({'success': True, 'execution': _serialize_execution(existing), 'idempotent_replay': True}), 200
+
+    try:
+        execution = _build_execution_from_payload(plan, data)
+    except ValueError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+
     db.session.add(execution)
-
-    if execution.was_performed:
-        plan.was_performed = True
-        plan.performed_date = execution.performed_date
-
     db.session.commit()
+    app.logger.info('execution_created id=%s plan_id=%s user_id=%s', execution.id, plan.id, current_user.id)
     return jsonify({'success': True, 'execution': _serialize_execution(execution)}), 201
 
 
@@ -222,12 +226,42 @@ def list_plan_executions(plan_id):
     if not current_user.is_doctor() and not current_user.is_secretary():
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
 
-    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
-    executions = ProcedureExecution.query.filter_by(plan_id=plan.id).order_by(
+    CosmeticProcedurePlan.query.get_or_404(plan_id)
+    executions = ProcedureExecution.query.filter_by(plan_id=plan_id).order_by(
         ProcedureExecution.performed_date.desc().nullslast(),
         ProcedureExecution.created_at.desc()
     ).all()
     return jsonify({'success': True, 'executions': [_serialize_execution(e) for e in executions]})
+
+
+@app.route('/api/executions', methods=['GET'])
+@login_required
+def list_executions():
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    query = db.session.query(ProcedureExecution).join(CosmeticProcedurePlan, ProcedureExecution.plan_id == CosmeticProcedurePlan.id).join(Note, CosmeticProcedurePlan.note_id == Note.id)
+    if current_user.is_doctor():
+        query = query.filter(Note.doctor_id == current_user.id)
+
+    if request.args.get('doctor_id', type=int):
+        query = query.filter(Note.doctor_id == request.args.get('doctor_id', type=int))
+    if request.args.get('procedure_name'):
+        query = query.filter(CosmeticProcedurePlan.procedure_name == request.args.get('procedure_name'))
+    if request.args.get('execution_status'):
+        query = query.filter(ProcedureExecution.execution_status == request.args.get('execution_status'))
+    if request.args.get('date_from'):
+        date_from = _parse_date_or_datetime(request.args.get('date_from'))
+        query = query.filter(db.or_(ProcedureExecution.scheduled_date >= date_from, ProcedureExecution.performed_date >= date_from))
+    if request.args.get('date_to'):
+        date_to = _parse_date_or_datetime(request.args.get('date_to'))
+        query = query.filter(db.or_(ProcedureExecution.scheduled_date <= date_to, ProcedureExecution.performed_date <= date_to))
+
+    page = max(request.args.get('page', 1, type=int), 1)
+    per_page = min(max(request.args.get('per_page', 20, type=int), 1), 100)
+    total = query.count()
+    rows = query.order_by(ProcedureExecution.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    return jsonify({'success': True, 'total': total, 'page': page, 'per_page': per_page, 'executions': [_serialize_execution(e) for e in rows]})
 
 
 @app.route('/api/executions/<int:execution_id>', methods=['PUT'])
@@ -243,11 +277,27 @@ def update_execution(execution_id):
         execution.scheduled_date = _parse_date_or_datetime(data.get('scheduled_date'))
     if 'performed_date' in data:
         execution.performed_date = _parse_date_or_datetime(data.get('performed_date'))
-    if 'was_performed' in data:
-        execution.was_performed = bool(data.get('was_performed'))
+    if 'execution_status' in data:
+        execution.execution_status = (data.get('execution_status') or '').strip().lower()
+    elif 'was_performed' in data:
+        execution.execution_status = 'realizada' if bool(data.get('was_performed')) else 'agendada'
+
+    if execution.execution_status == 'realizada' and not execution.performed_date:
+        return jsonify({'success': False, 'error': 'performed_date é obrigatório quando execution_status=realizada'}), 400
+    if execution.execution_status == 'agendada' and not execution.scheduled_date:
+        return jsonify({'success': False, 'error': 'scheduled_date é obrigatório quando execution_status=agendada'}), 400
+
+    execution.was_performed = execution.execution_status == 'realizada'
+
     if 'charged_value' in data:
         raw = data.get('charged_value')
-        execution.charged_value = float(raw) if raw not in (None, '') else None
+        if raw in (None, ''):
+            execution.charged_value = None
+        else:
+            value = float(raw)
+            if value < 0:
+                return jsonify({'success': False, 'error': 'charged_value não pode ser negativo'}), 400
+            execution.charged_value = value
     if 'notes' in data:
         execution.notes = data.get('notes')
     if 'followup_date' in data:
@@ -258,10 +308,11 @@ def update_execution(execution_id):
             return jsonify({'success': False, 'error': 'followup_status inválido'}), 400
         execution.followup_status = status
 
-    if execution.was_performed and not execution.performed_date:
-        execution.performed_date = get_brazil_time().replace(tzinfo=None)
+    execution.updated_by = current_user.id
+    execution.updated_at = get_brazil_time()
 
     db.session.commit()
+    app.logger.info('execution_updated id=%s plan_id=%s user_id=%s', execution.id, execution.plan_id, current_user.id)
     return jsonify({'success': True, 'execution': _serialize_execution(execution)})
 
 
@@ -274,6 +325,7 @@ def delete_execution(execution_id):
     execution = ProcedureExecution.query.get_or_404(execution_id)
     db.session.delete(execution)
     db.session.commit()
+    app.logger.info('execution_deleted id=%s plan_id=%s user_id=%s', execution.id, execution.plan_id, current_user.id)
     return jsonify({'success': True})
 
 @app.route('/health')
@@ -3310,8 +3362,6 @@ def get_cosmetic_plans(patient_id):
             'status': plan.status,
             'planned_value': plan.planned_value,
             'final_budget': plan.final_budget,
-            'was_performed': plan.was_performed,
-            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_months': plan.follow_up_months,
             'created_at': note.created_at.isoformat() if note else None,
             'executions': [_serialize_execution(execution) for execution in executions]
@@ -3364,8 +3414,6 @@ def get_cosmetic_plans_grouped(patient_id):
             'status': plan.status,
             'planned_value': float(plan.planned_value) if plan.planned_value else 0,
             'final_budget': float(plan.final_budget) if plan.final_budget else 0,
-            'was_performed': plan.was_performed,
-            'performed_date': plan.performed_date.isoformat() if plan.performed_date else None,
             'follow_up_months': plan.follow_up_months,
             'created_at': plan.created_at.isoformat() if plan.created_at else None,
             'executions': [_serialize_execution(execution) for execution in executions]
@@ -3380,8 +3428,43 @@ def get_cosmetic_plans_grouped(patient_id):
         })
     
     result.sort(key=lambda x: x['consultation_info']['date'], reverse=True)
-    
-    return jsonify({'success': True, 'grouped_plans': result})
+
+    pending_by_date = {}
+    realized_by_date = {}
+    for item in result:
+        for procedure in item.get('procedures', []):
+            executions = procedure.get('executions') or []
+            if not executions:
+                key = (procedure.get('created_at') or item['consultation_info']['date'] or '')[:10]
+                pending_by_date.setdefault(key, []).append(procedure)
+                continue
+            for execution in executions:
+                status = execution.get('execution_status') or ('realizada' if execution.get('was_performed') else 'agendada')
+                base_date = execution.get('performed_date') if status == 'realizada' else execution.get('scheduled_date')
+                key = (base_date or procedure.get('created_at') or item['consultation_info']['date'] or '')[:10]
+                target = realized_by_date if status == 'realizada' else pending_by_date
+                target.setdefault(key, []).append({
+                    'plan_id': procedure.get('id'),
+                    'procedure_name': procedure.get('procedure_name'),
+                    'status': status,
+                    'execution': execution,
+                    'color': '#198754' if status == 'realizada' else '#ffc107'
+                })
+
+    return jsonify({'success': True, 'grouped_plans': result, 'pending_by_date': pending_by_date, 'realized_by_date': realized_by_date})
+
+
+@app.route('/api/prontuario/cosmetic-plan/<int:plan_id>', methods=['DELETE'])
+@login_required
+def delete_cosmetic_plan(plan_id):
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    db.session.delete(plan)
+    db.session.commit()
+    return jsonify({'success': True})
+
 
 @app.route('/api/prontuario/cosmetic-plan/<int:plan_id>', methods=['PATCH'])
 @login_required
@@ -3402,10 +3485,6 @@ def update_cosmetic_plan(plan_id):
         plan.planned_value = float(data['planned_value'])
     if 'final_budget' in data:
         plan.final_budget = float(data['final_budget'])
-    if 'was_performed' in data:
-        plan.was_performed = bool(data['was_performed'])
-        if plan.was_performed and not plan.performed_date:
-            plan.performed_date = get_brazil_time().date()
     if 'follow_up_months' in data:
         plan.follow_up_months = int(data['follow_up_months'])
     if 'status' in data:
