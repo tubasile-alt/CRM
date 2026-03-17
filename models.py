@@ -327,11 +327,16 @@ class ProcedureExecution(db.Model):
     plan_id = db.Column(db.Integer, db.ForeignKey('cosmetic_procedure_plan.id'), nullable=False, index=True)
     scheduled_date = db.Column(db.DateTime, nullable=True, index=True)
     performed_date = db.Column(db.DateTime, nullable=True, index=True)
+    execution_status = db.Column(db.String(20), default='agendada', nullable=False, index=True)  # agendada, realizada, cancelada, faltou
     was_performed = db.Column(db.Boolean, default=False, nullable=False, index=True)
     charged_value = db.Column(db.Numeric(10, 2), nullable=True)
     notes = db.Column(db.Text, nullable=True)
     followup_date = db.Column(db.DateTime, nullable=True, index=True)
     followup_status = db.Column(db.String(20), default='pendente', nullable=False, index=True)  # pendente, contatado, agendado, sem_resposta
+    idempotency_key = db.Column(db.String(100), nullable=True, unique=True, index=True)
+    created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    updated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
+    updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time, index=True)
     created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
 
 # Modelos para Transplante Capilar
