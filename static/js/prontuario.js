@@ -2669,24 +2669,9 @@ function renderEvolutionsInAccordion(consultations = []) {
 
       container.innerHTML = "";
 
-      if (canEditClinical()) {
-        const quickEvoDiv = document.createElement("div");
-        quickEvoDiv.className = "mt-3 p-3 bg-light rounded border mb-3";
-        quickEvoDiv.innerHTML = `
-          <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Nova Evolução</h6>
-          <p class="text-muted small mb-2">Para registrar evolução de retorno, use o botão abaixo (abre em pop-up dentro desta consulta).</p>
-          <div class="d-flex justify-content-end">
-            <button class="btn btn-sm btn-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date || ""}')">
-              <i class="bi bi-plus-circle"></i> Adicionar Evolução
-            </button>
-          </div>
-        `;
-        container.appendChild(quickEvoDiv);
-      }
-
       if (consultation.evolutions && consultation.evolutions.length > 0) {
         const historyTitle = document.createElement("div");
-        historyTitle.className = "border-top pt-2 mt-2 mb-2";
+        historyTitle.className = "border-bottom pb-2 mb-3";
         historyTitle.innerHTML = '<small class="text-muted fw-bold">Evoluções Anteriores:</small>';
         container.appendChild(historyTitle);
 
@@ -2702,6 +2687,21 @@ function renderEvolutionsInAccordion(consultations = []) {
           `;
           container.appendChild(evoDiv);
         });
+      }
+
+      if (canEditClinical()) {
+        const quickEvoDiv = document.createElement("div");
+        quickEvoDiv.className = "mt-3 p-3 bg-light rounded border";
+        quickEvoDiv.innerHTML = `
+          <h6 class="text-muted mb-2"><i class="bi bi-plus-circle"></i> Nova Evolução</h6>
+          <p class="text-muted small mb-2">Para registrar evolução de retorno, use o botão abaixo (abre em pop-up dentro desta consulta).</p>
+          <div class="d-flex justify-content-end">
+            <button class="btn btn-sm btn-success" onclick="openEvolutionFromConsultation(${consultation.id}, '${consultation.date || ""}')">
+              <i class="bi bi-plus-circle"></i> Adicionar Evolução
+            </button>
+          </div>
+        `;
+        container.appendChild(quickEvoDiv);
       }
     });
   }, 350);
