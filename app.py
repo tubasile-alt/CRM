@@ -2075,9 +2075,14 @@ def prontuario(patient_id):
             
             # Forçar carregamento de dados relacionados
             all_cosmetic_plans = []
+            seen_cosmetic_plan_ids = set()
             for note in appt_notes:
                 for plan in note.cosmetic_plans:
+                    if plan.id in seen_cosmetic_plan_ids:
+                        continue
+                    seen_cosmetic_plan_ids.add(plan.id)
                     all_cosmetic_plans.append({
+                        'id': plan.id,
                         'procedure_name': plan.procedure_name,
                         'planned_value': plan.planned_value,
                         'final_budget': plan.final_budget,
@@ -2133,9 +2138,14 @@ def prontuario(patient_id):
                 processed_notes.add(gn.id)
             
             all_cosmetic_plans = []
+            seen_cosmetic_plan_ids = set()
             for gn in grouped_notes:
                 for plan in gn.cosmetic_plans:
+                    if plan.id in seen_cosmetic_plan_ids:
+                        continue
+                    seen_cosmetic_plan_ids.add(plan.id)
                     all_cosmetic_plans.append({
+                        'id': plan.id,
                         'procedure_name': plan.procedure_name,
                         'planned_value': plan.planned_value,
                         'final_budget': plan.final_budget,
@@ -2316,9 +2326,14 @@ def prontuario_dp(dp_id):
             for note in appt_notes:
                 processed_notes.add(note.id)
             all_cosmetic_plans = []
+            seen_cosmetic_plan_ids = set()
             for note in appt_notes:
                 for plan in note.cosmetic_plans:
+                    if plan.id in seen_cosmetic_plan_ids:
+                        continue
+                    seen_cosmetic_plan_ids.add(plan.id)
                     all_cosmetic_plans.append({
+                        'id': plan.id,
                         'procedure_name': plan.procedure_name,
                         'planned_value': plan.planned_value,
                         'final_budget': plan.final_budget,
@@ -2359,9 +2374,14 @@ def prontuario_dp(dp_id):
             for gn in grouped_notes:
                 processed_notes.add(gn.id)
             all_cosmetic_plans = []
+            seen_cosmetic_plan_ids = set()
             for gn in grouped_notes:
                 for plan in gn.cosmetic_plans:
+                    if plan.id in seen_cosmetic_plan_ids:
+                        continue
+                    seen_cosmetic_plan_ids.add(plan.id)
                     all_cosmetic_plans.append({
+                        'id': plan.id,
                         'procedure_name': plan.procedure_name,
                         'planned_value': plan.planned_value,
                         'final_budget': plan.final_budget,

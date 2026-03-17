@@ -780,6 +780,7 @@ function setCosmeticContextFromConsultation(consultationId) {
     type: "consultation",
     consultationKey: id,
     appointmentId: id,
+    fallbackConsultationKey: `note_${id}`,
     label: `Consulta ${id}`
   };
 
@@ -796,6 +797,7 @@ function matchesContext(proc, context) {
 
   const ctxConsultationKey = normalizeString(context.consultationKey);
   const ctxAppointmentId = normalizeString(context.appointmentId);
+  const ctxFallbackConsultationKey = normalizeString(context.fallbackConsultationKey);
   const ctxConsultationDate = normalizeString(context.consultationDate);
 
   if (ctxConsultationKey && procConsultationKey && procConsultationKey === ctxConsultationKey) return true;
@@ -803,6 +805,9 @@ function matchesContext(proc, context) {
 
   if (ctxAppointmentId && procAppointmentId && procAppointmentId === ctxAppointmentId) return true;
   if (ctxAppointmentId && procConsultationKey && procConsultationKey === ctxAppointmentId) return true;
+
+  if (ctxFallbackConsultationKey && procConsultationKey && procConsultationKey === ctxFallbackConsultationKey) return true;
+  if (ctxFallbackConsultationKey && procAppointmentId && procAppointmentId === ctxFallbackConsultationKey) return true;
 
   if (ctxConsultationDate && procConsultationDate && procConsultationDate === ctxConsultationDate) return true;
 
@@ -1202,6 +1207,7 @@ function renderHistoricalConsultationRightPanel(consultationId, category) {
       type: "consultation",
       consultationKey: String(consultationId),
       appointmentId: String(consultationId),
+      fallbackConsultationKey: `note_${String(consultationId)}`,
       label: `Consulta ${consultationId}`
     };
 
