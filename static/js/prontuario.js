@@ -819,12 +819,12 @@ function getPlanExecutions(planId) {
 }
 
 function getPlanPerformed(plan) {
-  return getPlanExecutions(plan.id).some((execution) => execution.was_performed);
+  return getPlanExecutions(plan.id).some((execution) => (execution.execution_status || (execution.was_performed ? "realizada" : "agendada")) === "realizada");
 }
 
 function getPlanRealizedValue(plan) {
   return getPlanExecutions(plan.id)
-    .filter((execution) => execution.was_performed)
+    .filter((execution) => (execution.execution_status || (execution.was_performed ? "realizada" : "agendada")) === "realizada")
     .reduce((sum, execution) => sum + (parseFloat(execution.charged_value) || 0), 0);
 }
 
@@ -1587,8 +1587,9 @@ async function deleteExecution(executionId) {
 }
 
 async function promptCreateExecution(planId) {
+  const execution_status = (prompt("Status da sessão (agendada, realizada, cancelada, faltou)", "agendada") || "agendada").toLowerCase();
   const scheduled_date = prompt("Data agendada (AAAA-MM-DD)", "") || null;
-  const performed_date = prompt("Data realizada (AAAA-MM-DD). Deixe vazio se pendente", "") || null;
+  const performed_date = prompt("Data realizada (AAAA-MM-DD)", "") || null;
   const charged_raw = prompt("Valor cobrado (R$)", "") || "";
   const notes = prompt("Observações", "") || "";
   const followup_date = prompt("Data follow-up (AAAA-MM-DD)", "") || null;
@@ -1596,7 +1597,7 @@ async function promptCreateExecution(planId) {
   const payload = {
     scheduled_date,
     performed_date,
-    was_performed: !!performed_date,
+    execution_status,
     charged_value: charged_raw ? parseFloat(String(charged_raw).replace(',', '.')) : null,
     notes,
     followup_date,
@@ -1621,6 +1622,8 @@ async function promptEditExecution(executionId) {
   const entry = Object.values(planExecutionsByPlanId).flat().find((e) => Number(e.id) === Number(executionId));
   if (!entry) return;
 
+  const execution_status = (prompt("Status da sessão (agendada, realizada, cancelada, faltou)", entry.execution_status || (entry.was_performed ? "realizada" : "agendada")) || "agendada").toLowerCase();
+  const scheduled_date = prompt("Data agendada (AAAA-MM-DD)", entry.scheduled_date ? String(entry.scheduled_date).slice(0, 10) : "") || null;
   const performed_date = prompt("Data realizada (AAAA-MM-DD)", entry.performed_date ? String(entry.performed_date).slice(0, 10) : "") || null;
   const charged_raw = prompt("Valor cobrado (R$)", entry.charged_value ?? "") || "";
   const notes = prompt("Observações", entry.notes || "") || "";
@@ -1628,7 +1631,7 @@ async function promptEditExecution(executionId) {
   try {
     const result = await updateExecution(executionId, {
       performed_date,
-      was_performed: !!performed_date,
+      execution_status,
       charged_value: charged_raw ? parseFloat(String(charged_raw).replace(',', '.')) : null,
       notes
     });
@@ -1641,6 +1644,25 @@ async function promptEditExecution(executionId) {
   } catch (error) {
     console.error(error);
     showAlert("Erro ao atualizar sessão", "danger");
+  }
+}
+
+async function removePlan(planId) {
+  if (!confirm("Excluir este planejamento e todas as sessões?")) return;
+  try {
+    const result = await core.fetchJson(`/api/prontuario/cosmetic-plan/${planId}`, {
+      method: "DELETE",
+      headers: { "X-CSRFToken": getCSRFToken() }
+    });
+    if (!result.success) {
+      showAlert(result.error || "Erro ao excluir planejamento", "danger");
+      return;
+    }
+    await loadExistingPlans();
+    showAlert("Planejamento excluído", "success");
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao excluir planejamento", "danger");
   }
 }
 
@@ -1665,7 +1687,7 @@ function renderExecutionRow(tbody, execution) {
   row.innerHTML = `
     <td></td>
     <td class="small">${execution.scheduled_date ? formatDateBR(execution.scheduled_date) : "-"}</td>
-    <td class="small">${execution.performed_date ? formatDateBR(execution.performed_date) : "-"}</td>
+    <td class="small">${execution.performed_date ? formatDateBR(execution.performed_date) : "-"}<div class="text-muted">${core.escapeHtml(execution.execution_status || (execution.was_performed ? "realizada" : "agendada"))}</div></td>
     <td class="small">${execution.charged_value !== null && execution.charged_value !== undefined ? formatMoneyBRL(execution.charged_value) : "-"}</td>
     <td class="small">${core.escapeHtml(execution.notes || "-")}</td>
     <td class="small">${execution.followup_date ? formatDateBR(execution.followup_date) : "-"} · ${core.escapeHtml(execution.followup_status || "pendente")}</td>
@@ -1699,6 +1721,7 @@ function renderCosmeticProcedures() {
       <td class="text-center">
         <button class="btn btn-sm btn-outline-secondary" onclick="togglePlanSessions(${plan.id})">Sessões (${executions.length})</button>
         <button class="btn btn-sm btn-outline-success" onclick="promptCreateExecution(${plan.id})">Registrar nova sessão</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="removePlan(${plan.id})">Excluir planejamento</button>
       </td>
     `;
 

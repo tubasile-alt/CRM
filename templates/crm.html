@@ -539,11 +539,11 @@ function openPatient(patientId, dpId) {
     }
 }
 
-function markAsDone(planId) {
-    fetch(`/api/crm/records/${planId}`, {
-        method: 'PATCH',
+function markAsDone(executionId) {
+    fetch(`/api/executions/${executionId}`, {
+        method: 'PUT',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({was_performed: true})
+        body: JSON.stringify({followup_status: 'contatado'})
     })
     .then(r => r.json())
     .then(data => {
@@ -554,10 +554,11 @@ function markAsDone(planId) {
 }
 
 function markAsRealizado(planId) {
-    fetch(`/api/crm/records/${planId}`, {
-        method: 'PATCH',
+    const today = new Date().toISOString().split('T')[0];
+    fetch(`/api/cosmetic-plans/${planId}/executions`, {
+        method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({was_performed: true})
+        body: JSON.stringify({execution_status: 'realizada', performed_date: today, followup_status: 'pendente'})
     })
     .then(r => r.json())
     .then(data => {
