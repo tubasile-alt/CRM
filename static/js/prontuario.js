@@ -1663,8 +1663,37 @@ function normalizeCosmeticExecutionPayload(values) {
   };
 }
 
-function openCosmeticExecutionModal(config = {}) {
+async function openCosmeticExecutionPromptFallback(defaults = {}) {
   return new Promise((resolve) => {
+    const execution_status = prompt("Status da sessão (agendada/realizada):", defaults.execution_status || "agendada");
+    if (execution_status === null) {
+      resolve(null);
+      return;
+    }
+
+    const performed_date = prompt("Data de realização (AAAA-MM-DD, deixe vazio se não realizado):", defaults.performed_date || "");
+    const scheduled_date = prompt("Data agendada (AAAA-MM-DD):", defaults.scheduled_date || "");
+    const charged_value = prompt("Valor cobrado (opcional):", defaults.charged_value ? String(defaults.charged_value) : "");
+    const followup_date = prompt("Data de follow-up (AAAA-MM-DD):", defaults.followup_date || "");
+    const followup_status = prompt("Status do follow-up (pendente/realizado):", defaults.followup_status || "pendente");
+    const notes = prompt("Observações (opcional):", defaults.notes || "");
+
+    const payload = normalizeCosmeticExecutionPayload({
+      execution_status: execution_status || "agendada",
+      scheduled_date: scheduled_date || null,
+      performed_date: performed_date || null,
+      charged_value: charged_value || null,
+      notes: notes || "",
+      followup_date: followup_date || null,
+      followup_status: followup_status || "pendente"
+    });
+
+    resolve(payload);
+  });
+}
+
+function openCosmeticExecutionModal(config = {}) {
+  return new Promise(async (resolve) => {
     const modalEl = document.getElementById("cosmeticExecutionModal");
     const titleEl = document.getElementById("cosmeticExecutionModalTitle");
     const statusEl = document.getElementById("cosmeticExecutionStatus");
@@ -1677,8 +1706,10 @@ function openCosmeticExecutionModal(config = {}) {
     const confirmBtn = document.getElementById("confirmCosmeticExecution");
 
     if (!modalEl || !statusEl || !scheduledEl || !performedEl || !chargedEl || !followupDateEl || !followupStatusEl || !notesEl || !confirmBtn || !window.bootstrap) {
-      showAlert("Não foi possível abrir o formulário de sessão. Recarregue a página.", "danger");
-      resolve(null);
+      console.warn("Modal de execução cosmética não encontrado. Usando modo simplificado (prompts).");
+      showAlert("Abrindo formulário simplificado...", "warning");
+      const fallbackPayload = await openCosmeticExecutionPromptFallback(config.defaults || {});
+      resolve(fallbackPayload);
       return;
     }
 
