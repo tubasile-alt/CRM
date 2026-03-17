@@ -930,8 +930,8 @@ function renderProcedureCard(proc) {
   const executions = getPlanExecutions(proc.id);
   const lastExecution = executions[0] || null;
   const performed = getPlanPerformed(proc);
-  const followupText = lastExecution
-    ? `${lastExecution.followup_date ? formatDateBR(lastExecution.followup_date) : "-"} · ${lastExecution.followup_status || "pendente"}`
+  const performedDateText = lastExecution
+    ? `${lastExecution.performed_date ? formatDateBR(lastExecution.performed_date) : "-"}`
     : "-";
   const iconClass = performed
     ? "bi-check-circle-fill text-success"
@@ -947,7 +947,7 @@ function renderProcedureCard(proc) {
               <div>
                 <div class="fw-bold ${performed ? "text-muted" : "text-dark"}">${core.escapeHtml(proc.name)}</div>
                 <div class="text-muted">R$ ${formatMoneyBRL(value)} · ${executions.length} sessão(ões)</div>
-                <div class="small text-muted mt-1">Follow-up (última sessão): ${core.escapeHtml(followupText)}</div>
+                <div class="small text-muted mt-1">Realizado em: ${core.escapeHtml(performedDateText)}</div>
               </div>
             </div>
           </div>
