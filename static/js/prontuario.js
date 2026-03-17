@@ -6,9 +6,11 @@ let recognition = null;
 let activeTextarea = null;
 
 let currentCategory = "patologia";
-let cosmeticProcedures = [];
+let cosmeticPlans = [];
+let planExecutionsByPlanId = {};
 let groupedCosmeticPlans = [];
 let editingCosmeticProcedureIndex = null;
+let expandedCosmeticPlans = new Set();
 let selectedNorwood = null;
 let activeCosmeticContext = null;
 let currentRightPanelMode = null;
@@ -805,18 +807,32 @@ function matchesContext(proc, context) {
   return false;
 }
 
-function getProceduresForCurrentContext() {
+function getPlansForCurrentContext() {
   if (!activeCosmeticContext) {
-    return cosmeticProcedures.slice();
+    return cosmeticPlans.slice();
   }
-  return cosmeticProcedures.filter((proc) => matchesContext(proc, activeCosmeticContext));
+  return cosmeticPlans.filter((plan) => matchesContext(plan, activeCosmeticContext));
+}
+
+function getPlanExecutions(planId) {
+  return planExecutionsByPlanId[String(planId)] || [];
+}
+
+function getPlanPerformed(plan) {
+  return getPlanExecutions(plan.id).some((execution) => execution.was_performed);
+}
+
+function getPlanRealizedValue(plan) {
+  return getPlanExecutions(plan.id)
+    .filter((execution) => execution.was_performed)
+    .reduce((sum, execution) => sum + (parseFloat(execution.charged_value) || 0), 0);
 }
 
 function buildCosmeticSummary(procs) {
-  const planned = procs.reduce((sum, proc) => sum + (parseFloat(proc.budget ?? proc.value) || 0), 0);
-  const realizedItems = procs.filter((proc) => proc.performed);
-  const pendingItems = procs.filter((proc) => !proc.performed);
-  const realized = realizedItems.reduce((sum, proc) => sum + (parseFloat(proc.budget ?? proc.value) || 0), 0);
+  const planned = procs.reduce((sum, plan) => sum + (parseFloat(plan.budget ?? plan.value) || 0), 0);
+  const realized = procs.reduce((sum, plan) => sum + getPlanRealizedValue(plan), 0);
+  const realizedItems = procs.filter((plan) => getPlanPerformed(plan));
+  const pendingItems = procs.filter((plan) => !getPlanPerformed(plan));
 
   return {
     planned,
@@ -903,81 +919,29 @@ function renderCosmeticSummaryCards(summary, contextLabel) {
 }
 
 function renderProcedureCard(proc) {
-  const realIndex = cosmeticProcedures.indexOf(proc);
   const value = parseFloat(proc.budget ?? proc.value) || 0;
-  const procedureDate = proc.performedDate || "";
-  const iconClass = proc.performed
+  const executions = getPlanExecutions(proc.id);
+  const lastExecution = executions[0] || null;
+  const performed = getPlanPerformed(proc);
+  const followupText = lastExecution
+    ? `${lastExecution.followup_date ? formatDateBR(lastExecution.followup_date) : "-"} · ${lastExecution.followup_status || "pendente"}`
+    : "-";
+  const iconClass = performed
     ? "bi-check-circle-fill text-success"
     : "bi-x-circle-fill text-danger";
-  const valueInput = Number.isFinite(value)
-    ? value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : "0,00";
 
   return `
-    <div class="card mb-2 border-0 shadow-sm ${proc.performed ? "opacity-75" : ""}">
+    <div class="card mb-2 border-0 shadow-sm ${performed ? "opacity-75" : ""}">
       <div class="card-body py-3 px-3">
         <div class="d-flex align-items-start justify-content-between gap-2">
           <div class="flex-grow-1">
             <div class="d-flex align-items-start gap-2">
               <i class="bi ${iconClass} fs-5 mt-1"></i>
               <div>
-                <div class="fw-bold ${proc.performed ? "text-muted text-decoration-line-through" : "text-dark"}">
-                  ${core.escapeHtml(proc.name)}
-                </div>
-                <div class="text-muted">
-                  R$ ${formatMoneyBRL(value)}
-                </div>
-                ${
-                  procedureDate
-                    ? `<div class="small text-muted mt-1">Data: ${core.escapeHtml(formatDateBR(procedureDate))}</div>`
-                    : ""
-                }
-                ${
-                  proc.consultationDate
-                    ? `<div class="small text-muted mt-1"><i class="bi bi-calendar3 me-1"></i>${core.escapeHtml(proc.consultationDate)}</div>`
-                    : ""
-                }
-                ${
-                  proc.observation || proc.observations
-                    ? `<div class="small text-muted mt-1">${core.escapeHtml(proc.observation || proc.observations)}</div>`
-                    : ""
-                }
+                <div class="fw-bold ${performed ? "text-muted" : "text-dark"}">${core.escapeHtml(proc.name)}</div>
+                <div class="text-muted">R$ ${formatMoneyBRL(value)} · ${executions.length} sessão(ões)</div>
+                <div class="small text-muted mt-1">Follow-up (última sessão): ${core.escapeHtml(followupText)}</div>
               </div>
-            </div>
-          </div>
-
-          <div class="text-end" style="min-width: 200px;">
-            <div class="small text-muted text-start mb-1">Data do procedimento</div>
-            <input
-              type="date"
-              class="form-control form-control-sm mb-2"
-              value="${procedureDate}"
-              onchange="updatePlanDate(${realIndex}, this.value)"
-            >
-
-            <div class="small text-muted text-start mb-1">Valor do procedimento</div>
-            <div class="input-group input-group-sm mb-2">
-              <span class="input-group-text">R$</span>
-              <input
-                type="text"
-                class="form-control"
-                value="${valueInput}"
-                inputmode="decimal"
-                onchange="updateProcedureValueFromCurrencyInput(${realIndex}, this.value, this)"
-              >
-            </div>
-
-            <div class="form-check d-flex justify-content-end align-items-center gap-2 mt-2">
-              <input
-                class="form-check-input"
-                type="checkbox"
-                id="panelPerformed${realIndex}"
-                ${proc.performed ? "checked" : ""}
-                onchange="togglePlanPerformed(${realIndex}, this.checked)"
-              >
-              <label class="form-check-label small" for="panelPerformed${realIndex}">
-                Realizado
-              </label>
             </div>
           </div>
         </div>
@@ -1022,15 +986,15 @@ function renderCosmeticConduct() {
 
   const shouldShow =
     currentCategory === "cosmiatria" &&
-    Array.isArray(cosmeticProcedures);
+    Array.isArray(cosmeticPlans);
 
-  if (!shouldShow || cosmeticProcedures.length === 0) {
+  if (!shouldShow || cosmeticPlans.length === 0) {
     rightContent.innerHTML = '<div class="text-muted small">Nenhum procedimento planejado.</div>';
     showRightPanel();
     return;
   }
 
-  const procs = getProceduresForCurrentContext();
+  const procs = getPlansForCurrentContext();
   const contextLabel = activeCosmeticContext
     ? "Consulta em foco"
     : "Visão geral de todos os planejamentos";
@@ -1057,8 +1021,8 @@ function renderCosmeticConduct() {
 
   if (activeCosmeticContext) {
     const sortedProcs = [...procs].sort((a, b) => {
-      if (a.performed === b.performed) return 0;
-      return a.performed ? 1 : -1;
+      if (getPlanPerformed(a) === getPlanPerformed(b)) return 0;
+      return getPlanPerformed(a) ? 1 : -1;
     });
 
     sortedProcs.forEach((proc) => {
@@ -1225,7 +1189,7 @@ function renderHistoricalConsultationRightPanel(consultationId, category) {
     currentCategory = "cosmiatria";
 
     // Se ainda não houver dados carregados, tenta carregar antes de renderizar
-    if (!Array.isArray(cosmeticProcedures) || cosmeticProcedures.length === 0) {
+    if (!Array.isArray(cosmeticPlans) || cosmeticPlans.length === 0) {
       panelContent.innerHTML = `<div class="text-muted small">Nenhum planejamento encontrado nesta consulta.</div>`;
       showRightPanel();
       return;
@@ -1302,7 +1266,7 @@ function renderRightPanel(contextCategory = null, consultationData = null) {
 
     if (panelTitle) panelTitle.innerHTML = '<i class="bi bi-heart-pulse me-2"></i>Planejamento e Execução';
 
-    if (!Array.isArray(cosmeticProcedures) || cosmeticProcedures.length === 0) {
+    if (!Array.isArray(cosmeticPlans) || cosmeticPlans.length === 0) {
       panelContent.innerHTML = `<div class="text-muted small">Nenhum planejamento cadastrado.</div>`;
       showRightPanel();
       return;
@@ -1392,31 +1356,33 @@ async function loadExistingPlans() {
   try {
     const data = await core.fetchJson(`/api/prontuario/${patientId}/cosmetic-plans-grouped`);
 
+    groupedCosmeticPlans = [];
+    cosmeticPlans = [];
+    planExecutionsByPlanId = {};
+
     if (data.success && data.grouped_plans && data.grouped_plans.length > 0) {
       groupedCosmeticPlans = data.grouped_plans;
-      cosmeticProcedures = [];
 
       data.grouped_plans.forEach((group) => {
         group.procedures.forEach((plan) => {
-          cosmeticProcedures.push({
+          const normalizedPlan = {
             id: plan.id,
             name: plan.procedure_name,
             value: parseFloat(plan.planned_value) || 0,
             months: plan.follow_up_months || 6,
             budget: parseFloat(plan.final_budget || plan.planned_value) || 0,
-            performed: !!plan.was_performed,
-            performedDate: plan.performed_date || null,
             observations: plan.observations || "",
             observation: plan.observations || "",
+            status: plan.status || "ativo",
             consultationKey: group.consultation_key || null,
             consultationDate: group.consultation_info?.display_date || "",
             appointmentId: group.consultation_info?.appointment_id || null
-          });
+          };
+
+          cosmeticPlans.push(normalizedPlan);
+          planExecutionsByPlanId[String(plan.id)] = Array.isArray(plan.executions) ? plan.executions : [];
         });
       });
-    } else {
-      groupedCosmeticPlans = [];
-      cosmeticProcedures = [];
     }
 
     renderCosmeticProcedures();
@@ -1426,7 +1392,8 @@ async function loadExistingPlans() {
   } catch (error) {
     console.error("Erro ao carregar planejamentos:", error);
     groupedCosmeticPlans = [];
-    cosmeticProcedures = [];
+    cosmeticPlans = [];
+    planExecutionsByPlanId = {};
     renderCosmeticProcedures();
     renderCosmeticConduct();
     updateCosmeticTotal();
@@ -1435,7 +1402,7 @@ async function loadExistingPlans() {
 }
 
 function updateCosmeticTotal() {
-  const total = cosmeticProcedures.reduce(
+  const total = cosmeticPlans.reduce(
     (sum, proc) => sum + (parseFloat(proc.budget ?? proc.value) || 0),
     0
   );
@@ -1468,8 +1435,8 @@ function addCosmeticProcedure() {
   }
 
   if (editingCosmeticProcedureIndex !== null) {
-    const original = cosmeticProcedures[editingCosmeticProcedureIndex];
-    cosmeticProcedures[editingCosmeticProcedureIndex] = {
+    const original = cosmeticPlans[editingCosmeticProcedureIndex];
+    cosmeticPlans[editingCosmeticProcedureIndex] = {
       ...original,
       name,
       value,
@@ -1489,13 +1456,11 @@ function addCosmeticProcedure() {
 
     showAlert("Procedimento atualizado com sucesso.", "success");
   } else {
-    cosmeticProcedures.push({
+    cosmeticPlans.push({
       name,
       value,
       months,
       budget: value,
-      performed: false,
-      performedDate: null,
       observations,
       observation: observations
     });
@@ -1516,7 +1481,7 @@ function addCosmeticProcedure() {
 }
 
 function editCosmeticProcedure(index) {
-  const proc = cosmeticProcedures[index];
+  const proc = cosmeticPlans[index];
   if (!proc) return;
 
   editingCosmeticProcedureIndex = index;
@@ -1539,7 +1504,7 @@ function editCosmeticProcedure(index) {
 }
 
 function removeCosmeticProcedure(index) {
-  cosmeticProcedures.splice(index, 1);
+  cosmeticPlans.splice(index, 1);
 
   if (editingCosmeticProcedureIndex === index) {
     editingCosmeticProcedureIndex = null;
@@ -1564,260 +1529,216 @@ function removeCosmeticProcedure(index) {
 }
 
 function updatePlanValue(index, val) {
-  if (!cosmeticProcedures[index]) return;
-  cosmeticProcedures[index].budget = parseFloat(val) || 0;
-  cosmeticProcedures[index].value = parseFloat(val) || 0;
+  if (!cosmeticPlans[index]) return;
+  cosmeticPlans[index].budget = parseFloat(val) || 0;
+  cosmeticPlans[index].value = parseFloat(val) || 0;
   updateCosmeticTotal();
   renderCosmeticConduct();
 }
 
-function updatePlanDate(index, val) {
-  if (!cosmeticProcedures[index]) return;
-  cosmeticProcedures[index].performedDate = val;
-  renderCosmeticConduct();
+
+function updatePlanDate() {
+  showAlert("No novo fluxo, datas são controladas por sessão.", "info");
 }
 
-function togglePlanPerformed(index, checked) {
-  if (!cosmeticProcedures[index]) return;
-  cosmeticProcedures[index].performed = checked;
-  if (checked && !cosmeticProcedures[index].performedDate) {
-    cosmeticProcedures[index].performedDate = new Date().toLocaleDateString("en-CA");
+function togglePlanPerformed() {
+  showAlert("No novo fluxo, realizado é controlado por sessão.", "info");
+}
+
+async function updatePlanStatus(planId, status) {
+  try {
+    const result = await core.fetchJson(`/api/prontuario/cosmetic-plan/${planId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+      body: JSON.stringify({ status })
+    });
+    if (!result.success) {
+      showAlert(result.error || "Erro ao atualizar status", "danger");
+      return;
+    }
+    await loadExistingPlans();
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao atualizar status do plano", "danger");
   }
-  renderCosmeticProcedures();
-  renderCosmeticConduct();
-  updateCosmeticTotal();
-  updateMainLayoutColumns();
 }
 
-function updateProcedureBudget(index, value) {
-  if (!cosmeticProcedures[index]) return;
-  const val = parseFloat(value) || 0;
-  cosmeticProcedures[index].budget = val;
-  cosmeticProcedures[index].value = val;
-  updateCosmeticTotal();
-  renderCosmeticConduct();
+async function createExecution(planId, payload) {
+  return core.fetchJson(`/api/cosmetic-plans/${planId}/executions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+    body: JSON.stringify(payload)
+  });
 }
 
-function updateProcedureDate(index, dateValue) {
-  if (!cosmeticProcedures[index]) return;
-  cosmeticProcedures[index].performedDate = dateValue;
-  renderCosmeticConduct();
+async function updateExecution(executionId, payload) {
+  return core.fetchJson(`/api/executions/${executionId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+    body: JSON.stringify(payload)
+  });
 }
 
-function updateProcedureObservation(index, value) {
-  if (!cosmeticProcedures[index]) return;
-  cosmeticProcedures[index].observation = value;
-  cosmeticProcedures[index].observations = value;
-  renderCosmeticConduct();
+async function deleteExecution(executionId) {
+  return core.fetchJson(`/api/executions/${executionId}`, {
+    method: "DELETE",
+    headers: { "X-CSRFToken": getCSRFToken() }
+  });
 }
 
-function updateProcedureValueById(id, value) {
-  const proc = cosmeticProcedures.find((p) => String(p.id) === String(id));
-  if (!proc) return;
-  proc.value = parseFloat(value) || 0;
-  proc.budget = parseFloat(value) || 0;
-  updateCosmeticTotal();
-  renderCosmeticConduct();
+async function promptCreateExecution(planId) {
+  const scheduled_date = prompt("Data agendada (AAAA-MM-DD)", "") || null;
+  const performed_date = prompt("Data realizada (AAAA-MM-DD). Deixe vazio se pendente", "") || null;
+  const charged_raw = prompt("Valor cobrado (R$)", "") || "";
+  const notes = prompt("Observações", "") || "";
+  const followup_date = prompt("Data follow-up (AAAA-MM-DD)", "") || null;
+
+  const payload = {
+    scheduled_date,
+    performed_date,
+    was_performed: !!performed_date,
+    charged_value: charged_raw ? parseFloat(String(charged_raw).replace(',', '.')) : null,
+    notes,
+    followup_date,
+    followup_status: "pendente"
+  };
+
+  try {
+    const result = await createExecution(planId, payload);
+    if (!result.success) {
+      showAlert(result.error || "Erro ao registrar sessão", "danger");
+      return;
+    }
+    await loadExistingPlans();
+    showAlert("Sessão registrada com sucesso", "success");
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao criar sessão", "danger");
+  }
 }
 
-function updateProcedureDateById(id, date) {
-  const proc = cosmeticProcedures.find((p) => String(p.id) === String(id));
-  if (!proc) return;
-  proc.performedDate = date || null;
-  renderCosmeticConduct();
+async function promptEditExecution(executionId) {
+  const entry = Object.values(planExecutionsByPlanId).flat().find((e) => Number(e.id) === Number(executionId));
+  if (!entry) return;
+
+  const performed_date = prompt("Data realizada (AAAA-MM-DD)", entry.performed_date ? String(entry.performed_date).slice(0, 10) : "") || null;
+  const charged_raw = prompt("Valor cobrado (R$)", entry.charged_value ?? "") || "";
+  const notes = prompt("Observações", entry.notes || "") || "";
+
+  try {
+    const result = await updateExecution(executionId, {
+      performed_date,
+      was_performed: !!performed_date,
+      charged_value: charged_raw ? parseFloat(String(charged_raw).replace(',', '.')) : null,
+      notes
+    });
+    if (!result.success) {
+      showAlert(result.error || "Erro ao editar sessão", "danger");
+      return;
+    }
+    await loadExistingPlans();
+    showAlert("Sessão atualizada", "success");
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao atualizar sessão", "danger");
+  }
+}
+
+async function removeExecution(executionId) {
+  if (!confirm("Excluir esta sessão?")) return;
+  try {
+    const result = await deleteExecution(executionId);
+    if (!result.success) {
+      showAlert(result.error || "Erro ao excluir sessão", "danger");
+      return;
+    }
+    await loadExistingPlans();
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao excluir sessão", "danger");
+  }
+}
+
+function renderExecutionRow(tbody, execution) {
+  const row = tbody.insertRow();
+  row.className = "table-light";
+  row.innerHTML = `
+    <td></td>
+    <td class="small">${execution.scheduled_date ? formatDateBR(execution.scheduled_date) : "-"}</td>
+    <td class="small">${execution.performed_date ? formatDateBR(execution.performed_date) : "-"}</td>
+    <td class="small">${execution.charged_value !== null && execution.charged_value !== undefined ? formatMoneyBRL(execution.charged_value) : "-"}</td>
+    <td class="small">${core.escapeHtml(execution.notes || "-")}</td>
+    <td class="small">${execution.followup_date ? formatDateBR(execution.followup_date) : "-"} · ${core.escapeHtml(execution.followup_status || "pendente")}</td>
+    <td class="text-center">
+      <button class="btn btn-sm btn-outline-primary border-0" onclick="promptEditExecution(${execution.id})"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger border-0" onclick="removeExecution(${execution.id})"><i class="bi bi-trash"></i></button>
+    </td>
+  `;
 }
 
 function renderCosmeticProcedures() {
   const tbody = document.getElementById("cosmeticPlanBody");
   if (!tbody) return;
-
   tbody.innerHTML = "";
 
-  const newProcedures = cosmeticProcedures.filter((p) => !p.id);
-
-  if (newProcedures.length > 0) {
-    const headerRow = tbody.insertRow();
-    headerRow.className = "consultation-group-header";
-    headerRow.innerHTML = `
-      <td colspan="5" class="bg-success bg-opacity-10 border-top border-bottom border-2 border-success">
-        <div class="d-flex align-items-center py-2">
-          <i class="bi bi-plus-circle me-2 text-success"></i>
-          <strong class="text-success">Nova Consulta (Planejamento Atual)</strong>
-        </div>
+  cosmeticPlans.forEach((plan, index) => {
+    const executions = getPlanExecutions(plan.id);
+    const performed = getPlanPerformed(plan);
+    const expanded = expandedCosmeticPlans.has(plan.id);
+    const row = tbody.insertRow();
+    row.className = performed ? "table-success" : "";
+    row.innerHTML = `
+      <td class="ps-2"><div class="fw-bold">${core.escapeHtml(plan.name)}</div></td>
+      <td><input type="number" class="form-control form-control-sm" value="${plan.budget || plan.value}" onchange="updatePlanValue(${index}, this.value)"></td>
+      <td><input type="number" class="form-control form-control-sm" value="${plan.months || 6}" readonly></td>
+      <td>
+        <select class="form-select form-select-sm" onchange="updatePlanStatus(${plan.id}, this.value)">
+          ${['ativo','pausado','concluido','cancelado'].map((st)=>`<option value="${st}" ${plan.status===st?'selected':''}>${st}</option>`).join('')}
+        </select>
+      </td>
+      <td class="text-center">
+        <button class="btn btn-sm btn-outline-secondary" onclick="togglePlanSessions(${plan.id})">Sessões (${executions.length})</button>
+        <button class="btn btn-sm btn-outline-success" onclick="promptCreateExecution(${plan.id})">Registrar nova sessão</button>
       </td>
     `;
 
-    newProcedures.forEach((proc) => {
-      const globalIndex = cosmeticProcedures.findIndex((p) => p === proc);
-      const row = tbody.insertRow();
-      row.className = proc.performed ? "table-success" : "";
-      row.innerHTML = `
-        <td class="ps-3">
-          <div class="fw-bold text-primary">${core.escapeHtml(proc.name)}</div>
-        </td>
-        <td>
-          <input type="number" class="form-control form-control-sm" value="${proc.budget || proc.value}" onchange="updatePlanValue(${globalIndex}, this.value)">
-        </td>
-        <td>
-          <input type="date" class="form-control form-control-sm" value="${proc.performedDate || ""}" onchange="updatePlanDate(${globalIndex}, this.value)">
-        </td>
-        <td class="text-center align-middle">
-          <div class="form-check d-flex justify-content-center">
-            <input class="form-check-input" type="checkbox" ${proc.performed ? "checked" : ""} onchange="togglePlanPerformed(${globalIndex}, this.checked)">
-          </div>
-        </td>
-        <td class="text-center">
-          <button class="btn btn-sm btn-outline-primary border-0 me-1" onclick="editCosmeticProcedure(${globalIndex})"><i class="bi bi-pencil"></i></button>
-          <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${globalIndex})"><i class="bi bi-trash"></i></button>
-        </td>
-      `;
-    });
+    if (expanded) {
+      executions.forEach((execution) => renderExecutionRow(tbody, execution));
+    }
+  });
+
+  if (cosmeticPlans.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
   }
+}
 
-  if (groupedCosmeticPlans.length > 0) {
-    groupedCosmeticPlans.forEach((group) => {
-      const groupId = group.consultation_key || group.appointment_id || Math.random().toString(36).slice(2);
-
-      const headerRow = tbody.insertRow();
-      headerRow.className = "consultation-group-header";
-      headerRow.id = `group-${groupId}`;
-      headerRow.innerHTML = `
-        <td colspan="5" class="bg-light border-top border-bottom border-2">
-          <div class="d-flex align-items-center py-2">
-            <i class="bi bi-calendar3 me-2 text-primary"></i>
-            <strong>Consulta de ${core.escapeHtml(group.consultation_info?.display_date || "")}</strong>
-          </div>
-        </td>
-      `;
-
-      group.procedures.forEach((proc) => {
-        const globalIndex = cosmeticProcedures.findIndex((p) => p.id === proc.id);
-        if (globalIndex === -1) return;
-
-        const pObj = cosmeticProcedures[globalIndex];
-        const row = tbody.insertRow();
-        row.className = pObj.performed ? "table-success" : "";
-        row.innerHTML = `
-          <td class="ps-3">
-            <div class="fw-bold text-primary">${core.escapeHtml(pObj.name)}</div>
-          </td>
-          <td>
-            <input type="number" class="form-control form-control-sm" value="${pObj.budget || pObj.value}" onchange="updatePlanValue(${globalIndex}, this.value)">
-          </td>
-          <td>
-            <input type="date" class="form-control form-control-sm" value="${pObj.performedDate || ""}" onchange="updatePlanDate(${globalIndex}, this.value)">
-          </td>
-          <td class="text-center align-middle">
-            <div class="form-check d-flex justify-content-center">
-              <input class="form-check-input" type="checkbox" ${pObj.performed ? "checked" : ""} onchange="togglePlanPerformed(${globalIndex}, this.checked)">
-            </div>
-          </td>
-          <td class="text-center">
-            <button class="btn btn-sm btn-outline-primary border-0 me-1" onclick="editCosmeticProcedure(${globalIndex})"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-sm btn-outline-danger border-0" onclick="removeCosmeticProcedure(${globalIndex})"><i class="bi bi-trash"></i></button>
-          </td>
-        `;
-      });
-    });
+function togglePlanSessions(planId) {
+  if (expandedCosmeticPlans.has(planId)) {
+    expandedCosmeticPlans.delete(planId);
+  } else {
+    expandedCosmeticPlans.add(planId);
   }
-
-  if (cosmeticProcedures.length === 0) {
-    tbody.innerHTML =
-      '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
-  }
+  renderCosmeticProcedures();
 }
 
 async function performCosmeticProcedure(planId, procedureName, consultationId = null) {
   const today = new Date().toISOString().split("T")[0];
-  const dateInput = prompt(
-    `Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`,
-    today
-  );
+  const dateInput = prompt(`Marcar "${procedureName}" como realizado em qual data? (AAAA-MM-DD)`, today);
   if (!dateInput) return;
 
-  const apptId = consultationId || getAppointmentId() || null;
-
-  try {
-    const result = await core.fetchJson(`/api/cosmetic-plans/${planId}/perform`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCSRFToken()
-      },
-      body: JSON.stringify({
-        appointment_id: apptId,
-        performed_date: dateInput
-      })
-    });
-
-    if (result.success) {
-      showAlert("Procedimento marcado como realizado!", "success");
-      setTimeout(() => location.reload(), 700);
-    } else {
-      showAlert(result.error || "Erro ao processar", "danger");
-    }
-  } catch (err) {
-    console.error(err);
-    showAlert(err.message || "Erro na comunicação com o servidor", "danger");
-  }
+  await promptCreateExecution(planId);
 }
 
 window.toggleProcedurePerformed = async function (index) {
-  const proc = cosmeticProcedures[index];
-  if (!proc) return;
-
-  if (proc.id) {
-    const today = new Date().toLocaleDateString("en-CA");
-    const dateInput = prompt(
-      `Marcar "${proc.name}" como realizado em qual data? (AAAA-MM-DD)`,
-      proc.performedDate || today
-    );
-    if (!dateInput) return;
-
-    try {
-      const result = await core.fetchJson(`/api/cosmetic-plans/${proc.id}/perform`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-CSRFToken": getCSRFToken()
-        },
-        body: JSON.stringify({
-          appointment_id: getAppointmentId(),
-          performed_date: dateInput
-        })
-      });
-
-      if (result.success) {
-        showAlert("Procedimento marcado como realizado!", "success");
-        await loadExistingPlans();
-        renderCosmeticConduct();
-      } else {
-        showAlert(result.error || "Erro ao marcar como realizado", "danger");
-      }
-    } catch (err) {
-      console.error(err);
-      showAlert("Erro de conexão ao salvar procedimento", "danger");
-    }
-
-    return;
-  }
-
-  proc.performed = !proc.performed;
-  if (proc.performed && !proc.performedDate) {
-    proc.performedDate = new Date().toLocaleDateString("en-CA");
-  }
-  if (!proc.performed) proc.performedDate = null;
-
-  renderCosmeticProcedures();
-  renderCosmeticConduct();
-  updateCosmeticTotal();
-  updateMainLayoutColumns();
+  const proc = cosmeticPlans[index];
+  if (!proc || !proc.id) return;
+  await promptCreateExecution(proc.id);
 };
 
 function generateBudget() {
   const patientId = getPatientId();
 
-  if (cosmeticProcedures.length === 0) {
+  if (cosmeticPlans.length === 0) {
     showAlert("Adicione procedimentos ao planejamento antes de gerar o orçamento", "warning");
     return;
   }
@@ -1829,7 +1750,7 @@ function generateBudget() {
       "Content-Type": "application/json",
       "X-CSRFToken": getCSRFToken()
     },
-    body: JSON.stringify({ procedures: cosmeticProcedures })
+    body: JSON.stringify({ procedures: cosmeticPlans })
   })
     .then((response) => response.blob())
     .then((blob) => {
@@ -2101,20 +2022,17 @@ function buildFinalizePayload() {
     payload.transplant_data = planning;
   }
 
-  if (currentCategory === "cosmiatria" && cosmeticProcedures.length > 0) {
-    payload.cosmetic_procedures = cosmeticProcedures;
+  if (currentCategory === "cosmiatria" && cosmeticPlans.length > 0) {
+    payload.cosmetic_procedures = cosmeticPlans;
 
-    const performedProcedures = cosmeticProcedures.filter((p) => p.performed);
-    const totalPerformed = performedProcedures.reduce(
-      (sum, p) => sum + (parseFloat(p.budget ?? p.value) || 0),
-      0
-    );
+    const performedProcedures = cosmeticPlans.filter((p) => getPlanPerformed(p));
+    const totalPerformed = performedProcedures.reduce((sum, p) => sum + getPlanRealizedValue(p), 0);
 
     if (totalPerformed > 0) {
       payload.checkout_amount = totalPerformed;
       payload.checkout_procedures = performedProcedures.map((p) => ({
         name: p.name,
-        value: parseFloat(p.budget ?? p.value) || 0,
+        value: getPlanRealizedValue(p),
         budget: parseFloat(p.budget ?? p.value) || 0
       }));
     }
@@ -3328,13 +3246,11 @@ window.addCosmeticProcedure = addCosmeticProcedure;
 window.editCosmeticProcedure = editCosmeticProcedure;
 window.removeCosmeticProcedure = removeCosmeticProcedure;
 window.updatePlanValue = updatePlanValue;
-window.updatePlanDate = updatePlanDate;
-window.togglePlanPerformed = togglePlanPerformed;
-window.updateProcedureBudget = updateProcedureBudget;
-window.updateProcedureDate = updateProcedureDate;
-window.updateProcedureObservation = updateProcedureObservation;
-window.updateProcedureValueById = updateProcedureValueById;
-window.updateProcedureDateById = updateProcedureDateById;
+window.updatePlanStatus = updatePlanStatus;
+window.togglePlanSessions = togglePlanSessions;
+window.promptCreateExecution = promptCreateExecution;
+window.promptEditExecution = promptEditExecution;
+window.removeExecution = removeExecution;
 window.performCosmeticProcedure = performCosmeticProcedure;
 window.generateBudget = generateBudget;
 window.highlightConsultationGroup = highlightConsultationGroup;

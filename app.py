@@ -101,7 +101,7 @@ def format_brazil_datetime(dt):
 @app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
 @login_required
 def perform_cosmetic_plan(plan_id):
-    """Atalho legado: registrar execução realizada para um plano."""
+    """Atalho legado: registrar execução realizada para um plano (compatibilidade com clientes antigos; front D2 usa /executions)."""
     plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
     data = request.json or {}
 
