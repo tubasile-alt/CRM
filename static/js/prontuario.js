@@ -1772,6 +1772,17 @@ async function promptCreateExecution(planId, defaults = {}) {
   });
   if (!payload) return;
 
+  // Validação: se status é "realizada", precisa de performed_date
+  if (payload.execution_status === "realizada" && !payload.performed_date) {
+    showAlert("Data de realização é obrigatória para status 'realizada'", "warning");
+    return;
+  }
+  // Validação: se status é "agendada", precisa de scheduled_date
+  if (payload.execution_status === "agendada" && !payload.scheduled_date) {
+    showAlert("Data agendada é obrigatória para status 'agendada'", "warning");
+    return;
+  }
+
   try {
     const result = await createExecution(planId, payload);
     if (!result.success) {
@@ -1803,6 +1814,17 @@ async function promptEditExecution(executionId) {
     }
   });
   if (!payload) return;
+
+  // Validação: se status é "realizada", precisa de performed_date
+  if (payload.execution_status === "realizada" && !payload.performed_date) {
+    showAlert("Data de realização é obrigatória para status 'realizada'", "warning");
+    return;
+  }
+  // Validação: se status é "agendada", precisa de scheduled_date
+  if (payload.execution_status === "agendada" && !payload.scheduled_date) {
+    showAlert("Data agendada é obrigatória para status 'agendada'", "warning");
+    return;
+  }
 
   try {
     const result = await updateExecution(executionId, payload);
