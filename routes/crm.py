@@ -160,6 +160,7 @@ def get_pending_surgeries():
 @login_required
 def get_performed_procedures():
     # D1: prioriza execuções realizadas; fallback legado para planos sem execução.
+    # Busca TODOS os procedimentos realizados (sem limite) para sincronizar com CRM
     query = db.session.query(ProcedureExecution, CosmeticProcedurePlan, Note, Patient).join(
         CosmeticProcedurePlan, ProcedureExecution.plan_id == CosmeticProcedurePlan.id
     ).join(
@@ -171,7 +172,8 @@ def get_performed_procedures():
     if current_user.is_doctor():
         query = query.filter(Note.doctor_id == current_user.id)
     
-    rows = query.order_by(ProcedureExecution.performed_date.desc()).limit(100).all()
+    # Sem limite - retorna TODOS os realizados para bater com CRM/Google Sheets
+    rows = query.order_by(ProcedureExecution.performed_date.desc()).all()
     
     result = []
     for execution, plan, note, patient in rows:
