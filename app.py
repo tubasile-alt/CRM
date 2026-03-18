@@ -233,6 +233,71 @@ def create_plan_execution(plan_id):
     db.session.add(execution)
     db.session.commit()
     app.logger.info('execution_created id=%s plan_id=%s user_id=%s', execution.id, plan.id, current_user.id)
+    
+    # Sincronizar com Google Sheets se foi marcado como realizado
+    if execution.execution_status == 'realizada':
+        try:
+            from threading import Thread
+            def sync_sheets():
+                from routes.crm import _get_performed_procedures_historical
+                from services.google_sheets import _get_access_token
+                import requests as req
+                
+                patients_dict = _get_performed_procedures_historical()
+                if patients_dict:
+                    SPREADSHEET_ID = '1IUNWhBRzt5u6_ttfzjfTKckhSMOMx1l_s7uGnIom66o'
+                    SHEET_NAME = 'Procedimentos Realizados'
+                    
+                    rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos Realizados', 'Total Realizado (R$)', 'Última Realização']]
+                    for pd in patients_dict.values():
+                        procs_str = '; '.join([
+                            f"{p['procedure_name']} ({p['performed_date'][:10] if p['performed_date'] else 'N/A'}) - R$ {float(p['charged_value']):.2f}"
+                            for p in pd['procedures']
+                        ])
+                        last_date = pd.get('last_performed_date', '')[:10] if pd.get('last_performed_date') else ''
+                        rows.append([
+                            pd['patient_name'],
+                            pd.get('patient_phone', ''),
+                            pd.get('funnel_status', 'Realizado'),
+                            pd.get('funnel_temperature', ''),
+                            procs_str,
+                            f"{float(pd['total_value']):.2f}",
+                            str(last_date),
+                        ])
+                    
+                    try:
+                        access_token = _get_access_token()
+                        headers = {
+                            'Authorization': f'Bearer {access_token}',
+                            'Content-Type': 'application/json'
+                        }
+                        base = f'https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}'
+                        
+                        meta = req.get(f'{base}?fields=sheets.properties.title', headers=headers, timeout=10)
+                        sheet_titles = [s['properties']['title'] for s in meta.json().get('sheets', [])] if meta.status_code == 200 else []
+                        
+                        if SHEET_NAME not in sheet_titles:
+                            req.post(f'{base}:batchUpdate', headers=headers, timeout=10, json={
+                                'requests': [{'addSheet': {'properties': {'title': SHEET_NAME}}}]
+                            })
+                        
+                        req.post(f'{base}/values/{SHEET_NAME}!A1:Z2000:clear', headers=headers, timeout=10)
+                        req.put(
+                            f'{base}/values/{SHEET_NAME}!A1',
+                            headers=headers,
+                            timeout=15,
+                            params={'valueInputOption': 'USER_ENTERED'},
+                            json={'values': rows}
+                        )
+                        app.logger.info('Google Sheets sincronizado automaticamente - procedimento realizado')
+                    except Exception as e:
+                        app.logger.error(f'Erro ao sincronizar Google Sheets: {e}')
+            
+            thread = Thread(target=sync_sheets, daemon=True)
+            thread.start()
+        except Exception as e:
+            app.logger.error(f'Erro ao iniciar sincronização Google Sheets: {e}')
+    
     return jsonify({'success': True, 'execution': _serialize_execution(execution)}), 201
 
 
@@ -326,9 +391,76 @@ def update_execution(execution_id):
 
     execution.updated_by = current_user.id
     execution.updated_at = get_brazil_time()
+    
+    was_realizado = execution.execution_status == 'realizada'
 
     db.session.commit()
     app.logger.info('execution_updated id=%s plan_id=%s user_id=%s', execution.id, execution.plan_id, current_user.id)
+    
+    # Sincronizar com Google Sheets se foi marcado como realizado
+    if was_realizado:
+        try:
+            from threading import Thread
+            def sync_sheets():
+                from routes.crm import _get_performed_procedures_historical
+                from services.google_sheets import _get_access_token
+                import requests as req
+                
+                patients_dict = _get_performed_procedures_historical()
+                if patients_dict:
+                    SPREADSHEET_ID = '1IUNWhBRzt5u6_ttfzjfTKckhSMOMx1l_s7uGnIom66o'
+                    SHEET_NAME = 'Procedimentos Realizados'
+                    
+                    rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos Realizados', 'Total Realizado (R$)', 'Última Realização']]
+                    for pd in patients_dict.values():
+                        procs_str = '; '.join([
+                            f"{p['procedure_name']} ({p['performed_date'][:10] if p['performed_date'] else 'N/A'}) - R$ {float(p['charged_value']):.2f}"
+                            for p in pd['procedures']
+                        ])
+                        last_date = pd.get('last_performed_date', '')[:10] if pd.get('last_performed_date') else ''
+                        rows.append([
+                            pd['patient_name'],
+                            pd.get('patient_phone', ''),
+                            pd.get('funnel_status', 'Realizado'),
+                            pd.get('funnel_temperature', ''),
+                            procs_str,
+                            f"{float(pd['total_value']):.2f}",
+                            str(last_date),
+                        ])
+                    
+                    try:
+                        access_token = _get_access_token()
+                        headers = {
+                            'Authorization': f'Bearer {access_token}',
+                            'Content-Type': 'application/json'
+                        }
+                        base = f'https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}'
+                        
+                        meta = req.get(f'{base}?fields=sheets.properties.title', headers=headers, timeout=10)
+                        sheet_titles = [s['properties']['title'] for s in meta.json().get('sheets', [])] if meta.status_code == 200 else []
+                        
+                        if SHEET_NAME not in sheet_titles:
+                            req.post(f'{base}:batchUpdate', headers=headers, timeout=10, json={
+                                'requests': [{'addSheet': {'properties': {'title': SHEET_NAME}}}]
+                            })
+                        
+                        req.post(f'{base}/values/{SHEET_NAME}!A1:Z2000:clear', headers=headers, timeout=10)
+                        req.put(
+                            f'{base}/values/{SHEET_NAME}!A1',
+                            headers=headers,
+                            timeout=15,
+                            params={'valueInputOption': 'USER_ENTERED'},
+                            json={'values': rows}
+                        )
+                        app.logger.info('Google Sheets sincronizado automaticamente - procedimento atualizado')
+                    except Exception as e:
+                        app.logger.error(f'Erro ao sincronizar Google Sheets: {e}')
+            
+            thread = Thread(target=sync_sheets, daemon=True)
+            thread.start()
+        except Exception as e:
+            app.logger.error(f'Erro ao iniciar sincronização Google Sheets: {e}')
+    
     return jsonify({'success': True, 'execution': _serialize_execution(execution)})
 
 
