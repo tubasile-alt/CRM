@@ -639,6 +639,161 @@ def sync_to_google_sheets():
         print(f'[sync_to_google_sheets] Erro: {e}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
+
+def _get_performed_procedures_historical(month=None, year=None):
+    """Busca TODOS os procedimentos realizados históricos (sem limite)."""
+    arthur_doctor = User.query.filter(
+        db.func.lower(User.name).like('%arthur%'),
+        User.role == 'medico'
+    ).first()
+    
+    if not arthur_doctor:
+        return {}
+
+    query = db.session.query(
+        ProcedureExecution, CosmeticProcedurePlan, Note, Patient
+    ).join(
+        CosmeticProcedurePlan, ProcedureExecution.plan_id == CosmeticProcedurePlan.id
+    ).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    ).join(
+        Patient, Note.patient_id == Patient.id
+    ).filter(
+        ProcedureExecution.execution_status == 'realizada',
+        Note.doctor_id == arthur_doctor.id
+    )
+
+    if month:
+        query = query.filter(extract('month', ProcedureExecution.performed_date) == month)
+    if year:
+        query = query.filter(extract('year', ProcedureExecution.performed_date) == year)
+
+    rows = query.order_by(ProcedureExecution.performed_date.desc()).all()
+
+    # Agrupar dados por paciente
+    patients_dict = {}
+    for execution, plan, note, patient in rows:
+        patient_key = patient.id
+        if patient_key not in patients_dict:
+            funnel_entry = PatientFunnelStatus.query.filter_by(patient_id=patient.id).first()
+            patients_dict[patient_key] = {
+                'patient_name': patient.name,
+                'patient_phone': patient.phone or '',
+                'funnel_status': funnel_entry.funnel_status if funnel_entry else 'Realizado',
+                'funnel_temperature': funnel_entry.funnel_temperature if funnel_entry else '',
+                'procedures': [],
+                'total_value': 0.0,
+                'last_performed_date': None
+            }
+        
+        performed_value = float(execution.charged_value or plan.planned_value or 0)
+        patients_dict[patient_key]['procedures'].append({
+            'plan_name': plan.name,
+            'procedure_name': plan.procedure_name,
+            'performed_date': execution.performed_date.isoformat() if execution.performed_date else None,
+            'charged_value': performed_value,
+            'notes': execution.notes or ''
+        })
+        patients_dict[patient_key]['total_value'] += performed_value
+        
+        # Guardar última data de realização
+        if execution.performed_date:
+            if not patients_dict[patient_key]['last_performed_date']:
+                patients_dict[patient_key]['last_performed_date'] = execution.performed_date.isoformat()
+
+    return patients_dict
+
+
+@crm_bp.route('/api/crm/sync-performed-to-google-sheets', methods=['POST'])
+@login_required
+def sync_performed_to_google_sheets():
+    """Sincroniza TODOS os procedimentos realizados com Google Sheets (busca ativa histórica)."""
+    if (current_user.username or '').strip().lower() != 'marcella':
+        return jsonify({'error': 'Acesso restrito'}), 403
+
+    try:
+        from services.google_sheets import _get_access_token, _get_sheets_service
+        import requests as req
+
+        # Buscar todos os dados realizados históricos
+        month = request.args.get('month', type=int)
+        year  = request.args.get('year',  type=int)
+
+        patients_dict = _get_performed_procedures_historical(month=month, year=year)
+
+        if not patients_dict:
+            return jsonify({'success': False, 'error': 'Sem dados realizados para sincronizar'}), 404
+
+        # Montar linhas para planilha com histórico realizado
+        rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos Realizados', 'Total Realizado (R$)', 'Última Realização']]
+
+        for pd in patients_dict.values():
+            procs_str = '; '.join([
+                f"{p['procedure_name']} ({p['performed_date'][:10] if p['performed_date'] else 'N/A'}) - R$ {float(p['charged_value']):.2f}"
+                for p in pd['procedures']
+            ])
+            last_date = pd.get('last_performed_date', '')[:10] if pd.get('last_performed_date') else ''
+            rows.append([
+                pd['patient_name'],
+                pd.get('patient_phone', ''),
+                pd.get('funnel_status', 'Realizado'),
+                pd.get('funnel_temperature', ''),
+                procs_str,
+                f"{float(pd['total_value']):.2f}",
+                str(last_date),
+            ])
+
+        # Sincronizar com Google Sheets
+        SPREADSHEET_ID = '1IUNWhBRzt5u6_ttfzjfTKckhSMOMx1l_s7uGnIom66o'
+        SHEET_NAME     = 'Procedimentos Realizados'
+
+        access_token = _get_access_token()
+        headers = {
+            'Authorization': f'Bearer {access_token}',
+            'Content-Type': 'application/json'
+        }
+
+        base = f'https://sheets.googleapis.com/v4/spreadsheets/{SPREADSHEET_ID}'
+
+        # Garantir que a aba existe
+        meta = req.get(f'{base}?fields=sheets.properties.title', headers=headers, timeout=10)
+        if meta.status_code == 200:
+            sheet_titles = [s['properties']['title'] for s in meta.json().get('sheets', [])]
+        else:
+            sheet_titles = []
+
+        if SHEET_NAME not in sheet_titles:
+            # Criar aba
+            req.post(f'{base}:batchUpdate', headers=headers, timeout=10, json={
+                'requests': [{'addSheet': {'properties': {'title': SHEET_NAME}}}]
+            })
+
+        # Limpar aba
+        req.post(f'{base}/values/{SHEET_NAME}!A1:Z2000:clear', headers=headers, timeout=10)
+
+        # Escrever dados
+        resp = req.put(
+            f'{base}/values/{SHEET_NAME}!A1',
+            headers=headers,
+            timeout=15,
+            params={'valueInputOption': 'USER_ENTERED'},
+            json={'values': rows}
+        )
+
+        if resp.status_code not in (200, 201):
+            return jsonify({'success': False, 'error': f'Google Sheets API: {resp.status_code}'}), 500
+
+        total_rows = len(rows) - 1
+        return jsonify({
+            'success': True, 
+            'rows_written': total_rows,
+            'message': f'✅ {total_rows} procedimentos realizados sincronizados com CRM'
+        })
+
+    except Exception as e:
+        print(f'[sync_performed_to_google_sheets] Erro: {e}')
+        return jsonify({'error': str(e)}), 500
+
 @crm_bp.route('/api/crm/records/<int:plan_id>', methods=['PATCH'])
 @login_required
 def update_cosmetic_plan(plan_id):
