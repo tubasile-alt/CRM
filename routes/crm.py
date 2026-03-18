@@ -897,3 +897,56 @@ def delete_cosmetic_plan(plan_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@crm_bp.route('/api/crm/botox-follow-ups')
+@login_required
+def get_botox_follow_ups():
+    """Retorna apenas Botox realizados com follow-up em 5 meses para contato direto."""
+    query = db.session.query(ProcedureExecution, CosmeticProcedurePlan, Note, Patient).join(
+        CosmeticProcedurePlan, ProcedureExecution.plan_id == CosmeticProcedurePlan.id
+    ).join(
+        Note, CosmeticProcedurePlan.note_id == Note.id
+    ).join(
+        Patient, Note.patient_id == Patient.id
+    ).filter(
+        ProcedureExecution.execution_status == 'realizada',
+        db.func.lower(CosmeticProcedurePlan.procedure_name).like('%botox%')
+    )
+    
+    if current_user.is_doctor():
+        query = query.filter(Note.doctor_id == current_user.id)
+    
+    rows = query.order_by(ProcedureExecution.performed_date.desc()).all()
+    
+    result = []
+    for execution, plan, note, patient in rows:
+        performed_date = execution.performed_date
+        if not performed_date or not patient.phone:
+            continue
+            
+        # Follow-up em 5 meses
+        follow_up_date = (performed_date + relativedelta(months=5)).date()
+        
+        # Apenas pacientes com telefone
+        phone = (patient.phone or '').strip()
+        if not phone:
+            continue
+            
+        # Formatar número para WhatsApp (remover caracteres especiais)
+        phone_clean = ''.join(c for c in phone if c.isdigit())
+        
+        result.append({
+            'id': execution.id,
+            'plan_id': plan.id,
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'procedure_name': plan.procedure_name,
+            'performed_date': performed_date.isoformat(),
+            'follow_up_date': follow_up_date.isoformat(),
+            'phone': phone,
+            'phone_clean': phone_clean,
+            'whatsapp_url': f'https://wa.me/{phone_clean}?text=Olá%20{patient.name.replace(" ", "%20")},%20tudo%20bem?%20Gostaria%20de%20agendar%20seu%20follow-up%20de%20Botox%20previsto%20para%20{follow_up_date.strftime("%d/%m/%Y")}'
+        })
+    
+    return jsonify(result)
