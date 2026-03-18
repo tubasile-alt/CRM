@@ -1323,14 +1323,19 @@ function toggleFQ(type) {
 let botoxFollowupData = [];
 
 function loadBotoxFollowups() {
+    console.log('[BOTOX] Carregando Botox Follow-ups...');
     fetch('/api/crm/botox-follow-ups')
-        .then(r => r.json())
+        .then(r => {
+            console.log('[BOTOX] Resposta:', r.status);
+            return r.json();
+        })
         .then(data => {
+            console.log('[BOTOX] Dados recebidos:', data.length, 'procedimentos');
             botoxFollowupData = data;
             renderBotoxFollowupCards(data);
         })
         .catch(e => {
-            console.error('Erro ao carregar Botox Follow-ups:', e);
+            console.error('[BOTOX] Erro:', e);
         });
 }
 
