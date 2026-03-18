@@ -1946,11 +1946,6 @@ function renderCosmeticProcedures() {
       <td class="ps-2"><input class="form-control form-control-sm mb-1" value="${core.escapeHtml(plan.name)}" onchange="updatePlanName(${plan.id}, this.value)"><div class="small text-muted">${core.escapeHtml(plan.procedure_name || plan.name)}</div></td>
       <td><input type="number" class="form-control form-control-sm" value="${plan.budget || plan.value}" onchange="updatePlanValue(${index}, this.value)"></td>
       <td><input type="number" class="form-control form-control-sm" value="${plan.months || 6}" readonly></td>
-      <td>
-        <select class="form-select form-select-sm" onchange="updatePlanStatus(${plan.id}, this.value)">
-          ${['ativo','pausado','concluido','cancelado'].map((st)=>`<option value="${st}" ${plan.status===st?'selected':''}>${st}</option>`).join('')}
-        </select>
-      </td>
       <td class="text-center">
         <button class="btn btn-sm btn-outline-secondary" onclick="togglePlanSessions(${plan.id})">Sessões (${executions.length})</button>
         <button class="btn btn-sm btn-outline-success" onclick="promptCreateExecution(${plan.id})">Registrar nova sessão</button>
@@ -1964,7 +1959,7 @@ function renderCosmeticProcedures() {
   });
 
   if (cosmeticPlans.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Nenhum procedimento planejado</td></tr>';
   }
 }
 
