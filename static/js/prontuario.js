@@ -1841,10 +1841,13 @@ async function promptEditExecution(executionId) {
   const entry = Object.values(planExecutionsByPlanId).flat().find((e) => Number(e.id) === Number(executionId));
   if (!entry) return;
 
+  const currentStatus = entry.execution_status || (entry.was_performed ? "realizada" : "agendada");
+  const wasPerformed = currentStatus === "realizada";
+
   const payload = await openCosmeticExecutionModal({
     title: '<i class="bi bi-pencil"></i> Editar sessão',
     defaults: {
-      execution_status: entry.execution_status || (entry.was_performed ? "realizada" : "agendada"),
+      execution_status: currentStatus,
       scheduled_date: entry.scheduled_date ? String(entry.scheduled_date).slice(0, 10) : "",
       performed_date: entry.performed_date ? String(entry.performed_date).slice(0, 10) : "",
       charged_value: entry.charged_value ?? "",
@@ -1854,6 +1857,12 @@ async function promptEditExecution(executionId) {
     }
   });
   if (!payload) return;
+
+  // Proteção: procedimentos realizados não podem voltar a pendente acidentalmente
+  if (wasPerformed && payload.execution_status !== "realizada") {
+    showAlert("Procedimentos já realizados não podem voltar para status pendente. Se necessário, edite os detalhes mantendo como 'realizada'.", "info");
+    return;
+  }
 
   // Validação: se status é "realizada", precisa de performed_date
   if (payload.execution_status === "realizada" && !payload.performed_date) {
