@@ -290,7 +290,14 @@ def create_plan_execution(plan_id):
                 from services.google_sheets import _get_access_token
                 import requests as req
                 
-                patients_dict = _get_performed_procedures_historical()
+                patients_dict = {}
+                try:
+                    with app.app_context():
+                        patients_dict = _get_performed_procedures_historical()
+                except Exception as ctx_err:
+                    app.logger.error(f'Erro no app context sync_sheets: {ctx_err}')
+                    return
+                
                 if patients_dict:
                     SPREADSHEET_ID = '1IUNWhBRzt5u6_ttfzjfTKckhSMOMx1l_s7uGnIom66o'
                     SHEET_NAME = 'Procedimentos Realizados'
