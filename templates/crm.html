@@ -90,6 +90,10 @@
     background: linear-gradient(135deg, #198754 0%, #146c43 100%);
 }
 
+.panel-header.purple {
+    background: linear-gradient(135deg, #a78bfa 0%, #9370db 100%);
+}
+
 .panel-body {
     max-height: 500px;
     overflow-y: auto;
@@ -317,6 +321,16 @@
                 <div class="empty-panel">Carregando...</div>
             </div>
         </div>
+        
+        <div class="crm-panel">
+            <div class="panel-header purple">
+                <span><i class="bi bi-syringe"></i> Botox Follow-up (5 meses)</span>
+                <span class="badge bg-light text-dark" id="botoxFollowupCount">0</span>
+            </div>
+            <div class="panel-body" id="botoxFollowupPanel">
+                <div class="empty-panel">Carregando...</div>
+            </div>
+        </div>
     </div>
     {% else %}
     <div class="alert alert-info border-0 shadow-sm">
@@ -333,6 +347,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     loadCRMData();
     loadTransplantDashboard();
+    loadBotoxFollowups();
 });
 
 async function loadTransplantDashboard() {
@@ -400,6 +415,7 @@ function loadCRMData() {
     loadFollowups();
     loadPlanned();
     loadPerformed();
+    loadBotoxFollowups();
     {% endif %}
 }
 
@@ -496,6 +512,45 @@ function loadPerformed() {
                     ${item.follow_up_due_at ? `<div class="date-info">Próximo retorno: ${formatDate(item.follow_up_due_at)}</div>` : ''}
                 </div>
             `).join('');
+        });
+}
+
+function loadBotoxFollowups() {
+    const ts = new Date().getTime();
+    fetch(`/api/crm/botox-follow-ups?t=${ts}`)
+        .then(r => r.json())
+        .then(data => {
+            const panel = document.getElementById('botoxFollowupPanel');
+            document.getElementById('botoxFollowupCount').textContent = data.length;
+            
+            if (data.length === 0) {
+                panel.innerHTML = '<div class="empty-panel"><i class="bi bi-syringe"></i><br>Nenhum Botox com follow-up pendente</div>';
+                return;
+            }
+            
+            panel.innerHTML = data.map(item => `
+                <div class="procedure-item" 
+                     style="border-left: 4px solid #a78bfa;" 
+                     onclick="openPatient(${item.patient_id})">
+                    <div class="patient-name">${item.patient_name}</div>
+                    <div class="procedure-name" style="color: #a78bfa;">${item.procedure_name}</div>
+                    <div class="date-info">
+                        Realizado: ${formatDate(item.performed_date)}<br>
+                        <strong>Follow-up: ${formatDate(item.follow_up_date)}</strong>
+                    </div>
+                    ${item.phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.phone}</div>` : ''}
+                    <div class="action-buttons" onclick="event.stopPropagation()">
+                        <a href="${item.whatsapp_url}" target="_blank" class="action-btn scheduled" style="text-decoration: none;">
+                            <i class="bi bi-whatsapp"></i> WhatsApp
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+        })
+        .catch(e => {
+            console.error('Erro ao carregar Botox Follow-ups:', e);
+            const panel = document.getElementById('botoxFollowupPanel');
+            panel.innerHTML = '<div class="empty-panel"><i class="bi bi-exclamation-triangle"></i><br>Erro ao carregar dados</div>';
         });
 }
 
