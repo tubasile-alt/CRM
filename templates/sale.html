@@ -1326,9 +1326,11 @@ let botoxFollowupData = [];
 
 function loadBotoxFollowups() {
     console.log('[BOTOX] Carregando Botox Follow-ups...');
-    fetch('/api/crm/botox-follow-ups?v=20260318-v2')
+    const ts = new Date().getTime();
+    fetch(`/api/crm/botox-follow-ups?t=${ts}`)
         .then(r => {
             console.log('[BOTOX] Resposta:', r.status);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.json();
         })
         .then(data => {
@@ -1337,7 +1339,7 @@ function loadBotoxFollowups() {
             renderBotoxFollowupCards(data);
         })
         .catch(e => {
-            console.error('[BOTOX] Erro:', e);
+            console.error('[BOTOX] Erro ao carregar:', e);
         });
 }
 
