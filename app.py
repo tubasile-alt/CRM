@@ -98,6 +98,53 @@ def format_brazil_datetime(dt):
     
     return dt.strftime('%d/%m/%Y %H:%M')
 
+
+def _note_counts_as_finalized(note):
+    if not note:
+        return False
+
+    if getattr(note, 'is_finalized', False):
+        return True
+
+    if getattr(note, 'finalized_at', None):
+        return True
+
+    duration = getattr(note, 'consultation_duration', None)
+    if duration is not None:
+        return True
+
+    return False
+
+
+def _find_finalized_note(notes):
+    if not notes:
+        return None
+
+    explicit_note = next((n for n in notes if _note_counts_as_finalized(n)), None)
+    if explicit_note:
+        return explicit_note
+
+    return next((
+        n for n in notes
+        if n.note_type == 'conduta' and (
+            (n.content or '').strip() == '[Conduta registrada via procedimentos]'
+            or len(getattr(n, 'indications', []) or []) > 0
+            or len(getattr(n, 'cosmetic_plans', []) or []) > 0
+            or len(getattr(n, 'hair_transplants', []) or []) > 0
+        )
+    ), None)
+
+
+def _resolve_consultation_finalization(appointment, grouped_notes):
+    finalized_note = _find_finalized_note(grouped_notes)
+    appointment_finalized = bool(
+        appointment and (
+            getattr(appointment, 'is_finalized', False)
+            or getattr(appointment, 'finalized_at', None)
+        )
+    )
+    return appointment_finalized or finalized_note is not None, finalized_note
+
 @app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
 @login_required
 def perform_cosmetic_plan(plan_id):
@@ -2252,8 +2299,10 @@ def prontuario(patient_id):
             notes_by_type = {note.note_type: note for note in appt_notes}
             
             # Identificar consulta finalizada
-            finalized_note = next((n for n in appt_notes if n.consultation_duration), None)
-            is_finalized = finalized_note is not None
+            is_finalized, finalized_note = _resolve_consultation_finalization(
+                db.session.get(Appointment, appt_id),
+                appt_notes
+            )
             
             # Usar dados da primeira nota como referência
             first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
@@ -2313,7 +2362,7 @@ def prontuario(patient_id):
                     })
             
             notes_by_type = {gn.note_type: gn for gn in grouped_notes}
-            finalized_note = next((n for n in grouped_notes if n.consultation_duration), None)
+            is_finalized, finalized_note = _resolve_consultation_finalization(None, grouped_notes)
             
             consultations.append({
                 'id': note.id,
@@ -2324,7 +2373,7 @@ def prontuario(patient_id):
                 'notes_by_type': notes_by_type,
                 'all_notes': grouped_notes,
                 'cosmetic_plans': all_cosmetic_plans,
-                'is_finalized': finalized_note is not None
+                'is_finalized': is_finalized
             })
         
         # Incluir agendamentos "atendido" sem notas
@@ -2347,7 +2396,7 @@ def prontuario(patient_id):
                 'notes_by_type': {},
                 'all_notes': [],
                 'cosmetic_plans': [],
-                'is_finalized': False,
+                'is_finalized': bool(getattr(ea, 'is_finalized', False) or getattr(ea, 'finalized_at', None)),
                 'status': ea.status
             })
 
@@ -2501,9 +2550,9 @@ def prontuario_dp(dp_id):
                         'follow_up_months': plan.follow_up_months
                     })
             notes_by_type = {note.note_type: note for note in appt_notes}
-            finalized_note = next((n for n in appt_notes if n.consultation_duration), None)
-            first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
             appointment = db.session.get(Appointment, appt_id)
+            is_finalized, finalized_note = _resolve_consultation_finalization(appointment, appt_notes)
+            first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
             if appointment:
                 consultation_date = appointment.consultation_date or appointment.start_time
             else:
@@ -2517,7 +2566,7 @@ def prontuario_dp(dp_id):
                 'notes_by_type': notes_by_type,
                 'all_notes': appt_notes,
                 'cosmetic_plans': all_cosmetic_plans,
-                'is_finalized': finalized_note is not None
+                'is_finalized': is_finalized
             })
 
         notes_without_appointment.sort(key=lambda x: x.created_at, reverse=True)
@@ -2550,7 +2599,7 @@ def prontuario_dp(dp_id):
                         'follow_up_months': plan.follow_up_months
                     })
             notes_by_type = {gn.note_type: gn for gn in grouped_notes}
-            finalized_note = next((n for n in grouped_notes if n.consultation_duration), None)
+            is_finalized, finalized_note = _resolve_consultation_finalization(None, grouped_notes)
             consultations.append({
                 'id': note.id,
                 'date': note.created_at,
@@ -2560,7 +2609,7 @@ def prontuario_dp(dp_id):
                 'notes_by_type': notes_by_type,
                 'all_notes': grouped_notes,
                 'cosmetic_plans': all_cosmetic_plans,
-                'is_finalized': finalized_note is not None
+                'is_finalized': is_finalized
             })
 
         consultations.sort(key=lambda x: x['date'], reverse=True)
@@ -2781,6 +2830,8 @@ def finalizar_atendimento(patient_id):
         category = data.get('category', 'patologia')
         duration = data.get('duration')
         appointment_id = data.get('appointment_id')  # Chave de agrupamento
+        finalized_at = get_brazil_time()
+        consultation_started_at = parse_datetime_with_tz(data['consultation_started_at']) if data.get('consultation_started_at') else None
         
         # Fetch patient object early for reuse
         patient = db.session.get(Patient, patient_id)
@@ -2798,6 +2849,10 @@ def finalizar_atendimento(patient_id):
                 if appt_to_update and appt_to_update.patient_id == patient_id:
                     appt_to_update.status = 'atendido'
                     appt_to_update.waiting = False
+                    appt_to_update.is_finalized = True
+                    appt_to_update.finalized_at = finalized_at
+                    if consultation_started_at:
+                        appt_to_update.consultation_started_at = consultation_started_at
                     if not appt_to_update.checked_in_time:
                         appt_to_update.checked_in_time = get_brazil_time()
                     db.session.add(appt_to_update)
@@ -2845,11 +2900,21 @@ def finalizar_atendimento(patient_id):
                 category=category,  # Adicionar categoria
                 content=conduta_content or '[Conduta registrada via procedimentos]',
                 consultation_duration=duration,
-                transplant_indication=transplant_indication
+                transplant_indication=transplant_indication,
+                finalized_at=finalized_at,
+                is_finalized=True
             )
             db.session.add(conduta_note)
             db.session.flush()
             note_ids['conduta'] = conduta_note.id
+        elif note_ids:
+            fallback_note = db.session.get(Note, next(reversed(note_ids.values())))
+            if fallback_note:
+                fallback_note.is_finalized = True
+                fallback_note.finalized_at = finalized_at
+                if fallback_note.consultation_duration is None:
+                    fallback_note.consultation_duration = duration
+                db.session.add(fallback_note)
         
         # Salvar procedimentos indicados e realizados (Patologia e Cosmiatria)
         if category != 'transplante_capilar':
@@ -3076,6 +3141,10 @@ def finalizar_atendimento(patient_id):
                 if surgical_planning.get('norwood') and patient:
                     patient.has_transplant_indication = True
                     db.session.add(patient)
+
+        if patient and data.get('transplant_indication') in ('sim', 'nao'):
+            patient.has_transplant_indication = (data.get('transplant_indication') == 'sim')
+            db.session.add(patient)
         
         # Atualizar status do agendamento para "atendido"
         print(f"DEBUG finalizar: appointment_id={appointment_id}, patient_id={patient_id}, doctor_id={current_user.id}")
@@ -3095,6 +3164,10 @@ def finalizar_atendimento(patient_id):
             if appointment_final:
                 appointment_final.status = 'atendido'
                 appointment_final.waiting = False
+                appointment_final.is_finalized = True
+                appointment_final.finalized_at = finalized_at
+                if consultation_started_at and not appointment_final.consultation_started_at:
+                    appointment_final.consultation_started_at = consultation_started_at
                 if not appointment_final.checked_in_time:
                     appointment_final.checked_in_time = get_brazil_time()
                 db.session.add(appointment_final)
