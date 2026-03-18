@@ -1326,7 +1326,7 @@ let botoxFollowupData = [];
 
 function loadBotoxFollowups() {
     console.log('[BOTOX] Carregando Botox Follow-ups...');
-    fetch('/api/crm/botox-follow-ups')
+    fetch('/api/crm/botox-follow-ups?v=20260318-v2')
         .then(r => {
             console.log('[BOTOX] Resposta:', r.status);
             return r.json();
