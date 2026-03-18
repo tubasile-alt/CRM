@@ -299,12 +299,11 @@ class CosmeticProcedurePlan(db.Model):
     __tablename__ = 'cosmetic_procedure_plan'
     id = db.Column(db.Integer, primary_key=True)
     note_id = db.Column(db.Integer, db.ForeignKey('note.id'), nullable=False)
+    name = db.Column(db.String(150), nullable=False)
     procedure_name = db.Column(db.String(100), nullable=False)  # Botox, Sculptra, Morpheus, etc
     status = db.Column(db.String(20), default='ativo', nullable=False, index=True)  # ativo, pausado, concluido, cancelado
     planned_value = db.Column(db.Numeric(10, 2))  # Valor planejado (precisão decimal para valores monetários)
     final_budget = db.Column(db.Numeric(10, 2))  # Orçamento final ajustado
-    was_performed = db.Column(db.Boolean, default=False)  # Se foi realizado
-    performed_date = db.Column(db.DateTime)  # Data de realização
     follow_up_months = db.Column(db.Integer)  # Intervalo de retorno em meses
     observations = db.Column(db.Text)  # Observações sobre o procedimento
     created_at = db.Column(db.DateTime, default=get_brazil_time)
@@ -319,12 +318,23 @@ class CosmeticProcedurePlan(db.Model):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+    @property
+    def was_performed(self):
+        return any((execution.execution_status or ('realizada' if execution.was_performed else 'agendada')) == 'realizada' for execution in (self.executions or []))
+
+    @property
+    def performed_date(self):
+        performed = [execution.performed_date for execution in (self.executions or []) if execution.performed_date]
+        if not performed:
+            return None
+        return max(performed)
+
 
 class ProcedureExecution(db.Model):
     __tablename__ = 'procedure_execution'
 
     id = db.Column(db.Integer, primary_key=True)
-    plan_id = db.Column(db.Integer, db.ForeignKey('cosmetic_procedure_plan.id'), nullable=False, index=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey('cosmetic_procedure_plan.id', ondelete='CASCADE'), nullable=False, index=True)
     scheduled_date = db.Column(db.DateTime, nullable=True, index=True)
     performed_date = db.Column(db.DateTime, nullable=True, index=True)
     execution_status = db.Column(db.String(20), default='agendada', nullable=False, index=True)  # agendada, realizada, cancelada, faltou

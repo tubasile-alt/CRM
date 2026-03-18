@@ -101,12 +101,28 @@ def format_brazil_datetime(dt):
 @app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
 @login_required
 def perform_cosmetic_plan(plan_id):
-    """Endpoint legado descontinuado no D3: use /api/cosmetic-plans/<id>/executions."""
-    return jsonify({
-        'success': False,
-        'error': 'Endpoint legado removido. Use POST /api/cosmetic-plans/<id>/executions com execution_status=realizada.',
-        'deprecated': True
-    }), 410
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    data = request.get_json(silent=True) or {}
+    performed_date = _parse_date_or_datetime(data.get('performed_date')) or get_brazil_time()
+
+    try:
+        execution = _build_execution_from_payload(plan, {
+            'execution_status': 'realizada',
+            'performed_date': performed_date.isoformat(),
+            'charged_value': data.get('charged_value', plan.final_budget or plan.planned_value),
+            'notes': data.get('notes') or data.get('observations'),
+            'followup_date': data.get('followup_date'),
+            'followup_status': data.get('followup_status', 'pendente')
+        }, force_performed=True)
+    except ValueError as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+
+    db.session.add(execution)
+    db.session.commit()
+    return jsonify({'success': True, 'execution': _serialize_execution(execution)})
 
 
 def _parse_date_or_datetime(value):
@@ -323,6 +339,14 @@ def delete_execution(execution_id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
 
     execution = ProcedureExecution.query.get_or_404(execution_id)
+    plan = db.session.query(CosmeticProcedurePlan).join(Note, CosmeticProcedurePlan.note_id == Note.id).filter(
+        CosmeticProcedurePlan.id == execution.plan_id
+    ).first()
+    if not plan:
+        return jsonify({'success': False, 'error': 'Planejamento não encontrado'}), 404
+    if current_user.is_doctor() and plan.note.doctor_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
     db.session.delete(execution)
     db.session.commit()
     app.logger.info('execution_deleted id=%s plan_id=%s user_id=%s', execution.id, execution.plan_id, current_user.id)
@@ -1902,7 +1926,7 @@ def build_patient_timeline(p_id):
     from models import Note as _Note, CosmeticProcedurePlan as _CPP
     cosmetic_plans = _CPP.query.join(_Note).filter(
         _Note.patient_id == p_id,
-        _CPP.was_performed == True
+        db.exists().where(ProcedureExecution.plan_id == _CPP.id).where(ProcedureExecution.execution_status == 'realizada')
     ).all()
     for plan in cosmetic_plans:
         d = safe_parse_date(plan.performed_date)
@@ -2083,6 +2107,7 @@ def prontuario(patient_id):
                     seen_cosmetic_plan_ids.add(plan.id)
                     all_cosmetic_plans.append({
                         'id': plan.id,
+                        'name': plan.name,
                         'procedure_name': plan.procedure_name,
                         'planned_value': plan.planned_value,
                         'final_budget': plan.final_budget,
@@ -2146,6 +2171,7 @@ def prontuario(patient_id):
                     seen_cosmetic_plan_ids.add(plan.id)
                     all_cosmetic_plans.append({
                         'id': plan.id,
+                        'name': plan.name,
                         'procedure_name': plan.procedure_name,
                         'planned_value': plan.planned_value,
                         'final_budget': plan.final_budget,
@@ -2334,6 +2360,7 @@ def prontuario_dp(dp_id):
                     seen_cosmetic_plan_ids.add(plan.id)
                     all_cosmetic_plans.append({
                         'id': plan.id,
+                        'name': plan.name,
                         'procedure_name': plan.procedure_name,
                         'planned_value': plan.planned_value,
                         'final_budget': plan.final_budget,
@@ -2382,6 +2409,7 @@ def prontuario_dp(dp_id):
                     seen_cosmetic_plan_ids.add(plan.id)
                     all_cosmetic_plans.append({
                         'id': plan.id,
+                        'name': plan.name,
                         'procedure_name': plan.procedure_name,
                         'planned_value': plan.planned_value,
                         'final_budget': plan.final_budget,
@@ -2765,17 +2793,35 @@ def finalizar_atendimento(patient_id):
                         except:
                             performed_date_value = None
                     
+                    plan_name = (proc_item.get('name') or '').strip()
+                    if not plan_name:
+                        raise ValueError('name é obrigatório em cosmetic_procedures')
+
                     plan_obj = CosmeticProcedurePlan(
                         note_id=conduta_note_id,
-                        procedure_name=proc_name,
+                        name=plan_name,
+                        procedure_name=proc_item.get('procedure_name', proc_name),
                         planned_value=float(proc_item['value']),
                         final_budget=float(proc_item.get('budget', proc_item['value'])),
-                        was_performed=bool(proc_item.get('performed', False)),
-                        performed_date=performed_date_value,
                         follow_up_months=int(proc_item['months']),
                         observations=proc_item.get('observations', '')
                     )
                     db.session.add(plan_obj)
+                    db.session.flush()
+
+                    if bool(proc_item.get('performed', False)) and performed_date_value:
+                        execution_obj = ProcedureExecution(
+                            plan_id=plan_obj.id,
+                            performed_date=datetime.combine(performed_date_value, datetime.min.time()),
+                            execution_status='realizada',
+                            was_performed=True,
+                            charged_value=float(proc_item.get('budget', proc_item['value'])),
+                            notes=proc_item.get('observations', ''),
+                            followup_status='pendente',
+                            created_by=current_user.id,
+                            updated_by=current_user.id,
+                        )
+                        db.session.add(execution_obj)
                     
                     # Criar novo lembrete APENAS para não realizados
                     if not proc_item.get('performed', False):
@@ -3378,6 +3424,7 @@ def get_cosmetic_plans(patient_id):
 
         plans_data.append({
             'id': plan.id,
+            'name': plan.name,
             'procedure_name': plan.procedure_name,
             'status': plan.status,
             'planned_value': plan.planned_value,
@@ -3430,6 +3477,7 @@ def get_cosmetic_plans_grouped(patient_id):
 
         grouped_plans[consultation_key].append({
             'id': plan.id,
+            'name': plan.name,
             'procedure_name': plan.procedure_name,
             'status': plan.status,
             'planned_value': float(plan.planned_value) if plan.planned_value else 0,
@@ -3507,6 +3555,11 @@ def update_cosmetic_plan(plan_id):
         plan.final_budget = float(data['final_budget'])
     if 'follow_up_months' in data:
         plan.follow_up_months = int(data['follow_up_months'])
+    if 'name' in data:
+        name = (data.get('name') or '').strip()
+        if not name:
+            return jsonify({'success': False, 'error': 'name é obrigatório'}), 400
+        plan.name = name
     if 'status' in data:
         status = (data.get('status') or '').strip().lower()
         if status not in {'ativo', 'pausado', 'concluido', 'cancelado'}:
