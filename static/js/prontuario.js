@@ -1977,13 +1977,78 @@ function togglePlanSessions(planId) {
   renderCosmeticProcedures();
 }
 
+function openSimplifiedExecutionModal(defaults = {}) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById("simplifiedExecutionModal");
+    const dateEl = document.getElementById("simplifiedPerformedDate");
+    const confirmBtn = document.getElementById("confirmSimplifiedExecution");
+
+    if (!modalEl || !dateEl || !confirmBtn || !window.bootstrap) {
+      console.warn("Modal simplificado não encontrado");
+      showAlert("Erro ao abrir modal", "danger");
+      resolve(null);
+      return;
+    }
+
+    dateEl.value = defaults.performed_date || new Date().toISOString().split("T")[0];
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    let settled = false;
+    const cleanup = () => {
+      confirmBtn.removeEventListener("click", onConfirm);
+      modalEl.removeEventListener("hidden.bs.modal", onHidden);
+    };
+
+    const onConfirm = () => {
+      settled = true;
+      cleanup();
+      modal.hide();
+      resolve({
+        execution_status: "realizada",
+        performed_date: dateEl.value || null,
+        followup_status: "pendente"
+      });
+    };
+
+    const onHidden = () => {
+      if (!settled) {
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    confirmBtn.addEventListener("click", onConfirm);
+    modalEl.addEventListener("hidden.bs.modal", onHidden);
+    modal.show();
+  });
+}
+
 async function performCosmeticProcedure(planId, procedureName, consultationId = null) {
   const today = new Date().toISOString().split("T")[0];
-  await promptCreateExecution(planId, {
-    execution_status: "realizada",
-    performed_date: today,
-    followup_status: "pendente"
+  const payload = await openSimplifiedExecutionModal({
+    performed_date: today
   });
+  
+  if (!payload) return;
+
+  if (!payload.performed_date) {
+    showAlert("Data de realização é obrigatória", "warning");
+    return;
+  }
+
+  try {
+    const result = await createExecution(planId, payload);
+    if (!result.success) {
+      showAlert(result.error || "Erro ao registrar realização", "danger");
+      return;
+    }
+    await loadExistingPlans();
+    showAlert("Procedimento marcado como realizado", "success");
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao registrar realização", "danger");
+  }
 }
 
 async function deleteCosmeticPlan(planId, procedureName) {

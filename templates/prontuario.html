@@ -1431,6 +1431,27 @@
   </div>
 </div>
 
+<div class="modal fade" id="simplifiedExecutionModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-check-circle"></i> Confirmar realização
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="simplifiedPerformedDate">Data de realização</label>
+        <input type="date" id="simplifiedPerformedDate" class="form-control">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="confirmSimplifiedExecution">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="cosmeticExecutionModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content">
@@ -1493,7 +1514,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/prontuario-core.js') }}?v=20260317-9"></script>
-<script src="{{ url_for('static', filename='js/surgeries.js') }}?v=20260317-9"></script>
-<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260317-performed-date"></script>
+<script src="{{ url_for('static', filename='js/prontuario-core.js') }}?v=20260318-simplified"></script>
+<script src="{{ url_for('static', filename='js/surgeries.js') }}?v=20260318-simplified"></script>
+<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260318-simple-modal"></script>
 {% endblock %}
