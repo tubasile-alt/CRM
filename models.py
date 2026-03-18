@@ -106,6 +106,9 @@ class Appointment(db.Model):
     checked_in_time = db.Column(db.DateTime)
     room = db.Column(db.String(50))
     total_waiting_minutes = db.Column(db.Integer)
+    consultation_started_at = db.Column(db.DateTime, nullable=True)
+    finalized_at = db.Column(db.DateTime, nullable=True)
+    is_finalized = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     doctor = db.relationship('User', backref='appointments')
@@ -122,6 +125,8 @@ class Note(db.Model):
     consultation_duration = db.Column(db.Integer)
     transplant_indication = db.Column(db.String(10), default='nao')  # 'sim' ou 'nao'
     surgical_planning = db.Column(db.Text)  # JSON com planejamento cirúrgico
+    finalized_at = db.Column(db.DateTime, nullable=True)
+    is_finalized = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     __table_args__ = (

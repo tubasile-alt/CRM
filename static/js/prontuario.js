@@ -232,33 +232,11 @@ function updateTimer() {
 }
 
 function startConsultation() {
-  const button = document.getElementById("startTimer");
   const display = document.getElementById("timerDisplay");
 
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-
-    if (button) {
-      button.innerHTML = '<i class="bi bi-play-circle"></i> Iniciar Atendimento';
-      button.classList.remove("btn-danger");
-      button.classList.add("btn-success");
-    }
-
-    if (display) {
-      display.classList.remove("timer-running");
-    }
-
-    return;
-  }
+  if (timerInterval || timerStartTime) return;
 
   timerStartTime = Date.now();
-
-  if (button) {
-    button.innerHTML = '<i class="bi bi-stop-circle"></i> Parar Atendimento';
-    button.classList.remove("btn-success");
-    button.classList.add("btn-danger");
-  }
 
   if (display) {
     display.classList.add("timer-running");
@@ -271,6 +249,11 @@ function startConsultation() {
 function getConsultationDuration() {
   if (!timerStartTime) return 0;
   return Math.floor((Date.now() - timerStartTime) / 60000);
+}
+
+function getConsultationStartedAtIso() {
+  if (!timerStartTime) return null;
+  return new Date(timerStartTime).toISOString();
 }
 
 /* =========================
@@ -2351,9 +2334,9 @@ function buildSurgicalPlanningPayload() {
 
 function buildFinalizePayload() {
   const payload = {
-    consultation_started: true,
     category: currentCategory,
     duration: getConsultationDuration(),
+    consultation_started_at: getConsultationStartedAtIso(),
     queixa: document.getElementById("queixaText")?.value || "",
     anamnese: document.getElementById("anamneseText")?.value || "",
     diagnostico: document.getElementById("diagnosticoText")?.value || "",
@@ -3396,6 +3379,9 @@ document.addEventListener("DOMContentLoaded", async function () {
   window.patientId = getPatientId();
 
   initSpeechRecognition();
+  if (canEditClinical()) {
+    startConsultation();
+  }
   initCategoryFromCheckedRadio();
 
   const categoryInputs = document.querySelectorAll('input[name="category"]');
