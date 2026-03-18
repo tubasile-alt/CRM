@@ -630,7 +630,7 @@
               <table class="table table-sm" id="cosmeticPlanTable">
                 <thead>
                   <tr>
-                    <th>Procedimento</th>
+                    <th>Plano / Procedimento</th>
                     <th style="width: 150px;">Valor (R$)</th>
                     <th style="width: 120px;">Retorno (meses)</th>
                     <th style="width: 160px;">Status do plano</th>
@@ -643,7 +643,11 @@
 
             <div class="mb-3">
               <div class="row g-2 mb-2">
-                <div class="col-md-5">
+                <div class="col-md-3">
+                  <input type="text" class="form-control" id="newPlanName" placeholder="Nome do plano (obrigatório)">
+                </div>
+
+                <div class="col-md-4">
                   <select class="form-select" id="newProcedureName">
                     <option value="">Selecione o procedimento...</option>
                     <option value="Botox">Botox (6 meses)</option>
@@ -669,11 +673,11 @@
                   </select>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                   <input type="number" class="form-control" id="newProcedureValue" placeholder="Valor (R$)" step="any" min="0">
                 </div>
 
-                <div class="col-md-2">
+                <div class="col-md-1">
                   <input type="number" class="form-control" id="newProcedureMonths" placeholder="Meses" value="6">
                 </div>
 

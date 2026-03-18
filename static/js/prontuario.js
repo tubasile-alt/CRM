@@ -1420,7 +1420,8 @@ async function loadExistingPlans() {
         group.procedures.forEach((plan) => {
           const normalizedPlan = {
             id: plan.id,
-            name: plan.procedure_name,
+            name: plan.name || plan.procedure_name,
+            procedure_name: plan.procedure_name,
             value: parseFloat(plan.planned_value) || 0,
             months: plan.follow_up_months || 6,
             budget: parseFloat(plan.final_budget || plan.planned_value) || 0,
@@ -1478,19 +1479,27 @@ function updateCosmeticTotal() {
 }
 
 function addCosmeticProcedure() {
-  const nameInput = document.getElementById("newProcedureName");
+  const planNameInput = document.getElementById("newPlanName");
+  const procedureInput = document.getElementById("newProcedureName");
   const valueInput = document.getElementById("newProcedureValue");
   const monthsInput = document.getElementById("newProcedureMonths");
   const observationsInput = document.getElementById("newProcedureObservations");
 
-  const name = (nameInput?.value || "").trim();
+  const planName = (planNameInput?.value || "").trim();
+  const procedureName = (procedureInput?.value || "").trim();
   const value = parseFloat((valueInput?.value || "").trim()) || 0;
   const months = parseInt(monthsInput?.value || "6", 10) || 6;
   const observations = observationsInput?.value || "";
 
-  if (!name) {
+  if (!planName) {
+    alert("Por favor, informe o nome do plano");
+    planNameInput?.focus();
+    return;
+  }
+
+  if (!procedureName) {
     alert("Por favor, selecione um procedimento");
-    nameInput?.focus();
+    procedureInput?.focus();
     return;
   }
 
@@ -1504,7 +1513,8 @@ function addCosmeticProcedure() {
     const original = cosmeticPlans[editingCosmeticProcedureIndex];
     cosmeticPlans[editingCosmeticProcedureIndex] = {
       ...original,
-      name,
+      name: planName,
+      procedure_name: procedureName,
       value,
       months,
       budget: parseFloat(original?.budget ?? value) || value,
@@ -1523,7 +1533,8 @@ function addCosmeticProcedure() {
     showAlert("Procedimento atualizado com sucesso.", "success");
   } else {
     cosmeticPlans.push({
-      name,
+      name: planName,
+      procedure_name: procedureName,
       value,
       months,
       budget: value,
@@ -1538,12 +1549,13 @@ function addCosmeticProcedure() {
   updateCosmeticTotal();
   updateMainLayoutColumns();
 
-  if (nameInput) nameInput.value = "";
+  if (planNameInput) planNameInput.value = "";
+  if (procedureInput) procedureInput.value = "";
   if (valueInput) valueInput.value = "";
   if (monthsInput) monthsInput.value = "6";
   if (observationsInput) observationsInput.value = "";
 
-  setTimeout(() => nameInput?.focus(), 100);
+  setTimeout(() => planNameInput?.focus(), 100);
 }
 
 function editCosmeticProcedure(index) {
@@ -1552,7 +1564,8 @@ function editCosmeticProcedure(index) {
 
   editingCosmeticProcedureIndex = index;
 
-  document.getElementById("newProcedureName").value = proc.name || "";
+  document.getElementById("newPlanName").value = proc.name || "";
+  document.getElementById("newProcedureName").value = proc.procedure_name || proc.name || "";
   document.getElementById("newProcedureValue").value = proc.value || 0;
   document.getElementById("newProcedureMonths").value = proc.months || 6;
   document.getElementById("newProcedureObservations").value =
@@ -1565,7 +1578,7 @@ function editCosmeticProcedure(index) {
     addBtn.classList.add("btn-primary");
   }
 
-  document.getElementById("newProcedureName")?.focus();
+  document.getElementById("newPlanName")?.focus();
   showAlert("Procedimento carregado para edição.", "info");
 }
 
@@ -1582,6 +1595,7 @@ function removeCosmeticProcedure(index) {
       addBtn.classList.add("btn-success");
     }
 
+    document.getElementById("newPlanName").value = "";
     document.getElementById("newProcedureName").value = "";
     document.getElementById("newProcedureValue").value = "";
     document.getElementById("newProcedureMonths").value = "6";
@@ -1609,6 +1623,32 @@ function updatePlanDate() {
 
 function togglePlanPerformed() {
   showAlert("No novo fluxo, realizado é controlado por sessão.", "info");
+}
+
+
+async function updatePlanName(planId, name) {
+  const value = String(name || "").trim();
+  if (!value) {
+    showAlert("Nome do plano é obrigatório", "warning");
+    await loadExistingPlans();
+    return;
+  }
+  try {
+    const result = await core.fetchJson(`/api/prontuario/cosmetic-plan/${planId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+      body: JSON.stringify({ name: value })
+    });
+    if (!result.success) {
+      showAlert(result.error || "Erro ao atualizar nome do plano", "danger");
+      await loadExistingPlans();
+      return;
+    }
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao atualizar nome do plano", "danger");
+    await loadExistingPlans();
+  }
 }
 
 async function updatePlanStatus(planId, status) {
@@ -1903,7 +1943,7 @@ function renderCosmeticProcedures() {
     const row = tbody.insertRow();
     row.className = performed ? "table-success" : "";
     row.innerHTML = `
-      <td class="ps-2"><div class="fw-bold">${core.escapeHtml(plan.name)}</div></td>
+      <td class="ps-2"><input class="form-control form-control-sm mb-1" value="${core.escapeHtml(plan.name)}" onchange="updatePlanName(${plan.id}, this.value)"><div class="small text-muted">${core.escapeHtml(plan.procedure_name || plan.name)}</div></td>
       <td><input type="number" class="form-control form-control-sm" value="${plan.budget || plan.value}" onchange="updatePlanValue(${index}, this.value)"></td>
       <td><input type="number" class="form-control form-control-sm" value="${plan.months || 6}" readonly></td>
       <td>
@@ -2279,7 +2319,7 @@ function buildFinalizePayload() {
     if (totalPerformed > 0) {
       payload.checkout_amount = totalPerformed;
       payload.checkout_procedures = performedProcedures.map((p) => ({
-        name: p.name,
+        name: p.procedure_name || p.name,
         value: getPlanRealizedValue(p),
         budget: parseFloat(p.budget ?? p.value) || 0
       }));
@@ -3451,6 +3491,7 @@ window.promptCreateExecution = promptCreateExecution;
 window.promptEditExecution = promptEditExecution;
 window.removeExecution = removeExecution;
 window.performCosmeticProcedure = performCosmeticProcedure;
+window.updatePlanName = updatePlanName;
 window.generateBudget = generateBudget;
 window.highlightConsultationGroup = highlightConsultationGroup;
 window.clearCosmeticContext = clearCosmeticContext;

@@ -66,6 +66,7 @@ def _get_funnel_data(month=None, year=None):
         
         planned_value = float(plan.planned_value) if plan.planned_value else 0.0
         patients_dict[patient_key]['procedures'].append({
+            'plan_name': plan.name,
             'procedure_name': plan.procedure_name,
             'planned_value': planned_value
         })
@@ -184,6 +185,7 @@ def get_performed_procedures():
             'plan_id': plan.id,
             'patient_id': patient.id,
             'patient_name': patient.name,
+            'plan_name': plan.name,
             'procedure_name': plan.procedure_name,
             'performed_date': execution_date.isoformat() if execution_date else None,
             'follow_up_due_at': follow_up_due_at.isoformat() if follow_up_due_at else None,
@@ -231,6 +233,7 @@ def get_followups():
             'patient_id': patient.id,
             'patient_name': patient.name,
             'patient_phone': patient.phone,
+            'plan_name': plan.name,
             'procedure_name': plan.procedure_name,
             'performed_date': execution_date.isoformat() if execution_date else None,
             'follow_up_due_at': follow_up_due_at.isoformat(),
@@ -270,6 +273,7 @@ def get_planned_procedures():
             'patient_id': patient.id,
             'patient_name': patient.name,
             'patient_phone': patient.phone,
+            'plan_name': plan.name,
             'procedure_name': plan.procedure_name,
             'planned_value': float(plan.planned_value) if plan.planned_value else None,
             'observations': plan.observations,
