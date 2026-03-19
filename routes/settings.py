@@ -41,10 +41,14 @@ def create_room():
         return jsonify({'error': 'Sem permissão'}), 403
     
     data = request.json
+    name = data.get('name', '').strip() if data else ''
+    if not name:
+        return jsonify({'error': 'name é obrigatório'}), 400
+    
     room = OperatingRoom(
-        name=data['name'],
-        capacity=data.get('capacity', 1),
-        is_active=data.get('is_active', True)
+        name=name,
+        capacity=data.get('capacity', 1) if data else 1,
+        is_active=data.get('is_active', True) if data else True
     )
     
     db.session.add(room)
@@ -68,13 +72,13 @@ def update_room(room_id):
     if not room:
         return jsonify({'error': 'Sala não encontrada'}), 404
     
-    data = request.json
+    data = request.json if request.json else {}
     if 'name' in data:
-        room.name = data['name']
+        room.name = data.get('name', '').strip() or room.name
     if 'capacity' in data:
-        room.capacity = data['capacity']
+        room.capacity = data.get('capacity', room.capacity)
     if 'is_active' in data:
-        room.is_active = data['is_active']
+        room.is_active = data.get('is_active', room.is_active)
     
     db.session.commit()
     return jsonify({'success': True})
@@ -133,9 +137,9 @@ def update_doctor_preferences():
         db.session.add(pref)
     
     if 'color' in data:
-        pref.color = data['color']
+        pref.color = data.get('color', '#0d6efd')
     if 'layer_enabled' in data:
-        pref.layer_enabled = data['layer_enabled']
+        pref.layer_enabled = data.get('layer_enabled', True)
     
     db.session.commit()
     return jsonify({'success': True})

@@ -982,7 +982,7 @@ def get_appointments():
             surgery_query = surgery_query.filter(Surgery.date == target_date)
             if doctor_id:
                 surgery_query = surgery_query.filter(Surgery.doctor_id == doctor_id)
-        except:
+        except (ValueError, TypeError):
             pass
     
     surgeries = surgery_query.all()
@@ -1216,7 +1216,9 @@ def create_appointment():
     
     if not patient:
         # Fallback: Buscar por nome normalizado (case-insensitive) para evitar duplicatas
-        patient_name_input = data['patientName'].strip()
+        patient_name_input = data.get('patientName', '').strip()
+        if not patient_name_input:
+            return jsonify({'success': False, 'error': 'patientName é obrigatório'}), 400
         patient = Patient.query.filter(db.func.lower(Patient.name) == db.func.lower(patient_name_input)).first()
     if not patient:
         # Converter strings vazias para None para campos opcionais
@@ -1230,7 +1232,7 @@ def create_appointment():
         occupation_val = data.get('occupation') or None
         
         patient = Patient(
-            name=data['patientName'],
+            name=data.get('patientName', '').strip() or None,
             phone=phone_val,
             email=data.get('email', ''),
             cpf=cpf_val,
@@ -1242,6 +1244,8 @@ def create_appointment():
             occupation=occupation_val,
             patient_type=data.get('patientType', 'particular')
         )
+        if not patient.name:
+            return jsonify({'success': False, 'error': 'patientName é obrigatório'}), 400
         db.session.add(patient)
         db.session.flush()
         
@@ -1304,11 +1308,16 @@ def create_appointment():
         if 'occupation' in data:
             patient.occupation = data['occupation']
     
+    start_time = data.get('start')
+    end_time = data.get('end')
+    if not start_time or not end_time:
+        return jsonify({'success': False, 'error': 'start e end são obrigatórios'}), 400
+    
     appointment = Appointment(
         patient_id=patient.id,
         doctor_id=doctor_id,
-        start_time=parse_datetime_with_tz(data['start']),
-        end_time=parse_datetime_with_tz(data['end']),
+        start_time=parse_datetime_with_tz(start_time),
+        end_time=parse_datetime_with_tz(end_time),
         status=data.get('status', 'agendado'),
         appointment_type=data.get('appointmentType', 'Particular'),
         notes=data.get('notes', '')
@@ -1333,8 +1342,8 @@ def create_appointment():
             db.session.add(operating_room)
             db.session.flush()
         
-        start_dt = parse_datetime_with_tz(data['start'])
-        end_dt = parse_datetime_with_tz(data['end'])
+        start_dt = parse_datetime_with_tz(start_time)
+        end_dt = parse_datetime_with_tz(end_time)
         
         surgery = Surgery(
             date=start_dt.date(),
@@ -1342,7 +1351,7 @@ def create_appointment():
             end_time=end_dt.time(),
             patient_id=patient.id,
             patient_name=patient.name,
-            procedure_name=data['surgery_name'],
+            procedure_name=data.get('surgery_name', ''),
             doctor_id=doctor_id,
             operating_room_id=operating_room.id,
             status='agendada',
@@ -2993,8 +3002,8 @@ def finalizar_atendimento(patient_id):
                     performed_date_value = None
                     if proc_item.get('performedDate'):
                         try:
-                            performed_date_value = dt.strptime(proc_item['performedDate'], '%Y-%m-%d').date()
-                        except:
+                            performed_date_value = dt.strptime(proc_item.get('performedDate', ''), '%Y-%m-%d').date()
+                        except (ValueError, TypeError, AttributeError):
                             performed_date_value = None
                     
                     plan_name = (proc_item.get('name') or '').strip()
@@ -3083,7 +3092,7 @@ def finalizar_atendimento(patient_id):
                 # Use a default empty dict if CONSULTATION_PRICES is not defined or other issue
                 try:
                     consultation_fee = CONSULTATION_PRICES.get(consultation_type, 0.0)
-                except:
+                except (AttributeError, TypeError):
                     consultation_fee = 0.0
 
                 if consultation_fee > 0:

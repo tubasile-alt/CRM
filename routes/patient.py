@@ -15,7 +15,7 @@ def get_patient_surgeries(patient_id):
         for s in surgeries:
             try:
                 evolutions = SurgeryEvolution.query.filter_by(surgery_id=s.id).order_by(SurgeryEvolution.evolution_date.desc()).all()
-            except:
+            except Exception:
                 evolutions = []
             result.append({
                 'id': s.id,
@@ -46,8 +46,8 @@ def create_patient_surgery(patient_id):
     data = request.get_json()
     
     try:
-        surgery_date = datetime.strptime(data.get('surgery_date'), '%Y-%m-%d').date()
-    except:
+        surgery_date = datetime.strptime(data.get('surgery_date', ''), '%Y-%m-%d').date()
+    except (ValueError, TypeError):
         return jsonify({'success': False, 'error': 'Data inválida'}), 400
     
     surgery = TransplantSurgeryRecord(
