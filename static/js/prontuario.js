@@ -1461,6 +1461,54 @@ function updateCosmeticTotal() {
   if (totalEl) totalEl.textContent = formatMoneyBRL(total);
 }
 
+function buildCosmeticPlanGroups(plans = cosmeticPlans) {
+  const groups = [];
+  const groupsByKey = new Map();
+
+  plans.forEach((plan, index) => {
+    const consultationKey = plan.consultationKey || "draft";
+    const groupName = String(plan.name || "").trim() || "Plano sem nome";
+    const groupKey = `${consultationKey}::${groupName}`;
+
+    if (!groupsByKey.has(groupKey)) {
+      const group = {
+        key: groupKey,
+        consultationKey,
+        name: groupName,
+        plans: [],
+        persisted: true
+      };
+      groupsByKey.set(groupKey, group);
+      groups.push(group);
+    }
+
+    const group = groupsByKey.get(groupKey);
+    group.plans.push({
+      ...plan,
+      index
+    });
+    if (!plan.id) {
+      group.persisted = false;
+    }
+  });
+
+  return groups;
+}
+
+function resetCosmeticProcedureForm({ preservePlanName = false } = {}) {
+  const planNameInput = document.getElementById("newPlanName");
+  const procedureInput = document.getElementById("newProcedureName");
+  const valueInput = document.getElementById("newProcedureValue");
+  const monthsInput = document.getElementById("newProcedureMonths");
+  const observationsInput = document.getElementById("newProcedureObservations");
+
+  if (!preservePlanName && planNameInput) planNameInput.value = "";
+  if (procedureInput) procedureInput.value = "";
+  if (valueInput) valueInput.value = "";
+  if (monthsInput) monthsInput.value = "6";
+  if (observationsInput) observationsInput.value = "";
+}
+
 function addCosmeticProcedure() {
   const planNameInput = document.getElementById("newPlanName");
   const procedureInput = document.getElementById("newProcedureName");
@@ -1473,6 +1521,7 @@ function addCosmeticProcedure() {
   const value = parseFloat((valueInput?.value || "").trim()) || 0;
   const months = parseInt(monthsInput?.value || "6", 10) || 6;
   const observations = observationsInput?.value || "";
+  const wasEditing = editingCosmeticProcedureIndex !== null;
 
   if (!planName) {
     alert("Por favor, informe o nome do plano");
@@ -1492,7 +1541,7 @@ function addCosmeticProcedure() {
     return;
   }
 
-  if (editingCosmeticProcedureIndex !== null) {
+  if (wasEditing) {
     const original = cosmeticPlans[editingCosmeticProcedureIndex];
     cosmeticPlans[editingCosmeticProcedureIndex] = {
       ...original,
@@ -1532,13 +1581,15 @@ function addCosmeticProcedure() {
   updateCosmeticTotal();
   updateMainLayoutColumns();
 
-  if (planNameInput) planNameInput.value = "";
-  if (procedureInput) procedureInput.value = "";
-  if (valueInput) valueInput.value = "";
-  if (monthsInput) monthsInput.value = "6";
-  if (observationsInput) observationsInput.value = "";
+  resetCosmeticProcedureForm({ preservePlanName: !wasEditing });
 
-  setTimeout(() => planNameInput?.focus(), 100);
+  setTimeout(() => {
+    if (!wasEditing) {
+      procedureInput?.focus();
+    } else {
+      planNameInput?.focus();
+    }
+  }, 100);
 }
 
 function editCosmeticProcedure(index) {
@@ -1578,11 +1629,7 @@ function removeCosmeticProcedure(index) {
       addBtn.classList.add("btn-success");
     }
 
-    document.getElementById("newPlanName").value = "";
-    document.getElementById("newProcedureName").value = "";
-    document.getElementById("newProcedureValue").value = "";
-    document.getElementById("newProcedureMonths").value = "6";
-    document.getElementById("newProcedureObservations").value = "";
+    resetCosmeticProcedureForm();
   }
 
   renderCosmeticProcedures();
@@ -1627,6 +1674,75 @@ async function updatePlanName(planId, name) {
       await loadExistingPlans();
       return;
     }
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao atualizar nome do plano", "danger");
+    await loadExistingPlans();
+  }
+}
+
+async function updatePlanGroupName(groupKey, currentName, nextName) {
+  const value = String(nextName || "").trim();
+  const previousName = String(currentName || "").trim();
+
+  if (!value) {
+    showAlert("Nome do plano é obrigatório", "warning");
+    await loadExistingPlans();
+    return;
+  }
+
+  const groupPlans = cosmeticPlans.filter((plan) => {
+    const planConsultationKey = plan.consultationKey || "draft";
+    const planName = String(plan.name || "").trim();
+    return `${planConsultationKey}::${planName}` === groupKey;
+  });
+
+  if (groupPlans.length === 0) return;
+
+  const persistedPlans = groupPlans.filter((plan) => plan.id);
+  const draftPlans = groupPlans.filter((plan) => !plan.id);
+
+  draftPlans.forEach((plan) => {
+    plan.name = value;
+  });
+
+  if (!persistedPlans.length) {
+    renderCosmeticProcedures();
+    renderCosmeticConduct();
+    updateCosmeticTotal();
+    return;
+  }
+
+  try {
+    const results = await Promise.all(
+      persistedPlans.map((plan) =>
+        core.fetchJson(`/api/prontuario/cosmetic-plan/${plan.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+          body: JSON.stringify({ name: value })
+        })
+      )
+    );
+
+    const failedResult = results.find((result) => !result.success);
+    if (failedResult) {
+      showAlert(failedResult.error || "Erro ao atualizar nome do plano", "danger");
+      await loadExistingPlans();
+      return;
+    }
+
+    persistedPlans.forEach((plan) => {
+      plan.name = value;
+    });
+
+    renderCosmeticProcedures();
+    renderCosmeticConduct();
+    updateCosmeticTotal();
+
+    const detail = previousName && previousName !== value
+      ? ` de "${previousName}" para "${value}"`
+      : "";
+    showAlert(`Nome do plano atualizado${detail}.`, "success");
   } catch (error) {
     console.error(error);
     showAlert("Erro ao atualizar nome do plano", "danger");
@@ -1928,26 +2044,72 @@ function renderCosmeticProcedures() {
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  cosmeticPlans.forEach((plan, index) => {
-    const executions = getPlanExecutions(plan.id);
-    const performed = getPlanPerformed(plan);
-    const expanded = expandedCosmeticPlans.has(plan.id);
-    const row = tbody.insertRow();
-    row.className = performed ? "table-success" : "";
-    row.innerHTML = `
-      <td class="ps-2"><input class="form-control form-control-sm mb-1" value="${core.escapeHtml(plan.name)}" onchange="updatePlanName(${plan.id}, this.value)"><div class="small text-muted">${core.escapeHtml(plan.procedure_name || plan.name)}</div></td>
-      <td><input type="number" class="form-control form-control-sm" value="${plan.budget || plan.value}" onchange="updatePlanValue(${index}, this.value)"></td>
-      <td><input type="number" class="form-control form-control-sm" value="${plan.months || 6}" readonly></td>
-      <td class="text-center">
-        <button class="btn btn-sm btn-outline-secondary" onclick="togglePlanSessions(${plan.id})">Sessões (${executions.length})</button>
-        <button class="btn btn-sm btn-outline-success" onclick="promptCreateExecution(${plan.id})">Registrar nova sessão</button>
-        <button class="btn btn-sm btn-outline-danger" onclick="removePlan(${plan.id})">Excluir planejamento</button>
+  const groupedPlans = buildCosmeticPlanGroups();
+
+  groupedPlans.forEach((group) => {
+    const headerRow = tbody.insertRow();
+    headerRow.className = "table-light";
+    const persistedLabel = group.persisted
+      ? `<span class="badge bg-secondary ms-2">${group.plans.length} procedimento(s)</span>`
+      : `<span class="badge bg-info text-dark ms-2">rascunho · ${group.plans.length} procedimento(s)</span>`;
+    const consultationLabel = group.plans[0]?.consultationDate
+      ? `<div class="small text-muted mt-1">Consulta: ${core.escapeHtml(group.plans[0].consultationDate)}</div>`
+      : "";
+    const escapedCurrentName = JSON.stringify(group.name);
+    const escapedGroupKey = JSON.stringify(group.key);
+
+    headerRow.innerHTML = `
+      <td colspan="4" class="ps-2">
+        <div class="d-flex flex-column flex-lg-row gap-2 align-items-lg-center justify-content-between">
+          <div class="flex-grow-1">
+            <label class="form-label form-label-sm fw-semibold mb-1">Nome do plano</label>
+            <input
+              class="form-control form-control-sm"
+              value="${core.escapeHtml(group.name)}"
+              onchange="updatePlanGroupName(${escapedGroupKey}, ${escapedCurrentName}, this.value)"
+            >
+            ${consultationLabel}
+          </div>
+          <div class="text-lg-end">
+            ${persistedLabel}
+          </div>
+        </div>
       </td>
     `;
 
-    if (expanded) {
-      executions.forEach((execution) => renderExecutionRow(tbody, execution));
-    }
+    group.plans.forEach((plan) => {
+      const executions = getPlanExecutions(plan.id);
+      const performed = getPlanPerformed(plan);
+      const expanded = expandedCosmeticPlans.has(plan.id);
+      const row = tbody.insertRow();
+      row.className = performed ? "table-success" : "";
+      row.innerHTML = `
+        <td class="ps-4">
+          <div class="fw-semibold">${core.escapeHtml(plan.procedure_name || plan.name || "Procedimento")}</div>
+          ${plan.observations || plan.observation
+            ? `<div class="small text-muted">${core.escapeHtml(plan.observations || plan.observation)}</div>`
+            : '<div class="small text-muted">Sem observações.</div>'}
+        </td>
+        <td><input type="number" class="form-control form-control-sm" value="${plan.budget || plan.value}" onchange="updatePlanValue(${plan.index}, this.value)"></td>
+        <td><input type="number" class="form-control form-control-sm" value="${plan.months || 6}" readonly></td>
+        <td class="text-center">
+          ${plan.id
+            ? `
+              <button class="btn btn-sm btn-outline-secondary" onclick="togglePlanSessions(${plan.id})">Sessões (${executions.length})</button>
+              <button class="btn btn-sm btn-outline-success" onclick="promptCreateExecution(${plan.id})">Registrar nova sessão</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="removePlan(${plan.id})">Excluir planejamento</button>
+            `
+            : `
+              <button class="btn btn-sm btn-outline-primary" onclick="editCosmeticProcedure(${plan.index})">Editar</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="removeCosmeticProcedure(${plan.index})">Remover</button>
+            `}
+        </td>
+      `;
+
+      if (expanded) {
+        executions.forEach((execution) => renderExecutionRow(tbody, execution));
+      }
+    });
   });
 
   if (cosmeticPlans.length === 0) {
