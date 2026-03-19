@@ -4,11 +4,35 @@ import requests as http_requests
 from datetime import datetime, timezone
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+import re
 
 SPREADSHEET_TITLE = "CRM Clínica Basile - Procedimentos"
 SHEET_HEADERS = [
     "Nome Completo", "Procedimento", "Data do Procedimento", "Data do Retorno", "Telefone"
 ]
+
+
+def format_phone_for_sheets(phone):
+    """
+    Formata telefone para o padrão Brasil (55 + número sem hífens).
+    Exemplo: (16) 99994-1774 -> 5516999941774
+    Exemplo: 16999941774 -> 5516999941774
+    """
+    if not phone:
+        return ""
+    
+    # Remove tudo que não é número
+    digits_only = re.sub(r'\D', '', str(phone).strip())
+    
+    # Se tem menos de 10 dígitos, retorna como está
+    if len(digits_only) < 10:
+        return digits_only
+    
+    # Se não começa com 55, adiciona
+    if not digits_only.startswith('55'):
+        digits_only = '55' + digits_only
+    
+    return digits_only
 
 
 def _get_access_token():
@@ -151,7 +175,7 @@ def _do_append_batch(procedures_data):
                 proc.get('procedure_name', ''),
                 proc.get('procedure_date', ''),
                 proc.get('return_date', ''),
-                proc.get('phone', ''),
+                format_phone_for_sheets(proc.get('phone', '')),
             ])
 
         if rows:
@@ -205,7 +229,7 @@ def _do_append_transplant(data):
             if name.lower() in existing_names:
                 continue
                 
-            phone = item.get('phone', '')
+            phone = format_phone_for_sheets(item.get('phone', ''))
             status = item.get('status', 'pendente')
             surgery_date = item.get('surgery_date', '')
             
@@ -285,7 +309,7 @@ def _do_append_botox_row(row_data):
             params={'valueInputOption': 'USER_ENTERED', 'insertDataOption': 'INSERT_ROWS'},
             json={'values': [[
                 row_data.get('patient_name', ''),
-                row_data.get('phone', ''),
+                format_phone_for_sheets(row_data.get('phone', '')),
                 row_data.get('performed_date', ''),
                 row_data.get('followup_date', ''),
             ]]}
@@ -330,7 +354,7 @@ def sync_all_botox_to_sheet(rows):
 
             values = [BOTOX_HEADERS] + [[
                 r.get('patient_name', ''),
-                r.get('phone', ''),
+                format_phone_for_sheets(r.get('phone', '')),
                 r.get('performed_date', ''),
                 r.get('followup_date', ''),
             ] for r in rows]
