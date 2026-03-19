@@ -3684,6 +3684,7 @@ def get_cosmetic_plans(patient_id):
             'planned_value': plan.planned_value,
             'final_budget': plan.final_budget,
             'follow_up_months': plan.follow_up_months,
+            'observations': plan.observations,
             'created_at': note.created_at.isoformat() if note else None,
             'executions': [_serialize_execution(execution) for execution in executions]
         })
@@ -3737,6 +3738,7 @@ def get_cosmetic_plans_grouped(patient_id):
             'planned_value': float(plan.planned_value) if plan.planned_value else 0,
             'final_budget': float(plan.final_budget) if plan.final_budget else 0,
             'follow_up_months': plan.follow_up_months,
+            'observations': plan.observations,
             'created_at': plan.created_at.isoformat() if plan.created_at else None,
             'executions': [_serialize_execution(execution) for execution in executions]
         })
