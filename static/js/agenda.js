@@ -490,26 +490,30 @@
             const isWaiting = app.extendedProps?.waiting || app.waiting || false;
             let actionBadgeHtml = '';
 
-            // Surgery-map entries use string IDs (e.g. "surg_16") and don't support check-in
-            if (!isSurgeryMap) {
-                if (status === 'atendido') {
-                    actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
-                } else if (status === 'faltou') {
-                    actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
-                        <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
-                } else if (isWaiting) {
-                    actionBadgeHtml = `
-                        <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
-                        <button class="btn btn-sm btn-success ms-2" onclick="event.stopPropagation(); doCheckout('${app.id}')" title="Finalizar atendimento">
-                            <i class="bi bi-check2-circle"></i> Finalizar
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger ms-1" onclick="event.stopPropagation(); removeFromWaiting('${app.id}')" title="Remover da espera (sem finalizar)">
-                            <i class="bi bi-x-circle"></i> Remover
-                        </button>
-                    `;
-                } else {
-                    actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
-                }
+            // Todos os agendamentos (incluindo cirurgias) agora suportam check-in
+            if (status === 'atendido') {
+                actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
+            } else if (status === 'faltou') {
+                actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
+                    <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+            } else if (isWaiting) {
+                actionBadgeHtml = `
+                    <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
+                    <button class="btn btn-sm btn-success ms-2" onclick="event.stopPropagation(); doCheckout('${app.id}')" title="Finalizar atendimento">
+                        <i class="bi bi-check2-circle"></i> Finalizar
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger ms-1" onclick="event.stopPropagation(); removeFromWaiting('${app.id}')" title="Remover da espera (sem finalizar)">
+                        <i class="bi bi-x-circle"></i> Remover
+                    </button>
+                `;
+            } else {
+                actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+            }
+            
+            // Adicionar botão de acesso ao prontuário para cirurgias também
+            if (isSurgeryMap && patientId) {
+                const prontuarioBtn = `<button class="btn btn-sm btn-primary ms-2" onclick="event.stopPropagation(); goToPatientChart(${patientId}, '${app.id}')" title="Ver prontuário"><i class="bi bi-file-medical"></i> Prontuário</button>`;
+                actionBadgeHtml += prontuarioBtn;
             }
 
             block.innerHTML = `
