@@ -121,11 +121,78 @@ def create_surgery_evolution(patient_id, surgery_id):
     if not content:
         return jsonify({'success': False, 'error': 'Conteúdo da evolução não pode estar vazio'}), 400
     
+    # Extrair data da evolução se fornecida
+    evolution_date_str = data.get('evolution_date')
+    evolution_date = None
+    if evolution_date_str:
+        try:
+            from datetime import datetime
+            evolution_date = datetime.fromisoformat(evolution_date_str.replace('Z', '+00:00'))
+        except Exception:
+            pass
+    
+    # Extrair tipo de retorno
+    return_type = data.get('return_type', 'general')
+    
+    # Extrair checked_items (lista de valores dos checkboxes marcados)
+    checked_items = data.get('checked_items', [])
+    
     evolution = SurgeryEvolution(
         surgery_id=surgery_id,
         doctor_id=current_user.id,
-        content=content
+        content=content,
+        evolution_type=return_type
     )
+    
+    # Se evolution_date foi fornecida, usar essa
+    if evolution_date:
+        evolution.evolution_date = evolution_date
+    
+    # Mapear checked_items para campos booleanos
+    # Checkbox de segunda cirurgia
+    if 'segunda_cirurgia' in checked_items:
+        evolution.needs_another_surgery = True
+    
+    # Checkbox de corpo
+    if 'corpo' in checked_items:
+        evolution.needs_body_hair = True
+    
+    # Checkbox de retoque
+    if 'retoque' in checked_items:
+        evolution.needs_touch_up = True
+    
+    # Mapear checklist de sintomas (7 dias)
+    if 'necrose' in checked_items:
+        evolution.has_necrosis = True
+    if 'crostas' in checked_items:
+        evolution.has_scabs = True
+    if 'infeccao_secundaria' in checked_items:
+        evolution.has_infection = True
+    if 'falha' in checked_items:
+        evolution.has_follicle_loss = True
+    if 'foliculite' in checked_items:
+        evolution.has_folliculitis_acute = True
+    
+    # Mapear checklist de 5 meses
+    if 'rarefacao' in checked_items:
+        evolution.has_rarefaction = True
+    if 'falha_localizada' in checked_items:
+        evolution.has_local_failure = True
+    
+    # Mapear checklist de 1 ano
+    if 'resultado_otimo' in checked_items:
+        evolution.patient_satisfied = True
+        evolution.result_within_expected = True
+    if 'resultado_bom' in checked_items:
+        evolution.patient_satisfied = True
+        evolution.result_within_expected = True
+    if 'resultado_inferior' in checked_items:
+        evolution.result_within_expected = False
+    if 'paciente_satisfeito' in checked_items:
+        evolution.patient_satisfied = True
+    if 'paciente_insatisfeito' in checked_items:
+        evolution.patient_satisfied = False
+    
     db.session.add(evolution)
     db.session.commit()
     
