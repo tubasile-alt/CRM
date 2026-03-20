@@ -156,6 +156,41 @@ def get_pending_surgeries():
     
     return jsonify(result)
 
+@crm_bp.route('/api/crm/surgery-evolutions-second-surgery')
+@login_required
+def get_surgery_evolutions_second_surgery():
+    """Retorna pacientes com indicação de segunda cirurgia (needs_another_surgery = True)"""
+    from models import SurgeryEvolution
+    
+    # Busca evoluções com needs_another_surgery = True
+    evolutions = db.session.query(SurgeryEvolution, TransplantSurgeryRecord, Patient).join(
+        TransplantSurgeryRecord, SurgeryEvolution.surgery_id == TransplantSurgeryRecord.id
+    ).join(
+        Patient, TransplantSurgeryRecord.patient_id == Patient.id
+    ).filter(
+        SurgeryEvolution.needs_another_surgery == True
+    ).order_by(TransplantSurgeryRecord.surgery_date.desc()).all()
+    
+    result = []
+    for evolution, surgery, patient in evolutions:
+        last_app = db.session.query(Appointment).filter_by(
+            patient_id=patient.id,
+            appointment_type='Transplante Capilar'
+        ).order_by(Appointment.start_time.desc()).first()
+        
+        result.append({
+            'id': patient.id,
+            'name': patient.name,
+            'phone': patient.phone,
+            'surgery_date': surgery.surgery_date.strftime('%d/%m/%Y') if surgery.surgery_date else 'N/A',
+            'last_consultation': last_app.start_time.strftime('%d/%m/%Y') if last_app else 'N/A',
+            'evolution_date': evolution.evolution_date.strftime('%d/%m/%Y %H:%M') if evolution.evolution_date else 'N/A',
+            'doctor': surgery.doctor.name if surgery.doctor else 'N/A',
+            'dp_id': _get_dp_id(patient.id, surgery.doctor_id)
+        })
+    
+    return jsonify(result)
+
 @crm_bp.route('/api/crm/performed')
 @login_required
 def get_performed_procedures():
