@@ -909,13 +909,8 @@ function renderCosmeticSummaryCards(summary, contextLabel) {
 }
 
 function renderProcedureCard(proc) {
-  const value = parseFloat(proc.budget ?? proc.value) || 0;
   const executions = getPlanExecutions(proc.id);
-  const lastExecution = executions[0] || null;
   const performed = getPlanPerformed(proc);
-  const performedDateText = lastExecution
-    ? `${lastExecution.performed_date ? formatDateBR(lastExecution.performed_date) : "-"}`
-    : "-";
   const iconClass = performed
     ? "bi-check-circle-fill text-success"
     : "bi-x-circle-fill text-danger";
@@ -927,10 +922,16 @@ function renderProcedureCard(proc) {
           <div class="flex-grow-1">
             <div class="d-flex align-items-start gap-2">
               <i class="bi ${iconClass} fs-5 mt-1"></i>
-              <div>
-                <div class="fw-bold ${performed ? "text-muted" : "text-dark"}">${core.escapeHtml(proc.name)}</div>
-                <div class="text-muted">R$ ${formatMoneyBRL(value)} · ${executions.length} sessão(ões)</div>
-                <div class="small text-muted mt-1">Realizado em: ${core.escapeHtml(performedDateText)}</div>
+              <div style="width: 100%;">
+                <div class="fw-bold text-primary" style="font-size: 14px; margin-bottom: 4px;">
+                  ${core.escapeHtml(proc.name)}
+                </div>
+                ${proc.procedure_name ? `<div class="text-muted small" style="margin-bottom: 4px;">
+                  ${core.escapeHtml(proc.procedure_name)}
+                </div>` : ''}
+                ${proc.observations ? `<div class="text-muted small" style="margin-bottom: 8px;">
+                  ${core.escapeHtml(proc.observations)}
+                </div>` : ''}
               </div>
             </div>
           </div>
