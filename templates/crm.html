@@ -536,11 +536,16 @@ function loadPlanned() {
                 <div class="procedure-item" 
                      style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
                      onclick="openPatient(${item.patient_id}, ${item.dp_id || null})">
-                    <div class="patient-name">${item.patient_name}</div>
-                    <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
-                    <div class="date-info">Planejado: ${item.planned_date ? formatDate(item.planned_date) : 'Sem data'}</div>
-                    ${item.patient_phone ? `<div class="phone-info"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
-                    <div class="action-buttons" onclick="event.stopPropagation()">
+                    <div class="plan-title fw-bold" style="color: ${getProcedureColor(item.procedure_name)}; font-size: 14px; margin-bottom: 4px;">
+                        ${item.plan_name}
+                    </div>
+                    <div class="procedure-name small" style="color: #666; margin-bottom: 4px;">
+                        ${item.procedure_name}
+                    </div>
+                    ${item.observations ? `<div class="obs-info small text-muted" style="margin-bottom: 8px;">${item.observations}</div>` : ''}
+                    <div class="patient-name small"><strong>${item.patient_name}</strong></div>
+                    ${item.patient_phone ? `<div class="phone-info small"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
+                    <div class="action-buttons" onclick="event.stopPropagation()" style="margin-top: 8px;">
                         <button class="action-btn scheduled" onclick="markAsRealizado(${item.id})">Marcar Realizado</button>
                     </div>
                 </div>
@@ -564,10 +569,17 @@ function loadPerformed() {
                 <div class="procedure-item" 
                      style="border-left: 4px solid ${getProcedureColor(item.procedure_name)}" 
                      onclick="openPatient(${item.patient_id}, ${item.dp_id || null})">
-                    <div class="patient-name">${item.patient_name}</div>
-                    <div class="procedure-name" style="color: ${getProcedureColor(item.procedure_name)}">${item.procedure_name}</div>
-                    <div class="date-info">Realizado: ${formatDate(item.performed_date)}</div>
-                    ${item.follow_up_due_at ? `<div class="date-info">Próximo retorno: ${formatDate(item.follow_up_due_at)}</div>` : ''}
+                    <div class="plan-title fw-bold" style="color: ${getProcedureColor(item.procedure_name)}; font-size: 14px; margin-bottom: 4px;">
+                        ${item.plan_name}
+                    </div>
+                    <div class="procedure-name small" style="color: #666; margin-bottom: 4px;">
+                        ${item.procedure_name}
+                    </div>
+                    ${item.observations ? `<div class="obs-info small text-muted" style="margin-bottom: 8px;">${item.observations}</div>` : ''}
+                    <div class="patient-name small"><strong>${item.patient_name}</strong></div>
+                    ${item.patient_phone ? `<div class="phone-info small"><i class="bi bi-telephone"></i> ${item.patient_phone}</div>` : ''}
+                    <div class="date-info small text-success"><i class="bi bi-check-circle"></i> Realizado: ${formatDate(item.performed_date)}</div>
+                    ${item.follow_up_due_at ? `<div class="date-info small">Próximo retorno: ${formatDate(item.follow_up_due_at)}</div>` : ''}
                 </div>
             `).join('');
         });
