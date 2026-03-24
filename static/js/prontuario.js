@@ -909,8 +909,13 @@ function renderCosmeticSummaryCards(summary, contextLabel) {
 }
 
 function renderProcedureCard(proc) {
+  const value = parseFloat(proc.budget ?? proc.value) || 0;
   const executions = getPlanExecutions(proc.id);
+  const lastExecution = executions[0] || null;
   const performed = getPlanPerformed(proc);
+  const performedDateText = lastExecution
+    ? `${lastExecution.performed_date ? formatDateBR(lastExecution.performed_date) : "-"}`
+    : "-";
   const iconClass = performed
     ? "bi-check-circle-fill text-success"
     : "bi-x-circle-fill text-danger";
@@ -932,6 +937,8 @@ function renderProcedureCard(proc) {
                 ${proc.observations ? `<div class="text-muted small" style="margin-bottom: 8px;">
                   ${core.escapeHtml(proc.observations)}
                 </div>` : ''}
+                <div class="text-muted small">R$ ${formatMoneyBRL(value)}</div>
+                <div class="small text-muted mt-1">Realizado em: ${core.escapeHtml(performedDateText)}</div>
               </div>
             </div>
           </div>
