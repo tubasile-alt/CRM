@@ -2420,6 +2420,7 @@ def prontuario(patient_id):
         
         # TRATAMENTO SEGURO DO APPOINTMENT_ID DA URL
         appointment_id = request.args.get('appointment_id', type=int)
+        active_appt = None
         appointment_start_iso = None
         if appointment_id:
             active_appt = db.session.get(Appointment, appointment_id)
@@ -2429,6 +2430,21 @@ def prontuario(patient_id):
                     appointment_start_iso = effective_dt.strftime('%Y-%m-%dT%H:%M')
             else:
                 appointment_id = None # Anular se inválido ou de outro paciente
+                active_appt = None
+
+        patient_type_label = (patient.patient_type or 'particular')
+        if isinstance(patient_type_label, str) and patient_type_label.lower() == 'particular':
+            patient_type_label = 'Particular'
+
+        consultation_type_label = None
+        if active_appt and active_appt.appointment_type:
+            consultation_type_label = active_appt.appointment_type
+        elif consultations:
+            latest_category = consultations[0].get('category')
+            if latest_category:
+                consultation_type_label = str(latest_category).replace('_', ' ').title()
+        if not consultation_type_label:
+            consultation_type_label = 'Não informado'
 
         age = None
         if patient.birth_date:
@@ -2453,6 +2469,8 @@ def prontuario(patient_id):
                              consultations=consultations,
                              appointment_id=appointment_id,
                              appointment_start_iso=appointment_start_iso,
+                             patient_type_label=patient_type_label,
+                             consultation_type_label=consultation_type_label,
                              age=age,
                              timeline_events=timeline_events,
                              debug_info=debug_info)
@@ -3281,20 +3299,117 @@ def finalizar_atendimento(patient_id):
 @app.route('/api/prontuario/<int:patient_id>/cosmetic-plan', methods=['POST'])
 @login_required
 def save_cosmetic_plan(patient_id):
-    """
-    DEPRECATED: Não salva mais no banco - dados são salvos apenas ao finalizar atendimento.
-    Mantido apenas para compatibilidade, retorna sucesso sem fazer nada.
-    Use generate-budget para gerar PDF.
-    """
     if not current_user.is_doctor():
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    
-    # Não salvar mais - apenas retornar sucesso
-    # Os dados serão salvos quando clicar em "Finalizar Atendimento"
-    return jsonify({
-        'success': True, 
-        'message': 'Planejamento será salvo ao finalizar o atendimento'
-    })
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        from models import CosmeticProcedurePlan, Note
+
+        plan_name = (data.get('name') or '').strip()
+        procedure_name = (data.get('procedure_name') or data.get('name') or '').strip()
+        planned_value = float(data.get('value', 0) or 0)
+        final_budget = float(data.get('budget', planned_value) or planned_value)
+        follow_up_months = int(data.get('months', 6) or 6)
+        observations = data.get('observations', '')
+
+        if not plan_name:
+            return jsonify({'success': False, 'error': 'Nome do plano é obrigatório'}), 400
+        if not procedure_name:
+            return jsonify({'success': False, 'error': 'Procedimento é obrigatório'}), 400
+        if planned_value <= 0:
+            return jsonify({'success': False, 'error': 'Valor deve ser maior que zero'}), 400
+
+        consultation_key = str(data.get('consultation_key') or '').strip()
+        fallback_consultation_key = str(data.get('fallback_consultation_key') or '').strip()
+
+        target_note = None
+        appointment_id = None
+
+        if consultation_key.startswith('note_'):
+            try:
+                note_id = int(consultation_key.replace('note_', ''))
+                note_candidate = db.session.get(Note, note_id)
+                if (
+                    note_candidate
+                    and note_candidate.patient_id == patient_id
+                    and note_candidate.note_type == 'conduta'
+                ):
+                    target_note = note_candidate
+            except (ValueError, TypeError):
+                target_note = None
+        elif consultation_key.isdigit():
+            appointment_id = int(consultation_key)
+
+        if target_note is None and fallback_consultation_key.startswith('note_'):
+            try:
+                note_id = int(fallback_consultation_key.replace('note_', ''))
+                note_candidate = db.session.get(Note, note_id)
+                if (
+                    note_candidate
+                    and note_candidate.patient_id == patient_id
+                    and note_candidate.note_type == 'conduta'
+                ):
+                    target_note = note_candidate
+            except (ValueError, TypeError):
+                target_note = None
+
+        if target_note is None and appointment_id:
+            target_note = Note.query.filter_by(
+                patient_id=patient_id,
+                appointment_id=appointment_id,
+                note_type='conduta'
+            ).order_by(Note.id.desc()).first()
+
+        if target_note is None:
+            target_note = Note.query.filter_by(
+                patient_id=patient_id,
+                note_type='conduta',
+                category='cosmiatria'
+            ).order_by(Note.id.desc()).first()
+
+        if target_note is None:
+            target_note = Note(
+                patient_id=patient_id,
+                doctor_id=current_user.id,
+                appointment_id=appointment_id,
+                note_type='conduta',
+                category='cosmiatria',
+                content='[Atualização de planejamento pós-finalização]',
+                finalized_at=get_brazil_time(),
+                is_finalized=True
+            )
+            db.session.add(target_note)
+            db.session.flush()
+
+        plan = CosmeticProcedurePlan(
+            note_id=target_note.id,
+            name=plan_name,
+            procedure_name=procedure_name,
+            planned_value=planned_value,
+            final_budget=final_budget,
+            follow_up_months=follow_up_months,
+            observations=observations
+        )
+        db.session.add(plan)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'plan': {
+                'id': plan.id,
+                'name': plan.name,
+                'procedure_name': plan.procedure_name,
+                'planned_value': float(plan.planned_value) if plan.planned_value else 0,
+                'final_budget': float(plan.final_budget) if plan.final_budget else 0,
+                'follow_up_months': plan.follow_up_months,
+                'observations': plan.observations,
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Erro ao salvar planejamento: {str(e)}'}), 500
 
 @app.route('/api/prontuario/<int:patient_id>/generate-budget', methods=['POST'])
 @login_required
