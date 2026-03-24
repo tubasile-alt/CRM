@@ -340,6 +340,36 @@ function openEditPatientModal() {
   new bootstrap.Modal(document.getElementById("editPatientModal")).show();
 }
 
+async function copyPatientFullName() {
+  const fullName = cfg().patientName || window.patientName || "";
+  if (!fullName) {
+    showAlert("Nome do paciente não disponível para cópia.", "warning");
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(fullName);
+    showAlert("Nome completo copiado!", "success");
+  } catch (error) {
+    const input = document.createElement("textarea");
+    input.value = fullName;
+    input.style.position = "fixed";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    input.focus();
+    input.select();
+    try {
+      document.execCommand("copy");
+      showAlert("Nome completo copiado!", "success");
+    } catch (copyError) {
+      console.error("Falha ao copiar nome:", copyError);
+      showAlert("Não foi possível copiar o nome.", "danger");
+    } finally {
+      document.body.removeChild(input);
+    }
+  }
+}
+
 async function savePatientData() {
   const patientId = getPatientId();
   const data = {
@@ -1517,7 +1547,33 @@ function resetCosmeticProcedureForm({ preservePlanName = false } = {}) {
   if (observationsInput) observationsInput.value = "";
 }
 
-function addCosmeticProcedure() {
+function shouldPersistCosmeticProcedureImmediately() {
+  // Quando o médico está navegando em uma consulta histórica, não haverá
+  // "finalizar atendimento" para persistir; então salvamos imediatamente.
+  if (getAppointmentId()) return false;
+  return Boolean(currentHistoricalConsultation || activeCosmeticContext?.consultationKey || activeCosmeticContext?.fallbackConsultationKey);
+}
+
+async function persistCosmeticProcedureImmediately(procData) {
+  const patientId = getPatientId();
+  if (!patientId) {
+    throw new Error("Paciente não encontrado.");
+  }
+
+  const payload = {
+    ...procData,
+    consultation_key: activeCosmeticContext?.consultationKey || currentHistoricalConsultation || null,
+    fallback_consultation_key: activeCosmeticContext?.fallbackConsultationKey || null
+  };
+
+  return core.fetchJson(`/api/prontuario/${patientId}/cosmetic-plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+    body: JSON.stringify(payload)
+  });
+}
+
+async function addCosmeticProcedure() {
   const planNameInput = document.getElementById("newPlanName");
   const procedureInput = document.getElementById("newProcedureName");
   const valueInput = document.getElementById("newProcedureValue");
@@ -1572,7 +1628,7 @@ function addCosmeticProcedure() {
 
     showAlert("Procedimento atualizado com sucesso.", "success");
   } else {
-    cosmeticPlans.push({
+    const newProcedure = {
       name: planName,
       procedure_name: procedureName,
       value,
@@ -1580,8 +1636,26 @@ function addCosmeticProcedure() {
       budget: value,
       observations,
       observation: observations
-    });
-    showAlert("Procedimento adicionado com sucesso.", "success");
+    };
+
+    if (shouldPersistCosmeticProcedureImmediately()) {
+      try {
+        const result = await persistCosmeticProcedureImmediately(newProcedure);
+        if (!result.success) {
+          showAlert(result.error || "Erro ao salvar procedimento", "danger");
+          return;
+        }
+        await loadExistingPlans();
+        showAlert("Procedimento adicionado ao plano com sucesso.", "success");
+      } catch (error) {
+        console.error("Erro ao adicionar procedimento no plano histórico:", error);
+        showAlert(error.message || "Erro ao salvar procedimento", "danger");
+        return;
+      }
+    } else {
+      cosmeticPlans.push(newProcedure);
+      showAlert("Procedimento adicionado com sucesso.", "success");
+    }
   }
 
   renderCosmeticProcedures();
@@ -2533,9 +2607,15 @@ function buildFinalizePayload() {
   }
 
   if (currentCategory === "cosmiatria" && cosmeticPlans.length > 0) {
-    payload.cosmetic_procedures = cosmeticPlans;
+    // Evita duplicar planejamentos antigos: no finalizar salvamos somente
+    // os itens novos (sem id), pois os existentes já estão persistidos.
+    const plansToPersist = cosmeticPlans.filter((p) => !p.id);
 
-    const performedProcedures = cosmeticPlans.filter((p) => getPlanPerformed(p));
+    if (plansToPersist.length > 0) {
+      payload.cosmetic_procedures = plansToPersist;
+    }
+
+    const performedProcedures = plansToPersist.filter((p) => getPlanPerformed(p));
     const totalPerformed = performedProcedures.reduce((sum, p) => sum + getPlanRealizedValue(p), 0);
 
     if (totalPerformed > 0) {

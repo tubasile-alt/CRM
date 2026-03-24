@@ -76,6 +76,14 @@
               <div>
                 <h2 class="mb-1 fw-bold" style="color: #2c3e50;">
                   Prontuário: {{ patient.name|upper }}
+                  <button
+                    class="btn btn-sm btn-link text-secondary p-0 ms-2 align-baseline"
+                    type="button"
+                    title="Copiar nome completo"
+                    onclick="copyPatientFullName()"
+                  >
+                    <i class="bi bi-copy"></i>
+                  </button>
                   {% if age %}
                   <span class="text-muted fw-normal fs-4">({{ age }} anos)</span>
                   {% endif %}
@@ -108,6 +116,14 @@
                   </button>
                   {% endif %}
                 </h2>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                  <span class="badge rounded-pill text-bg-light border">
+                    <i class="bi bi-person-badge me-1"></i>Tipo paciente: {{ patient_type_label }}
+                  </span>
+                  <span class="badge rounded-pill text-bg-light border">
+                    <i class="bi bi-clipboard2-pulse me-1"></i>Tipo consulta: {{ consultation_type_label }}
+                  </span>
+                </div>
 
                 <div class="d-flex align-items-center gap-3 text-muted">
                   {% if patient.phone %}
