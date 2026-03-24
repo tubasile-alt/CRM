@@ -88,22 +88,6 @@ class BudgetExporter:
         ]))
         
         story.append(table)
-        story.append(Spacer(1, 0.5*inch))
-        
-        # Observações
-        obs_style = ParagraphStyle(
-            'Observation',
-            parent=styles['Normal'],
-            fontSize=9,
-            textColor=colors.grey
-        )
-        story.append(Paragraph(
-            '<i>Observações:</i><br/>'
-            '• Este orçamento tem validade de 30 dias.<br/>'
-            '• Os valores podem sofrer alterações conforme avaliação médica.<br/>'
-            '• O agendamento do procedimento está sujeito à disponibilidade.',
-            obs_style
-        ))
         
         doc.build(story)
         buffer.seek(0)
