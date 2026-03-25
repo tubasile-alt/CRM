@@ -315,15 +315,39 @@ function loadWeeklyMap() {
         });
 }
 
+function parseLocalDate(dateStr) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+}
+
+function formatYMD(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function addDaysLocal(date, days) {
+    const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    result.setDate(result.getDate() + days);
+    return result;
+}
+
+function getMondayOfWeek(date) {
+    const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const diff = (result.getDay() + 6) % 7; // segunda=0 ... domingo=6
+    result.setDate(result.getDate() - diff);
+    return result;
+}
+
 function organizeSurgeriesByDay(data) {
     const days = {};
-    const weekStart = new Date(data.week_start);
+    const weekStart = parseLocalDate(data.week_start);
     
     // Criar estrutura para cada dia da semana (seg-sex)
     for (let i = 0; i < 5; i++) {
-        const date = new Date(weekStart);
-        date.setDate(date.getDate() + i);
-        const dateStr = date.toISOString().split('T')[0];
+        const date = addDaysLocal(weekStart, i);
+        const dateStr = formatYMD(date);
         
         days[dateStr] = {
             date: dateStr,
@@ -579,28 +603,27 @@ function formatDuration(minutes) {
 }
 
 function formatDate(dateStr) {
-    const d = new Date(dateStr);
+    const d = parseLocalDate(dateStr);
     return d.toLocaleDateString('pt-BR');
 }
 
 function previousWeek() {
-    const d = new Date(currentWeekStart);
-    d.setDate(d.getDate() - 7);
-    currentWeekStart = d.toISOString().split('T')[0];
+    const d = parseLocalDate(currentWeekStart);
+    const prev = addDaysLocal(d, -7);
+    currentWeekStart = formatYMD(prev);
     loadWeeklyMap();
 }
 
 function currentWeek() {
-    const today = new Date();
-    const monday = new Date(today.setDate(today.getDate() - today.getDay() + 1));
-    currentWeekStart = monday.toISOString().split('T')[0];
+    const monday = getMondayOfWeek(new Date());
+    currentWeekStart = formatYMD(monday);
     loadWeeklyMap();
 }
 
 function nextWeek() {
-    const d = new Date(currentWeekStart);
-    d.setDate(d.getDate() + 7);
-    currentWeekStart = d.toISOString().split('T')[0];
+    const d = parseLocalDate(currentWeekStart);
+    const next = addDaysLocal(d, 7);
+    currentWeekStart = formatYMD(next);
     loadWeeklyMap();
 }
 
