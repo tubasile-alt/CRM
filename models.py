@@ -618,6 +618,7 @@ class PatientFunnelStatus(db.Model):
     funnel_temperature = db.Column(db.String(100))
     next_contact_date = db.Column(db.Date, nullable=True)
     contact_attempts = db.Column(db.Integer, default=0)
+    seller_notes = db.Column(db.Text, nullable=True)
     updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time)
 
     patient = db.relationship('Patient', backref=db.backref('funnel_status_entry', uselist=False))
