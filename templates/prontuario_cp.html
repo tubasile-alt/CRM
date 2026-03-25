@@ -92,7 +92,18 @@
       <a href="{{ url_for('agenda') }}" class="btn btn-sm btn-outline-light mb-2">
         <i class="bi bi-arrow-left me-1"></i>Agenda
       </a>
-      <div class="patient-name">{{ patient.name }}</div>
+      <div class="patient-name d-flex align-items-center gap-2 flex-wrap">
+        <span>{{ patient.name }}</span>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-light py-0 px-2"
+          id="cpCopyPatientNameBtn"
+          title="Copiar nome completo"
+          aria-label="Copiar nome completo"
+        >
+          <i class="bi bi-copy"></i>
+        </button>
+      </div>
       <div class="patient-meta">
         {% if age %}{{ age }} anos &bull; {% endif %}
         {% if patient.cpf %}CPF: {{ patient.cpf }} &bull; {% endif %}
@@ -430,5 +441,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/prontuario_cp.js') }}"></script>
+<script src="{{ url_for('static', filename='js/prontuario_cp.js') }}?v=20260325-copy-patient-name"></script>
 {% endblock %}
