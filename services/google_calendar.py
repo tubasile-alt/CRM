@@ -60,20 +60,29 @@ def _get_calendar_service():
 
 
 def list_available_calendars():
-    """Lista todos os calendários disponíveis do usuário"""
+    """Lista apenas os calendários Ribeirão e Clínica Basile"""
     try:
         service = _get_calendar_service()
         calendars_list = service.calendarList().list().execute()
         calendars = []
         
+        # Filtros para incluir apenas Ribeirão e Clínica Basile
+        allowed_names = ['RIBEIRÃO', 'clinicabasile']
+        
         for calendar in calendars_list.get('items', []):
-            calendars.append({
-                'id': calendar['id'],
-                'name': calendar.get('summary', 'Sem nome'),
-                'description': calendar.get('description', ''),
-                'primary': calendar.get('primary', False),
-                'timezone': calendar.get('timeZone', 'America/Sao_Paulo')
-            })
+            cal_name = calendar.get('summary', '').strip()
+            # Verificar se o nome está na lista de permitidos (case-insensitive)
+            if any(allowed.lower() in cal_name.lower() for allowed in allowed_names):
+                calendars.append({
+                    'id': calendar['id'],
+                    'name': cal_name,
+                    'description': calendar.get('description', ''),
+                    'primary': calendar.get('primary', False),
+                    'timezone': calendar.get('timeZone', 'America/Sao_Paulo')
+                })
+        
+        # Ordenar para ter Ribeirão primeiro
+        calendars.sort(key=lambda x: (x['name'].lower() != 'ribeirão', x['name']))
         
         return calendars
     except Exception as e:
