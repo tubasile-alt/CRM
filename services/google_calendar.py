@@ -5,6 +5,8 @@ from datetime import datetime, date, time, timedelta
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
+_selected_calendar_id = None  # Cache para o calendário selecionado
+
 
 def _get_access_token():
     hostname = os.environ.get('REPLIT_CONNECTORS_HOSTNAME')
@@ -57,9 +59,53 @@ def _get_calendar_service():
     return build('calendar', 'v3', credentials=creds, cache_discovery=False)
 
 
+def list_available_calendars():
+    """Lista todos os calendários disponíveis do usuário"""
+    try:
+        service = _get_calendar_service()
+        calendars_list = service.calendarList().list().execute()
+        calendars = []
+        
+        for calendar in calendars_list.get('items', []):
+            calendars.append({
+                'id': calendar['id'],
+                'name': calendar.get('summary', 'Sem nome'),
+                'description': calendar.get('description', ''),
+                'primary': calendar.get('primary', False),
+                'timezone': calendar.get('timeZone', 'America/Sao_Paulo')
+            })
+        
+        return calendars
+    except Exception as e:
+        print(f"✗ Erro ao listar calendários: {e}")
+        return []
+
+
+def set_selected_calendar(calendar_id):
+    """Define qual calendário usar para novos eventos"""
+    global _selected_calendar_id
+    _selected_calendar_id = calendar_id
+    
+    try:
+        service = _get_calendar_service()
+        calendar = service.calendars().get(calendarId=calendar_id).execute()
+        print(f"✓ Calendário selecionado: {calendar.get('summary', calendar_id)}")
+        return True
+    except Exception as e:
+        print(f"✗ Erro ao validar calendário: {e}")
+        _selected_calendar_id = None
+        return False
+
+
+def get_selected_calendar():
+    """Retorna o calendário selecionado ou 'primary' como padrão"""
+    return _selected_calendar_id or 'primary'
+
+
 def _do_create_event(patient_name, procedure_name, surgery_date, start_time, end_time, notes=''):
     try:
         service = _get_calendar_service()
+        calendar_id = get_selected_calendar()
 
         if isinstance(surgery_date, date) and not isinstance(surgery_date, datetime):
             start_dt = datetime.combine(surgery_date, start_time)
@@ -88,7 +134,7 @@ def _do_create_event(patient_name, procedure_name, surgery_date, start_time, end
             },
         }
 
-        created = service.events().insert(calendarId='primary', body=event).execute()
+        created = service.events().insert(calendarId=calendar_id, body=event).execute()
         print(f"✓ Google Calendar: Evento criado - {patient_name} ({created.get('id')})")
         return created.get('id')
     except Exception as e:

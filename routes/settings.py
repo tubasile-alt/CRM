@@ -5,6 +5,7 @@ from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 from models import db, OperatingRoom, DoctorPreference, User
 from utils.backup import BackupManager
+from services.google_calendar import list_available_calendars, set_selected_calendar, get_selected_calendar
 
 settings_bp = Blueprint('settings', __name__, url_prefix='/configuracoes')
 backup_manager = BackupManager()
@@ -180,3 +181,55 @@ def list_backups():
         } for b in backups],
         'stats': stats
     })
+
+
+@settings_bp.route('/api/google-calendar/list', methods=['GET'])
+@login_required
+def get_google_calendars():
+    """Lista todos os calendários disponíveis do Google Calendar"""
+    try:
+        calendars = list_available_calendars()
+        selected = get_selected_calendar()
+        
+        return jsonify({
+            'success': True,
+            'calendars': calendars,
+            'selected': selected
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@settings_bp.route('/api/google-calendar/select', methods=['POST'])
+@login_required
+def set_google_calendar():
+    """Define qual calendário usar para novos eventos"""
+    if not current_user.is_doctor():
+        return jsonify({'error': 'Sem permissão'}), 403
+    
+    data = request.get_json()
+    calendar_id = data.get('calendar_id')
+    
+    if not calendar_id:
+        return jsonify({'error': 'calendar_id é obrigatório'}), 400
+    
+    try:
+        success = set_selected_calendar(calendar_id)
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Calendário {calendar_id} selecionado com sucesso'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Falha ao validar calendário'
+            }), 400
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
