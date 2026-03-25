@@ -713,15 +713,21 @@
         if (q.length < 2) return;
         const body = document.getElementById('patientSearchResults');
         body.innerHTML = '<tr><td colspan="4">Buscando...</td></tr>';
-        fetch(`/api/patients/search_detailed?q=${encodeURIComponent(q)}`)
+
+        const params = new URLSearchParams({ q });
+        if (currentDoctorFilter) {
+            params.set('doctor_id', String(currentDoctorFilter));
+        }
+
+        fetch(`/api/doctor-patients/search?${params.toString()}`)
             .then(r => r.json())
             .then(data => {
                 body.innerHTML = data.length ? data.map(p => `
                     <tr>
-                        <td>${p.name}</td>
-                        <td>${p.prontuario}</td>
-                        <td>${p.last_consult}</td>
-                        <td><button class="btn btn-sm btn-primary" onclick="openPatientDetail(${p.id})">Ficha</button></td>
+                        <td>${p.patient_name}</td>
+                        <td>${p.patient_code ?? '-'}</td>
+                        <td>Dr(a). ${p.doctor_name} (${p.doctor_role || 'DERM'})</td>
+                        <td><button class="btn btn-sm btn-primary" onclick="goToPatientChart(${p.patient_id}, null, ${p.dp_id})">Prontuário</button></td>
                     </tr>`).join('') : '<tr><td colspan="4">Nenhum encontrado</td></tr>';
             });
     };

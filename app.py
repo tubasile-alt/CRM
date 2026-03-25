@@ -2670,6 +2670,7 @@ def prontuario_dp(dp_id):
 @login_required
 def search_doctor_patients():
     q = request.args.get('q', '').strip()
+    doctor_id = request.args.get('doctor_id')
     if not q or len(q) < 2:
         return jsonify([])
 
@@ -2679,6 +2680,13 @@ def search_doctor_patients():
         .join(Patient, PatientDoctor.patient_id == Patient.id)\
         .join(User, PatientDoctor.doctor_id == User.id)\
         .filter(Patient.name.ilike(f'%{q}%'))
+
+    if doctor_id and doctor_id != 'null':
+        try:
+            doctor_id = int(doctor_id)
+            base_q = base_q.filter(PatientDoctor.doctor_id == doctor_id)
+        except (TypeError, ValueError):
+            pass
 
     if not (current_user.is_secretary() or current_user.role_clinico in ('SECRETARY', 'ADMIN')):
         base_q = base_q.filter(PatientDoctor.doctor_id == current_user.id)
