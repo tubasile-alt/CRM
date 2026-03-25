@@ -12,6 +12,44 @@
     let autosaveTimer = null;
     let autosaveLastAt = null;
 
+    function notify(message, level = 'info') {
+        if (typeof window.showAlert === 'function') {
+            window.showAlert(message, level);
+            return;
+        }
+        console.log(`[${level}] ${message}`);
+    }
+
+    async function copyPatientName() {
+        const patientName = document.querySelector('.cp-header .patient-name span')?.textContent?.trim() || '';
+        if (!patientName) {
+            notify('Nome da paciente não disponível para cópia.', 'warning');
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(patientName);
+            notify('Nome completo copiado!', 'success');
+        } catch (error) {
+            const input = document.createElement('textarea');
+            input.value = patientName;
+            input.style.position = 'fixed';
+            input.style.opacity = '0';
+            document.body.appendChild(input);
+            input.focus();
+            input.select();
+            try {
+                document.execCommand('copy');
+                notify('Nome completo copiado!', 'success');
+            } catch (copyError) {
+                console.error('Falha ao copiar nome da paciente:', copyError);
+                notify('Não foi possível copiar o nome.', 'danger');
+            } finally {
+                document.body.removeChild(input);
+            }
+        }
+    }
+
     // ===== PROCEDURES BY CATEGORY =====
     const PROCEDURES = {
         FACE: ['Rinoplastia', 'Ritidoplastia (Face)', 'Blefaroplastia', 'Otoplastia',
@@ -52,11 +90,15 @@
 
     const timerToggle = document.getElementById('cpTimerToggle');
     const timerIcon = document.getElementById('cpTimerIcon');
+    const copyNameBtn = document.getElementById('cpCopyPatientNameBtn');
     if (timerToggle) {
         timerToggle.addEventListener('click', () => {
             timerRunning = !timerRunning;
             timerIcon.className = timerRunning ? 'bi bi-pause-fill' : 'bi bi-play-fill';
         });
+    }
+    if (copyNameBtn) {
+        copyNameBtn.addEventListener('click', copyPatientName);
     }
 
     // ===== TABS =====
