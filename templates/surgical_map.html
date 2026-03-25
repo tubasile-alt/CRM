@@ -217,6 +217,13 @@
                         <label class="form-label">Observações</label>
                         <textarea class="form-control" name="notes" rows="3"></textarea>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">📅 Google Calendar</label>
+                        <select class="form-select" id="googleCalendarSelect" name="calendar_id">
+                            <option value="">Carregando calendários...</option>
+                        </select>
+                        <small class="form-text text-muted">Selecione em qual calendário o evento será criado</small>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -627,7 +634,32 @@ function nextWeek() {
     loadWeeklyMap();
 }
 
+function loadGoogleCalendars() {
+    fetch('/configuracoes/api/google-calendar/list', {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const select = document.getElementById('googleCalendarSelect');
+        if (data.success && data.calendars && data.calendars.length > 0) {
+            select.innerHTML = data.calendars.map(cal => 
+                `<option value="${cal.id}" ${cal.id === data.selected ? 'selected' : ''}>${cal.name}${cal.primary ? ' (Padrão)' : ''}</option>`
+            ).join('');
+        } else {
+            select.innerHTML = '<option value="">Nenhum calendário disponível</option>';
+        }
+    })
+    .catch(err => {
+        console.error('Erro ao carregar calendários:', err);
+        document.getElementById('googleCalendarSelect').innerHTML = '<option value="">Erro ao carregar</option>';
+    });
+}
+
 function showNewSurgeryModal() {
+    loadGoogleCalendars();
     new bootstrap.Modal(document.getElementById('newSurgeryModal')).show();
 }
 
@@ -686,6 +718,19 @@ function saveSurgery() {
     if (isNaN(durationMinutes) || durationMinutes <= 0) {
         showAlert('Formato de duração inválido. Use: 1h, 1h30, 2h ou 30min', 'danger');
         return;
+    }
+    
+    // Se calendário selecionado, atualizar seleção
+    const selectedCalendar = data.calendar_id;
+    if (selectedCalendar) {
+        fetch('/configuracoes/api/google-calendar/select', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({ calendar_id: selectedCalendar })
+        }).catch(err => console.error('Erro ao selecionar calendário:', err));
     }
     
     fetch('/mapa-cirurgico/api/surgery', {
