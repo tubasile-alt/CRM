@@ -376,6 +376,7 @@ def get_marcella_sales_funnel():
                 'funnel_temperature': funnel_entry.funnel_temperature if funnel_entry else '',
                 'next_contact_date': funnel_entry.next_contact_date.isoformat() if (funnel_entry and funnel_entry.next_contact_date) else None,
                 'contact_attempts': funnel_entry.contact_attempts if funnel_entry else 0,
+                'seller_notes': funnel_entry.seller_notes if funnel_entry else '',
                 'procedures': [],
                 'total_value': 0.0
             }
@@ -427,6 +428,8 @@ def save_patient_funnel_status(patient_id):
             funnel_entry.next_contact_date = None
     if 'contact_attempts' in data:
         funnel_entry.contact_attempts = int(data['contact_attempts'] or 0)
+    if 'seller_notes' in data:
+        funnel_entry.seller_notes = (data.get('seller_notes') or '').strip()
 
     funnel_entry.updated_at = datetime.now()
     db.session.commit()

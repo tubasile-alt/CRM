@@ -903,9 +903,9 @@ body { font-family: 'Figtree', sans-serif !important; }
                     <div class="modal-section-label"><i class="bi bi-list-check me-1"></i>Procedimentos Propostos</div>
                     <div class="table-responsive">
                         <table class="table table-sm modal-table mb-0">
-                            <thead><tr><th>Procedimento</th><th class="text-end">Valor</th><th>Data</th><th>Obs.</th><th style="min-width:170px;">Ações</th></tr></thead>
+                            <thead><tr><th>Procedimento</th><th class="text-end">Valor</th><th>Data</th><th style="min-width:170px;">Ações</th></tr></thead>
                             <tbody id="modalProceduresBody"></tbody>
-                            <tfoot><tr><td><strong>Total pendente</strong></td><td class="text-end" id="modalTotalValue">—</td><td colspan="3"></td></tr></tfoot>
+                            <tfoot><tr><td><strong>Total pendente</strong></td><td class="text-end" id="modalTotalValue">—</td><td colspan="2"></td></tr></tfoot>
                         </table>
                     </div>
                 </div>
@@ -943,10 +943,16 @@ body { font-family: 'Figtree', sans-serif !important; }
                     </div>
                 </div>
 
-                <!-- Observações do médico (no final) -->
+                <!-- Observações da vendedora (no final) -->
                 <div class="mb-3">
-                    <div class="modal-section-label"><i class="bi bi-journal-text me-1"></i>Observações do Médico</div>
-                    <div class="modal-doctor-notes" id="modalDoctorNotes">—</div>
+                    <div class="modal-section-label"><i class="bi bi-journal-text me-1"></i>Observações da Vendedora</div>
+                    <textarea
+                        id="modalSellerNotes"
+                        class="modal-input"
+                        rows="3"
+                        placeholder="Escreva uma observação de acompanhamento (opcional)."
+                        style="width:100%;resize:vertical;"
+                    ></textarea>
                 </div>
 
             </div>
@@ -1529,7 +1535,7 @@ function openPatientModal(patient) {
     }
     document.getElementById('modalConsultDate').textContent = consultDate;
     
-    document.getElementById('modalDoctorNotes').textContent  = patient.doctor_notes || 'Nenhuma observação registrada.';
+    document.getElementById('modalSellerNotes').value = patient.seller_notes || '';
 
     const tbody = document.getElementById('modalProceduresBody');
     tbody.innerHTML = (patient.procedures || []).map(proc => `
@@ -1539,7 +1545,6 @@ function openPatientModal(patient) {
                 <input type="number" step="0.01" min="0" class="modal-value-input" id="procValue_${proc.plan_id}" value="${parseFloat(proc.planned_value || 0).toFixed(2)}">
             </td>
             <td>${formatDate(proc.planned_date)}</td>
-            <td><small>${proc.observations || '—'}</small></td>
             <td>
                 <button class="btn-proc-action btn-proc-save" onclick="saveProcedureValue(${proc.plan_id})">Salvar valor</button>
                 <button class="btn-proc-action btn-proc-done" onclick="markProcedureDone(${proc.plan_id})">Indicação pendente → Feito</button>
@@ -1626,6 +1631,7 @@ function saveFunnelStatus() {
         funnel_temperature: document.getElementById('modalTemperature').value,
         next_contact_date:  document.getElementById('modalNextContact').value || null,
         contact_attempts:   parseInt(document.getElementById('attemptsCount').textContent) || 0,
+        seller_notes:       document.getElementById('modalSellerNotes').value || '',
     };
 
     postJSON(`/api/crm/patient-funnel-status/${currentPatient.patient_id}`, payload)
@@ -1640,6 +1646,7 @@ function saveFunnelStatus() {
                 allData[idx].funnel_temperature = payload.funnel_temperature;
                 allData[idx].next_contact_date  = payload.next_contact_date;
                 allData[idx].contact_attempts   = payload.contact_attempts;
+                allData[idx].seller_notes       = payload.seller_notes;
             }
             renderAll();
             syncToGoogleSheets();
@@ -1690,7 +1697,6 @@ function printBudget() {
                     <td style="padding:8px;border:1px solid #dee2e6;"></td>
                 </tr></tfoot>
             </table>
-            ${currentPatient.doctor_notes ? `<div style="padding:12px;background:#fffbe6;border:1px solid #ffe58f;border-radius:4px;"><strong>Obs. Médico:</strong><p style="margin:6px 0 0;white-space:pre-wrap;color:#555;">${currentPatient.doctor_notes}</p></div>` : ''}
             <div style="margin-top:40px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee;padding-top:12px;">Válido por 30 dias a partir de ${today}.</div>
         </div>`;
     const area = document.getElementById('printArea');
