@@ -3292,16 +3292,41 @@ function renderSurgeryHistoryCard(surgeries = []) {
           evosContainer.className = "ms-2 ps-3 border-start border-success";
 
           surgery.evolutions.forEach((evo) => {
+            // Extrair tipo de retorno do conteúdo para exibição amigável
+            const content = evo.content || '';
+            const returnTypeMatch = content.match(/\[TIPO DE RETORNO\]\s*(\S+)/i);
+            const returnTypeRaw = returnTypeMatch ? returnTypeMatch[1] : '';
+            const returnTypeLabels = {
+              'general': 'Retorno Geral',
+              '7_days': '7 Dias',
+              '1_month': '1 Mês',
+              '3_months': '3 Meses',
+              '6_months': '6 Meses',
+              '1_year': '1 Ano'
+            };
+            const returnTypeLabel = returnTypeLabels[returnTypeRaw] || returnTypeRaw || 'Retorno';
+
+            // Extrair só as observações (remover tags [TIPO DE RETORNO] e [OBSERVAÇÕES])
+            const cleanContent = content
+              .replace(/\[TIPO DE RETORNO\][^\n]*/gi, '')
+              .replace(/\[CHECKLIST\]/gi, '✅ Checklist:')
+              .replace(/\[OBSERVAÇÕES\]/gi, '')
+              .trim();
+
             const evoDiv = document.createElement("div");
             evoDiv.className = "mb-3 p-2 bg-light rounded";
             evoDiv.style.borderLeft = "4px solid #198754";
             evoDiv.innerHTML = `
               <div class="d-flex justify-content-between align-items-start">
                 <div class="flex-grow-1">
-                  <p class="mb-1 mt-2" style="white-space: pre-wrap;">${core.escapeHtml(evo.content)}</p>
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-success">${core.escapeHtml(evo.date || '')}</span>
+                    <span class="badge bg-secondary">${core.escapeHtml(returnTypeLabel)}</span>
+                  </div>
+                  <p class="mb-1 mt-1" style="white-space: pre-wrap;">${core.escapeHtml(cleanContent)}</p>
                   <small class="text-muted">Dr. ${core.escapeHtml(evo.doctor)}</small>
                 </div>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteSurgeryEvolution(${evo.id})">
+                <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteSurgeryEvolution(${evo.id})">
                   <i class="bi bi-trash"></i>
                 </button>
               </div>
