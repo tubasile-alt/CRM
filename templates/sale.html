@@ -1364,8 +1364,8 @@ function renderBotoxFollowupCards(list) {
     panel.style.display = '';
     
     body.innerHTML = list.map(b => {
-        const perfDate = b.performed_date ? new Date(b.performed_date + 'T12:00:00').toLocaleDateString('pt-BR') : 'N/A';
-        const followDate = b.follow_up_date ? new Date(b.follow_up_date + 'T12:00:00').toLocaleDateString('pt-BR') : 'N/A';
+        const perfDate = b.performed_date ? new Date(b.performed_date.split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR') : 'N/A';
+        const followDate = b.follow_up_date ? new Date(b.follow_up_date.split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR') : 'N/A';
         const firstName = (b.patient_name || '').split(' ')[0];
         
         return `
