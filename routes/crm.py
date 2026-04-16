@@ -79,14 +79,14 @@ crm_bp = Blueprint('crm', __name__)
 @crm_bp.route('/crm')
 @login_required
 def crm_page():
-    is_marcella = (current_user.username or '').strip().lower() in ('marcella', 'arthur')
+    is_marcella = (current_user.username or '').strip().lower() in ('marcella', 'tubasile')
     return render_template('crm.html', is_marcella=is_marcella)
 
 @crm_bp.route('/sale')
 @login_required
 def sales_funnel():
     """Sales funnel page for Marcella"""
-    is_marcella = (current_user.username or '').strip().lower() in ('marcella', 'arthur')
+    is_marcella = (current_user.username or '').strip().lower() in ('marcella', 'tubasile')
     if not is_marcella:
         return redirect(url_for('crm.crm_page'))
     return render_template('sale.html')
@@ -325,7 +325,7 @@ def get_planned_procedures():
 @login_required
 def get_marcella_sales_funnel():
     """Retorna pendências de procedimentos do Dr. Arthur Basile para a usuária Marcella."""
-    if (current_user.username or '').strip().lower() not in ('marcella', 'arthur'):
+    if (current_user.username or '').strip().lower() not in ('marcella', 'tubasile'):
         return jsonify({'error': 'Acesso restrito'}), 403
 
     arthur_doctor = User.query.filter(
@@ -402,7 +402,7 @@ def get_marcella_sales_funnel():
 @login_required
 def save_patient_funnel_status(patient_id):
     """Salva o status e temperatura do funil de vendas para um paciente."""
-    if (current_user.username or '').strip().lower() not in ('marcella', 'arthur'):
+    if (current_user.username or '').strip().lower() not in ('marcella', 'tubasile'):
         return jsonify({'error': 'Acesso restrito'}), 403
 
     data = request.get_json()
@@ -439,7 +439,7 @@ def save_patient_funnel_status(patient_id):
 @login_required
 def populate_google_sheets():
     """Popula Google Sheets com TODOS os dados existentes do funil."""
-    if (current_user.username or '').strip().lower() not in ('marcella', 'arthur'):
+    if (current_user.username or '').strip().lower() not in ('marcella', 'tubasile'):
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
@@ -491,7 +491,7 @@ def populate_google_sheets():
 @login_required
 def export_excel():
     """Exporta dados do funil para arquivo Excel."""
-    if (current_user.username or '').strip().lower() not in ('marcella', 'arthur'):
+    if (current_user.username or '').strip().lower() not in ('marcella', 'tubasile'):
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
@@ -597,7 +597,7 @@ def export_excel():
 @login_required
 def sync_to_google_sheets():
     """Sincroniza dados do funil de vendas com Google Sheets automaticamente."""
-    if (current_user.username or '').strip().lower() not in ('marcella', 'arthur'):
+    if (current_user.username or '').strip().lower() not in ('marcella', 'tubasile'):
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
@@ -749,7 +749,7 @@ def _get_performed_procedures_historical(month=None, year=None):
 @login_required
 def sync_performed_to_google_sheets():
     """Sincroniza TODOS os procedimentos realizados com Google Sheets (busca ativa histórica)."""
-    if (current_user.username or '').strip().lower() not in ('marcella', 'arthur'):
+    if (current_user.username or '').strip().lower() not in ('marcella', 'tubasile'):
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
