@@ -950,6 +950,11 @@ function renderProcedureCard(proc) {
     ? "bi-check-circle-fill text-success"
     : "bi-x-circle-fill text-danger";
 
+  const procIndex = cosmeticPlans.indexOf(proc);
+  const markDoneAction = proc.id
+    ? `performCosmeticProcedure(${proc.id}, '${core.escapeHtml(proc.name)}')`
+    : `saveProcThenMarkDone(${procIndex}, '${core.escapeHtml(proc.name)}')`;
+
   return `
     <div class="card mb-2 border-0 shadow-sm ${performed ? "opacity-75" : ""}">
       <div class="card-body py-3 px-3">
@@ -973,13 +978,13 @@ function renderProcedureCard(proc) {
             </div>
           </div>
           <div class="d-flex gap-1">
-            ${!performed ? `<button class="btn btn-sm btn-outline-success py-1 px-2" title="Marcar como realizado" onclick="performCosmeticProcedure(${proc.id}, '${core.escapeHtml(proc.name)}')">
+            ${!performed ? `<button class="btn btn-sm btn-outline-success py-1 px-2" title="Marcar como realizado" onclick="${markDoneAction}">
               <i class="bi bi-check-lg"></i>
             </button>` : ''}
             ${executions.length > 0 ? `<button class="btn btn-sm btn-outline-primary py-1 px-2" title="Editar execução" onclick="promptEditExecution(${executions[0].id})">
               <i class="bi bi-pencil"></i>
             </button>` : ''}
-            <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Deletar planejamento" onclick="deleteCosmeticPlan(${proc.id}, '${core.escapeHtml(proc.name)}')">
+            <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Deletar planejamento" onclick="deleteCosmeticPlan(${proc.id ?? 'null'}, '${core.escapeHtml(proc.name)}', ${procIndex})">
               <i class="bi bi-trash"></i>
             </button>
           </div>
@@ -2255,6 +2260,55 @@ function openSimplifiedExecutionModal(defaults = {}) {
   });
 }
 
+async function saveProcThenMarkDone(procIndex, procedureName) {
+  const proc = cosmeticPlans[procIndex];
+  if (!proc) {
+    showAlert("Procedimento não encontrado. Tente recarregar a página.", "danger");
+    return;
+  }
+
+  const patientId = getPatientId();
+  if (!patientId) {
+    showAlert("Paciente não encontrado.", "danger");
+    return;
+  }
+
+  try {
+    const appointmentId = getAppointmentId();
+    const payload = {
+      ...proc,
+      consultation_key: activeCosmeticContext?.consultationKey
+        || (appointmentId ? String(appointmentId) : null)
+        || currentHistoricalConsultation
+        || null,
+      fallback_consultation_key: activeCosmeticContext?.fallbackConsultationKey || null
+    };
+
+    const saveResult = await core.fetchJson(`/api/prontuario/${patientId}/cosmetic-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+      body: JSON.stringify(payload)
+    });
+
+    if (!saveResult.success) {
+      showAlert(saveResult.error || "Erro ao salvar procedimento antes de registrar realização", "danger");
+      return;
+    }
+
+    const newPlanId = saveResult.plan?.id;
+    if (!newPlanId) {
+      showAlert("Erro ao obter ID do procedimento salvo.", "danger");
+      return;
+    }
+
+    await loadExistingPlans();
+    await performCosmeticProcedure(newPlanId, procedureName);
+  } catch (error) {
+    console.error("saveProcThenMarkDone error:", error);
+    showAlert("Erro ao salvar e marcar procedimento como realizado.", "danger");
+  }
+}
+
 async function performCosmeticProcedure(planId, procedureName, consultationId = null) {
   const today = new Date().toISOString().split("T")[0];
   const payload = await openSimplifiedExecutionModal({
@@ -2282,8 +2336,22 @@ async function performCosmeticProcedure(planId, procedureName, consultationId = 
   }
 }
 
-async function deleteCosmeticPlan(planId, procedureName) {
+async function deleteCosmeticPlan(planId, procedureName, procIndex = -1) {
   if (!confirm(`Deletar o planejamento "${procedureName}"?\n\nEsta ação não pode ser desfeita.`)) {
+    return;
+  }
+
+  // Se o proc ainda não foi salvo no banco (sem ID), removemos apenas do array local
+  if (!planId || planId === 'null') {
+    if (procIndex >= 0 && cosmeticPlans[procIndex]) {
+      cosmeticPlans.splice(procIndex, 1);
+      renderCosmeticProcedures();
+      renderCosmeticConduct();
+      updateCosmeticTotal();
+      showAlert(`Planejamento "${procedureName}" removido`, 'success');
+    } else {
+      showAlert('Procedimento não encontrado.', 'warning');
+    }
     return;
   }
 
