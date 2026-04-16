@@ -597,7 +597,14 @@ function loadBotoxFollowups() {
                 panel.innerHTML = '<div class="empty-panel"><i class="bi bi-syringe"></i><br>Nenhum Botox com follow-up pendente</div>';
                 return;
             }
-            
+
+            // Ordenar do mais antigo para o mais recente (por data de follow-up)
+            data.sort((a, b) => {
+                const da = new Date(a.follow_up_date || a.performed_date || 0);
+                const db = new Date(b.follow_up_date || b.performed_date || 0);
+                return da - db;
+            });
+
             panel.innerHTML = data.map(item => `
                 <div class="procedure-item" 
                      style="border-left: 4px solid #a78bfa;" 
