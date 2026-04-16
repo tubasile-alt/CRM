@@ -452,13 +452,14 @@ def populate_google_sheets():
             return jsonify({'success': False, 'message': 'Nenhum paciente encontrado'}), 404
 
         # Montar dados para Google Sheets
+        from services.google_sheets import format_phone_for_sheets
         rows = [['Paciente', 'Telefone', 'Status', 'Temperatura', 'Procedimentos', 'Total (R$)', 'Observações']]
         
         for patient_data in patients_dict.values():
             procs_str = '; '.join([f"{p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
             rows.append([
                 patient_data['patient_name'],
-                patient_data['patient_phone'],
+                format_phone_for_sheets(patient_data['patient_phone']),
                 patient_data['funnel_status'],
                 patient_data['funnel_temperature'],
                 procs_str,
@@ -537,12 +538,13 @@ def export_excel():
         
         # Preencher dados
         row_num = 2
+        from services.google_sheets import format_phone_for_sheets
         for patient_data in patients_dict.values():
             procs_str = '\n'.join([f"• {p['procedure_name']} (R$ {p['planned_value']:.2f})" for p in patient_data['procedures']])
             
             ws.append([
                 patient_data['patient_name'],
-                patient_data['patient_phone'],
+                format_phone_for_sheets(patient_data['patient_phone']),
                 patient_data['funnel_status'],
                 patient_data['funnel_temperature'],
                 procs_str,
@@ -599,7 +601,7 @@ def sync_to_google_sheets():
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
-        from services.google_sheets import _get_access_token, _get_sheets_service
+        from services.google_sheets import _get_access_token, _get_sheets_service, format_phone_for_sheets
         import requests as req
 
         # Buscar dados com filtros opcionais
@@ -623,7 +625,7 @@ def sync_to_google_sheets():
             next_contact = pd.get('next_contact_date') or ''
             rows.append([
                 pd['patient_name'],
-                pd.get('patient_phone', ''),
+                format_phone_for_sheets(pd.get('patient_phone', '')),
                 pd.get('funnel_status', ''),
                 pd.get('funnel_temperature', ''),
                 procs_str,
@@ -751,7 +753,7 @@ def sync_performed_to_google_sheets():
         return jsonify({'error': 'Acesso restrito'}), 403
 
     try:
-        from services.google_sheets import _get_access_token, _get_sheets_service
+        from services.google_sheets import _get_access_token, _get_sheets_service, format_phone_for_sheets
         import requests as req
 
         # Buscar todos os dados realizados históricos
@@ -774,7 +776,7 @@ def sync_performed_to_google_sheets():
             last_date = pd.get('last_performed_date', '')[:10] if pd.get('last_performed_date') else ''
             rows.append([
                 pd['patient_name'],
-                pd.get('patient_phone', ''),
+                format_phone_for_sheets(pd.get('patient_phone', '')),
                 pd.get('funnel_status', 'Realizado'),
                 pd.get('funnel_temperature', ''),
                 procs_str,

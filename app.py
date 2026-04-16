@@ -287,7 +287,7 @@ def create_plan_execution(plan_id):
             from threading import Thread
             def sync_sheets():
                 from routes.crm import _get_performed_procedures_historical
-                from services.google_sheets import _get_access_token
+                from services.google_sheets import _get_access_token, format_phone_for_sheets
                 import requests as req
                 
                 patients_dict = {}
@@ -311,7 +311,7 @@ def create_plan_execution(plan_id):
                         last_date = pd.get('last_performed_date', '')[:10] if pd.get('last_performed_date') else ''
                         rows.append([
                             pd['patient_name'],
-                            pd.get('patient_phone', ''),
+                            format_phone_for_sheets(pd.get('patient_phone', '')),
                             pd.get('funnel_status', 'Realizado'),
                             pd.get('funnel_temperature', ''),
                             procs_str,
@@ -457,7 +457,7 @@ def update_execution(execution_id):
             from threading import Thread
             def sync_sheets():
                 from routes.crm import _get_performed_procedures_historical
-                from services.google_sheets import _get_access_token
+                from services.google_sheets import _get_access_token, format_phone_for_sheets
                 import requests as req
                 
                 patients_dict = _get_performed_procedures_historical()
@@ -474,7 +474,7 @@ def update_execution(execution_id):
                         last_date = pd.get('last_performed_date', '')[:10] if pd.get('last_performed_date') else ''
                         rows.append([
                             pd['patient_name'],
-                            pd.get('patient_phone', ''),
+                            format_phone_for_sheets(pd.get('patient_phone', '')),
                             pd.get('funnel_status', 'Realizado'),
                             pd.get('funnel_temperature', ''),
                             procs_str,
