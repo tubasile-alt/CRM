@@ -3178,6 +3178,30 @@ async function deleteEvolution(evoId) {
   }
 }
 
+async function deletePatientSurgery(surgeryId) {
+  if (!confirm("Tem certeza que deseja apagar esta cirurgia? Todas as evoluções associadas também serão removidas. Esta ação não pode ser desfeita.")) return;
+
+  try {
+    const result = await core.fetchJson(`/api/patient/delete/${surgeryId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCSRFToken()
+      }
+    });
+
+    if (result.success) {
+      showAlert("✅ Cirurgia apagada!", "success");
+      loadTimeline();
+    } else {
+      showAlert(result.error || "Erro ao apagar cirurgia", "danger");
+    }
+  } catch (err) {
+    console.error(err);
+    showAlert("Erro ao apagar cirurgia", "danger");
+  }
+}
+
 async function deleteSurgeryEvolution(evolutionId) {
   if (!confirm("Tem certeza que deseja deletar esta evolução da cirurgia?")) return;
 
@@ -3338,9 +3362,14 @@ function renderSurgeryHistoryCard(surgeries = []) {
               <p class="mb-1"><small class="text-success"><i class="bi bi-hourglass-split"></i> ${core.escapeHtml(daysPassed)}</small></p>
               <p class="mb-1"><small><strong>Cirurgia de Transplante</strong></small></p>
             </div>
-            <button class="btn btn-sm btn-outline-success" onclick="createEvolutionForSurgery(${surgery.id}, '${core.escapeHtml(surgery.surgery_date_iso || surgery.surgery_date)}')">
-              <i class="bi bi-plus"></i> Evolução
-            </button>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-success" onclick="createEvolutionForSurgery(${surgery.id}, '${core.escapeHtml(surgery.surgery_date_iso || surgery.surgery_date)}')">
+                <i class="bi bi-plus"></i> Evolução
+              </button>
+              <button class="btn btn-sm btn-outline-danger" onclick="deletePatientSurgery(${surgery.id})" title="Apagar cirurgia">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
           </div>
           <p style="white-space: pre-wrap;"><strong>Dados:</strong> ${core.escapeHtml(surgery.surgical_data || "")}</p>
           ${surgery.observations ? `<p><strong>Observações:</strong> ${core.escapeHtml(surgery.observations)}</p>` : ""}
@@ -3921,6 +3950,7 @@ window.openSurgeryEvolutionModal = openSurgeryEvolutionModal;
 window.saveEvolution = saveEvolution;
 window.deleteEvolution = deleteEvolution;
 window.deleteSurgeryEvolution = deleteSurgeryEvolution;
+window.deletePatientSurgery = deletePatientSurgery;
 
 window.loadTimeline = loadTimeline;
 window.renderHistoricalConsultationRightPanel = renderHistoricalConsultationRightPanel;

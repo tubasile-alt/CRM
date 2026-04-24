@@ -221,8 +221,8 @@ def update_surgery(surgery_id):
 @login_required
 def delete_surgery(surgery_id):
     """Deleta cirurgia"""
-    if not current_user.is_secretary():
-        return jsonify({'error': 'Apenas a secretária pode excluir cirurgias'}), 403
+    if not (current_user.is_secretary() or current_user.is_doctor() or getattr(current_user, 'is_admin', lambda: False)()):
+        return jsonify({'error': 'Sem permissão para excluir cirurgias'}), 403
     
     surgery = Surgery.query.get(surgery_id)
     if not surgery:
