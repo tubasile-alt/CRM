@@ -38,6 +38,14 @@ db.init_app(app)
 csrf = CSRFProtect(app)
 mail = Mail(app)
 
+from flask_wtf.csrf import CSRFError
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """Quando o token CSRF expira, voltar para o login com mensagem amigável em vez de erro 400."""
+    flash('Sua sessão expirou. Por favor, faça login novamente.', 'warning')
+    return redirect(url_for('login'))
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
