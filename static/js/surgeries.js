@@ -87,6 +87,16 @@
       <label class="form-check-label">Falha localizada</label>
       </div>
 
+      <div class="form-check">
+      <input class="form-check-input evolution-check" type="checkbox" value="foliculite_recorrente">
+      <label class="form-check-label">Foliculite recorrente</label>
+      </div>
+
+      <div class="form-check">
+      <input class="form-check-input evolution-check" type="checkbox" value="antibiotico_foliculite">
+      <label class="form-check-label">Fez uso de antibiótico para foliculite</label>
+      </div>
+
       </div>`;
     }
 
@@ -132,6 +142,16 @@
       <div class="form-check">
       <input class="form-check-input evolution-check" type="checkbox" value="segunda_cirurgia">
       <label class="form-check-label">Indicação de segunda cirurgia</label>
+      </div>
+
+      <div class="form-check">
+      <input class="form-check-input evolution-check" type="checkbox" value="foliculite_recorrente">
+      <label class="form-check-label">Foliculite recorrente</label>
+      </div>
+
+      <div class="form-check">
+      <input class="form-check-input evolution-check" type="checkbox" value="antibiotico_foliculite">
+      <label class="form-check-label">Fez uso de antibiótico para foliculite</label>
       </div>
 
       </div>`;
