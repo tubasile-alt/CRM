@@ -36,6 +36,27 @@
   }
 
   function getChecklist(type) {
+    const therapyChecks = `
+      <div class="form-check">
+      <input class="form-check-input evolution-check" type="checkbox" value="minoxidil_oral_prescrito">
+      <label class="form-check-label">Prescrevo minoxidil oral</label>
+      </div>
+
+      <div class="form-check">
+      <input class="form-check-input evolution-check" type="checkbox" value="minoxidil_oral_em_uso">
+      <label class="form-check-label">Em uso de minoxidil oral</label>
+      </div>
+
+      <div class="form-check">
+      <input class="form-check-input evolution-check" type="checkbox" value="finasterida_prescrita">
+      <label class="form-check-label">Prescrevo finasterida</label>
+      </div>
+
+      <div class="form-check">
+      <input class="form-check-input evolution-check" type="checkbox" value="finasterida_em_uso">
+      <label class="form-check-label">Em uso de finasterida</label>
+      </div>`;
+
     if (type === "7_days") {
       return `
       <div class="border rounded p-3 bg-light mb-3">
@@ -69,7 +90,7 @@
       <input class="form-check-input evolution-check" type="checkbox" value="foliculite">
       <label class="form-check-label">Foliculite</label>
       </div>
-
+${therapyChecks}
       </div>`;
     }
 
@@ -96,7 +117,7 @@
       <input class="form-check-input evolution-check" type="checkbox" value="antibiotico_foliculite">
       <label class="form-check-label">Fez uso de antibiótico para foliculite</label>
       </div>
-
+${therapyChecks}
       </div>`;
     }
 
@@ -153,44 +174,14 @@
       <input class="form-check-input evolution-check" type="checkbox" value="antibiotico_foliculite">
       <label class="form-check-label">Fez uso de antibiótico para foliculite</label>
       </div>
-
+${therapyChecks}
       </div>`;
     }
 
     if (type === "general") {
       return `
       <div class="border rounded p-3 bg-light mb-3">
-
-      <div class="form-check">
-      <input class="form-check-input evolution-check" type="checkbox" value="minoxidil_oral_prescrito">
-      <label class="form-check-label">Prescrevo minoxidil oral</label>
-      </div>
-
-      <div class="form-check">
-      <input class="form-check-input evolution-check" type="checkbox" value="minoxidil_oral_em_uso">
-      <label class="form-check-label">Em uso de minoxidil oral</label>
-      </div>
-
-      <div class="form-check">
-      <input class="form-check-input evolution-check" type="checkbox" value="finasterida_prescrita">
-      <label class="form-check-label">Prescrevo finasterida</label>
-      </div>
-
-      <div class="form-check">
-      <input class="form-check-input evolution-check" type="checkbox" value="finasterida_em_uso">
-      <label class="form-check-label">Em uso de finasterida</label>
-      </div>
-
-      <div class="form-check">
-      <input class="form-check-input evolution-check" type="checkbox" value="foliculite_recorrente">
-      <label class="form-check-label">Foliculite recorrente</label>
-      </div>
-
-      <div class="form-check">
-      <input class="form-check-input evolution-check" type="checkbox" value="antibiotico_foliculite">
-      <label class="form-check-label">Fez uso de antibiótico para foliculite</label>
-      </div>
-
+${therapyChecks}
       </div>`;
     }
 
