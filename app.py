@@ -3378,11 +3378,27 @@ def save_cosmetic_plan(patient_id):
                 note_type='conduta'
             ).order_by(Note.id.desc()).first()
 
+        if target_note is None and appointment_id:
+            # busca sem filtro de categoria
+            target_note = Note.query.filter_by(
+                patient_id=patient_id,
+                appointment_id=appointment_id,
+                note_type='conduta'
+            ).order_by(Note.id.desc()).first()
+
         if target_note is None:
+            # busca a conduta mais recente do paciente com categoria cosmiatria
             target_note = Note.query.filter_by(
                 patient_id=patient_id,
                 note_type='conduta',
                 category='cosmiatria'
+            ).order_by(Note.id.desc()).first()
+
+        if target_note is None:
+            # última tentativa: qualquer conduta recente do paciente
+            target_note = Note.query.filter_by(
+                patient_id=patient_id,
+                note_type='conduta'
             ).order_by(Note.id.desc()).first()
 
         if target_note is None:
@@ -3392,7 +3408,7 @@ def save_cosmetic_plan(patient_id):
                 appointment_id=appointment_id,
                 note_type='conduta',
                 category='cosmiatria',
-                content='[Atualização de planejamento pós-finalização]',
+                content='',
                 finalized_at=get_brazil_time(),
                 is_finalized=True
             )
