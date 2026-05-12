@@ -3446,6 +3446,80 @@ function renderSurgeryHistoryCard(surgeries = []) {
 }
 
 /* =========================
+   SURGERY TAB LIST
+========================= */
+
+function renderSurgeriesTab(surgeries = []) {
+  const list = document.getElementById("surgeriesList");
+  if (!list) return;
+
+  if (surgeries.length === 0) {
+    list.innerHTML = '<p class="text-muted text-center">Nenhuma cirurgia registrada.</p>';
+    return;
+  }
+
+  list.innerHTML = "";
+  const sorted = [...surgeries].sort((a, b) => {
+    return new Date(b.surgery_date_iso || b.surgery_date) - new Date(a.surgery_date_iso || a.surgery_date);
+  });
+
+  sorted.forEach((surgery) => {
+    const daysPassed = calculateDaysPassed(surgery.surgery_date);
+    const div = document.createElement("div");
+    div.className = "mb-4 p-3 border rounded";
+    div.style.backgroundColor = "#e3f2fd";
+    div.style.borderLeft = "5px solid #2196F3";
+
+    const evoRows = (surgery.evolutions || []).map((evo) => {
+      const content = evo.content || '';
+      const cleanContent = content
+        .replace(/\[TIPO DE RETORNO\][^\n]*/gi, '')
+        .replace(/\[CHECKLIST\]/gi, '✅ Checklist:')
+        .replace(/\[OBSERVAÇÕES\]/gi, '')
+        .trim();
+      return `<div class="mb-2 p-2 bg-white rounded border-start border-success border-3">
+        <small class="text-muted">${core.escapeHtml(evo.date || '')} — Dr. ${core.escapeHtml(evo.doctor || '')}</small>
+        <p class="mb-0 mt-1 small" style="white-space:pre-wrap;">${core.escapeHtml(cleanContent)}</p>
+      </div>`;
+    }).join('');
+
+    div.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <h6 class="mb-1"><i class="bi bi-heart-pulse"></i> <strong>${core.escapeHtml(surgery.surgery_date)}</strong></h6>
+          <p class="mb-1"><small class="text-success"><i class="bi bi-hourglass-split"></i> ${core.escapeHtml(daysPassed)}</small></p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-success" onclick="createEvolutionForSurgery(${surgery.id}, '${core.escapeHtml(surgery.surgery_date_iso || surgery.surgery_date)}')">
+            <i class="bi bi-plus"></i> Evolução
+          </button>
+          <button class="btn btn-sm btn-outline-danger" onclick="deletePatientSurgery(${surgery.id})" title="Apagar">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>
+      <p style="white-space:pre-wrap;"><strong>Dados:</strong> ${core.escapeHtml(surgery.surgical_data || "")}</p>
+      ${surgery.observations ? `<p><strong>Observações:</strong> ${core.escapeHtml(surgery.observations)}</p>` : ""}
+      <p class="mb-2"><small class="text-muted">Dr. ${core.escapeHtml(surgery.doctor_name || "")}</small></p>
+      ${evoRows ? `<div class="mt-2"><strong class="small text-success">Evoluções:</strong>${evoRows}</div>` : '<p class="text-muted small mb-0"><em>Nenhuma evolução registrada</em></p>'}
+    `;
+    list.appendChild(div);
+  });
+}
+
+async function loadSurgeries() {
+  const patientId = getPatientId();
+  if (!patientId) return;
+  try {
+    const surgeries = await core.fetchJson(`/api/patient/${patientId}/surgeries`);
+    renderSurgeriesTab(surgeries || []);
+    renderSurgeryHistoryCard(surgeries || []);
+  } catch (err) {
+    console.error("Erro ao carregar cirurgias:", err);
+  }
+}
+
+/* =========================
    TIMELINE LOAD
 ========================= */
 
@@ -3454,6 +3528,7 @@ function renderTimeline(consultations = [], surgeries = []) {
   window.timelineSurgeries = surgeries || [];
   renderEvolutionsInAccordion(consultations || []);
   renderSurgeryHistoryCard(surgeries || []);
+  renderSurgeriesTab(surgeries || []);
 }
 
 async function loadTimeline() {
@@ -3958,6 +4033,8 @@ window.renderPatologiaRightPanelFromScreen = renderPatologiaRightPanelFromScreen
 window.renderTransplantRightPanelFromScreen = renderTransplantRightPanelFromScreen;
 window.showRightPanel = showRightPanel;
 window.hideRightPanel = hideRightPanel;
+
+window.loadSurgeries = loadSurgeries;
 
 window.refreshSurgeryHistory = function () {
   if (window.ProntuarioCore) {
