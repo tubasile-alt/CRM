@@ -2275,30 +2275,57 @@ async function saveProcThenMarkDone(procIndex, procedureName) {
 
   try {
     const appointmentId = getAppointmentId();
-    const payload = {
-      ...proc,
-      consultation_key: activeCosmeticContext?.consultationKey
-        || (appointmentId ? String(appointmentId) : null)
-        || currentHistoricalConsultation
-        || null,
-      fallback_consultation_key: activeCosmeticContext?.fallbackConsultationKey || null
-    };
+    const consultationKey = activeCosmeticContext?.consultationKey
+      || (appointmentId ? String(appointmentId) : null)
+      || currentHistoricalConsultation
+      || null;
+    const fallbackConsultationKey = activeCosmeticContext?.fallbackConsultationKey || null;
 
-    const saveResult = await core.fetchJson(`/api/prontuario/${patientId}/cosmetic-plan`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
-      body: JSON.stringify(payload)
-    });
-
-    if (!saveResult.success) {
-      showAlert(saveResult.error || "Erro ao salvar procedimento antes de registrar realização", "danger");
-      return;
+    // Salvar todos os procedimentos não persistidos (sem id) antes de marcar um como realizado
+    const unsaved = cosmeticPlans.filter((p, i) => !p.id && i !== procIndex);
+    for (const unsavedProc of unsaved) {
+      try {
+        await core.fetchJson(`/api/prontuario/${patientId}/cosmetic-plan`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+          body: JSON.stringify({
+            ...unsavedProc,
+            consultation_key: consultationKey,
+            fallback_consultation_key: fallbackConsultationKey
+          })
+        });
+      } catch (e) {
+        console.warn("Erro ao salvar procedimento não persistido:", e);
+      }
     }
 
-    const newPlanId = saveResult.plan?.id;
+    // Agora salvar o procedimento que vai ser marcado como realizado
+    const targetPayload = {
+      ...proc,
+      consultation_key: consultationKey,
+      fallback_consultation_key: fallbackConsultationKey
+    };
+
+    // Se o proc já tem ID, não precisa salvar de novo — só marcar como realizado
+    let newPlanId = proc.id || null;
+
     if (!newPlanId) {
-      showAlert("Erro ao obter ID do procedimento salvo.", "danger");
-      return;
+      const saveResult = await core.fetchJson(`/api/prontuario/${patientId}/cosmetic-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+        body: JSON.stringify(targetPayload)
+      });
+
+      if (!saveResult.success) {
+        showAlert(saveResult.error || "Erro ao salvar procedimento antes de registrar realização", "danger");
+        return;
+      }
+
+      newPlanId = saveResult.plan?.id;
+      if (!newPlanId) {
+        showAlert("Erro ao obter ID do procedimento salvo.", "danger");
+        return;
+      }
     }
 
     await loadExistingPlans();
