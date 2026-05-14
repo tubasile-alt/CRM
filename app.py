@@ -2319,8 +2319,12 @@ def prontuario(patient_id):
                         'follow_up_months': plan.follow_up_months
                     })
             
-            # Separar notas por tipo
-            notes_by_type = {note.note_type: note for note in appt_notes}
+            # Separar notas por tipo (preferir nota com conteúdo não-vazio)
+            notes_by_type = {}
+            for _n in appt_notes:
+                existing = notes_by_type.get(_n.note_type)
+                if existing is None or ((_n.content or '').strip() and not (existing.content or '').strip()):
+                    notes_by_type[_n.note_type] = _n
             
             # Identificar consulta finalizada
             is_finalized, finalized_note = _resolve_consultation_finalization(
@@ -2385,7 +2389,11 @@ def prontuario(patient_id):
                         'follow_up_months': plan.follow_up_months
                     })
             
-            notes_by_type = {gn.note_type: gn for gn in grouped_notes}
+            notes_by_type = {}
+            for _gn in grouped_notes:
+                existing = notes_by_type.get(_gn.note_type)
+                if existing is None or ((_gn.content or '').strip() and not (existing.content or '').strip()):
+                    notes_by_type[_gn.note_type] = _gn
             is_finalized, finalized_note = _resolve_consultation_finalization(None, grouped_notes)
             
             consultations.append({
@@ -2591,7 +2599,11 @@ def prontuario_dp(dp_id):
                         'performed_date': plan.performed_date,
                         'follow_up_months': plan.follow_up_months
                     })
-            notes_by_type = {note.note_type: note for note in appt_notes}
+            notes_by_type = {}
+            for _n in appt_notes:
+                existing = notes_by_type.get(_n.note_type)
+                if existing is None or ((_n.content or '').strip() and not (existing.content or '').strip()):
+                    notes_by_type[_n.note_type] = _n
             appointment = db.session.get(Appointment, appt_id)
             is_finalized, finalized_note = _resolve_consultation_finalization(appointment, appt_notes)
             first_note = sorted(appt_notes, key=lambda x: x.created_at)[0]
@@ -2640,7 +2652,11 @@ def prontuario_dp(dp_id):
                         'performed_date': plan.performed_date,
                         'follow_up_months': plan.follow_up_months
                     })
-            notes_by_type = {gn.note_type: gn for gn in grouped_notes}
+            notes_by_type = {}
+            for _gn in grouped_notes:
+                existing = notes_by_type.get(_gn.note_type)
+                if existing is None or ((_gn.content or '').strip() and not (existing.content or '').strip()):
+                    notes_by_type[_gn.note_type] = _gn
             is_finalized, finalized_note = _resolve_consultation_finalization(None, grouped_notes)
             consultations.append({
                 'id': note.id,

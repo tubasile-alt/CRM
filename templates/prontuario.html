@@ -1159,21 +1159,21 @@
                 </div>
                 {% endif %}
 
-                {% if 'queixa' in consultation.notes_by_type %}
+                {% if 'queixa' in consultation.notes_by_type and consultation.notes_by_type['queixa'].content %}
                 <div class="mb-3">
                   <h6 class="text-primary"><i class="bi bi-chat-left-text"></i> Queixa Principal</h6>
                   <p class="mb-0" style="white-space: pre-wrap;">{{ consultation.notes_by_type['queixa'].content }}</p>
                 </div>
                 {% endif %}
 
-                {% if 'anamnese' in consultation.notes_by_type %}
+                {% if 'anamnese' in consultation.notes_by_type and consultation.notes_by_type['anamnese'].content %}
                 <div class="mb-3">
                   <h6 class="text-primary"><i class="bi bi-clipboard-pulse"></i> Anamnese / Exame Físico</h6>
                   <p class="mb-0" style="white-space: pre-wrap;">{{ consultation.notes_by_type['anamnese'].content }}</p>
                 </div>
                 {% endif %}
 
-                {% if 'diagnostico' in consultation.notes_by_type %}
+                {% if 'diagnostico' in consultation.notes_by_type and consultation.notes_by_type['diagnostico'].content %}
                 <div class="mb-3">
                   <h6 class="text-primary"><i class="bi bi-clipboard-check"></i> Diagnóstico</h6>
                   <p class="mb-0" style="white-space: pre-wrap;">{{ consultation.notes_by_type['diagnostico'].content }}</p>
@@ -1184,7 +1184,7 @@
                   {% set conduta_text = consultation.notes_by_type['conduta'].content %}
                   {% set conduta_note = consultation.notes_by_type['conduta'] %}
 
-                  {% if conduta_text and conduta_text != '[Conduta registrada via procedimentos]' %}
+                  {% if conduta_text and conduta_text.strip() and conduta_text != '[Conduta registrada via procedimentos]' %}
                   <div class="mb-3">
                     <h6 class="text-primary"><i class="bi bi-prescription2"></i> Conduta</h6>
                     <p class="mb-0" style="white-space: pre-wrap;">{{ conduta_text }}</p>
