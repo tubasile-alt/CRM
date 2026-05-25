@@ -72,6 +72,27 @@ def load_user(user_id):
     return db.session.get(User, int(user_id))
 app.register_blueprint(patient_bp)
 
+@app.route('/apple-touch-icon.png')
+@app.route('/apple-touch-icon-precomposed.png')
+def apple_touch_icon():
+    return send_file('static/img/icons/apple-touch-icon.png', mimetype='image/png')
+
+@app.route('/icon-192.png')
+def icon_192():
+    return send_file('static/img/icons/icon-192.png', mimetype='image/png')
+
+@app.route('/icon-512.png')
+def icon_512():
+    return send_file('static/img/icons/icon-512.png', mimetype='image/png')
+
+@app.route('/icon-1024.png')
+def icon_1024():
+    return send_file('static/img/icons/icon-1024.png', mimetype='image/png')
+
+@app.route('/manifest.json')
+def manifest():
+    return send_file('static/manifest.json', mimetype='application/manifest+json')
+
 def get_brazil_time():
     tz = pytz.timezone('America/Sao_Paulo')
     return datetime.now(tz)
