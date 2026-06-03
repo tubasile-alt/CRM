@@ -2,8 +2,10 @@ import logging
 from logging.config import fileConfig
 
 from flask import current_app
-
 from alembic import context
+
+# Fallback: try to import db from models if Flask-Migrate is not available
+from models import db
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -11,17 +13,25 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+if config.config_file_name:
+    fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
 
 
 def get_engine():
     try:
-        # this works with Flask-SQLAlchemy<3 and Alchemical
-        return current_app.extensions['migrate'].db.get_engine()
-    except (TypeError, AttributeError):
-        # this works with Flask-SQLAlchemy>=3
-        return current_app.extensions['migrate'].db.engine
+        # Try Flask-Migrate first
+        ext = current_app.extensions['migrate']
+        return ext.db.get_engine()
+    except (KeyError, TypeError, AttributeError):
+        pass
+    try:
+        # Fallback to Flask-SQLAlchemy directly
+        return current_app.extensions['sqlalchemy'].db.engine
+    except (KeyError, TypeError, AttributeError):
+        pass
+    # Final fallback
+    return db.engine
 
 
 def get_engine_url():
@@ -37,7 +47,7 @@ def get_engine_url():
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 config.set_main_option('sqlalchemy.url', get_engine_url())
-target_db = current_app.extensions['migrate'].db
+target_db = db
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -90,7 +100,10 @@ def run_migrations_online():
                 directives[:] = []
                 logger.info('No changes in schema detected.')
 
-    conf_args = current_app.extensions['migrate'].configure_args
+    try:
+        conf_args = current_app.extensions['migrate'].configure_args
+    except KeyError:
+        conf_args = {}
     if conf_args.get("process_revision_directives") is None:
         conf_args["process_revision_directives"] = process_revision_directives
 

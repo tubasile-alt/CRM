@@ -41,3 +41,10 @@ externalPort = 3000
 [deployment]
 deploymentTarget = "autoscale"
 run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=2", "--threads=2", "--worker-class=gthread", "--timeout=120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
+
+[userenv]
+
+[userenv.shared]
+VAPID_PUBLIC_KEY = "BD0pfmg9eQ8NtVf2ruB2bA-_WtkHM1Rp3kDXTHYBBiHDCx5DOj93zq0lrQZIkckstfNV30e68ncRIjNU4mXAb4w"
+VAPID_PRIVATE_KEY = "nhY_BKHgzfVLyHUkbjAMz4OMn5IagnkPNhUEmMfazwI"
+VAPID_CLAIMS_EMAIL = "mailto: tubasile@gmail.com"
