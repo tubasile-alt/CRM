@@ -93,23 +93,43 @@
 
     async function initializePushNotifications() {
         const button = document.getElementById(ENABLE_BUTTON_ID);
-        if (!button) return;
+        if (!button) {
+            console.warn('[Push] Botão de ativar notificações NÃO encontrado no DOM');
+            return;
+        }
+        console.log('[Push] Botão encontrado. isPushSupported:', isPushSupported());
+        console.log('[Push] ServiceWorker:', 'serviceWorker' in navigator);
+        console.log('[Push] PushManager:', 'PushManager' in window);
+        console.log('[Push] Notification:', 'Notification' in window);
+        console.log('[Push] Notification.permission:', Notification.permission);
 
         if (!isPushSupported()) {
+            console.warn('[Push] Push não suportado neste dispositivo');
             setButtonState('Push indisponível neste dispositivo', true);
             return;
         }
 
         try {
-            await registerServiceWorker();
-            if (Notification.permission === 'granted') {
-                setButtonState('Notificações já permitidas', false);
-            }
+            const reg = await registerServiceWorker();
+            console.log('[Push] Service Worker registrado:', reg.scope);
         } catch (error) {
             console.error('[Push] Erro ao registrar service worker:', error);
+            setButtonState('Erro no service worker', true);
+        }
+
+        // Ajustar estado do botão baseado na permissão atual
+        if (Notification.permission === 'granted') {
+            setButtonState('Notificações já permitidas', true);
+        } else if (Notification.permission === 'denied') {
+            console.warn('[Push] Permissão BLOQUEADA pelo usuário');
+            setButtonState('Permissão bloqueada — desbloqueie nas configurações', true);
+        } else {
+            console.log('[Push] Permissão padrão (default), pronto para solicitar');
+            setButtonState('Ativar notificações push', false);
         }
 
         button.addEventListener('click', async () => {
+            console.log('[Push] Botão clicado!');
             try {
                 await enablePushNotifications();
             } catch (error) {
