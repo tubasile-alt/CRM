@@ -20,3 +20,4 @@ pandas
 APScheduler
 google-api-python-client
 google-auth
+pywebpush

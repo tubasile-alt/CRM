@@ -10,7 +10,7 @@ import os
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription
 from utils.database_backup import backup_manager
 
 app = Flask(__name__)
@@ -59,6 +59,7 @@ from routes.patient import patient_bp
 from routes.crm import crm_bp
 from routes.dermascribe import dermascribe_bp
 from routes.cp import cp_bp
+from routes.push import push_bp
 
 app.register_blueprint(surgical_map_bp)
 app.register_blueprint(waiting_room_bp)
@@ -66,6 +67,7 @@ app.register_blueprint(settings_bp)
 app.register_blueprint(crm_bp)
 app.register_blueprint(dermascribe_bp)
 app.register_blueprint(cp_bp)
+app.register_blueprint(push_bp)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -92,6 +94,12 @@ def icon_1024():
 @app.route('/manifest.json')
 def manifest():
     return send_file('static/manifest.json', mimetype='application/manifest+json')
+
+@app.route('/service-worker.js')
+def service_worker():
+    response = send_file('static/service-worker.js', mimetype='application/javascript')
+    response.headers['Service-Worker-Allowed'] = '/'
+    return response
 
 def get_brazil_time():
     tz = pytz.timezone('America/Sao_Paulo')

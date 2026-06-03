@@ -5,10 +5,14 @@ from flask import Blueprint, render_template, request, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime
 from services.waiting_service import WaitingService
+from services.push_service import send_checkin_push_notification
+from models import Appointment
+import logging
 import pytz
 
 waiting_room_bp = Blueprint('waiting_room', __name__, url_prefix='/espera')
 waiting_service = WaitingService()
+logger = logging.getLogger(__name__)
 
 @waiting_room_bp.route('/api/checkin/<int:appointment_id>', methods=['POST'])
 @login_required
@@ -16,6 +20,19 @@ def check_in(appointment_id):
     """Realiza check-in de um paciente"""
     try:
         result = waiting_service.check_in(appointment_id)
+        try:
+            appointment = Appointment.query.get(appointment_id)
+            if appointment and appointment.doctor_id:
+                patient = appointment.patient
+                send_checkin_push_notification(
+                    doctor_id=appointment.doctor_id,
+                    patient_name=patient.name if patient else result.get('patient_name'),
+                    appointment_id=appointment.id,
+                    patient_id=appointment.patient_id,
+                )
+        except Exception:
+            logger.exception('Falha ao disparar push de check-in para appointment_id=%s', appointment_id)
+
         return jsonify({'success': True, 'data': result})
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
