@@ -34,7 +34,9 @@
     }
 
     async function getVapidPublicKey() {
-        const response = await fetch(PUBLIC_KEY_URL);
+        const response = await fetch(PUBLIC_KEY_URL, {
+            credentials: 'same-origin',
+        });
         if (!response.ok) {
             throw new Error('Não foi possível obter a chave pública VAPID.');
         }
@@ -45,6 +47,10 @@
     async function saveSubscription(subscription) {
         const response = await fetch(SUBSCRIBE_URL, {
             method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+            },
             body: JSON.stringify(subscription.toJSON()),
         });
 

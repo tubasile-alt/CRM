@@ -8,9 +8,12 @@ push_bp = Blueprint('push', __name__, url_prefix='/api/push')
 
 
 @push_bp.route('/vapid-public-key', methods=['GET'])
-@login_required
 def vapid_public_key():
-    """Retorna somente a chave pública VAPID configurada."""
+    """Retorna somente a chave pública VAPID configurada.
+
+    A chave pública VAPID é segura para ser exposta publicamente;
+    o service worker precisa acessá-la sem sessão de login.
+    """
     public_key = current_app.config.get('VAPID_PUBLIC_KEY')
     if not public_key:
         return jsonify({'error': 'VAPID_PUBLIC_KEY não configurada'}), 503
@@ -75,3 +78,17 @@ def unsubscribe():
 
     db.session.commit()
     return jsonify({'success': True, 'updated': updated})
+
+
+@push_bp.route('/test', methods=['POST'])
+@login_required
+def test_push():
+    """Envia uma notificação push de teste para o usuário logado."""
+    from services.push_service import send_checkin_push_notification
+    result = send_checkin_push_notification(
+        doctor_id=current_user.id,
+        patient_name='Teste de Notificação',
+        appointment_id=999,
+        patient_id=999,
+    )
+    return jsonify({'success': True, 'result': result})
