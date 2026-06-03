@@ -13,8 +13,10 @@ def _vapid_claims():
     if not email:
         return None
 
+    email = email.strip()
     subject = email if email.startswith('mailto:') else f'mailto:{email}'
-    return {'sub': subject}
+    import time
+    return {'sub': subject, 'exp': int(time.time()) + 86400}
 
 
 def _subscription_info(subscription):
