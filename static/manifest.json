@@ -1,6 +1,6 @@
 {
-  "name": "Clínica Basile",
-  "short_name": "Basile CRM",
+  "name": "CRM Clínica Basile",
+  "short_name": "CRM Basile",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
