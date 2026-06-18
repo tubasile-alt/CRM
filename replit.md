@@ -16,7 +16,8 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - ✅ **Alerta de possível paciente duplicado** — antes de criar paciente novo, normaliza nome (trim/espaços/maiúsculas) e busca semelhantes; retorna aviso (HTTP 409) e modal com "Abrir ficha existente" ou "Criar novo mesmo assim" (`force_create`). NÃO mescla/exclui nada.
 - ✅ **Listas de pacientes ordenadas por código (ASC)** — endpoints de busca de pacientes.
 - ✅ **Endpoint de relatórios (somente leitura)** — `/api/reports/patient-growth` (crescimento mensal/anual/total; filtro opcional por médico).
-- ⏳ **FASE 2 (pendente, NÃO feita)** — auditoria/correção de códigos duplicados históricos (264), mescla de pacientes duplicados. Proibido na FASE 1.
+- ✅ **FASE 2 (18/06/2026)** — Tela de auditoria de pacientes antigos (`/admin/audit-patients`) com detecção de: nomes idênticos, nomes parecidos, mesmo telefone, mesmo CPF, mesmo código, sem código, gap de sequência. Classificação por risco (alto/médio/baixo). Exportação CSV. Nenhum dado alterado — apenas revisão manual.
+- ⏳ **FASE 3 (pendente)** — Correção manual dos duplicados históricos após revisão do usuário.
 
 ## 📊 Status Atual (09/02/2026)
 - ✅ Migração de dados do SQLite para PostgreSQL completa

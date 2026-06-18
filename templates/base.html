@@ -109,6 +109,13 @@
                         </a>
                     </li>
                     {% endif %}
+                    {% if current_user.is_doctor() or current_user.role_clinico in ('SECRETARY', 'ADMIN') %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'audit_patients_page' %}active{% endif %}" href="{{ url_for('audit_patients_page') }}">
+                            <i class="bi bi-clipboard-data"></i> Auditoria
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'chat' %}active{% endif %}" href="{{ url_for('chat') }}">
                             <i class="bi bi-chat-dots"></i> Chat

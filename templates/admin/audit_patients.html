@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}Auditoria de Pacientes - Clínica Basile{% endblock %}
+{% block extra_css %}
+<style>
+.audit-header { background: #f8f9fa; border-bottom: 2px solid #dee2e6; padding: 1rem 0; margin-bottom: 1rem; }
+.audit-card { border: 1px solid #dee2e6; border-radius: 0.5rem; overflow: hidden; }
+.audit-table th { white-space: nowrap; font-size: 0.8rem; background: #f8f9fa; }
+.audit-table td { font-size: 0.85rem; vertical-align: middle; }
+.badge-alto { background: #dc3545; color: #fff; }
+.badge-medio { background: #ffc107; color: #212529; }
+.badge-baixo { background: #6c757d; color: #fff; }
+.badge-cat { font-size: 0.75rem; }
+.filter-row { background: #f8f9fa; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem; }
+.loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="audit-header">
+    <div class="container-fluid">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h3 class="mb-1"><i class="bi bi-clipboard-data"></i> Auditoria de Pacientes</h3>
+                <p class="text-muted mb-0">Revisão manual de pacientes com possíveis duplicidades ou problemas. <strong>Nenhum dado é alterado.</strong></p>
+            </div>
+            <div class="text-end">
+                <span id="totalCount" class="badge bg-primary fs-6">Carregando...</span>
+                <button class="btn btn-sm btn-success ms-2" id="btnExportCsv" onclick="exportCsv()">
+                    <i class="bi bi-download"></i> Exportar CSV
+                </button>
+                <button class="btn btn-sm btn-outline-primary ms-2" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i> Atualizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="filter-row">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" style="font-size:0.8rem; margin-bottom:0.2rem;">Filtrar por categoria</label>
+                <select class="form-select form-select-sm" id="filterCategory">
+                    <option value="">Todas</option>
+                    <option value="provável_duplicado">Provável duplicado</option>
+                    <option value="possível_duplicado">Possível duplicado</option>
+                    <option value="mesmo_telefone">Mesmo telefone</option>
+                    <option value="mesmo_cpf">Mesmo CPF</option>
+                    <option value="mesmo_código">Mesmo código</option>
+                    <option value="sem_código">Sem código</option>
+                    <option value="revisar_manualmente">Revisar manualmente</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" style="font-size:0.8rem; margin-bottom:0.2rem;">Filtrar por risco</label>
+                <select class="form-select form-select-sm" id="filterRisk">
+                    <option value="">Todos</option>
+                    <option value="alto">Alto</option>
+                    <option value="médio">Médio</option>
+                    <option value="baixo">Baixo</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" style="font-size:0.8rem; margin-bottom:0.2rem;">Buscar nome/ID</label>
+                <input type="text" class="form-control form-control-sm" id="filterSearch" placeholder="Nome ou ID...">
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-sm btn-primary w-100" onclick="applyFilters()">
+                    <i class="bi bi-search"></i> Filtrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="audit-card">
+        <div class="table-responsive" style="max-height: 70vh; overflow-y: auto;">
+            <table class="table table-striped table-hover audit-table mb-0" id="auditTable">
+                <thead class="sticky-top">
+                    <tr>
+                        <th>#</th>
+                        <th>ID</th>
+                        <th>Código</th>
+                        <th>Nome</th>
+                        <th>Nome normalizado</th>
+                        <th>Médico</th>
+                        <th>Telefone</th>
+                        <th>CPF</th>
+                        <th>Cidade</th>
+                        <th>Categoria</th>
+                        <th>Risco</th>
+                        <th>Razão</th>
+                        <th>Consultas</th>
+                        <th>Notas</th>
+                        <th>Evoluções</th>
+                        <th>Cirurgias</th>
+                        <th>Transp.</th>
+                        <th>Follow-ups</th>
+                        <th>Receitas</th>
+                        <th>Última consulta</th>
+                        <th>Criado em</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="auditBody">
+                    <tr>
+                        <td colspan="22" class="text-center text-muted py-5">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            Carregando dados...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-2 text-muted">Carregando auditoria...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allRecords = [];
+
+function loadAudit() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+    fetch('/api/admin/audit-patients')
+        .then(r => r.json())
+        .then(data => {
+            allRecords = data.records || [];
+            document.getElementById('totalCount').textContent = `${allRecords.length} pacientes com alerta`;
+            renderTable(allRecords);
+        })
+        .catch(err => {
+            console.error('Erro auditoria:', err);
+            document.getElementById('auditBody').innerHTML = `<tr><td colspan="22" class="text-center text-danger py-5">Erro ao carregar auditoria.</td></tr>`;
+        })
+        .finally(() => {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        });
+}
+
+function riskBadgeClass(risk) {
+    if (risk === 'alto') return 'badge-alto';
+    if (risk === 'médio') return 'badge-medio';
+    return 'badge-baixo';
+}
+
+function categoryBadgeClass(cat) {
+    const map = {
+        'provável_duplicado': 'bg-danger',
+        'possível_duplicado': 'bg-warning text-dark',
+        'mesmo_telefone': 'bg-info',
+        'mesmo_cpf': 'bg-dark',
+        'mesmo_código': 'bg-primary',
+        'sem_código': 'bg-secondary',
+        'revisar_manualmente': 'bg-light text-dark border'
+    };
+    return map[cat] || 'bg-secondary';
+}
+
+function formatDate(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleDateString('pt-BR');
+}
+
+function renderTable(records) {
+    const tbody = document.getElementById('auditBody');
+    if (!records.length) {
+        tbody.innerHTML = `<tr><td colspan="22" class="text-center text-muted py-5">Nenhum paciente com alerta encontrado.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = records.map((r, idx) => `
+        <tr>
+            <td>${idx + 1}</td>
+            <td><code>${r.id}</code></td>
+            <td>${r.patient_code || '-'}</td>
+            <td><strong>${r.name || '-'}</strong></td>
+            <td class="text-muted">${r.normalized_name || '-'}</td>
+            <td>${r.doctor_name || '-'}</td>
+            <td>${r.phone || '-'}</td>
+            <td>${r.cpf || '-'}</td>
+            <td>${r.city || '-'}</td>
+            <td><span class="badge ${categoryBadgeClass(r.category)} badge-cat">${r.category}</span></td>
+            <td><span class="badge ${riskBadgeClass(r.risk)}">${r.risk}</span></td>
+            <td>${r.reason}</td>
+            <td>${r.count_appointments}</td>
+            <td>${r.count_notes}</td>
+            <td>${r.count_evolutions}</td>
+            <td>${r.count_surgeries}</td>
+            <td>${r.count_transplant_surgeries}</td>
+            <td>${r.count_followups}</td>
+            <td>${r.count_prescriptions}</td>
+            <td>${formatDate(r.last_appointment)}</td>
+            <td>${formatDate(r.created_at)}</td>
+            <td>
+                <a class="btn btn-sm btn-outline-primary" href="/prontuario/${r.id}" target="_blank" title="Abrir prontuário">
+                    <i class="bi bi-file-medical"></i>
+                </a>
+                ${r.related_ids.length > 1 ? `<button class="btn btn-sm btn-outline-secondary" onclick="showRelated(${r.id}, ${JSON.stringify(r.related_ids).replace(/"/g, '&quot;')})" title="Ver relacionados">R</button>` : ''}
+            </td>
+        </tr>
+    `).join('');
+}
+
+function applyFilters() {
+    const cat = document.getElementById('filterCategory').value;
+    const risk = document.getElementById('filterRisk').value;
+    const q = document.getElementById('filterSearch').value.toLowerCase().trim();
+    const filtered = allRecords.filter(r => {
+        if (cat && r.category !== cat) return false;
+        if (risk && r.risk !== risk) return false;
+        if (q) {
+            const hay = `${r.name} ${r.normalized_name} ${r.id} ${r.patient_code || ''} ${r.phone || ''} ${r.cpf || ''}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+        }
+        return true;
+    });
+    renderTable(filtered);
+    document.getElementById('totalCount').textContent = `${filtered.length} de ${allRecords.length} pacientes`;
+}
+
+function exportCsv() {
+    const cat = document.getElementById('filterCategory').value;
+    const risk = document.getElementById('filterRisk').value;
+    const q = document.getElementById('filterSearch').value.toLowerCase().trim();
+    const filtered = allRecords.filter(r => {
+        if (cat && r.category !== cat) return false;
+        if (risk && r.risk !== risk) return false;
+        if (q) {
+            const hay = `${r.name} ${r.normalized_name} ${r.id} ${r.patient_code || ''} ${r.phone || ''} ${r.cpf || ''}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+        }
+        return true;
+    });
+
+    const headers = [
+        'ID','Código','Nome','Nome_Normalizado','Médico','Telefone','CPF','Cidade',
+        'Categoria','Risco','Razão','Consultas','Notas','Evoluções','Cirurgias','Transplante','Followups','Receitas',
+        'Ultima_Consulta','Criado_Em','Relacionados'
+    ];
+    const rows = filtered.map(r => [
+        r.id, r.patient_code || '', r.name || '', r.normalized_name || '', r.doctor_name || '',
+        r.phone || '', r.cpf || '', r.city || '', r.category, r.risk, r.reason,
+        r.count_appointments, r.count_notes, r.count_evolutions, r.count_surgeries,
+        r.count_transplant_surgeries, r.count_followups, r.count_prescriptions,
+        r.last_appointment ? new Date(r.last_appointment).toLocaleDateString('pt-BR') : '',
+        r.created_at ? new Date(r.created_at).toLocaleDateString('pt-BR') : '',
+        (r.related_ids || []).join(';')
+    ].map(v => {
+        const s = String(v).replace(/"/g, '""');
+        return s.includes(',') || s.includes('\n') || s.includes('"') ? `"${s}"` : s;
+    }).join(','));
+
+    const csv = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `auditoria_pacientes_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+function showRelated(selfId, relatedIds) {
+    const related = allRecords.filter(r => relatedIds.includes(r.id) && r.id !== selfId);
+    const list = related.map(r => `<li><a href="/prontuario/${r.id}" target="_blank">${r.name} (ID ${r.id}, Cód. ${r.patient_code || '-'}, ${r.doctor_name || '-'})</a></li>`).join('');
+    alert('Pacientes relacionados:\n\n' + list.replace(/<li>/g, '').replace(/<\/li>/g, '\n').replace(/<a[^>]*>/g, '').replace(/<\/a>/g, ''));
+}
+
+// auto-load
+loadAudit();
+
+// event listeners
+['filterCategory', 'filterRisk', 'filterSearch'].forEach(id => {
+    document.getElementById(id).addEventListener('input', applyFilters);
+    document.getElementById(id).addEventListener('change', applyFilters);
+});
+</script>
+{% endblock %}

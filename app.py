@@ -2982,6 +2982,229 @@ def report_patient_growth():
     })
 
 
+def _audit_access_required():
+    if not (current_user.is_doctor() or current_user.is_secretary() or
+            current_user.role_clinico in ('SECRETARY', 'ADMIN')):
+        abort(403)
+
+
+@app.route('/admin/audit-patients')
+@login_required
+def audit_patients_page():
+    """Tela de auditoria de pacientes antigos (duplicados/possíveis problemas) — somente leitura."""
+    _audit_access_required()
+    return render_template('admin/audit_patients.html')
+
+
+@app.route('/api/admin/audit-patients')
+@login_required
+def api_audit_patients():
+    """
+    Relatório de auditoria de pacientes antigos (FASE 2). Somente leitura.
+    Retorna pacientes com possíveis problemas para revisão manual.
+    NÃO mescla, exclui ou altera nenhum paciente.
+    """
+    _audit_access_required()
+    from difflib import SequenceMatcher
+    from collections import defaultdict
+
+    # ── 1. Coleta agregada de todos os pacientes com contadores ──
+    sql = """
+    SELECT
+        p.id,
+        p.name,
+        p.phone,
+        p.cpf,
+        p.city,
+        p.created_at,
+        pd.id AS pd_id,
+        pd.doctor_id,
+        pd.patient_code,
+        u.name AS doctor_name,
+        (SELECT COUNT(*) FROM appointment a WHERE a.patient_id = p.id) AS count_appointments,
+        (SELECT COUNT(*) FROM note n WHERE n.patient_id = p.id) AS count_notes,
+        (SELECT COUNT(*) FROM evolution e WHERE e.patient_id = p.id) AS count_evolutions,
+        (SELECT COUNT(*) FROM surgery s WHERE s.patient_id = p.id) AS count_surgeries,
+        (SELECT COUNT(*) FROM transplant_surgery_record tsr WHERE tsr.patient_id = p.id) AS count_transplant_surgeries,
+        (SELECT COUNT(*) FROM follow_up_reminder f WHERE f.patient_id = p.id) AS count_followups,
+        (SELECT COUNT(*) FROM prescription pr WHERE pr.patient_id = p.id) AS count_prescriptions,
+        (SELECT MAX(a.start_time) FROM appointment a WHERE a.patient_id = p.id) AS last_appointment
+    FROM patient p
+    LEFT JOIN patient_doctor pd ON pd.patient_id = p.id
+    LEFT JOIN "user" u ON u.id = pd.doctor_id
+    ORDER BY p.id, pd.patient_code
+    """
+    rows = db.session.execute(db.text(sql)).fetchall()
+
+    # ── 2. Estruturar por paciente (um paciente pode ter múltiplos vínculos) ──
+    patients_map = {}
+    for row in rows:
+        pid = row.id
+        if pid not in patients_map:
+            patients_map[pid] = {
+                'id': pid,
+                'name': row.name,
+                'normalized_name': normalize_patient_name(row.name),
+                'phone': row.phone,
+                'cpf': row.cpf,
+                'city': row.city,
+                'created_at': row.created_at.isoformat() if row.created_at else None,
+                'last_appointment': row.last_appointment.isoformat() if row.last_appointment else None,
+                'count_appointments': row.count_appointments,
+                'count_notes': row.count_notes,
+                'count_evolutions': row.count_evolutions,
+                'count_surgeries': row.count_surgeries,
+                'count_transplant_surgeries': row.count_transplant_surgeries,
+                'count_followups': row.count_followups,
+                'count_prescriptions': row.count_prescriptions,
+                'links': [],
+                'has_code': False,
+            }
+        if row.pd_id is not None:
+            patients_map[pid]['links'].append({
+                'dp_id': row.pd_id,
+                'doctor_id': row.doctor_id,
+                'doctor_name': row.doctor_name,
+                'patient_code': row.patient_code,
+            })
+            patients_map[pid]['has_code'] = True
+
+    patients_list = list(patients_map.values())
+
+    # ── 3. Índices para rápida busca ──
+    by_normalized = defaultdict(list)
+    by_phone = defaultdict(list)
+    by_cpf = defaultdict(list)
+    by_code = defaultdict(list)
+    by_first_token = defaultdict(list)
+    for p in patients_list:
+        nn = p['normalized_name']
+        if nn:
+            by_normalized[nn].append(p)
+            token = nn.split(' ')[0]
+            if token:
+                by_first_token[token].append(p)
+        ph = (p['phone'] or '').strip()
+        if ph:
+            by_phone[ph].append(p)
+        cp = (p['cpf'] or '').strip()
+        if cp:
+            by_cpf[cp].append(p)
+        for link in p['links']:
+            by_code[(link['doctor_id'], link['patient_code'])].append(p)
+
+    # ── 4. Detectar problemas ──
+    # Cada paciente pode ter múltiplos alertas (lista por id).
+    # Isso garante que um paciente seja reportado em todas as categorias relevantes.
+    alerts = defaultdict(list)
+    def _add_alert(p, cat, risk, reason, related_ids=None):
+        alerts[p['id']].append({
+            'id': p['id'],
+            'name': p['name'],
+            'normalized_name': p['normalized_name'],
+            'patient_code': p['links'][0]['patient_code'] if p['links'] else None,
+            'doctor_name': p['links'][0]['doctor_name'] if p['links'] else None,
+            'phone': p['phone'],
+            'cpf': p['cpf'],
+            'city': p['city'],
+            'created_at': p['created_at'],
+            'last_appointment': p['last_appointment'],
+            'count_appointments': p['count_appointments'],
+            'count_notes': p['count_notes'],
+            'count_evolutions': p['count_evolutions'],
+            'count_surgeries': p['count_surgeries'],
+            'count_transplant_surgeries': p['count_transplant_surgeries'],
+            'count_followups': p['count_followups'],
+            'count_prescriptions': p['count_prescriptions'],
+            'links': p['links'],
+            'category': cat,
+            'risk': risk,
+            'reason': reason,
+            'related_ids': related_ids or [],
+        })
+
+    # 4a. Códigos duplicados
+    for (doctor_id, code), group in by_code.items():
+        if len(group) > 1:
+            ids = [p['id'] for p in group]
+            for p in group:
+                _add_alert(p, 'mesmo_código', 'alto', f'Código {code} duplicado com médico {doctor_id}', ids)
+
+    # 4b. Nomes idênticos
+    for nn, group in by_normalized.items():
+        if len(group) > 1:
+            ids = [p['id'] for p in group]
+            for p in group:
+                _add_alert(p, 'provável_duplicado', 'alto', 'Nomes idênticos', ids)
+
+    # 4c. Nomes parecidos (candidate blocking com first-token)
+    checked_pairs = set()
+    for token, candidates in by_first_token.items():
+        for i, p in enumerate(candidates):
+            for j in range(i + 1, len(candidates)):
+                q = candidates[j]
+                key = (min(p['id'], q['id']), max(p['id'], q['id']))
+                if key in checked_pairs:
+                    continue
+                checked_pairs.add(key)
+                if not p['normalized_name'] or not q['normalized_name']:
+                    continue
+                ratio = SequenceMatcher(None, p['normalized_name'], q['normalized_name']).ratio()
+                if ratio >= 0.85 and p['normalized_name'] != q['normalized_name']:
+                    ids = [p['id'], q['id']]
+                    _add_alert(p, 'possível_duplicado', 'médio', f'Nome parecido (sim={round(ratio,2)})', ids)
+                    _add_alert(q, 'possível_duplicado', 'médio', f'Nome parecido (sim={round(ratio,2)})', ids)
+
+    # 4d. Mesmo telefone
+    for ph, group in by_phone.items():
+        if len(group) > 1:
+            ids = [p['id'] for p in group]
+            for p in group:
+                _add_alert(p, 'mesmo_telefone', 'médio', f'Telefone {ph} compartilhado', ids)
+
+    # 4e. Mesmo CPF
+    for cp, group in by_cpf.items():
+        if len(group) > 1:
+            ids = [p['id'] for p in group]
+            for p in group:
+                _add_alert(p, 'mesmo_cpf', 'alto', f'CPF {cp} compartilhado', ids)
+
+    # 4f. Sem código
+    for p in patients_list:
+        if not p['has_code']:
+            _add_alert(p, 'sem_código', 'baixo', 'Paciente sem código de vínculo médico', [])
+
+    # 4g. Códigos fora da sequência (gap > 1)
+    doctor_codes = defaultdict(list)
+    for p in patients_list:
+        for link in p['links']:
+            doctor_codes[link['doctor_id']].append((link['patient_code'], p['id']))
+    for doctor_id, codes in doctor_codes.items():
+        codes.sort(key=lambda x: x[0])
+        for i in range(len(codes) - 1):
+            gap = codes[i + 1][0] - codes[i][0]
+            if gap > 1:
+                pid = codes[i + 1][1]
+                p = patients_map.get(pid)
+                if p:
+                    _add_alert(p, 'revisar_manualmente', 'baixo', f'Gap de {gap} códigos após {codes[i][0]} (médico {doctor_id})', [])
+
+    # ── 5. Flatten: um paciente pode aparecer múltiplas vezes (cada alerta) ──
+    # Ordenar por gravidade
+    categories = []
+    for pid, alert_list in alerts.items():
+        categories.extend(alert_list)
+
+    risk_order = {'alto': 0, 'médio': 1, 'baixo': 2}
+    categories.sort(key=lambda r: (risk_order.get(r['risk'], 3), r['name'] or ''))
+
+    return jsonify({
+        'success': True,
+        'count': len(categories),
+        'records': categories,
+    })
+
+
 @app.route('/debug/timeline/<int:patient_id>')
 @login_required
 def debug_timeline(patient_id):
