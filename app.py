@@ -3090,14 +3090,23 @@ def api_audit_patients():
         cp = (p['cpf'] or '').strip()
         if cp:
             by_cpf[cp].append(p)
+        seen_code_keys = set()
         for link in p['links']:
-            by_code[(link['doctor_id'], link['patient_code'])].append(p)
+            key = (link['doctor_id'], link['patient_code'])
+            if key not in seen_code_keys:
+                seen_code_keys.add(key)
+                by_code[key].append(p)
 
     # ── 4. Detectar problemas ──
     # Cada paciente pode ter múltiplos alertas (lista por id).
     # Isso garante que um paciente seja reportado em todas as categorias relevantes.
     alerts = defaultdict(list)
+    alert_keys = set()
     def _add_alert(p, cat, risk, reason, related_ids=None):
+        key = (p['id'], cat, reason)
+        if key in alert_keys:
+            return
+        alert_keys.add(key)
         alerts[p['id']].append({
             'id': p['id'],
             'name': p['name'],
@@ -3177,8 +3186,12 @@ def api_audit_patients():
     # 4g. Códigos fora da sequência (gap > 1)
     doctor_codes = defaultdict(list)
     for p in patients_list:
+        seen = set()
         for link in p['links']:
-            doctor_codes[link['doctor_id']].append((link['patient_code'], p['id']))
+            key = (link['doctor_id'], link['patient_code'])
+            if key not in seen:
+                seen.add(key)
+                doctor_codes[link['doctor_id']].append((link['patient_code'], p['id']))
     for doctor_id, codes in doctor_codes.items():
         codes.sort(key=lambda x: x[0])
         for i in range(len(codes) - 1):
