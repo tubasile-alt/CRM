@@ -1,0 +1,70 @@
+Não execute nenhuma alteração ainda. Quero primeiro um PLANO TÉCNICO seguro para corrigir a ordenação dos pacientes/consultas do Dr. Arthur na API.
+
+Contexto do problema:
+A API parece usar query.all() sem order_by, então os dados podem voltar em ordem aleatória do banco. O JavaScript tenta ordenar no frontend, mas pode estar usando o campo start com problema de timezone, especialmente na função parseLocalDateTime.
+
+Objetivo principal:
+Corrigir a ordem de exibição dos pacientes/consultas do Dr. Arthur de forma estável, sem quebrar pacientes já cadastrados, códigos existentes, prontuários, consultas, notas, procedimentos ou vínculos médicos.
+
+Analise e planeje:
+
+1. Identifique todos os endpoints que retornam pacientes, consultas ou listas do Dr. Arthur.
+2. Verifique onde existe query.all() sem order_by.
+3. Proponha order_by no backend com ordenação estável:
+   - primeiro por data correta: created_at, start ou data da consulta, conforme o caso
+   - segundo por ID/código como critério de desempate
+4. Revise se o campo start está sendo enviado em formato ISO consistente.
+5. Revise a função parseLocalDateTime para evitar erro de timezone e deslocamento de data/hora.
+6. Não depender apenas do JavaScript para ordenar. O backend deve retornar os dados já ordenados.
+7. O frontend pode manter ordenação apenas como reforço visual.
+
+Cuidados com pacientes já existentes:
+1. O sistema já possui vários pacientes com código/ID.
+2. Não alterar, sobrescrever, recalcular ou reordenar códigos antigos automaticamente.
+3. Primeiro identificar como o código do paciente é gerado hoje.
+4. Confirmar se o código exibido é o ID real do banco ou um campo separado.
+5. Verificar dependências desse código em:
+   - consultas
+   - prontuários
+   - notas
+   - procedimentos
+   - follow-ups
+   - vínculos médicos
+6. Se houver necessidade de reorganizar numeração histórica, NÃO fazer automaticamente.
+7. Antes, criar plano de migração com:
+   - backup
+   - tabela de equivalência código antigo → novo código
+   - validação manual
+8. Minha preferência inicial é manter os códigos antigos intactos e corrigir apenas a ordem de exibição.
+
+Validação de pacientes duplicados:
+1. Não pode haver novos pacientes com nomes duplicados sem alerta.
+2. Antes de comparar nomes, normalizar:
+   - remover espaços extras
+   - ignorar maiúsculas/minúsculas
+   - considerar acentos
+3. Identificar pacientes já existentes com nomes iguais ou muito parecidos.
+4. NÃO apagar, mesclar ou alterar duplicados automaticamente.
+5. Gerar relatório dos possíveis duplicados contendo:
+   - ID/código
+   - nome
+   - médico vinculado
+   - data de criação
+   - consultas vinculadas
+   - notas/evoluções
+   - procedimentos
+   - follow-ups
+6. Para cada duplicado, sugerir ação segura:
+   - manter separado
+   - revisar manualmente
+   - possível mesclagem futura com backup
+7. Nenhum dado histórico pode ser perdido.
+
+Antes de qualquer mudança no código, me entregue:
+1. Arquivos que serão alterados.
+2. Funções/endpoints envolvidos.
+3. Risco de cada alteração.
+4. Plano de backup.
+5. Plano de teste.
+6. Lista de possíveis pacientes duplicados.
+7. Confirmação de que nenhuma exclusão ou migração será feita sem minha aprovação.
