@@ -86,6 +86,15 @@ class PatientDoctor(db.Model):
     __table_args__ = (
         db.UniqueConstraint('patient_id', 'doctor_id', name='unique_patient_doctor'),
         db.Index('idx_doctor_code', 'doctor_id', 'patient_code'),
+        # Índice único PARCIAL: garante unicidade APENAS para a nova faixa de
+        # códigos (>= 1001). Preserva integralmente os códigos históricos
+        # (inclusive o duplicado 264), que não são afetados por esta restrição.
+        db.Index(
+            'idx_unique_new_code',
+            'doctor_id', 'patient_code',
+            unique=True,
+            postgresql_where=db.text('patient_code >= 1001'),
+        ),
     )
     
     patient = db.relationship('Patient', backref='doctor_codes')

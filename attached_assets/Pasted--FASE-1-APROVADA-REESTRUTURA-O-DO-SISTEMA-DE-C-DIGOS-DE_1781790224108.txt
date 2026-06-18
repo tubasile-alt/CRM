@@ -1,0 +1,395 @@
+# FASE 1 APROVADA — REESTRUTURAÇÃO DO SISTEMA DE CÓDIGOS DE PACIENTES
+
+## OBJETIVO PRINCIPAL
+
+O objetivo desta fase NÃO é corrigir o histórico.
+
+O objetivo é criar uma nova política segura e definitiva para os códigos dos pacientes daqui para frente, preservando integralmente todos os dados já existentes.
+
+O código do paciente passa a ser o identificador operacional principal do CRM.
+
+Cada paciente deve possuir:
+
+* Nome
+* Código único
+* Ficha única
+* Histórico único
+* Prontuário único
+
+O código deve ser:
+
+* Único
+* Permanente
+* Sequencial
+* Não reutilizável
+* Imutável após criação
+
+---
+
+# REGRA MAIS IMPORTANTE
+
+## NÃO ALTERAR PACIENTES ANTIGOS
+
+Nesta fase é proibido:
+
+* Renumerar códigos antigos
+* Corrigir códigos antigos
+* Corrigir duplicados históricos
+* Mesclar pacientes
+* Excluir pacientes
+* Alterar prontuários
+* Alterar consultas
+* Alterar procedimentos
+* Alterar evoluções
+* Alterar vínculos existentes
+
+Todos os pacientes históricos devem permanecer exatamente como estão.
+
+Exemplos:
+
+```text
+59 → permanece 59
+264 → permanece 264
+596 → permanece 596
+845 → permanece 845
+```
+
+Inclusive o código duplicado 264 identificado anteriormente NÃO deve ser corrigido nesta fase.
+
+Ele será tratado em uma futura Fase 2.
+
+---
+
+# NOVA POLÍTICA DE CÓDIGOS
+
+## INÍCIO DA NOVA GERAÇÃO
+
+A partir da implantação:
+
+```text
+1001
+1002
+1003
+1004
+1005
+1006
+...
+```
+
+Todos os novos pacientes do Dr. Arthur deverão receber códigos nesta nova faixa.
+
+---
+
+## REGRA DE TRANSIÇÃO
+
+Verificar o maior patient_code já existente.
+
+Se NÃO existir nenhum código >= 1001:
+
+```text
+Próximo código = 1001
+```
+
+Se já existir algum código >= 1001:
+
+```text
+Próximo código = MAIOR_CODIGO + 1
+```
+
+Exemplo:
+
+```text
+Maior código encontrado = 1038
+
+Próximo paciente = 1039
+```
+
+---
+
+# PROTEÇÃO CONTRA DUPLICIDADE DE CÓDIGOS
+
+Atualmente foi identificado que existe risco de concorrência.
+
+Duas pessoas podem criar pacientes simultaneamente e receber o mesmo código.
+
+Isso precisa ser corrigido.
+
+Implementar:
+
+## UNIQUE CONSTRAINT
+
+Adicionar:
+
+```sql
+UNIQUE(doctor_id, patient_code)
+```
+
+Objetivo:
+
+Impedir definitivamente que dois pacientes tenham o mesmo código para o mesmo médico.
+
+---
+
+## GERAÇÃO TRANSACIONAL SEGURA
+
+Substituir a lógica simples:
+
+```python
+max_code + 1
+```
+
+por geração protegida por transação.
+
+Objetivo:
+
+Impedir race conditions.
+
+Garantir que dois usuários nunca recebam o mesmo código.
+
+---
+
+# PROTEÇÃO CONTRA DUPLICIDADE DE PACIENTES
+
+## NÃO CORRIGIR DUPLICADOS HISTÓRICOS
+
+Nesta fase:
+
+* Não mesclar
+* Não excluir
+* Não corrigir
+
+Apenas prevenir novos problemas.
+
+---
+
+## NOVA VALIDAÇÃO
+
+Antes de criar paciente:
+
+Normalizar o nome:
+
+* remover espaços extras
+* remover espaços finais
+* ignorar maiúsculas/minúsculas
+
+Exemplos:
+
+```text
+FELIPE RUSSO
+Felipe Russo
+FELIPE  RUSSO
+```
+
+Devem ser considerados equivalentes.
+
+---
+
+## ALERTA DE POSSÍVEL DUPLICIDADE
+
+Se encontrar paciente com nome igual ou muito parecido:
+
+Exibir:
+
+```text
+Possível paciente já cadastrado.
+
+Deseja abrir a ficha existente
+ou criar um novo cadastro mesmo assim?
+```
+
+Opções:
+
+* Abrir ficha existente
+* Criar novo paciente mesmo assim
+
+O sistema não deve decidir sozinho.
+
+---
+
+# ORDENAÇÃO DAS LISTAS
+
+Quando listar pacientes:
+
+Ordenar por:
+
+```text
+patient_code ASC
+```
+
+Exemplo:
+
+```text
+1001
+1002
+1003
+1004
+1005
+```
+
+Nunca ordenar por horário da consulta quando o objetivo for exibir pacientes.
+
+---
+
+# RELATÓRIOS GERENCIAIS
+
+Preparar a estrutura para relatórios futuros.
+
+Quero conseguir visualizar:
+
+## Crescimento Mensal
+
+Exemplo:
+
+```text
+Junho/2026 → 24 pacientes novos
+Julho/2026 → 31 pacientes novos
+Agosto/2026 → 29 pacientes novos
+```
+
+## Crescimento Anual
+
+Exemplo:
+
+```text
+2024 → 312 pacientes
+2025 → 447 pacientes
+2026 → 538 pacientes
+```
+
+## Total Acumulado
+
+Exemplo:
+
+```text
+Total de pacientes cadastrados:
+1.245
+```
+
+Esses relatórios podem ser implementados em etapa futura, mas a estrutura deve permanecer compatível.
+
+---
+
+# ARQUIVOS AUTORIZADOS PARA ALTERAÇÃO
+
+## models.py
+
+Adicionar:
+
+```sql
+UNIQUE(doctor_id, patient_code)
+```
+
+Adicionar índice para:
+
+```sql
+(doctor_id, patient_code)
+```
+
+Objetivo:
+
+Garantir unicidade e performance.
+
+---
+
+## app.py
+
+Pontos identificados:
+
+* linha ~1369
+* linha ~2278
+* linha ~2782
+
+Objetivo:
+
+Corrigir geração de patient_code.
+
+Implementar transação segura.
+
+Implementar nova faixa iniciando em 1001.
+
+---
+
+## app.py
+
+Linha ~1259
+
+Implementar:
+
+* normalização de nomes
+* busca de duplicados
+* retorno de alerta
+
+---
+
+## static/js/agenda.js
+
+Implementar:
+
+* modal de alerta de duplicidade
+
+---
+
+## templates/agenda.html
+
+Implementar:
+
+* interface do modal
+
+---
+
+# BACKUP OBRIGATÓRIO
+
+Antes de qualquer alteração:
+
+Executar backup completo do banco.
+
+Validar restauração.
+
+Somente após backup validado iniciar a implementação.
+
+---
+
+# CONFIRMAÇÃO DE SEGURANÇA
+
+Nesta fase:
+
+✅ Iniciar nova sequência em 1001
+
+✅ Garantir códigos únicos
+
+✅ Garantir crescimento sequencial
+
+✅ Impedir duplicidades futuras
+
+✅ Alertar sobre possíveis pacientes já cadastrados
+
+✅ Ordenar pacientes por código
+
+❌ Não alterar códigos antigos
+
+❌ Não corrigir o código 264
+
+❌ Não mesclar pacientes
+
+❌ Não excluir pacientes
+
+❌ Não modificar histórico
+
+❌ Não modificar prontuários
+
+❌ Não modificar consultas
+
+❌ Não modificar procedimentos
+
+❌ Não modificar evoluções
+
+## RESULTADO ESPERADO
+
+Após a implantação:
+
+* Todo paciente novo receberá código sequencial a partir de 1001.
+* Nenhum código novo poderá ser duplicado.
+* O sistema alertará sobre possíveis pacientes já existentes.
+* Os pacientes antigos permanecerão exatamente como estão.
+* O histórico será preservado integralmente.
+* A futura auditoria e correção dos pacientes históricos ficará para uma Fase 2 específica.

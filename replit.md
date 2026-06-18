@@ -9,6 +9,15 @@ Sistema completo de gestão de clínica dermatológica e cirurgia plástica com 
 - **Frontend:** Jinja2 + HTML/CSS/JavaScript
 - **Autenticação:** Flask-Login com roles (médico, secretária)
 
+## 🔢 Política de Códigos de Paciente — FASE 1 (18/06/2026)
+- ✅ **Nova faixa de códigos a partir de 1001** — novos pacientes do médico recebem código `max(max_atual+1, 1001)` por médico (regra de transição). Códigos históricos NÃO foram alterados.
+- ✅ **Geração transacional segura** — `generate_next_patient_code()` usa `LOCK TABLE patient_doctor` (PostgreSQL) para impedir race condition; usado nos 3 pontos de criação (agendamento, prontuário CP, vínculo médico-paciente).
+- ✅ **Índice único PARCIAL** — `UNIQUE(doctor_id, patient_code) WHERE patient_code >= 1001`. Garante unicidade só na faixa nova; preserva integralmente os códigos históricos (inclusive o duplicado 264).
+- ✅ **Alerta de possível paciente duplicado** — antes de criar paciente novo, normaliza nome (trim/espaços/maiúsculas) e busca semelhantes; retorna aviso (HTTP 409) e modal com "Abrir ficha existente" ou "Criar novo mesmo assim" (`force_create`). NÃO mescla/exclui nada.
+- ✅ **Listas de pacientes ordenadas por código (ASC)** — endpoints de busca de pacientes.
+- ✅ **Endpoint de relatórios (somente leitura)** — `/api/reports/patient-growth` (crescimento mensal/anual/total; filtro opcional por médico).
+- ⏳ **FASE 2 (pendente, NÃO feita)** — auditoria/correção de códigos duplicados históricos (264), mescla de pacientes duplicados. Proibido na FASE 1.
+
 ## 📊 Status Atual (09/02/2026)
 - ✅ Migração de dados do SQLite para PostgreSQL completa
 - ✅ Interface de agenda diária com mini-calendário

@@ -1071,6 +1071,60 @@
         }
     };
 
+    window.showDuplicatePatientModal = function(data) {
+        const listEl = document.getElementById('duplicatePatientList');
+        const msgEl = document.getElementById('duplicatePatientMessage');
+        if (!listEl) return;
+        if (msgEl && data.message) msgEl.textContent = data.message;
+
+        const dups = data.duplicates || [];
+        listEl.innerHTML = dups.map(d => {
+            const codeBadge = d.patient_code
+                ? `<span class="badge bg-primary ms-2">Cód. ${d.patient_code}</span>`
+                : '<span class="badge bg-secondary ms-2">Sem código</span>';
+            const phone = d.phone ? ` · ${d.phone}` : '';
+            const city = d.city ? ` · ${d.city}` : '';
+            return `
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${d.name}</strong>${codeBadge}
+                        <div class="text-muted small">${(d.cpf || 'Sem CPF')}${phone}${city}</div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-success" onclick="openExistingPatient(${d.id})">
+                        <i class="bi bi-folder2-open"></i> Abrir ficha
+                    </button>
+                </div>`;
+        }).join('');
+
+        const modalEl = document.getElementById('duplicatePatientModal');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    };
+
+    window.openExistingPatient = function(patientId) {
+        const modalEl = document.getElementById('duplicatePatientModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        if (typeof goToPatientChart === 'function') {
+            goToPatientChart(patientId, null);
+        } else {
+            window.location.href = `/prontuario/${patientId}`;
+        }
+    };
+
+    (function() {
+        const btn = document.getElementById('duplicateCreateAnywayBtn');
+        if (btn) {
+            btn.addEventListener('click', function() {
+                const modalEl = document.getElementById('duplicatePatientModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+                window._forceCreatePatient = true;
+                window.saveAppointment();
+            });
+        }
+    })();
+
     window.saveAppointment = function() {
         const saveBtn = document.querySelector('#appointmentForm button[type="submit"]') || 
                         document.querySelector('#newAppointmentModal .btn-primary:last-child');
@@ -1141,6 +1195,11 @@
             photo_data: photoData
         };
 
+        if (window._forceCreatePatient) {
+            payload.force_create = true;
+            window._forceCreatePatient = false;
+        }
+
         fetch('/api/appointments', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
@@ -1148,6 +1207,10 @@
         })
         .then(r => r.json())
         .then(data => {
+            if (data.warning === 'duplicate_found') {
+                showDuplicatePatientModal(data);
+                return;
+            }
             if (data.success) {
                 showAlert('Agendamento salvo com sucesso!');
                 loadAppointments();

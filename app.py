@@ -38,6 +38,98 @@ db.init_app(app)
 csrf = CSRFProtect(app)
 mail = Mail(app)
 
+
+# Faixa inicial da nova política de códigos de paciente (FASE 1).
+# Novos pacientes recebem códigos a partir de 1001. Códigos históricos
+# (< 1001) são preservados integralmente e nunca alterados aqui.
+NEW_PATIENT_CODE_START = 1001
+
+
+def generate_next_patient_code(doctor_id):
+    """Gera o próximo patient_code de forma segura contra concorrência.
+
+    Regra de transição (FASE 1):
+      - Se NÃO existir nenhum código >= 1001 para o médico => próximo = 1001.
+      - Se já existir algum código >= 1001 => próximo = MAIOR_CODIGO + 1.
+
+    A geração é protegida por LOCK de tabela no PostgreSQL para impedir que
+    dois usuários simultâneos recebam o mesmo código (race condition). O lock
+    é liberado automaticamente no commit/rollback da transação corrente.
+
+    Deve ser chamada dentro de uma transação que será commitada pelo chamador.
+    """
+    if db.engine.dialect.name == 'postgresql':
+        db.session.execute(
+            db.text('LOCK TABLE patient_doctor IN SHARE ROW EXCLUSIVE MODE')
+        )
+    max_code = db.session.query(db.func.max(PatientDoctor.patient_code))\
+        .filter(PatientDoctor.doctor_id == doctor_id).scalar() or 0
+    return max(max_code + 1, NEW_PATIENT_CODE_START)
+
+
+def normalize_patient_name(name):
+    """Normaliza um nome de paciente para comparação:
+    - remove espaços nas extremidades
+    - colapsa espaços internos múltiplos em um único espaço
+    - ignora maiúsculas/minúsculas (retorna em minúsculas)
+    """
+    import re
+    if not name:
+        return ''
+    return re.sub(r'\s+', ' ', str(name).strip()).lower()
+
+
+def find_possible_duplicate_patients(name, doctor_id=None, limit=8):
+    """Procura pacientes com nome igual ou muito parecido ao informado.
+
+    Retorna uma lista de dicts com dados básicos do paciente (incluindo o
+    patient_code do médico, quando houver vínculo) para exibir no alerta de
+    possível duplicidade. NÃO mescla nem altera nada — apenas detecta.
+    """
+    from difflib import SequenceMatcher
+
+    target = normalize_patient_name(name)
+    if not target:
+        return []
+
+    first_token = target.split(' ')[0]
+
+    # Candidatos: nomes que contenham o primeiro token (reduz o conjunto),
+    # comparação final feita em Python sobre o nome normalizado.
+    candidates = Patient.query.filter(
+        Patient.name.ilike(f'%{first_token}%')
+    ).limit(200).all()
+
+    results = []
+    for cand in candidates:
+        cand_norm = normalize_patient_name(cand.name)
+        if not cand_norm:
+            continue
+        ratio = SequenceMatcher(None, target, cand_norm).ratio()
+        if cand_norm == target or ratio >= 0.85:
+            code = None
+            if doctor_id:
+                pd = PatientDoctor.query.filter_by(
+                    patient_id=cand.id, doctor_id=doctor_id
+                ).first()
+                if pd:
+                    code = pd.patient_code
+            results.append({
+                'id': cand.id,
+                'name': cand.name,
+                'patient_code': code,
+                'phone': cand.phone,
+                'birth_date': cand.birth_date,
+                'cpf': cand.cpf,
+                'city': cand.city,
+                'exact': cand_norm == target,
+                'similarity': round(ratio, 3),
+            })
+
+    # Mais parecidos primeiro
+    results.sort(key=lambda r: (not r['exact'], -r['similarity']))
+    return results[:limit]
+
 from flask_wtf.csrf import CSRFError
 
 @app.errorhandler(CSRFError)
@@ -1257,6 +1349,22 @@ def create_appointment():
         if not patient_name_input:
             return jsonify({'success': False, 'error': 'patientName é obrigatório'}), 400
         patient = Patient.query.filter(db.func.lower(Patient.name) == db.func.lower(patient_name_input)).first()
+
+    # Alerta de possível duplicidade: só ao criar paciente NOVO (sem patient_id
+    # selecionado e sem correspondência exata), e somente se o usuário ainda não
+    # confirmou criar mesmo assim (force_create). NÃO mescla/altera nada.
+    if not patient and not patient_id_input and not data.get('force_create'):
+        possible = find_possible_duplicate_patients(
+            data.get('patientName', ''), doctor_id=doctor_id
+        )
+        if possible:
+            return jsonify({
+                'success': False,
+                'warning': 'duplicate_found',
+                'duplicates': possible,
+                'message': 'Possível paciente já cadastrado. Deseja abrir a ficha existente ou criar um novo cadastro mesmo assim?'
+            }), 409
+
     if not patient:
         # Converter strings vazias para None para campos opcionais
         birth_date_val = data.get('birth_date') or None
@@ -1366,8 +1474,8 @@ def create_appointment():
     # Criar ou obter registro PatientDoctor com código crescente
     pd = PatientDoctor.query.filter_by(patient_id=patient.id, doctor_id=doctor_id).first()
     if not pd:
-        max_code = db.session.query(db.func.max(PatientDoctor.patient_code)).filter_by(doctor_id=doctor_id).scalar() or 0
-        pd = PatientDoctor(patient_id=patient.id, doctor_id=doctor_id, patient_code=max_code + 1)
+        next_code = generate_next_patient_code(doctor_id)
+        pd = PatientDoctor(patient_id=patient.id, doctor_id=doctor_id, patient_code=next_code)
         db.session.add(pd)
     
     # Se for tipo de paciente Cirurgia, criar automaticamente no mapa cirúrgico
@@ -1668,6 +1776,9 @@ def search_patients():
             patient_data['patient_code'] = pd.patient_code if pd else None
         
         result.append(patient_data)
+    
+    # Ordenar a lista de pacientes por código crescente (sem código vai ao fim)
+    result.sort(key=lambda p: (p.get('patient_code') is None, p.get('patient_code') or 0))
     
     return jsonify(result)
 
@@ -2275,8 +2386,8 @@ def prontuario(patient_id):
         from models import PatientDoctor as _PD
         _dp = _PD.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
         if not _dp:
-            _max = db.session.query(db.func.max(_PD.patient_code)).filter(_PD.doctor_id == current_user.id).scalar() or 0
-            _dp = _PD(patient_id=patient_id, doctor_id=current_user.id, patient_code=_max + 1)
+            next_code = generate_next_patient_code(current_user.id)
+            _dp = _PD(patient_id=patient_id, doctor_id=current_user.id, patient_code=next_code)
             db.session.add(_dp)
             db.session.commit()
         return redirect(url_for('prontuario_dp', dp_id=_dp.id))
@@ -2744,6 +2855,9 @@ def search_doctor_patients():
     if not (current_user.is_secretary() or current_user.role_clinico in ('SECRETARY', 'ADMIN')):
         base_q = base_q.filter(PatientDoctor.doctor_id == current_user.id)
 
+    # Ordenar por código do paciente crescente
+    base_q = base_q.order_by(PatientDoctor.patient_code.asc())
+
     rows = base_q.limit(20).all()
 
     result = []
@@ -2779,17 +2893,69 @@ def link_doctor_patient():
 
     dp = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=doctor_id).first()
     if not dp:
-        max_code = db.session.query(db.func.max(PatientDoctor.patient_code))\
-            .filter(PatientDoctor.doctor_id == doctor_id).scalar() or 0
+        next_code = generate_next_patient_code(doctor_id)
         dp = PatientDoctor(
             patient_id=patient_id,
             doctor_id=doctor_id,
-            patient_code=max_code + 1
+            patient_code=next_code
         )
         db.session.add(dp)
         db.session.commit()
 
     return jsonify({'dp_id': dp.id, 'patient_code': dp.patient_code})
+
+
+@app.route('/api/reports/patient-growth')
+@login_required
+def report_patient_growth():
+    """Relatório gerencial de crescimento de pacientes (somente leitura).
+
+    Estrutura preparada para uso futuro. Retorna:
+      - monthly: novos pacientes por mês (YYYY-MM)
+      - annual: novos pacientes por ano
+      - total: total acumulado de pacientes cadastrados
+
+    Pode ser filtrado por médico via ?doctor_id=. Quando informado, usa a data
+    de vínculo (patient_doctor.created_at); sem filtro, usa patient.created_at.
+    """
+    doctor_id = request.args.get('doctor_id')
+
+    if doctor_id and doctor_id not in ('null', ''):
+        try:
+            doctor_id = int(doctor_id)
+        except (TypeError, ValueError):
+            doctor_id = None
+    else:
+        doctor_id = None
+
+    if doctor_id:
+        created_col = PatientDoctor.created_at
+        base = db.session.query(created_col).filter(PatientDoctor.doctor_id == doctor_id)
+    else:
+        created_col = Patient.created_at
+        base = db.session.query(created_col)
+
+    rows = base.filter(created_col.isnot(None)).all()
+
+    monthly = {}
+    annual = {}
+    for (created,) in rows:
+        if not created:
+            continue
+        ym = created.strftime('%Y-%m')
+        y = created.strftime('%Y')
+        monthly[ym] = monthly.get(ym, 0) + 1
+        annual[y] = annual.get(y, 0) + 1
+
+    monthly_list = [{'period': k, 'count': monthly[k]} for k in sorted(monthly)]
+    annual_list = [{'year': k, 'count': annual[k]} for k in sorted(annual)]
+
+    return jsonify({
+        'monthly': monthly_list,
+        'annual': annual_list,
+        'total': sum(annual.values()),
+        'doctor_id': doctor_id,
+    })
 
 
 @app.route('/debug/timeline/<int:patient_id>')

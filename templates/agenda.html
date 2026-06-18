@@ -1131,6 +1131,28 @@
     </div>
 </div>
 
+<!-- Modal de alerta de possível paciente duplicado -->
+<div class="modal fade" id="duplicatePatientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Possível paciente já cadastrado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="duplicatePatientMessage" class="mb-3">Encontramos pacientes com nome igual ou parecido. Deseja abrir a ficha existente ou criar um novo cadastro mesmo assim?</p>
+                <div id="duplicatePatientList" class="list-group"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="duplicateCreateAnywayBtn">
+                    <i class="bi bi-person-plus"></i> Criar novo paciente mesmo assim
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
