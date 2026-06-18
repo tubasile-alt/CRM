@@ -14,6 +14,27 @@ def backup_database():
         return backup_name
     return None
 
+def create_partial_unique_index():
+    """
+    Cria o índice único parcial no PostgreSQL para garantir unicidade de
+    patient_code na faixa nova (>= 1001) sem afetar códigos históricos.
+    """
+    with app.app_context():
+        if not db.engine.dialect.name == 'postgresql':
+            print('  (SQLite detectado; índice parcial não necessário)')
+            return
+
+        # Criar o índice parcial se ainda não existir
+        db.session.execute(
+            db.text("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_new_code
+                ON patient_doctor (doctor_id, patient_code)
+                WHERE patient_code >= 1001;
+            """)
+        )
+        db.session.commit()
+        print('✓ Índice único parcial (patient_code >= 1001) criado/verificado')
+
 def migrate_database():
     """Migra o banco de dados adicionando novas tabelas e colunas"""
     with app.app_context():
@@ -26,6 +47,10 @@ def migrate_database():
             # Criar novas tabelas (se não existirem)
             db.create_all()
             print('✓ Novas tabelas criadas com sucesso')
+            
+            # Criar índice único parcial (FASE 1)
+            print('  Verificando índice único parcial para patient_doctor...')
+            create_partial_unique_index()
             
             db.session.commit()
             print('✓ Migração concluída com sucesso!')

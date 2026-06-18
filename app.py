@@ -39,6 +39,30 @@ csrf = CSRFProtect(app)
 mail = Mail(app)
 
 
+def _ensure_patient_doctor_partial_index():
+    """Garante que o índice único parcial exista no banco de dados (PostgreSQL).
+
+    É idempotente (IF NOT EXISTS) e roda uma vez no startup do app, garantindo
+    que o banco de produção também possua a proteção de unicidade para códigos
+    na faixa nova (>= 1001). Não afeta tabelas/códigos históricos.
+    """
+    try:
+        if db.engine.dialect.name == 'postgresql':
+            with db.engine.begin() as conn:
+                conn.execute(db.text("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_new_code
+                    ON patient_doctor (doctor_id, patient_code)
+                    WHERE patient_code >= 1001;
+                """))
+    except Exception as e:
+        app.logger.warning(f"Não foi possível garantir idx_unique_new_code: {e}")
+
+
+# Executar a verificação do índice uma vez no startup (idempotente)
+with app.app_context():
+    _ensure_patient_doctor_partial_index()
+
+
 # Faixa inicial da nova política de códigos de paciente (FASE 1).
 # Novos pacientes recebem códigos a partir de 1001. Códigos históricos
 # (< 1001) são preservados integralmente e nunca alterados aqui.
