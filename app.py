@@ -3142,6 +3142,33 @@ def api_audit_patients():
     # 4b. Nomes idênticos
     for nn, group in by_normalized.items():
         if len(group) > 1:
+            # Skip if the same patient is linked to multiple doctors (different doctor_ids)
+            # This is a normal case: one patient with multiple doctors, not a duplicate.
+            all_doctor_ids = set()
+            for p in group:
+                for link in p['links']:
+                    all_doctor_ids.add(link['doctor_id'])
+            # If there are multiple doctors AND the patient has multiple doctor links,
+            # it might be the same patient across doctors. Only flag if the same doctor
+            # has the same patient multiple times.
+            # Simpler: skip if there are 2+ doctors and all patients in group have unique ids
+            # Actually, skip when ALL patients in the group have different doctor_ids
+            # (meaning no two patients share the same doctor)
+            doctor_ids_per_patient = []
+            for p in group:
+                d_ids = [link['doctor_id'] for link in p['links']]
+                doctor_ids_per_patient.append(d_ids)
+            # Check if any two patients share at least one doctor
+            shares_doctor = False
+            for i in range(len(doctor_ids_per_patient)):
+                for j in range(i+1, len(doctor_ids_per_patient)):
+                    if set(doctor_ids_per_patient[i]) & set(doctor_ids_per_patient[j]):
+                        shares_doctor = True
+                        break
+                if shares_doctor:
+                    break
+            if not shares_doctor:
+                continue
             ids = [p['id'] for p in group]
             for p in group:
                 _add_alert(p, 'provável_duplicado', 'alto', 'Nomes idênticos', ids)
