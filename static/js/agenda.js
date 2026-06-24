@@ -65,6 +65,24 @@
         startWaitingClock();
         setupWebcamHandlers();
 
+        // Polling automático: atualiza apenas blocos com status alterado, a cada 60 segundos.
+        // Ignora quando há um modal aberto para não interromper interações em curso.
+        setInterval(_autoRefreshAppointments, 60000);
+
+        // Atualiza imediatamente ao voltar para a aba após > 30 segundos em background
+        let _hiddenSince = null;
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') {
+                _hiddenSince = Date.now();
+            } else if (document.visibilityState === 'visible') {
+                const away = _hiddenSince ? (Date.now() - _hiddenSince) : 0;
+                if (away > 30000) {
+                    _autoRefreshAppointments();
+                }
+                _hiddenSince = null;
+            }
+        });
+
         // Limpar campos de formulário automaticamente quando o modal de novo agendamento abrir
         const newModalEl = document.getElementById('newAppointmentModal');
         if (newModalEl) {
@@ -427,92 +445,41 @@
         return typeMap[type] || 'appointment-particular';
     }
 
-    window.renderDayView = function() {
-        const appointmentsGrid = document.getElementById('appointmentsGrid');
-        if (!appointmentsGrid) return;
-        appointmentsGrid.innerHTML = '';
-        
-        // Log para depuração no console do navegador
-        console.log("Renderizando Agenda. Filtro Médico ID:", currentDoctorFilter);
-        console.log("Total de agendamentos carregados:", appointmentsList.length);
+    function _buildAppointmentBlock(app) {
+        const start = parseLocalDateTime(app.start);
+        const timeStr = String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0');
+        const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
+        const ivpStars = app.extendedProps?.ivpStars;
+        const starsHtml = ivpStars ? `<span class="text-warning ms-1">${'⭐'.repeat(ivpStars)}</span>` : '';
 
-        const dayAppointments = appointmentsList.filter(app => {
-            const start = parseLocalDateTime(app.start);
-            if (!start) return false;
-            
-            const appDateStr = start.getFullYear() + '-' + 
-                               String(start.getMonth() + 1).padStart(2, '0') + '-' + 
-                               String(start.getDate()).padStart(2, '0');
-                               
-            const selectedDateStr = selectedDate.getFullYear() + '-' + 
-                                   String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                                   String(selectedDate.getDate()).padStart(2, '0');
-            
-            const isSameDate = appDateStr === selectedDateStr;
-            
-            // Verifica o ID do médico tanto no objeto extendido quanto no principal
-            const doctorId = parseInt(app.extendedProps?.doctorId || app.doctorId || app.doctor_id);
-            const isDoctorMatch = !currentDoctorFilter || doctorId === currentDoctorFilter;
-            
-            return isSameDate && isDoctorMatch;
-        });
+        const appointmentType = app.extendedProps?.appointmentType || app.appointmentType || 'Particular';
+        const patientType = app.extendedProps?.patientType || app.patientType || 'Particular';
+        const patientCode = app.extendedProps?.patientCode || null;
+        const status = app.extendedProps?.status || app.status || 'agendado';
+        const statusCadastral = app.extendedProps?.statusCadastral || 'ativo';
+        const isProvisorio = statusCadastral === 'provisorio';
+        const typeClass = getAppointmentTypeClass(appointmentType);
+        const statusClass = `status-${status}`;
+        const patientId = app.extendedProps?.patientId || app.patientId;
+        const doctorId = app.extendedProps?.doctorId || app.doctorId;
+        const isSurgeryMap = app.extendedProps?.isSurgeryMap || false;
 
-        console.log("Agendamentos filtrados para exibição:", dayAppointments.length);
-        
-        // Se a lista estiver vazia mas existirem agendamentos no total, logar as datas para debug
-        if (dayAppointments.length === 0 && appointmentsList.length > 0) {
-            console.log("DEBUG: Datas dos agendamentos carregados:", appointmentsList.map(a => a.start));
-            console.log("DEBUG: Data selecionada para filtro:", selectedDateStr);
-            console.log("DEBUG: Fuso horário local:", new Date().toString());
-        }
+        const block = document.createElement('div');
+        block.className = `appointment-block ${typeClass} ${statusClass}${isProvisorio ? ' appointment-provisorio' : ''}`;
+        if (isSurgeryMap) block.classList.add('appointment-cirurgia');
+        block.style.cursor = 'pointer';
+        block.dataset.appointmentId = app.id;
 
-        if (dayAppointments.length === 0) {
-            appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
-            return;
-        }
+        const isWaiting = app.extendedProps?.waiting || app.waiting || false;
+        let actionBadgeHtml = '';
 
-        dayAppointments.sort((a, b) => {
-            const startA = parseLocalDateTime(a.start);
-            const startB = parseLocalDateTime(b.start);
-            return startA - startB;
-        });
-
-        dayAppointments.forEach(app => {
-            const start = parseLocalDateTime(app.start);
-            const timeStr = String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0');
-            const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
-            const ivpStars = app.extendedProps?.ivpStars;
-            const starsHtml = ivpStars ? `<span class="text-warning ms-1">${'⭐'.repeat(ivpStars)}</span>` : '';
-            
-            const appointmentType = app.extendedProps?.appointmentType || app.appointmentType || 'Particular';
-            const patientType = app.extendedProps?.patientType || app.patientType || 'Particular';
-            const patientCode = app.extendedProps?.patientCode || null;
-            const status = app.extendedProps?.status || app.status || 'agendado';
-            const statusCadastral = app.extendedProps?.statusCadastral || 'ativo';
-            const isProvisorio = statusCadastral === 'provisorio';
-            const typeClass = getAppointmentTypeClass(appointmentType);
-            const statusClass = `status-${status}`;
-            const patientId = app.extendedProps?.patientId || app.patientId;
-            const doctorId = app.extendedProps?.doctorId || app.doctorId;
-            const isSurgeryMap = app.extendedProps?.isSurgeryMap || false;
-
-            const block = document.createElement('div');
-            block.className = `appointment-block ${typeClass} ${statusClass}${isProvisorio ? ' appointment-provisorio' : ''}`;
-            if (isSurgeryMap) block.classList.add('appointment-cirurgia');
-            block.style.cursor = 'pointer';
-            block.dataset.appointmentId = app.id;
-
-            const isWaiting = app.extendedProps?.waiting || app.waiting || false;
-            let actionBadgeHtml = '';
-
-            // Todos os agendamentos (incluindo cirurgias) agora suportam check-in
-            if (status === 'atendido') {
-                actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
-            } else if (status === 'faltou') {
-                actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
+        if (status === 'atendido') {
+            actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
+        } else if (status === 'faltou') {
+            actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
                     <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
-            } else if (isWaiting) {
-                actionBadgeHtml = `
+        } else if (isWaiting) {
+            actionBadgeHtml = `
                     <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
                     <button class="btn btn-sm btn-success ms-2" onclick="event.stopPropagation(); doCheckout('${app.id}')" title="Finalizar atendimento">
                         <i class="bi bi-check2-circle"></i> Finalizar
@@ -521,29 +488,26 @@
                         <i class="bi bi-x-circle"></i> Remover
                     </button>
                 `;
-            } else {
-                actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
-            }
+        } else {
+            actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+        }
 
-            // Botão de ativação (somente secretária, apenas para provisórios não atendidos)
-            if (isProvisorio && status !== 'atendido' && (window.isSecretary || window.isDoctor)) {
-                const existingPhone = app.extendedProps?.phone || '';
-                actionBadgeHtml += `<button class="btn btn-sm btn-warning ms-1 btn-ativar-provisorio"
+        if (isProvisorio && status !== 'atendido' && (window.isSecretary || window.isDoctor)) {
+            const existingPhone = app.extendedProps?.phone || '';
+            actionBadgeHtml += `<button class="btn btn-sm btn-warning ms-1 btn-ativar-provisorio"
                     onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'}, '${(existingPhone || '').replace(/'/g,"\\'")}')"
                     title="Ativar cadastro deste paciente"><i class="bi bi-person-check"></i> Ativar</button>`;
-            }
+        }
 
-            // Adicionar botão de acesso ao prontuário para cirurgias também
-            if (isSurgeryMap && patientId) {
-                const prontuarioBtn = `<button class="btn btn-sm btn-primary ms-2" onclick="event.stopPropagation(); goToPatientChart(${patientId}, '${app.id}')" title="Ver prontuário"><i class="bi bi-file-medical"></i> Prontuário</button>`;
-                actionBadgeHtml += prontuarioBtn;
-            }
+        if (isSurgeryMap && patientId) {
+            actionBadgeHtml += `<button class="btn btn-sm btn-primary ms-2" onclick="event.stopPropagation(); goToPatientChart(${patientId}, '${app.id}')" title="Ver prontuário"><i class="bi bi-file-medical"></i> Prontuário</button>`;
+        }
 
-            const codeLabel = isProvisorio
-                ? `<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;vertical-align:middle;">⏳ PROVISÓRIO</span>`
-                : `<span class="appointment-code">cod:${patientCode !== null ? patientCode : '-'}</span>`;
+        const codeLabel = isProvisorio
+            ? `<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;vertical-align:middle;">⏳ PROVISÓRIO</span>`
+            : `<span class="appointment-code">cod:${patientCode !== null ? patientCode : '-'}</span>`;
 
-            block.innerHTML = `
+        block.innerHTML = `
                 <div class="appointment-content">
                     <div class="appointment-info-line">
                         <span class="appointment-time-badge">${timeStr}</span>
@@ -556,8 +520,54 @@
                 </div>
             `;
 
-            block.onclick = () => selectAppointment(app);
-            appointmentsGrid.appendChild(block);
+        block.onclick = () => selectAppointment(app);
+        return block;
+    }
+
+    window.renderDayView = function() {
+        const appointmentsGrid = document.getElementById('appointmentsGrid');
+        if (!appointmentsGrid) return;
+        appointmentsGrid.innerHTML = '';
+
+        console.log("Renderizando Agenda. Filtro Médico ID:", currentDoctorFilter);
+        console.log("Total de agendamentos carregados:", appointmentsList.length);
+
+        const dayAppointments = appointmentsList.filter(app => {
+            const start = parseLocalDateTime(app.start);
+            if (!start) return false;
+
+            const appDateStr = start.getFullYear() + '-' +
+                               String(start.getMonth() + 1).padStart(2, '0') + '-' +
+                               String(start.getDate()).padStart(2, '0');
+
+            const selectedDateStr = selectedDate.getFullYear() + '-' +
+                                   String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' +
+                                   String(selectedDate.getDate()).padStart(2, '0');
+
+            const isSameDate = appDateStr === selectedDateStr;
+
+            const doctorId = parseInt(app.extendedProps?.doctorId || app.doctorId || app.doctor_id);
+            const isDoctorMatch = !currentDoctorFilter || doctorId === currentDoctorFilter;
+
+            return isSameDate && isDoctorMatch;
+        });
+
+        console.log("Agendamentos filtrados para exibição:", dayAppointments.length);
+
+        if (dayAppointments.length === 0 && appointmentsList.length > 0) {
+            console.log("DEBUG: Datas dos agendamentos carregados:", appointmentsList.map(a => a.start));
+            console.log("DEBUG: Fuso horário local:", new Date().toString());
+        }
+
+        if (dayAppointments.length === 0) {
+            appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
+            return;
+        }
+
+        dayAppointments.sort((a, b) => parseLocalDateTime(a.start) - parseLocalDateTime(b.start));
+
+        dayAppointments.forEach(app => {
+            appointmentsGrid.appendChild(_buildAppointmentBlock(app));
         });
     };
 
@@ -628,6 +638,75 @@
         });
     };
 
+    function _updateLastUpdatedLabel() {
+        const el = document.getElementById('agendaLastUpdated');
+        if (!el) return;
+        const now = new Date();
+        const h = String(now.getHours()).padStart(2, '0');
+        const m = String(now.getMinutes()).padStart(2, '0');
+        el.textContent = `Atualizado às ${h}:${m}`;
+    }
+
+    function _isAnyModalOpen() {
+        return document.querySelector('.modal.show') !== null;
+    }
+
+    function _getAppointmentStateKey(app) {
+        const status = app.extendedProps?.status || app.status || 'agendado';
+        const waiting = !!(app.extendedProps?.waiting || app.waiting);
+        return `${status}|${waiting}`;
+    }
+
+    function _autoRefreshAppointments() {
+        if (_isAnyModalOpen()) return;
+
+        const year = selectedDate.getFullYear();
+        const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+        const day = String(selectedDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        let url = `/api/appointments?date=${dateStr}`;
+        if (currentDoctorFilter) url += `&doctor_id=${currentDoctorFilter}`;
+
+        fetch(url)
+            .then(r => r.json())
+            .then(newData => {
+                if (_isAnyModalOpen()) return;
+
+                const oldIds = new Set(appointmentsList.map(a => String(a.id)));
+                const newIds = new Set(newData.map(a => String(a.id)));
+                const sameIdSet = oldIds.size === newIds.size && [...newIds].every(id => oldIds.has(id));
+
+                if (!sameIdSet) {
+                    appointmentsList = newData;
+                    renderDayView();
+                    _updateLastUpdatedLabel();
+                    if (calendar && currentView === 'month') calendar.refetchEvents();
+                    return;
+                }
+
+                const oldMap = {};
+                appointmentsList.forEach(a => { oldMap[String(a.id)] = a; });
+
+                let anyChanged = false;
+                newData.forEach(newApp => {
+                    const oldApp = oldMap[String(newApp.id)];
+                    if (!oldApp) return;
+                    if (_getAppointmentStateKey(newApp) !== _getAppointmentStateKey(oldApp)) {
+                        const existing = document.querySelector(`[data-appointment-id="${newApp.id}"]`);
+                        if (existing) {
+                            existing.parentNode.replaceChild(_buildAppointmentBlock(newApp), existing);
+                        }
+                        anyChanged = true;
+                    }
+                });
+
+                appointmentsList = newData;
+                _updateLastUpdatedLabel();
+                if (anyChanged && calendar && currentView === 'month') calendar.refetchEvents();
+            })
+            .catch(err => console.error('Erro no auto-refresh da agenda:', err));
+    }
+
     window.loadAppointments = function() {
         const year = selectedDate.getFullYear();
         const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
@@ -645,6 +724,7 @@
                 appointmentsList = data;
                 console.log("Agendamentos recebidos do servidor:", appointmentsList.length);
                 renderDayView();
+                _updateLastUpdatedLabel();
                 if (calendar && currentView === 'month') calendar.refetchEvents();
             })
             .catch(err => {
