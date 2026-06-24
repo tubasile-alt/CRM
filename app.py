@@ -1460,7 +1460,7 @@ def create_appointment():
         # Atualizar dados do paciente se fornecidos
         if 'patientType' in data:
             patient.patient_type = data['patientType']
-        if 'phone' in data:
+        if 'phone' in data and data['phone']:
             patient.phone = data['phone']
         if 'cpf' in data:
             patient.cpf = data['cpf']
@@ -1638,9 +1638,9 @@ def update_appointment(id):
     if 'patientType' in data:
         appointment.patient.patient_type = data['patientType']
     
-    # Update patient phone if provided
-    if 'phone' in data:
-        appointment.patient.phone = data['phone']
+    # NOTA: Não atualizar telefone do paciente aqui.
+    # A edição de consulta pode enviar phone vazio, apagando o telefone do cadastro.
+    # Telefone só deve ser atualizado via /api/patient/<id>/update
     
     # Update patient photo if provided
     if 'photo_data' in data and data['photo_data']:
