@@ -59,8 +59,13 @@ def _ensure_patient_doctor_partial_index():
 
 
 # Executar a verificação do índice uma vez no startup (idempotente)
-with app.app_context():
+# Adiado para evitar que falhas de conexão no import do módulo
+# quebrem o startup em produção. Rodará no primeiro request.
+@app.before_request
+def _ensure_index_on_startup():
     _ensure_patient_doctor_partial_index()
+    # Remove o handler após a primeira execução
+    app.before_request_funcs[None].remove(_ensure_index_on_startup)
 
 
 # Faixa inicial da nova política de códigos de paciente (FASE 1).
