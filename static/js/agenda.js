@@ -64,6 +64,18 @@
         startWaitingRoomUpdates();
         startWaitingClock();
         setupWebcamHandlers();
+
+        // Limpar campos de formulário automaticamente quando o modal de novo agendamento abrir
+        const newModalEl = document.getElementById('newAppointmentModal');
+        if (newModalEl) {
+            newModalEl.addEventListener('shown.bs.modal', function() {
+                const idsToClear = ['selectedPatientId', 'patientPhotoData', 'patientCode', 'patientCPF', 'patientBirthDate', 'patientPhone', 'patientAddress', 'patientCity', 'patientMotherName', 'patientIndicationSource', 'patientOccupation'];
+                idsToClear.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.value = '';
+                });
+            });
+        }
     });
 
     function setupPatientAutocomplete() {
