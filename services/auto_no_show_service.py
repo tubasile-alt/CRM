@@ -1,12 +1,21 @@
 """
 Servico de marcacao automatica de faltas
 Verifica a cada X minutos se pacientes faltaram (30 min apos horario sem check-in)
+IMPORTANTE: So executa apos o horario comercial (19h) para evitar marcar como faltou
+pacientes que compareceram mas nao passaram pelo check-in digital durante o dia.
 """
 from datetime import datetime, timedelta, time
 import pytz
 from models import db, Appointment
 
 TZ = pytz.timezone("America/Sao_Paulo")
+
+BUSINESS_HOURS_END = time(19, 0)
+
+
+def _now_sp():
+    return datetime.now(TZ)
+
 
 def _now_sp_naive():
     """
@@ -15,8 +24,10 @@ def _now_sp_naive():
     """
     return datetime.now(TZ).replace(tzinfo=None)
 
+
 def _today_sp():
     return datetime.now(TZ).date()
+
 
 def mark_no_shows_grace_minutes(grace_minutes: int = 30):
     """
@@ -25,8 +36,17 @@ def mark_no_shows_grace_minutes(grace_minutes: int = 30):
     - checked_in_time IS NULL
     - waiting = False (nao esta na sala de espera)
     - status NOT IN ('atendido', 'faltou')
+
+    RESTRICAO: So executa apos as 19h (BUSINESS_HOURS_END) para evitar
+    marcar incorretamente pacientes que compareceram mas nao fizeram check-in
+    digital durante o horario de atendimento.
     """
-    now_naive = _now_sp_naive()
+    now_sp = _now_sp()
+
+    if now_sp.time() < BUSINESS_HOURS_END:
+        return 0
+
+    now_naive = now_sp.replace(tzinfo=None)
     cutoff = now_naive - timedelta(minutes=grace_minutes)
 
     today = _today_sp()
