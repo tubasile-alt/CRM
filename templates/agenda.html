@@ -1161,6 +1161,13 @@
             </div>
             <div class="modal-body">
                 <p class="mb-1">Paciente: <strong id="ativarNomePaciente"></strong></p>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Telefone do paciente <span class="text-danger">*</span></label>
+                    <input type="tel" class="form-control" id="ativarTelefonePaciente" placeholder="(XX) XXXXX-XXXX" autocomplete="off">
+                    <div id="ativarTelefoneErro" class="text-danger small mt-1 d-none">
+                        <i class="bi bi-exclamation-circle"></i> Telefone obrigatório para ativar o cadastro.
+                    </div>
+                </div>
                 <div id="ativarAlertas" class="alert alert-warning d-none mb-3">
                     <strong><i class="bi bi-exclamation-triangle-fill"></i> Possíveis duplicados encontrados:</strong>
                     <div id="ativarAlertalista" class="mt-2"></div>

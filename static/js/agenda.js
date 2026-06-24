@@ -527,8 +527,9 @@
 
             // Botão de ativação (somente secretária, apenas para provisórios não atendidos)
             if (isProvisorio && status !== 'atendido' && (window.isSecretary || window.isDoctor)) {
+                const existingPhone = app.extendedProps?.phone || '';
                 actionBadgeHtml += `<button class="btn btn-sm btn-warning ms-1 btn-ativar-provisorio"
-                    onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'})"
+                    onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'}, '${(existingPhone || '').replace(/'/g,"\\'")}')"
                     title="Ativar cadastro deste paciente"><i class="bi bi-person-check"></i> Ativar</button>`;
             }
 
@@ -1446,10 +1447,13 @@
 // ── Ativação de cadastro provisório ──────────────────────────────────────────
 window._ativarCtx = { patientId: null, doctorId: null, warnings: [] };
 
-window.abrirModalAtivacao = function(patientId, patientName, doctorId) {
+window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingPhone) {
     window._ativarCtx = { patientId, doctorId, warnings: [] };
 
     document.getElementById('ativarNomePaciente').textContent = patientName;
+    const telInput = document.getElementById('ativarTelefonePaciente');
+    telInput.value = existingPhone || '';
+    document.getElementById('ativarTelefoneErro').classList.add('d-none');
     document.getElementById('ativarAlertas').classList.add('d-none');
     document.getElementById('ativarAlertalista').innerHTML = '';
     document.getElementById('ativarMergeOpcoes').classList.add('d-none');
@@ -1466,13 +1470,19 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId) {
     fetch(`/api/patients/${patientId}/ativar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-        body: JSON.stringify({ doctor_id: doctorId, force: false })
+        body: JSON.stringify({ doctor_id: doctorId, force: false, phone: existingPhone })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
             // Sem duplicados — ativar diretamente
-            _finalizarAtivacao(patientId, doctorId, null, false);
+            const phone = document.getElementById('ativarTelefonePaciente').value.trim();
+            _finalizarAtivacao(patientId, doctorId, null, false, phone);
+            return;
+        }
+        if (data.error === 'phone_required' || data.warning === 'phone_required') {
+            document.getElementById('ativarInstrucao').textContent =
+                data.message || 'Informe o telefone do paciente e escolha uma opção para ativar.';
             return;
         }
         if (data.warning === 'duplicates_found') {
@@ -1502,7 +1512,7 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId) {
                 </div>`;
 
                 mergeLista.innerHTML += `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
-                    onclick="event.stopPropagation(); _finalizarAtivacao(${patientId}, ${doctorId}, ${w.id}, false)">
+                    onclick="event.stopPropagation(); const phone = document.getElementById('ativarTelefonePaciente').value.trim(); if(!phone){document.getElementById('ativarTelefoneErro').classList.remove('d-none');return;}document.getElementById('ativarTelefoneErro').classList.add('d-none');_finalizarAtivacao(${patientId}, ${doctorId}, ${w.id}, false, phone)">
                     <span><strong>${w.name}</strong>
                     ${w.phone ? `<span class='text-muted ms-2 small'>${w.phone}</span>` : ''}
                     ${w.cpf ? `<span class='text-muted ms-2 small'>CPF: ${w.cpf}</span>` : ''}
@@ -1524,13 +1534,21 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId) {
 
     document.getElementById('ativarDiretoBtn').onclick = function() {
         const ctx = window._ativarCtx;
-        _finalizarAtivacao(ctx.patientId, ctx.doctorId, null, true);
+        const phone = document.getElementById('ativarTelefonePaciente').value.trim();
+        if (!phone) {
+            document.getElementById('ativarTelefoneErro').classList.remove('d-none');
+            telInput.focus();
+            return;
+        }
+        document.getElementById('ativarTelefoneErro').classList.add('d-none');
+        _finalizarAtivacao(ctx.patientId, ctx.doctorId, null, true, phone);
     };
 };
 
-window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force) {
+window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, phone) {
     const payload = { doctor_id: doctorId, force: true };
     if (mergeIntoId) payload.merge_into_patient_id = mergeIntoId;
+    if (phone) payload.phone = phone;
 
     fetch(`/api/patients/${patientId}/ativar`, {
         method: 'POST',

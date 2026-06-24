@@ -2983,6 +2983,17 @@ def ativar_paciente(patient_id):
     if provisional.status_cadastral != 'provisorio':
         return jsonify({'error': 'Paciente já está ativo', 'patient_id': provisional.id}), 409
 
+    # --- Telefone obrigatório para ativar ---
+    phone_input = (data.get('phone') or '').strip()
+    if not provisional.phone and not phone_input:
+        return jsonify({
+            'error': 'phone_required',
+            'message': 'Telefone obrigatório. Por favor, informe o telefone do paciente antes de ativar.'
+        }), 400
+    if phone_input:
+        provisional.phone = phone_input
+        db.session.flush()
+
     # --- Alertas de duplicidade (antes de forçar) ---
     if not force:
         warnings = []
