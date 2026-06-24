@@ -376,6 +376,26 @@
     color: #842029;
 }
 
+.appointment-provisorio {
+    border-left: 4px solid #ffc107 !important;
+    background: repeating-linear-gradient(
+        135deg,
+        rgba(255,193,7,0.06),
+        rgba(255,193,7,0.06) 6px,
+        transparent 6px,
+        transparent 14px
+    ) !important;
+    opacity: 0.92;
+}
+.appointment-provisorio .appointment-code {
+    display: none;
+}
+.btn-ativar-provisorio {
+    font-size: 0.7rem;
+    padding: 2px 7px;
+    border-radius: 10px;
+}
+
 .appointment-cirurgia {
     background: #dc3545 !important;
     border-left-color: #842029 !important;
@@ -1126,6 +1146,40 @@
                 </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                 <button type="button" class="btn btn-primary" onclick="updateAppointmentFromEdit()">Salvar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de ativação de cadastro provisório -->
+<div class="modal fade" id="ativarProvisiorioModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-person-check-fill"></i> Ativar cadastro provisório</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-1">Paciente: <strong id="ativarNomePaciente"></strong></p>
+                <div id="ativarAlertas" class="alert alert-warning d-none mb-3">
+                    <strong><i class="bi bi-exclamation-triangle-fill"></i> Possíveis duplicados encontrados:</strong>
+                    <div id="ativarAlertalista" class="mt-2"></div>
+                </div>
+                <p class="text-muted small mb-3" id="ativarInstrucao">
+                    Escolha uma das opções abaixo para ativar o cadastro.
+                </p>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success" id="ativarDiretoBtn">
+                        <i class="bi bi-person-plus-fill"></i> Ativar como novo paciente definitivo (gerar código)
+                    </button>
+                </div>
+                <div id="ativarMergeOpcoes" class="mt-3 d-none">
+                    <p class="fw-semibold mb-2">Ou vincular ao paciente ativo existente:</p>
+                    <div id="ativarMergeLista" class="list-group"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
             </div>
         </div>
     </div>

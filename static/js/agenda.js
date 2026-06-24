@@ -474,15 +474,18 @@
             
             const appointmentType = app.extendedProps?.appointmentType || app.appointmentType || 'Particular';
             const patientType = app.extendedProps?.patientType || app.patientType || 'Particular';
-            const patientCode = app.extendedProps?.patientCode || '-';
+            const patientCode = app.extendedProps?.patientCode || null;
             const status = app.extendedProps?.status || app.status || 'agendado';
+            const statusCadastral = app.extendedProps?.statusCadastral || 'ativo';
+            const isProvisorio = statusCadastral === 'provisorio';
             const typeClass = getAppointmentTypeClass(appointmentType);
             const statusClass = `status-${status}`;
             const patientId = app.extendedProps?.patientId || app.patientId;
+            const doctorId = app.extendedProps?.doctorId || app.doctorId;
             const isSurgeryMap = app.extendedProps?.isSurgeryMap || false;
 
             const block = document.createElement('div');
-            block.className = `appointment-block ${typeClass} ${statusClass}`;
+            block.className = `appointment-block ${typeClass} ${statusClass}${isProvisorio ? ' appointment-provisorio' : ''}`;
             if (isSurgeryMap) block.classList.add('appointment-cirurgia');
             block.style.cursor = 'pointer';
             block.dataset.appointmentId = app.id;
@@ -509,19 +512,30 @@
             } else {
                 actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
             }
-            
+
+            // Botão de ativação (somente secretária, apenas para provisórios não atendidos)
+            if (isProvisorio && status !== 'atendido' && (window.isSecretary || window.isDoctor)) {
+                actionBadgeHtml += `<button class="btn btn-sm btn-warning ms-1 btn-ativar-provisorio"
+                    onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'})"
+                    title="Ativar cadastro deste paciente"><i class="bi bi-person-check"></i> Ativar</button>`;
+            }
+
             // Adicionar botão de acesso ao prontuário para cirurgias também
             if (isSurgeryMap && patientId) {
                 const prontuarioBtn = `<button class="btn btn-sm btn-primary ms-2" onclick="event.stopPropagation(); goToPatientChart(${patientId}, '${app.id}')" title="Ver prontuário"><i class="bi bi-file-medical"></i> Prontuário</button>`;
                 actionBadgeHtml += prontuarioBtn;
             }
 
+            const codeLabel = isProvisorio
+                ? `<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;vertical-align:middle;">⏳ PROVISÓRIO</span>`
+                : `<span class="appointment-code">cod:${patientCode !== null ? patientCode : '-'}</span>`;
+
             block.innerHTML = `
                 <div class="appointment-content">
                     <div class="appointment-info-line">
                         <span class="appointment-time-badge">${timeStr}</span>
-                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId || 0}) { goToPatientChart(${patientId || 0}, '${app.id}') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }" style="cursor:${patientId ? 'pointer' : 'default'}; text-decoration:${patientId ? 'underline' : 'none'};">${patientName}${starsHtml}</span>
-                        <span class="appointment-code">cod:${patientCode}</span>
+                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId || 0} && !${isProvisorio}) { goToPatientChart(${patientId || 0}, '${app.id}') } else if(${isProvisorio}) { showAlert('Cadastro provisório — ative primeiro para acessar o prontuário.', 'warning') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }" style="cursor:pointer; text-decoration:underline;">${patientName}${starsHtml}</span>
+                        ${codeLabel}
                         <span class="appointment-type-label">pac:${patientType}</span>
                         <span class="appointment-consult-label">cons:${appointmentType}</span>
                         ${actionBadgeHtml}
@@ -1416,3 +1430,112 @@
     }
 
 })();
+
+// ── Ativação de cadastro provisório ──────────────────────────────────────────
+window._ativarCtx = { patientId: null, doctorId: null, warnings: [] };
+
+window.abrirModalAtivacao = function(patientId, patientName, doctorId) {
+    window._ativarCtx = { patientId, doctorId, warnings: [] };
+
+    document.getElementById('ativarNomePaciente').textContent = patientName;
+    document.getElementById('ativarAlertas').classList.add('d-none');
+    document.getElementById('ativarAlertalista').innerHTML = '';
+    document.getElementById('ativarMergeOpcoes').classList.add('d-none');
+    document.getElementById('ativarMergeLista').innerHTML = '';
+    document.getElementById('ativarInstrucao').textContent =
+        'Verificando duplicidades...';
+
+    if (!doctorId) {
+        doctorId = window.currentDoctorId;
+        window._ativarCtx.doctorId = doctorId;
+    }
+
+    // Chamar endpoint para detectar alertas (sem force=true)
+    fetch(`/api/patients/${patientId}/ativar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ doctor_id: doctorId, force: false })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Sem duplicados — ativar diretamente
+            _finalizarAtivacao(patientId, doctorId, null, false);
+            return;
+        }
+        if (data.warning === 'duplicates_found') {
+            window._ativarCtx.warnings = data.warnings || [];
+            const alertaDiv = document.getElementById('ativarAlertas');
+            const lista = document.getElementById('ativarAlertalista');
+            alertaDiv.classList.remove('d-none');
+
+            const mergeDiv = document.getElementById('ativarMergeOpcoes');
+            const mergeLista = document.getElementById('ativarMergeLista');
+            mergeDiv.classList.remove('d-none');
+
+            lista.innerHTML = '';
+            mergeLista.innerHTML = '';
+            data.warnings.forEach(w => {
+                const reasonLabel = {
+                    'nome_semelhante': 'Nome semelhante',
+                    'mesmo_cpf': 'Mesmo CPF',
+                    'mesmo_telefone': 'Mesmo telefone'
+                }[w.reason] || w.reason;
+
+                lista.innerHTML += `<div class="small mb-1">
+                    <span class="badge bg-secondary">${reasonLabel}</span>
+                    <strong>${w.name}</strong>
+                    ${w.phone ? `· ${w.phone}` : ''}
+                    ${w.cpf ? `· CPF: ${w.cpf}` : ''}
+                </div>`;
+
+                mergeLista.innerHTML += `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
+                    onclick="event.stopPropagation(); _finalizarAtivacao(${patientId}, ${doctorId}, ${w.id}, false)">
+                    <span><strong>${w.name}</strong>
+                    ${w.phone ? `<span class='text-muted ms-2 small'>${w.phone}</span>` : ''}
+                    ${w.cpf ? `<span class='text-muted ms-2 small'>CPF: ${w.cpf}</span>` : ''}
+                    <span class='ms-2 badge bg-secondary small'>${reasonLabel}</span></span>
+                    <span class="badge bg-primary">Vincular</span>
+                </button>`;
+            });
+
+            document.getElementById('ativarInstrucao').textContent =
+                'Foram encontrados cadastros possivelmente duplicados. Escolha vincular a um existente ou ativar como novo.';
+        } else if (data.error) {
+            showAlert(data.error, 'danger');
+        }
+    })
+    .catch(() => showAlert('Erro ao verificar duplicados', 'danger'));
+
+    const modal = new bootstrap.Modal(document.getElementById('ativarProvisiorioModal'));
+    modal.show();
+
+    document.getElementById('ativarDiretoBtn').onclick = function() {
+        const ctx = window._ativarCtx;
+        _finalizarAtivacao(ctx.patientId, ctx.doctorId, null, true);
+    };
+};
+
+window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force) {
+    const payload = { doctor_id: doctorId, force: true };
+    if (mergeIntoId) payload.merge_into_patient_id = mergeIntoId;
+
+    fetch(`/api/patients/${patientId}/ativar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const action = data.action === 'merge' ? 'vinculado ao cadastro existente' : 'ativado';
+            showAlert(`Cadastro ${action} com sucesso! Código: ${data.patient_code}`, 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('ativarProvisiorioModal'));
+            if (modal) modal.hide();
+            loadAppointments();
+        } else {
+            showAlert(data.error || 'Erro ao ativar cadastro', 'danger');
+        }
+    })
+    .catch(() => showAlert('Erro ao ativar cadastro', 'danger'));
+};

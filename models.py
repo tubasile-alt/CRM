@@ -55,23 +55,30 @@ class Patient(db.Model):
     patient_type = db.Column(db.String(50), default='particular')
     attention_note = db.Column(db.Text)
     has_transplant_indication = db.Column(db.Boolean, default=False)
-    photo_url = db.Column(db.String(255))  # Foto 3x4 do paciente
-    weight = db.Column(db.Float)  # Peso em kg
-    height = db.Column(db.Float)  # Altura em cm
-    blood_type = db.Column(db.String(5))  # O+, A-, etc.
-    allergies = db.Column(db.Text)  # Alergias conhecidas
-    smoker = db.Column(db.String(20))  # 'nao', 'sim', 'ex-tabagista'
+    photo_url = db.Column(db.String(255))
+    weight = db.Column(db.Float)
+    height = db.Column(db.Float)
+    blood_type = db.Column(db.String(5))
+    allergies = db.Column(db.Text)
+    smoker = db.Column(db.String(20))
     created_at = db.Column(db.DateTime, default=get_brazil_time)
-    
+    # 'ativo' = paciente definitivo com prontuário; 'provisorio' = criado via
+    # agendamento sem comparecimento confirmado — sem patient_code até ativação manual.
+    status_cadastral = db.Column(db.String(20), default='ativo', nullable=False)
+
     # Índice de Valor do Paciente (IVP) - Estrelas 0-3
     ivp_stars = db.Column(db.Integer, nullable=True)
     ivp_manual_override = db.Column(db.Boolean, default=False)
     ivp_updated_at = db.Column(db.DateTime, nullable=True)
-    
+
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
     notes = db.relationship('Note', backref='patient', lazy=True, cascade='all, delete-orphan')
     tags = db.relationship('PatientTag', backref='patient', lazy=True, cascade='all, delete-orphan')
-    
+
+    @property
+    def is_provisorio(self):
+        return self.status_cadastral == 'provisorio'
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -80,7 +87,7 @@ class PatientDoctor(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False)
     doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    patient_code = db.Column(db.Integer, nullable=False)  # Código crescente por médico
+    patient_code = db.Column(db.Integer, nullable=True)  # NULL enquanto provisório; preenchido na ativação
     created_at = db.Column(db.DateTime, default=get_brazil_time)
     
     __table_args__ = (
@@ -690,3 +697,30 @@ class CommercialTask(db.Model):
     patient = db.relationship('Patient', backref='commercial_tasks')
     doctor = db.relationship('User', backref='commercial_tasks')
     appointment = db.relationship('Appointment', backref='commercial_tasks')
+
+
+class PatientActivationLog(db.Model):
+    """Auditoria de ativações de cadastros provisórios.
+
+    Registra cada vez que um cadastro PROVISORIO é convertido para ATIVO,
+    indicando quem ativou, quando, qual paciente provisório foi origem e
+    se foi fundido com um paciente ativo já existente (merge) ou ativado
+    diretamente (activate).
+    """
+    __tablename__ = 'patient_activation_log'
+    id = db.Column(db.Integer, primary_key=True)
+    provisional_patient_id = db.Column(db.Integer, nullable=False)
+    activated_patient_id = db.Column(db.Integer, db.ForeignKey('patient.id'), nullable=False)
+    action = db.Column(db.String(20), nullable=False)  # 'activate' | 'merge'
+    performed_by_user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    patient_code_assigned = db.Column(db.Integer, nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+
+    activated_patient = db.relationship('Patient', foreign_keys=[activated_patient_id],
+                                        backref='activation_logs')
+    performed_by = db.relationship('User', foreign_keys=[performed_by_user_id],
+                                   backref='activation_actions')
+    doctor = db.relationship('User', foreign_keys=[doctor_id],
+                             backref='activation_logs_as_doctor')

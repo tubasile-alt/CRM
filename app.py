@@ -10,7 +10,7 @@ import os
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription
+from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
 from utils.database_backup import backup_manager
 
 app = Flask(__name__)
@@ -1241,7 +1241,8 @@ def get_appointments():
                     'checkedInTime': apt.checked_in_time.isoformat() + '-03:00' if apt.checked_in_time else None,
                     'phone': patient_phone,
                     'notes': apt.notes or '',
-                    'ivpStars': apt.patient.ivp_stars if apt.patient else None
+                    'ivpStars': apt.patient.ivp_stars if apt.patient else None,
+                    'statusCadastral': apt.patient.status_cadastral if apt.patient else 'ativo',
                 }
             })
         except Exception as e:
@@ -1389,6 +1390,7 @@ def create_appointment():
                 'message': 'Possível paciente já cadastrado. Deseja abrir a ficha existente ou criar um novo cadastro mesmo assim?'
             }), 409
 
+    is_new_patient = False
     if not patient:
         # Converter strings vazias para None para campos opcionais
         birth_date_val = data.get('birth_date') or None
@@ -1399,7 +1401,7 @@ def create_appointment():
         mother_name_val = data.get('mother_name') or None
         indication_source_val = data.get('indication_source') or None
         occupation_val = data.get('occupation') or None
-        
+
         patient = Patient(
             name=data.get('patientName', '').strip() or None,
             phone=phone_val,
@@ -1411,13 +1413,15 @@ def create_appointment():
             mother_name=mother_name_val,
             indication_source=indication_source_val,
             occupation=occupation_val,
-            patient_type=data.get('patientType', 'particular')
+            patient_type=data.get('patientType', 'particular'),
+            status_cadastral='provisorio',  # novo paciente nasce provisório
         )
         if not patient.name:
             return jsonify({'success': False, 'error': 'patientName é obrigatório'}), 400
         db.session.add(patient)
         db.session.flush()
-        
+        is_new_patient = True
+
         # Handle photo for new patient
         if 'photo_data' in data and data['photo_data']:
             try:
@@ -1426,38 +1430,32 @@ def create_appointment():
                 from uuid import uuid4
                 from PIL import Image
                 from io import BytesIO
-                
+
                 photo_data = data['photo_data']
                 if photo_data.startswith('data:image'):
                     header, encoded = photo_data.split(",", 1)
                     file_ext = header.split(";")[0].split("/")[1]
                     if file_ext == 'jpeg': file_ext = 'jpg'
-                    
-                    # Decodificar imagem
+
                     image_bytes = base64.b64decode(encoded)
                     img = Image.open(BytesIO(image_bytes))
-                    
-                    # Converter para RGB se necessário (remover transparência)
+
                     if img.mode in ("RGBA", "P"):
                         img = img.convert("RGB")
-                    
-                    # Redimensionar para tamanho 3x4 (proporcional)
-                    # Exemplo: 300x400 pixels é suficiente para ficha
+
                     img.thumbnail((300, 400), Image.LANCZOS)
-                    
+
                     filename = f"patient_{patient.id}_{uuid4().hex}.jpg"
                     filepath = os.path.join('static/uploads/photos', filename)
-                    
+
                     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                    
-                    # Salvar com compressão máxima
                     img.save(filepath, "JPEG", quality=60, optimize=True)
-                    
+
                     patient.photo_url = f"/{filepath}"
             except Exception as e:
                 print(f"Erro ao processar foto: {e}")
     else:
-        # Atualizar dados do paciente se fornecidos
+        # Paciente existente: atualizar dados se fornecidos
         if 'patientType' in data:
             patient.patient_type = data['patientType']
         if 'phone' in data and data['phone']:
@@ -1476,12 +1474,12 @@ def create_appointment():
             patient.indication_source = data['indication_source']
         if 'occupation' in data:
             patient.occupation = data['occupation']
-    
+
     start_time = data.get('start')
     end_time = data.get('end')
     if not start_time or not end_time:
         return jsonify({'success': False, 'error': 'start e end são obrigatórios'}), 400
-    
+
     appointment = Appointment(
         patient_id=patient.id,
         doctor_id=doctor_id,
@@ -1491,15 +1489,22 @@ def create_appointment():
         appointment_type=data.get('appointmentType', 'Particular'),
         notes=data.get('notes', '')
     )
-    
+
     db.session.add(appointment)
     db.session.flush()
-    
-    # Criar ou obter registro PatientDoctor com código crescente
+
+    # Criar ou obter registro PatientDoctor.
+    # Pacientes NOVOS (provisórios): sem patient_code — gerado somente na ativação manual.
+    # Pacientes EXISTENTES (ativos): gerar código normalmente se ainda não tiver.
     pd = PatientDoctor.query.filter_by(patient_id=patient.id, doctor_id=doctor_id).first()
     if not pd:
-        next_code = generate_next_patient_code(doctor_id)
-        pd = PatientDoctor(patient_id=patient.id, doctor_id=doctor_id, patient_code=next_code)
+        if is_new_patient:
+            # Provisório: sem patient_code
+            pd = PatientDoctor(patient_id=patient.id, doctor_id=doctor_id, patient_code=None)
+        else:
+            # Paciente ativo existente: garantir que tenha código
+            next_code = generate_next_patient_code(doctor_id)
+            pd = PatientDoctor(patient_id=patient.id, doctor_id=doctor_id, patient_code=next_code)
         db.session.add(pd)
     
     # Se for tipo de paciente Cirurgia, criar automaticamente no mapa cirúrgico
@@ -2407,6 +2412,10 @@ def prontuario(patient_id):
 
     # Médicos CP: criar/obter dp e redirecionar para rota dp
     if current_user.role_clinico == 'CP':
+        _patient_check = Patient.query.get(patient_id)
+        if _patient_check and _patient_check.status_cadastral == 'provisorio':
+            flash('Cadastro provisório — solicite ativação à secretária antes de abrir o prontuário.', 'warning')
+            return redirect(url_for('agenda'))
         from models import PatientDoctor as _PD
         _dp = _PD.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
         if not _dp:
@@ -2915,6 +2924,10 @@ def link_doctor_patient():
 
     from models import PatientDoctor
 
+    _p = Patient.query.get(patient_id)
+    if _p and _p.status_cadastral == 'provisorio':
+        return jsonify({'error': 'Paciente provisório. Use o endpoint de ativação (/api/patients/<id>/ativar).'}), 400
+
     dp = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=doctor_id).first()
     if not dp:
         next_code = generate_next_patient_code(doctor_id)
@@ -2927,6 +2940,176 @@ def link_doctor_patient():
         db.session.commit()
 
     return jsonify({'dp_id': dp.id, 'patient_code': dp.patient_code})
+
+
+@app.route('/api/patients/<int:patient_id>/ativar', methods=['POST'])
+@login_required
+def ativar_paciente(patient_id):
+    """Converte cadastro PROVISORIO em ATIVO e gera patient_code.
+
+    Payload JSON:
+      - doctor_id (int, obrigatório)
+      - merge_into_patient_id (int, opcional): se informado, transfere os
+        agendamentos do provisório para o paciente ativo existente e descarta
+        o provisório; caso contrário, ativa o próprio cadastro provisório.
+      - force (bool, opcional): confirmar mesmo havendo alertas de duplicidade.
+
+    Retorna:
+      - activated_patient_id: ID do paciente definitivo resultante
+      - patient_code: código gerado
+      - action: 'activate' | 'merge'
+      - warnings: lista de possíveis duplicados (se force não informado)
+    """
+    if not (current_user.is_doctor() or current_user.is_secretary()
+            or current_user.role_clinico in ('SECRETARY', 'ADMIN')):
+        abort(403)
+
+    data = request.get_json() or {}
+    doctor_id = data.get('doctor_id')
+    merge_into_id = data.get('merge_into_patient_id')
+    force = bool(data.get('force', False))
+
+    if not doctor_id:
+        return jsonify({'error': 'doctor_id obrigatório'}), 400
+
+    provisional = Patient.query.get(patient_id)
+    if not provisional:
+        return jsonify({'error': 'Paciente não encontrado'}), 404
+    if provisional.status_cadastral != 'provisorio':
+        return jsonify({'error': 'Paciente já está ativo', 'patient_id': provisional.id}), 409
+
+    # --- Alertas de duplicidade (antes de forçar) ---
+    if not force:
+        warnings = []
+        # Por nome semelhante
+        name_dups = find_possible_duplicate_patients(provisional.name, doctor_id=doctor_id)
+        # Excluir o próprio provisório da lista
+        name_dups = [d for d in name_dups if d['id'] != provisional.id]
+        if name_dups:
+            warnings.extend([{**d, 'reason': 'nome_semelhante'} for d in name_dups])
+        # Por CPF
+        if provisional.cpf:
+            cpf_dups = Patient.query.filter(
+                Patient.cpf == provisional.cpf,
+                Patient.id != provisional.id,
+                Patient.status_cadastral == 'ativo'
+            ).all()
+            for p in cpf_dups:
+                if not any(w['id'] == p.id for w in warnings):
+                    warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_cpf',
+                                     'phone': p.phone, 'cpf': p.cpf})
+        # Por telefone
+        if provisional.phone:
+            phone_dups = Patient.query.filter(
+                Patient.phone == provisional.phone,
+                Patient.id != provisional.id,
+                Patient.status_cadastral == 'ativo'
+            ).all()
+            for p in phone_dups:
+                if not any(w['id'] == p.id for w in warnings):
+                    warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_telefone',
+                                     'phone': p.phone, 'cpf': p.cpf})
+        if warnings:
+            return jsonify({
+                'success': False,
+                'warning': 'duplicates_found',
+                'warnings': warnings,
+                'message': 'Possíveis cadastros duplicados encontrados. Revise antes de ativar.'
+            }), 409
+
+    try:
+        if merge_into_id:
+            # --- MERGE: transferir agendamentos do provisório para ativo existente ---
+            target = Patient.query.get(merge_into_id)
+            if not target:
+                return jsonify({'error': 'Paciente destino não encontrado'}), 404
+            if target.status_cadastral != 'ativo':
+                return jsonify({'error': 'Paciente destino também é provisório'}), 400
+
+            from models import (Note, Evolution, Surgery, TransplantSurgeryRecord,
+                                FollowUpReminder, Prescription, Payment,
+                                PatientTag, PatientFunnelStatus, ProcedureRecord)
+            TRANSFERABLE = [Appointment, Note, Evolution, Surgery,
+                            TransplantSurgeryRecord, FollowUpReminder, Prescription,
+                            Payment, PatientTag, ProcedureRecord]
+            for cls in TRANSFERABLE:
+                cls.query.filter_by(patient_id=provisional.id).update(
+                    {'patient_id': target.id}, synchronize_session=False
+                )
+            # CommercialTask tem FK NOT NULL para consultation_id — apenas reatribui patient_id
+            from models import CommercialTask
+            CommercialTask.query.filter_by(patient_id=provisional.id).update(
+                {'patient_id': target.id}, synchronize_session=False
+            )
+            # Remover PatientDoctor do provisório (sem código) e apagar provisório
+            PatientDoctor.query.filter_by(patient_id=provisional.id).delete()
+            db.session.delete(provisional)
+
+            # Garantir que o ativo tenha PatientDoctor com código
+            pd = PatientDoctor.query.filter_by(patient_id=target.id, doctor_id=doctor_id).first()
+            if not pd:
+                next_code = generate_next_patient_code(doctor_id)
+                pd = PatientDoctor(patient_id=target.id, doctor_id=doctor_id,
+                                   patient_code=next_code)
+                db.session.add(pd)
+            elif pd.patient_code is None:
+                pd.patient_code = generate_next_patient_code(doctor_id)
+
+            db.session.flush()
+            log = PatientActivationLog(
+                provisional_patient_id=patient_id,
+                activated_patient_id=target.id,
+                action='merge',
+                performed_by_user_id=current_user.id,
+                doctor_id=doctor_id,
+                patient_code_assigned=pd.patient_code,
+            )
+            db.session.add(log)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'action': 'merge',
+                'activated_patient_id': target.id,
+                'patient_code': pd.patient_code,
+            })
+
+        else:
+            # --- ATIVAR: promover o próprio provisório a ativo ---
+            provisional.status_cadastral = 'ativo'
+
+            pd = PatientDoctor.query.filter_by(
+                patient_id=provisional.id, doctor_id=doctor_id
+            ).first()
+            if not pd:
+                next_code = generate_next_patient_code(doctor_id)
+                pd = PatientDoctor(patient_id=provisional.id, doctor_id=doctor_id,
+                                   patient_code=next_code)
+                db.session.add(pd)
+            elif pd.patient_code is None:
+                pd.patient_code = generate_next_patient_code(doctor_id)
+
+            db.session.flush()
+            log = PatientActivationLog(
+                provisional_patient_id=patient_id,
+                activated_patient_id=provisional.id,
+                action='activate',
+                performed_by_user_id=current_user.id,
+                doctor_id=doctor_id,
+                patient_code_assigned=pd.patient_code,
+            )
+            db.session.add(log)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'action': 'activate',
+                'activated_patient_id': provisional.id,
+                'patient_code': pd.patient_code,
+            })
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception('Erro ao ativar paciente %s', patient_id)
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/reports/patient-growth')
@@ -3032,6 +3215,7 @@ def api_audit_patients():
     FROM patient p
     LEFT JOIN patient_doctor pd ON pd.patient_id = p.id
     LEFT JOIN "user" u ON u.id = pd.doctor_id
+    WHERE p.status_cadastral = 'ativo'
     ORDER BY p.id, pd.patient_code
     """
     rows = db.session.execute(db.text(sql)).fetchall()
