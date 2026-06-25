@@ -5426,3 +5426,12 @@ def inject_asset_version():
             return 1
 
     return {'asset_version': asset_version}
+
+
+@app.context_processor
+def inject_environment_flags():
+    from config import IS_PRODUCTION
+    return {
+        'IS_PRODUCTION': IS_PRODUCTION,
+        'IS_PREVIEW': not IS_PRODUCTION,
+    }
