@@ -24,6 +24,9 @@ class WaitingService:
         appointment = Appointment.query.get(appointment_id)
         if not appointment:
             raise ValueError("Agendamento não encontrado")
+
+        if appointment.patient and appointment.patient.status_cadastral == 'provisorio':
+            raise ValueError("Paciente provisório não pode fazer check-in. Ative o cadastro antes do atendimento.")
         
         if appointment.checked_in_time:
             raise ValueError("Paciente já realizou check-in")

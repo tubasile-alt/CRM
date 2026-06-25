@@ -473,7 +473,11 @@
         const isWaiting = app.extendedProps?.waiting || app.waiting || false;
         let actionBadgeHtml = '';
 
-        if (status === 'atendido') {
+        if (isProvisorio) {
+            actionBadgeHtml = `<button class="btn btn-sm btn-warning btn-ativar-provisorio"
+                    onclick="event.stopPropagation(); openEditAppointmentModalById('${app.id}')"
+                    title="Editar cadastro provisório"><i class="bi bi-pencil-square"></i> Editar cadastro</button>`;
+        } else if (status === 'atendido') {
             actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
         } else if (status === 'faltou') {
             actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
@@ -492,7 +496,7 @@
             actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
         }
 
-        if (isProvisorio && status !== 'atendido' && (window.isSecretary || window.isDoctor)) {
+        if (isProvisorio && (window.isSecretary || window.isDoctor)) {
             const existingPhone = app.extendedProps?.phone || '';
             actionBadgeHtml += `<button class="btn btn-sm btn-warning ms-1 btn-ativar-provisorio"
                     onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'}, '${(existingPhone || '').replace(/'/g,"\\'")}')"
@@ -795,10 +799,46 @@
             return;
         }
         document.getElementById('editAppointmentId').value = app.id;
+        const props = app.extendedProps || {};
+        const isProvisorio = (props.statusCadastral || 'ativo') === 'provisorio';
         document.getElementById('editPatientName').value = app.title.split(' - ')[0];
+        document.getElementById('editPatientName').readOnly = !isProvisorio;
+        document.getElementById('editPatientPhone').value = props.phone || '';
+        document.getElementById('editPatientPhone').readOnly = !isProvisorio;
+        const extraFields = {
+            editPatientCPF: props.cpf || '',
+            editPatientBirthDate: props.birthDate || '',
+            editPatientAddress: props.address || '',
+            editPatientCity: props.city || '',
+            editPatientMotherName: props.motherName || '',
+            editPatientIndicationSource: props.indicationSource || '',
+            editPatientOccupation: props.occupation || ''
+        };
+        Object.entries(extraFields).forEach(([id, value]) => {
+            const el = document.getElementById(id);
+            if (el) el.value = value;
+        });
+        document.querySelectorAll('#editAppointmentModal .provisional-edit-only').forEach(el => {
+            el.style.display = isProvisorio ? '' : 'none';
+        });
+        const editStatusNote = document.getElementById('editProvisionalStatusNote');
+        if (editStatusNote) editStatusNote.remove();
+        if (isProvisorio) {
+            const note = document.createElement('div');
+            note.id = 'editProvisionalStatusNote';
+            note.className = 'alert alert-warning py-2';
+            note.innerHTML = '<strong>Cadastro provisório:</strong> edite os dados antes de ativar. Check-in fica indisponível até a ativação.';
+            modalEl.querySelector('.modal-body').prepend(note);
+        }
         const start = parseLocalDateTime(app.start);
         document.getElementById('editAppointmentDate').value = start.toISOString().split('T')[0];
         document.getElementById('editAppointmentTime').value = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
+        document.getElementById('editPatientType').value = props.patientType || 'Particular';
+        document.getElementById('editAppointmentType').value = props.appointmentType || 'Particular';
+        const durationMinutes = app.end ? Math.max(15, Math.round((parseLocalDateTime(app.end) - start) / 60000)) : 15;
+        document.getElementById('editAppointmentDuration').value = durationMinutes;
+        const notesEl = document.getElementById('editAppointmentNotes');
+        if (notesEl) notesEl.value = props.notes || '';
         
         // Adicionar botão de deletar se não existir
         let footer = modalEl.querySelector('.modal-footer');
@@ -815,6 +855,11 @@
         
         new bootstrap.Modal(modalEl).show();
     }
+
+    window.openEditAppointmentModalById = function(appointmentId) {
+        const app = appointmentsList.find(a => String(a.id) === String(appointmentId));
+        if (app) openEditAppointmentModal(app);
+    };
 
     window.deleteAppointment = function(id) {
         if (!confirm('Deseja realmente excluir este agendamento?')) return;
@@ -1417,8 +1462,16 @@
 
         const patientName = document.getElementById('editPatientName')?.value || '';
         const patientPhone = document.getElementById('editPatientPhone')?.value || '';
+        const patientCPF = document.getElementById('editPatientCPF')?.value || '';
+        const patientBirthDate = document.getElementById('editPatientBirthDate')?.value || '';
+        const patientAddress = document.getElementById('editPatientAddress')?.value || '';
+        const patientCity = document.getElementById('editPatientCity')?.value || '';
+        const patientMotherName = document.getElementById('editPatientMotherName')?.value || '';
+        const patientIndicationSource = document.getElementById('editPatientIndicationSource')?.value || '';
+        const patientOccupation = document.getElementById('editPatientOccupation')?.value || '';
         const patientType = document.getElementById('editPatientType')?.value || 'Particular';
         const appointmentType = document.getElementById('editAppointmentType')?.value || 'Particular';
+        const appointmentNotes = document.getElementById('editAppointmentNotes')?.value || '';
         const appointmentDate = document.getElementById('editAppointmentDate')?.value || '';
         const appointmentTime = document.getElementById('editAppointmentTime')?.value || '';
         const appointmentDuration = parseInt(document.getElementById('editAppointmentDuration')?.value || 15);
@@ -1437,8 +1490,16 @@
         const payload = {
             patientName: patientName,
             phone: patientPhone,
+            cpf: patientCPF,
+            birth_date: patientBirthDate,
+            address: patientAddress,
+            city: patientCity,
+            mother_name: patientMotherName,
+            indication_source: patientIndicationSource,
+            occupation: patientOccupation,
             patientType: patientType,
             appointmentType: appointmentType,
+            notes: appointmentNotes,
             photo_data: photoData
         };
         if (startDateTime) payload.start = startDateTime;
@@ -1551,6 +1612,46 @@
 // ── Ativação de cadastro provisório ──────────────────────────────────────────
 window._ativarCtx = { patientId: null, doctorId: null, warnings: [] };
 
+function renderActivationWarnings(data, patientId, doctorId) {
+    window._ativarCtx.warnings = data.warnings || [];
+    const alertaDiv = document.getElementById('ativarAlertas');
+    const lista = document.getElementById('ativarAlertalista');
+    alertaDiv.classList.remove('d-none');
+
+    const mergeDiv = document.getElementById('ativarMergeOpcoes');
+    const mergeLista = document.getElementById('ativarMergeLista');
+    mergeDiv.classList.remove('d-none');
+
+    lista.innerHTML = '';
+    mergeLista.innerHTML = '';
+    data.warnings.forEach(w => {
+        const reasonLabel = {
+            'nome_semelhante': 'Nome semelhante',
+            'mesmo_cpf': 'Mesmo CPF',
+            'mesmo_telefone': 'Mesmo telefone'
+        }[w.reason] || w.reason;
+
+        lista.innerHTML += `<div class="small mb-1">
+            <span class="badge bg-secondary">${reasonLabel}</span>
+            <strong>${w.name}</strong>
+            ${w.phone ? `· ${w.phone}` : ''}
+            ${w.cpf ? `· CPF: ${w.cpf}` : ''}
+        </div>`;
+
+        mergeLista.innerHTML += `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
+            onclick="event.stopPropagation(); const phone = document.getElementById('ativarTelefonePaciente').value.trim(); if(!phone){document.getElementById('ativarTelefoneErro').classList.remove('d-none');return;}document.getElementById('ativarTelefoneErro').classList.add('d-none');_finalizarAtivacao(${patientId}, ${doctorId}, ${w.id}, true, phone)">
+            <span><strong>${w.name}</strong>
+            ${w.phone ? `<span class='text-muted ms-2 small'>${w.phone}</span>` : ''}
+            ${w.cpf ? `<span class='text-muted ms-2 small'>CPF: ${w.cpf}</span>` : ''}
+            <span class='ms-2 badge bg-secondary small'>${reasonLabel}</span></span>
+            <span class="badge bg-primary">Vincular</span>
+        </button>`;
+    });
+
+    document.getElementById('ativarInstrucao').textContent =
+        'Foram encontrados cadastros possivelmente duplicados. Escolha vincular a um existente ou ativar como novo.';
+}
+
 window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingPhone) {
     window._ativarCtx = { patientId, doctorId, warnings: [] };
 
@@ -1570,18 +1671,17 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
         window._ativarCtx.doctorId = doctorId;
     }
 
-    // Chamar endpoint para detectar alertas (sem force=true)
-    fetch(`/api/patients/${patientId}/ativar`, {
+    // Verifica requisitos e duplicidades sem ativar o cadastro.
+    fetch(`/api/patients/${patientId}/activation-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-        body: JSON.stringify({ doctor_id: doctorId, force: false, phone: existingPhone })
+        body: JSON.stringify({ doctor_id: doctorId, phone: existingPhone })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            // Sem duplicados — ativar diretamente
-            const phone = document.getElementById('ativarTelefonePaciente').value.trim();
-            _finalizarAtivacao(patientId, doctorId, null, false, phone);
+            document.getElementById('ativarInstrucao').textContent =
+                'Revise os dados e confirme para ativar como novo paciente definitivo.';
             return;
         }
         if (data.error === 'phone_required' || data.warning === 'phone_required') {
@@ -1590,43 +1690,7 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
             return;
         }
         if (data.warning === 'duplicates_found') {
-            window._ativarCtx.warnings = data.warnings || [];
-            const alertaDiv = document.getElementById('ativarAlertas');
-            const lista = document.getElementById('ativarAlertalista');
-            alertaDiv.classList.remove('d-none');
-
-            const mergeDiv = document.getElementById('ativarMergeOpcoes');
-            const mergeLista = document.getElementById('ativarMergeLista');
-            mergeDiv.classList.remove('d-none');
-
-            lista.innerHTML = '';
-            mergeLista.innerHTML = '';
-            data.warnings.forEach(w => {
-                const reasonLabel = {
-                    'nome_semelhante': 'Nome semelhante',
-                    'mesmo_cpf': 'Mesmo CPF',
-                    'mesmo_telefone': 'Mesmo telefone'
-                }[w.reason] || w.reason;
-
-                lista.innerHTML += `<div class="small mb-1">
-                    <span class="badge bg-secondary">${reasonLabel}</span>
-                    <strong>${w.name}</strong>
-                    ${w.phone ? `· ${w.phone}` : ''}
-                    ${w.cpf ? `· CPF: ${w.cpf}` : ''}
-                </div>`;
-
-                mergeLista.innerHTML += `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
-                    onclick="event.stopPropagation(); const phone = document.getElementById('ativarTelefonePaciente').value.trim(); if(!phone){document.getElementById('ativarTelefoneErro').classList.remove('d-none');return;}document.getElementById('ativarTelefoneErro').classList.add('d-none');_finalizarAtivacao(${patientId}, ${doctorId}, ${w.id}, false, phone)">
-                    <span><strong>${w.name}</strong>
-                    ${w.phone ? `<span class='text-muted ms-2 small'>${w.phone}</span>` : ''}
-                    ${w.cpf ? `<span class='text-muted ms-2 small'>CPF: ${w.cpf}</span>` : ''}
-                    <span class='ms-2 badge bg-secondary small'>${reasonLabel}</span></span>
-                    <span class="badge bg-primary">Vincular</span>
-                </button>`;
-            });
-
-            document.getElementById('ativarInstrucao').textContent =
-                'Foram encontrados cadastros possivelmente duplicados. Escolha vincular a um existente ou ativar como novo.';
+            renderActivationWarnings(data, patientId, doctorId);
         } else if (data.error) {
             showAlert(data.error, 'danger');
         }
@@ -1645,12 +1709,13 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
             return;
         }
         document.getElementById('ativarTelefoneErro').classList.add('d-none');
-        _finalizarAtivacao(ctx.patientId, ctx.doctorId, null, true, phone);
+        const forceActivation = (ctx.warnings || []).length > 0;
+        _finalizarAtivacao(ctx.patientId, ctx.doctorId, null, forceActivation, phone);
     };
 };
 
 window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, phone) {
-    const payload = { doctor_id: doctorId, force: true };
+    const payload = { doctor_id: doctorId, force: !!force };
     if (mergeIntoId) payload.merge_into_patient_id = mergeIntoId;
     if (phone) payload.phone = phone;
 
@@ -1660,16 +1725,18 @@ window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, ph
         body: JSON.stringify(payload)
     })
     .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            const action = data.action === 'merge' ? 'vinculado ao cadastro existente' : 'ativado';
-            showAlert(`Cadastro ${action} com sucesso! Código: ${data.patient_code}`, 'success');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('ativarProvisiorioModal'));
-            if (modal) modal.hide();
-            loadAppointments();
-        } else {
-            showAlert(data.error || 'Erro ao ativar cadastro', 'danger');
-        }
+	    .then(data => {
+	        if (data.success) {
+	            const action = data.action === 'merge' ? 'vinculado ao cadastro existente' : 'ativado';
+	            showAlert(`Cadastro ${action} com sucesso! Código: ${data.patient_code}`, 'success');
+	            const modal = bootstrap.Modal.getInstance(document.getElementById('ativarProvisiorioModal'));
+	            if (modal) modal.hide();
+	            loadAppointments();
+	        } else if (data.warning === 'duplicates_found') {
+	            renderActivationWarnings(data, patientId, doctorId);
+	        } else {
+	            showAlert(data.error || 'Erro ao ativar cadastro', 'danger');
+	        }
     })
     .catch(() => showAlert('Erro ao ativar cadastro', 'danger'));
 };
