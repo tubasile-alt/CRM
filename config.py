@@ -43,22 +43,18 @@ def _resolve_database_url() -> str:
     """
     Select the correct DATABASE_URL based on environment.
 
-    - Production  (REPLIT_DEPLOYMENT=1): prefer NEON_DATABASE_URL, then DATABASE_URL.
-    - Dev/Preview (no REPLIT_DEPLOYMENT): use DATABASE_URL (Replit internal / helium),
-      fallback to SQLite.
+    - Always prefer NEON_DATABASE_URL when set (shared between Preview and Production).
+    - Fall back to DATABASE_URL (Replit internal helium) only when NEON_DATABASE_URL is absent.
+    - Last resort: SQLite local.
     """
     is_production = os.environ.get('REPLIT_DEPLOYMENT', '0') == '1'
+    env_label = 'PRODUÇÃO' if is_production else 'PREVIEW/DEV'
 
-    if is_production:
-        url = (
-            os.environ.get('NEON_DATABASE_URL')
-            or os.environ.get('DATABASE_URL')
-            or 'sqlite:///medcrm.db'
-        )
-        env_label = 'PRODUÇÃO'
-    else:
-        url = os.environ.get('DATABASE_URL') or 'sqlite:///medcrm.db'
-        env_label = 'PREVIEW/DEV'
+    url = (
+        os.environ.get('NEON_DATABASE_URL')
+        or os.environ.get('DATABASE_URL')
+        or 'sqlite:///medcrm.db'
+    )
 
     # Fix legacy postgres:// → postgresql://
     if url.startswith('postgres://'):
