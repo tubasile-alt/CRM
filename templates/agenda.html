@@ -377,23 +377,27 @@
 }
 
 .appointment-provisorio {
-    border-left: 4px solid #ffc107 !important;
-    background: repeating-linear-gradient(
-        135deg,
-        rgba(255,193,7,0.06),
-        rgba(255,193,7,0.06) 6px,
-        transparent 6px,
-        transparent 14px
-    ) !important;
-    opacity: 0.92;
+    border-left: 5px solid #e67e00 !important;
+    background: #fff8e6 !important;
+    box-shadow: 0 0 0 1px rgba(230, 126, 0, 0.35) inset !important;
+    opacity: 1 !important;
+}
+.appointment-provisorio .appointment-name {
+    color: #7a4600 !important;
+    font-style: italic;
 }
 .appointment-provisorio .appointment-code {
     display: none;
 }
 .btn-ativar-provisorio {
-    font-size: 0.7rem;
-    padding: 2px 7px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 10px;
     border-radius: 10px;
+    background: #e67e00 !important;
+    border-color: #c96800 !important;
+    color: #fff !important;
+    box-shadow: 0 1px 4px rgba(230,126,0,0.35);
 }
 
 .appointment-cirurgia {
@@ -580,6 +584,9 @@
         <h2 class="mb-4">Agenda Médica</h2>
         <div id="waitingCounter" class="badge bg-warning text-dark mb-3" style="font-size: 1.1rem;">
             <i class="bi bi-people"></i> <span id="waitingCount">0</span> aguardando
+        </div>
+        <div id="provisorioCounter" class="badge mb-3 ms-2" style="font-size: 1.1rem; background:#e67e00; color:#fff; display:none; cursor:pointer;" title="Pacientes aguardando ativação de cadastro">
+            <i class="bi bi-person-exclamation"></i> <span id="provisorioCount">0</span> pend. ativação
         </div>
         {% if not current_user.is_doctor() %}
         <div class="btn-group w-100 mb-3 doctor-filter-btns" style="display: flex; flex-wrap: wrap;">

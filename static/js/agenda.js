@@ -524,10 +524,32 @@
         return block;
     }
 
+    function updateProvisorioBadge() {
+        const count = appointmentsList.filter(a => {
+            const start = parseLocalDateTime(a.start);
+            if (!start) return false;
+            const appDateStr = start.getFullYear() + '-' +
+                String(start.getMonth() + 1).padStart(2, '0') + '-' +
+                String(start.getDate()).padStart(2, '0');
+            const selDateStr = selectedDate.getFullYear() + '-' +
+                String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' +
+                String(selectedDate.getDate()).padStart(2, '0');
+            return appDateStr === selDateStr &&
+                (a.extendedProps?.statusCadastral || 'ativo') === 'provisorio';
+        }).length;
+        const badge = document.getElementById('provisorioCounter');
+        const countEl = document.getElementById('provisorioCount');
+        if (badge && countEl) {
+            countEl.textContent = count;
+            badge.style.display = count > 0 ? '' : 'none';
+        }
+    }
+
     window.renderDayView = function() {
         const appointmentsGrid = document.getElementById('appointmentsGrid');
         if (!appointmentsGrid) return;
         appointmentsGrid.innerHTML = '';
+        updateProvisorioBadge();
 
         console.log("Renderizando Agenda. Filtro Médico ID:", currentDoctorFilter);
         console.log("Total de agendamentos carregados:", appointmentsList.length);
@@ -654,7 +676,8 @@
     function _getAppointmentStateKey(app) {
         const status = app.extendedProps?.status || app.status || 'agendado';
         const waiting = !!(app.extendedProps?.waiting || app.waiting);
-        return `${status}|${waiting}`;
+        const statusCadastral = app.extendedProps?.statusCadastral || 'ativo';
+        return `${status}|${waiting}|${statusCadastral}`;
     }
 
     function _autoRefreshAppointments() {
@@ -702,6 +725,7 @@
 
                 appointmentsList = newData;
                 _updateLastUpdatedLabel();
+                if (anyChanged) updateProvisorioBadge();
                 if (anyChanged && calendar && currentView === 'month') calendar.refetchEvents();
             })
             .catch(err => console.error('Erro no auto-refresh da agenda:', err));
