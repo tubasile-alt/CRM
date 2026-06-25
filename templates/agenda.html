@@ -1049,7 +1049,7 @@
 
 <!-- MODAL DE EDIÇÃO PARA SECRETÁRIA -->
 <div class="modal fade" id="editAppointmentModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Editar Agendamento</h5>
@@ -1089,9 +1089,46 @@
                     <input type="text" class="form-control" id="editPatientName">
                 </div>
                 
-                <div class="mb-3">
-                    <label class="form-label">Telefone</label>
-                    <input type="text" class="form-control" id="editPatientPhone">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Telefone</label>
+                        <input type="text" class="form-control" id="editPatientPhone">
+                    </div>
+                    <div class="col-md-6 mb-3 provisional-edit-only">
+                        <label class="form-label">CPF</label>
+                        <input type="text" class="form-control" id="editPatientCPF" placeholder="000.000.000-00">
+                    </div>
+                </div>
+
+                <div class="row provisional-edit-only">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Nascimento</label>
+                        <input type="date" class="form-control" id="editPatientBirthDate">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Cidade</label>
+                        <input type="text" class="form-control" id="editPatientCity">
+                    </div>
+                </div>
+
+                <div class="mb-3 provisional-edit-only">
+                    <label class="form-label">Endereço</label>
+                    <input type="text" class="form-control" id="editPatientAddress">
+                </div>
+
+                <div class="row provisional-edit-only">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Mãe</label>
+                        <input type="text" class="form-control" id="editPatientMotherName">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Indicação</label>
+                        <input type="text" class="form-control" id="editPatientIndicationSource">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Ocupação</label>
+                        <input type="text" class="form-control" id="editPatientOccupation">
+                    </div>
                 </div>
                 
                 <div class="row">
@@ -1146,6 +1183,10 @@
                         <label class="form-label">Duração (min)</label>
                         <input type="number" class="form-control" id="editAppointmentDuration" value="15">
                     </div>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label">Observações</label>
+                    <textarea class="form-control" id="editAppointmentNotes" rows="2"></textarea>
                 </div>
             </div>
             <div class="modal-footer">

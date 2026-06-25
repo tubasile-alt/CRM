@@ -1214,10 +1214,24 @@ def get_appointments():
             patient_name = 'Paciente'
             patient_type = 'Particular'
             patient_phone = ''
+            patient_cpf = ''
+            patient_birth_date = ''
+            patient_address = ''
+            patient_city = ''
+            patient_mother_name = ''
+            patient_indication_source = ''
+            patient_occupation = ''
             try:
                 patient_name = apt.patient.name or 'Paciente'
                 patient_type = apt.patient.patient_type or 'Particular'
                 patient_phone = apt.patient.phone or ''
+                patient_cpf = apt.patient.cpf or ''
+                patient_birth_date = apt.patient.birth_date.isoformat() if apt.patient.birth_date else ''
+                patient_address = apt.patient.address or ''
+                patient_city = apt.patient.city or ''
+                patient_mother_name = apt.patient.mother_name or ''
+                patient_indication_source = apt.patient.indication_source or ''
+                patient_occupation = apt.patient.occupation or ''
             except Exception as e:
                 print(f"Erro ao carregar dados do paciente {apt.patient_id}: {e}")
             
@@ -1245,6 +1259,13 @@ def get_appointments():
                     'waiting': apt.waiting,
                     'checkedInTime': apt.checked_in_time.isoformat() + '-03:00' if apt.checked_in_time else None,
                     'phone': patient_phone,
+                    'cpf': patient_cpf,
+                    'birthDate': patient_birth_date,
+                    'address': patient_address,
+                    'city': patient_city,
+                    'motherName': patient_mother_name,
+                    'indicationSource': patient_indication_source,
+                    'occupation': patient_occupation,
                     'notes': apt.notes or '',
                     'ivpStars': apt.patient.ivp_stars if apt.patient else None,
                     'statusCadastral': apt.patient.status_cadastral if apt.patient else 'ativo',
@@ -1648,9 +1669,32 @@ def update_appointment(id):
     if 'patientType' in data:
         appointment.patient.patient_type = data['patientType']
     
-    # NOTA: Não atualizar telefone do paciente aqui.
-    # A edição de consulta pode enviar phone vazio, apagando o telefone do cadastro.
-    # Telefone só deve ser atualizado via /api/patient/<id>/update
+    # Cadastros provisórios são editados pela agenda, antes de existir prontuário real.
+    # Para pacientes ativos, manter a proteção histórica e não alterar dados cadastrais aqui.
+    patient_is_provisional = (
+        appointment.patient and appointment.patient.status_cadastral == 'provisorio'
+    )
+    if patient_is_provisional:
+        if 'phone' in data:
+            appointment.patient.phone = data.get('phone') or None
+        if 'cpf' in data:
+            appointment.patient.cpf = data.get('cpf') or None
+        if 'birth_date' in data:
+            if data.get('birth_date'):
+                from datetime import datetime
+                appointment.patient.birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
+            else:
+                appointment.patient.birth_date = None
+        if 'address' in data:
+            appointment.patient.address = data.get('address') or None
+        if 'city' in data:
+            appointment.patient.city = data.get('city') or None
+        if 'mother_name' in data:
+            appointment.patient.mother_name = data.get('mother_name') or None
+        if 'indication_source' in data:
+            appointment.patient.indication_source = data.get('indication_source') or None
+        if 'occupation' in data:
+            appointment.patient.occupation = data.get('occupation') or None
     
     # Update patient photo if provided
     if 'photo_data' in data and data['photo_data']:
@@ -1686,16 +1730,21 @@ def update_appointment(id):
         except Exception as e:
             print(f"Erro ao processar foto na edicao: {e}")
 
-    # Update patient name if provided (find or update existing)
+    # Update patient name if provided.
+    # Provisórios podem ter o cadastro corrigido diretamente na agenda.
+    # Ativos preservam o comportamento legado de vincular por nome existente.
     if 'patientName' in data and data['patientName'] != appointment.patient.name:
-        # Check if patient with new name already exists
-        existing_patient = Patient.query.filter_by(name=data['patientName']).first()
-        if existing_patient:
-            # Link appointment to existing patient
-            appointment.patient_id = existing_patient.id
+        if patient_is_provisional:
+            new_name = (data.get('patientName') or '').strip()
+            if not new_name:
+                return jsonify({'success': False, 'error': 'Nome do paciente é obrigatório'}), 400
+            appointment.patient.name = new_name
         else:
-            # Update patient name
-            appointment.patient.name = data['patientName']
+            existing_patient = Patient.query.filter_by(name=data['patientName']).first()
+            if existing_patient:
+                appointment.patient_id = existing_patient.id
+            else:
+                appointment.patient.name = data['patientName']
     
     db.session.commit()
     
@@ -2947,6 +2996,85 @@ def link_doctor_patient():
     return jsonify({'dp_id': dp.id, 'patient_code': dp.patient_code})
 
 
+def _activation_warnings_for(provisional, doctor_id, phone_value=None):
+    warnings = []
+
+    name_dups = find_possible_duplicate_patients(provisional.name, doctor_id=doctor_id)
+    name_dups = [d for d in name_dups if d['id'] != provisional.id]
+    if name_dups:
+        warnings.extend([{**d, 'reason': 'nome_semelhante'} for d in name_dups])
+
+    if provisional.cpf:
+        cpf_dups = Patient.query.filter(
+            Patient.cpf == provisional.cpf,
+            Patient.id != provisional.id,
+            Patient.status_cadastral == 'ativo'
+        ).all()
+        for p in cpf_dups:
+            if not any(w['id'] == p.id for w in warnings):
+                warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_cpf',
+                                 'phone': p.phone, 'cpf': p.cpf})
+
+    phone_to_check = phone_value or provisional.phone
+    if phone_to_check:
+        phone_dups = Patient.query.filter(
+            Patient.phone == phone_to_check,
+            Patient.id != provisional.id,
+            Patient.status_cadastral == 'ativo'
+        ).all()
+        for p in phone_dups:
+            if not any(w['id'] == p.id for w in warnings):
+                warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_telefone',
+                                 'phone': p.phone, 'cpf': p.cpf})
+
+    return warnings
+
+
+@app.route('/api/patients/<int:patient_id>/activation-preview', methods=['POST'])
+@login_required
+def preview_ativacao_paciente(patient_id):
+    """Verifica requisitos e duplicidades da ativação sem alterar o cadastro."""
+    if not (current_user.is_doctor() or current_user.is_secretary()
+            or current_user.role_clinico in ('SECRETARY', 'ADMIN')):
+        abort(403)
+
+    data = request.get_json() or {}
+    doctor_id = data.get('doctor_id')
+    if current_user.is_doctor():
+        doctor_id = current_user.id
+    if not doctor_id:
+        return jsonify({'error': 'doctor_id obrigatório'}), 400
+
+    provisional = Patient.query.get(patient_id)
+    if not provisional:
+        return jsonify({'error': 'Paciente não encontrado'}), 404
+    if provisional.status_cadastral != 'provisorio':
+        return jsonify({'error': 'Paciente já está ativo', 'patient_id': provisional.id}), 409
+
+    phone_input = (data.get('phone') or '').strip()
+    if not provisional.phone and not phone_input:
+        return jsonify({
+            'success': False,
+            'error': 'phone_required',
+            'message': 'Telefone obrigatório. Por favor, informe o telefone do paciente antes de ativar.'
+        }), 400
+
+    warnings = _activation_warnings_for(provisional, doctor_id, phone_input)
+    if warnings:
+        return jsonify({
+            'success': False,
+            'warning': 'duplicates_found',
+            'warnings': warnings,
+            'message': 'Possíveis cadastros duplicados encontrados. Revise antes de ativar.'
+        }), 409
+
+    return jsonify({
+        'success': True,
+        'warnings': [],
+        'message': ''
+    })
+
+
 @app.route('/api/patients/<int:patient_id>/ativar', methods=['POST'])
 @login_required
 def ativar_paciente(patient_id):
@@ -2974,6 +3102,9 @@ def ativar_paciente(patient_id):
     merge_into_id = data.get('merge_into_patient_id')
     force = bool(data.get('force', False))
 
+    if current_user.is_doctor():
+        doctor_id = current_user.id
+
     if not doctor_id:
         return jsonify({'error': 'doctor_id obrigatório'}), 400
 
@@ -2996,35 +3127,7 @@ def ativar_paciente(patient_id):
 
     # --- Alertas de duplicidade (antes de forçar) ---
     if not force:
-        warnings = []
-        # Por nome semelhante
-        name_dups = find_possible_duplicate_patients(provisional.name, doctor_id=doctor_id)
-        # Excluir o próprio provisório da lista
-        name_dups = [d for d in name_dups if d['id'] != provisional.id]
-        if name_dups:
-            warnings.extend([{**d, 'reason': 'nome_semelhante'} for d in name_dups])
-        # Por CPF
-        if provisional.cpf:
-            cpf_dups = Patient.query.filter(
-                Patient.cpf == provisional.cpf,
-                Patient.id != provisional.id,
-                Patient.status_cadastral == 'ativo'
-            ).all()
-            for p in cpf_dups:
-                if not any(w['id'] == p.id for w in warnings):
-                    warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_cpf',
-                                     'phone': p.phone, 'cpf': p.cpf})
-        # Por telefone
-        if provisional.phone:
-            phone_dups = Patient.query.filter(
-                Patient.phone == provisional.phone,
-                Patient.id != provisional.id,
-                Patient.status_cadastral == 'ativo'
-            ).all()
-            for p in phone_dups:
-                if not any(w['id'] == p.id for w in warnings):
-                    warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_telefone',
-                                     'phone': p.phone, 'cpf': p.cpf})
+        warnings = _activation_warnings_for(provisional, doctor_id)
         if warnings:
             return jsonify({
                 'success': False,
