@@ -2927,10 +2927,33 @@ def search_doctor_patients():
 
     from models import PatientDoctor
 
+    digits = ''.join(ch for ch in q if ch.isdigit())
+
+    def only_digits_expr(column):
+        expr = db.func.coalesce(column, '')
+        for char in ['(', ')', '-', '.', '/', ' ']:
+            expr = db.func.replace(expr, char, '')
+        return expr
+
+    search_filters = [
+        Patient.name.ilike(f'%{q}%'),
+        Patient.phone.ilike(f'%{q}%'),
+        Patient.cpf.ilike(f'%{q}%'),
+    ]
+    if digits:
+        search_filters.extend([
+            only_digits_expr(Patient.phone).ilike(f'%{digits}%'),
+            only_digits_expr(Patient.cpf).ilike(f'%{digits}%'),
+        ])
+        try:
+            search_filters.append(PatientDoctor.patient_code == int(digits))
+        except ValueError:
+            pass
+
     base_q = db.session.query(PatientDoctor, Patient, User)\
         .join(Patient, PatientDoctor.patient_id == Patient.id)\
         .join(User, PatientDoctor.doctor_id == User.id)\
-        .filter(Patient.name.ilike(f'%{q}%'))
+        .filter(db.or_(*search_filters))
 
     if doctor_id and doctor_id != 'null':
         try:
@@ -2954,6 +2977,7 @@ def search_doctor_patients():
             'patient_id': patient.id,
             'patient_name': patient.name,
             'patient_phone': patient.phone or '',
+            'patient_cpf': patient.cpf or '',
             'patient_code': dp.patient_code,
             'doctor_id': doctor.id,
             'doctor_name': doctor.name,

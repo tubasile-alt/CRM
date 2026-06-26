@@ -146,13 +146,15 @@
                         div.className = 'p-2 border-bottom cursor-pointer hover-bg-light';
                         div.style.cursor = 'pointer';
                         const roleLabel = item.doctor_role === 'CP' ? 'CP' : 'DERM';
-                        div.innerHTML = `<span class="fw-semibold">${item.patient_name}</span> <span class="text-muted small">— Dr(a). ${item.doctor_name} (${roleLabel}) — Cód. ${item.patient_code}</span>`;
+                        const contactInfo = [item.patient_phone, item.patient_cpf ? `CPF ${item.patient_cpf}` : ''].filter(Boolean).join(' · ');
+                        div.innerHTML = `<span class="fw-semibold">${item.patient_name}</span> <span class="text-muted small">— Dr(a). ${item.doctor_name} (${roleLabel}) — Cód. ${item.patient_code || '-'}</span>${contactInfo ? `<div class="text-muted small">${contactInfo}</div>` : ''}`;
                         div.onclick = () => selectPatient({
                             id: item.patient_id,
                             name: item.patient_name,
                             dp_id: item.dp_id,
                             patient_code: item.patient_code,
                             phone: item.patient_phone,
+                            cpf: item.patient_cpf,
                             doctor_role: item.doctor_role
                         });
                         suggestionsDiv.appendChild(div);
@@ -888,7 +890,7 @@
         const q = document.getElementById('patientSearchInput').value.trim();
         if (q.length < 2) return;
         const body = document.getElementById('patientSearchResults');
-        body.innerHTML = '<tr><td colspan="4">Buscando...</td></tr>';
+        body.innerHTML = '<tr><td colspan="6">Buscando...</td></tr>';
 
         const params = new URLSearchParams({ q });
         if (currentDoctorFilter) {
@@ -902,9 +904,11 @@
                     <tr>
                         <td>${p.patient_name}</td>
                         <td>${p.patient_code ?? '-'}</td>
+                        <td>${p.patient_phone || '-'}</td>
+                        <td>${p.patient_cpf || '-'}</td>
                         <td>Dr(a). ${p.doctor_name} (${p.doctor_role || 'DERM'})</td>
                         <td><button class="btn btn-sm btn-primary" onclick="goToPatientChart(${p.patient_id}, null, ${p.dp_id})">Prontuário</button></td>
-                    </tr>`).join('') : '<tr><td colspan="4">Nenhum encontrado</td></tr>';
+                    </tr>`).join('') : '<tr><td colspan="6">Nenhum encontrado</td></tr>';
             });
     };
 
