@@ -7,6 +7,43 @@ from models import PushSubscription, db, get_brazil_time
 push_bp = Blueprint('push', __name__, url_prefix='/api/push')
 
 
+def _endpoint_partial(endpoint):
+    if not endpoint:
+        return None
+    if len(endpoint) <= 60:
+        return endpoint
+    return f'{endpoint[:36]}...{endpoint[-20:]}'
+
+
+def _detect_platform(user_agent):
+    ua = (user_agent or '').lower()
+    if 'iphone' in ua:
+        return 'iphone'
+    if 'ipad' in ua or ('macintosh' in ua and 'mobile' in ua):
+        return 'ipad'
+    if 'android' in ua:
+        return 'android'
+    if 'mac os' in ua or 'macintosh' in ua:
+        return 'macos'
+    if 'windows' in ua:
+        return 'windows'
+    return 'web'
+
+
+def _subscription_payload(subscription):
+    if not subscription:
+        return None
+    return {
+        'id': subscription.id,
+        'platform': subscription.platform,
+        'endpoint_partial': subscription.endpoint_partial,
+        'last_seen_at': subscription.last_seen_at.isoformat() if subscription.last_seen_at else None,
+        'last_test_at': subscription.last_test_at.isoformat() if subscription.last_test_at else None,
+        'last_error': subscription.last_error,
+        'is_active': subscription.is_active,
+    }
+
+
 @push_bp.route('/vapid-public-key', methods=['GET'])
 def vapid_public_key():
     """Retorna somente a chave pública VAPID configurada.
@@ -18,6 +55,22 @@ def vapid_public_key():
     if not public_key:
         return jsonify({'error': 'VAPID_PUBLIC_KEY não configurada'}), 503
     return jsonify({'publicKey': public_key})
+
+
+@push_bp.route('/status', methods=['GET'])
+@login_required
+def status():
+    """Retorna o estado mais recente de push para o usuário logado."""
+    subscription = PushSubscription.query.filter_by(
+        user_id=current_user.id,
+        is_active=True,
+    ).order_by(PushSubscription.last_seen_at.desc()).first()
+
+    return jsonify({
+        'success': True,
+        'has_subscription': bool(subscription),
+        'subscription': _subscription_payload(subscription),
+    })
 
 
 @push_bp.route('/subscribe', methods=['POST'])
@@ -48,14 +101,18 @@ def subscribe():
 
     subscription.p256dh = p256dh
     subscription.auth = auth
-    subscription.user_agent = request.headers.get('User-Agent')
+    user_agent = request.headers.get('User-Agent')
+    subscription.user_agent = user_agent
+    subscription.platform = _detect_platform(user_agent)
+    subscription.endpoint_partial = _endpoint_partial(endpoint)
     subscription.last_seen_at = now
+    subscription.last_error = None
     subscription.is_active = True
 
     db.session.add(subscription)
     db.session.commit()
 
-    return jsonify({'success': True, 'subscription_id': subscription.id})
+    return jsonify({'success': True, 'subscription_id': subscription.id, 'subscription': _subscription_payload(subscription)})
 
 
 @push_bp.route('/unsubscribe', methods=['POST'])
@@ -91,4 +148,22 @@ def test_push():
         appointment_id=999,
         patient_id=999,
     )
-    return jsonify({'success': True, 'result': result})
+    now = get_brazil_time()
+    active_subscriptions = PushSubscription.query.filter_by(
+        user_id=current_user.id,
+        is_active=True,
+    ).all()
+    for subscription in active_subscriptions:
+        subscription.last_test_at = now
+        db.session.add(subscription)
+    db.session.commit()
+
+    latest = PushSubscription.query.filter_by(
+        user_id=current_user.id,
+        is_active=True,
+    ).order_by(PushSubscription.last_seen_at.desc()).first()
+    return jsonify({
+        'success': True,
+        'result': result,
+        'subscription': _subscription_payload(latest),
+    })

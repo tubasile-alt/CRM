@@ -136,6 +136,7 @@
                         <ul class="dropdown-menu dropdown-menu-end">
                             {% if current_user.is_doctor() %}
                             <li><button class="dropdown-item" type="button" id="enable-push-notifications"><i class="bi bi-bell"></i> Ativar notificações neste iPhone</button></li>
+                            <li><button class="dropdown-item" type="button" id="test-push-notification" disabled><i class="bi bi-send-check"></i> Enviar notificação de teste</button></li>
                             <li><hr class="dropdown-divider"></li>
                             {% endif %}
                             <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a></li>

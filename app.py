@@ -2927,10 +2927,33 @@ def search_doctor_patients():
 
     from models import PatientDoctor
 
+    digits = ''.join(ch for ch in q if ch.isdigit())
+
+    def only_digits_expr(column):
+        expr = db.func.coalesce(column, '')
+        for char in ['(', ')', '-', '.', '/', ' ']:
+            expr = db.func.replace(expr, char, '')
+        return expr
+
+    search_filters = [
+        Patient.name.ilike(f'%{q}%'),
+        Patient.phone.ilike(f'%{q}%'),
+        Patient.cpf.ilike(f'%{q}%'),
+    ]
+    if digits:
+        search_filters.extend([
+            only_digits_expr(Patient.phone).ilike(f'%{digits}%'),
+            only_digits_expr(Patient.cpf).ilike(f'%{digits}%'),
+        ])
+        try:
+            search_filters.append(PatientDoctor.patient_code == int(digits))
+        except ValueError:
+            pass
+
     base_q = db.session.query(PatientDoctor, Patient, User)\
         .join(Patient, PatientDoctor.patient_id == Patient.id)\
         .join(User, PatientDoctor.doctor_id == User.id)\
-        .filter(Patient.name.ilike(f'%{q}%'))
+        .filter(db.or_(*search_filters))
 
     if doctor_id and doctor_id != 'null':
         try:
@@ -2954,6 +2977,7 @@ def search_doctor_patients():
             'patient_id': patient.id,
             'patient_name': patient.name,
             'patient_phone': patient.phone or '',
+            'patient_cpf': patient.cpf or '',
             'patient_code': dp.patient_code,
             'doctor_id': doctor.id,
             'doctor_name': doctor.name,
@@ -2996,7 +3020,7 @@ def link_doctor_patient():
     return jsonify({'dp_id': dp.id, 'patient_code': dp.patient_code})
 
 
-def _activation_warnings_for(provisional, doctor_id, phone_value=None):
+def _activation_warnings_for(provisional, doctor_id, phone_value=None, cpf_value=None):
     warnings = []
 
     name_dups = find_possible_duplicate_patients(provisional.name, doctor_id=doctor_id)
@@ -3004,9 +3028,10 @@ def _activation_warnings_for(provisional, doctor_id, phone_value=None):
     if name_dups:
         warnings.extend([{**d, 'reason': 'nome_semelhante'} for d in name_dups])
 
-    if provisional.cpf:
+    cpf_to_check = cpf_value or provisional.cpf
+    if cpf_to_check:
         cpf_dups = Patient.query.filter(
-            Patient.cpf == provisional.cpf,
+            Patient.cpf == cpf_to_check,
             Patient.id != provisional.id,
             Patient.status_cadastral == 'ativo'
         ).all()
@@ -3028,6 +3053,23 @@ def _activation_warnings_for(provisional, doctor_id, phone_value=None):
                                  'phone': p.phone, 'cpf': p.cpf})
 
     return warnings
+
+
+def _activation_required_errors(provisional, phone_input='', cpf_input=''):
+    errors = []
+    if not (phone_input or provisional.phone):
+        errors.append({
+            'field': 'phone',
+            'error': 'phone_required',
+            'message': 'Telefone obrigatório. Por favor, informe o telefone do paciente antes de ativar.'
+        })
+    if not (cpf_input or provisional.cpf):
+        errors.append({
+            'field': 'cpf',
+            'error': 'cpf_required',
+            'message': 'CPF obrigatório. Por favor, informe o CPF do paciente antes de ativar.'
+        })
+    return errors
 
 
 @app.route('/api/patients/<int:patient_id>/activation-preview', methods=['POST'])
@@ -3052,14 +3094,17 @@ def preview_ativacao_paciente(patient_id):
         return jsonify({'error': 'Paciente já está ativo', 'patient_id': provisional.id}), 409
 
     phone_input = (data.get('phone') or '').strip()
-    if not provisional.phone and not phone_input:
+    cpf_input = (data.get('cpf') or '').strip()
+    required_errors = _activation_required_errors(provisional, phone_input, cpf_input)
+    if required_errors:
         return jsonify({
             'success': False,
-            'error': 'phone_required',
-            'message': 'Telefone obrigatório. Por favor, informe o telefone do paciente antes de ativar.'
+            'error': 'required_fields',
+            'required': required_errors,
+            'message': 'Telefone e CPF são obrigatórios para ativar o cadastro provisório.'
         }), 400
 
-    warnings = _activation_warnings_for(provisional, doctor_id, phone_input)
+    warnings = _activation_warnings_for(provisional, doctor_id, phone_input, cpf_input)
     if warnings:
         return jsonify({
             'success': False,
@@ -3085,6 +3130,8 @@ def ativar_paciente(patient_id):
       - merge_into_patient_id (int, opcional): se informado, transfere os
         agendamentos do provisório para o paciente ativo existente e descarta
         o provisório; caso contrário, ativa o próprio cadastro provisório.
+      - phone (str, obrigatório se o provisório ainda não tiver telefone)
+      - cpf (str, obrigatório se o provisório ainda não tiver CPF)
       - force (bool, opcional): confirmar mesmo havendo alertas de duplicidade.
 
     Retorna:
@@ -3114,20 +3161,27 @@ def ativar_paciente(patient_id):
     if provisional.status_cadastral != 'provisorio':
         return jsonify({'error': 'Paciente já está ativo', 'patient_id': provisional.id}), 409
 
-    # --- Telefone obrigatório para ativar ---
+    # --- Telefone e CPF obrigatórios para ativar ---
     phone_input = (data.get('phone') or '').strip()
-    if not provisional.phone and not phone_input:
+    cpf_input = (data.get('cpf') or '').strip()
+    required_errors = _activation_required_errors(provisional, phone_input, cpf_input)
+    if required_errors:
         return jsonify({
-            'error': 'phone_required',
-            'message': 'Telefone obrigatório. Por favor, informe o telefone do paciente antes de ativar.'
+            'success': False,
+            'error': 'required_fields',
+            'required': required_errors,
+            'message': 'Telefone e CPF são obrigatórios para ativar o cadastro provisório.'
         }), 400
     if phone_input:
         provisional.phone = phone_input
+    if cpf_input:
+        provisional.cpf = cpf_input
+    if phone_input or cpf_input:
         db.session.flush()
 
     # --- Alertas de duplicidade (antes de forçar) ---
     if not force:
-        warnings = _activation_warnings_for(provisional, doctor_id)
+        warnings = _activation_warnings_for(provisional, doctor_id, phone_input, cpf_input)
         if warnings:
             return jsonify({
                 'success': False,

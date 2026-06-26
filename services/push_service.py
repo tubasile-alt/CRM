@@ -14,7 +14,9 @@ def _vapid_claims():
         return None
 
     email = email.strip()
-    subject = email if email.startswith('mailto:') else f'mailto:{email}'
+    if email.lower().startswith('mailto:'):
+        email = email.split(':', 1)[1].strip()
+    subject = f'mailto:{email}'
     import time
     return {'sub': subject, 'exp': int(time.time()) + 86400}
 
@@ -33,6 +35,16 @@ def _mark_subscription_inactive(subscription):
     subscription.is_active = False
     db.session.add(subscription)
     db.session.commit()
+
+
+def _set_subscription_error(subscription, message):
+    subscription.last_error = (message or 'Erro desconhecido')[:1000]
+    db.session.add(subscription)
+
+
+def _clear_subscription_error(subscription):
+    subscription.last_error = None
+    db.session.add(subscription)
 
 
 def send_checkin_push_notification(doctor_id, patient_name, appointment_id, patient_id=None):
@@ -87,23 +99,32 @@ def send_checkin_push_notification(doctor_id, patient_name, appointment_id, pati
                 vapid_private_key=private_key,
                 vapid_claims=claims,
             )
+            _clear_subscription_error(subscription)
             sent += 1
         except WebPushException as exc:
             failed += 1
             status_code = getattr(getattr(exc, 'response', None), 'status_code', None)
+            _set_subscription_error(subscription, f'WebPushException status={status_code}: {exc}')
             if status_code in (404, 410):
                 _mark_subscription_inactive(subscription)
+            else:
+                db.session.commit()
             logger.exception(
                 'Falha ao enviar push de check-in para user_id=%s subscription_id=%s',
                 doctor_id,
                 subscription.id,
             )
-        except Exception:
+        except Exception as exc:
             failed += 1
+            _set_subscription_error(subscription, str(exc))
+            db.session.commit()
             logger.exception(
                 'Erro inesperado ao enviar push de check-in para user_id=%s subscription_id=%s',
                 doctor_id,
                 subscription.id,
             )
+
+    if sent:
+        db.session.commit()
 
     return {'sent': sent, 'failed': failed, 'skipped': False}

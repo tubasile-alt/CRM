@@ -631,7 +631,7 @@
             </div>
             <div class="modal-body">
                 <div class="input-group mb-3">
-                    <input type="text" id="patientSearchInput" class="form-control" placeholder="Digite nome ou CPF do paciente...">
+                    <input type="text" id="patientSearchInput" class="form-control" placeholder="Digite nome, telefone, CPF ou código do paciente...">
                     <button class="btn btn-primary" onclick="searchPatientsDetailed()">Buscar</button>
                 </div>
                 <div class="table-responsive">
@@ -640,13 +640,15 @@
                             <tr>
                                 <th>Paciente</th>
                                 <th>Código</th>
+                                <th>Telefone</th>
+                                <th>CPF</th>
                                 <th>Médico</th>
                                 <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody id="patientSearchResults">
                             <tr>
-                                <td colspan="4" class="text-center text-muted">Digite algo para buscar</td>
+                                <td colspan="6" class="text-center text-muted">Digite algo para buscar</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1215,6 +1217,13 @@
                     <input type="tel" class="form-control" id="ativarTelefonePaciente" placeholder="(XX) XXXXX-XXXX" autocomplete="off">
                     <div id="ativarTelefoneErro" class="text-danger small mt-1 d-none">
                         <i class="bi bi-exclamation-circle"></i> Telefone obrigatório para ativar o cadastro.
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">CPF do paciente <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="ativarCpfPaciente" placeholder="000.000.000-00" autocomplete="off">
+                    <div id="ativarCpfErro" class="text-danger small mt-1 d-none">
+                        <i class="bi bi-exclamation-circle"></i> CPF obrigatório para ativar o cadastro.
                     </div>
                 </div>
                 <div id="ativarAlertas" class="alert alert-warning d-none mb-3">
