@@ -1,12 +1,13 @@
 """
-Servico de marcacao automatica de faltas
-Verifica a cada X minutos se pacientes faltaram (30 min apos horario sem check-in)
-IMPORTANTE: So executa apos o horario comercial (19h) para evitar marcar como faltou
-pacientes que compareceram mas nao passaram pelo check-in digital durante o dia.
+Servico de marcacao automatica de faltas.
+
+Pacientes provisorios sao marcados como faltou logo apos a tolerancia, porque
+nao fazem check-in nem recebem prontuario real antes da ativacao. Pacientes
+ativos preservam a regra historica: apenas apos o fim do horario comercial.
 """
 from datetime import datetime, timedelta, time
 import pytz
-from models import db, Appointment
+from models import db, Appointment, Patient
 
 TZ = pytz.timezone("America/Sao_Paulo")
 
@@ -35,16 +36,12 @@ def mark_no_shows_grace_minutes(grace_minutes: int = 30):
     - start_time <= agora - grace_minutes
     - checked_in_time IS NULL
     - waiting = False (nao esta na sala de espera)
-    - status NOT IN ('atendido', 'faltou')
+    - status ainda permite falta automatica
 
-    RESTRICAO: So executa apos as 19h (BUSINESS_HOURS_END) para evitar
-    marcar incorretamente pacientes que compareceram mas nao fizeram check-in
-    digital durante o horario de atendimento.
+    Pacientes ativos so entram apos as 19h. Pacientes provisorios entram
+    imediatamente apos a tolerancia de 30 minutos.
     """
     now_sp = _now_sp()
-
-    if now_sp.time() < BUSINESS_HOURS_END:
-        return 0
 
     now_naive = now_sp.replace(tzinfo=None)
     cutoff = now_naive - timedelta(minutes=grace_minutes)
@@ -53,16 +50,22 @@ def mark_no_shows_grace_minutes(grace_minutes: int = 30):
     start_of_day = datetime.combine(today, time(0, 0, 0))
     end_of_day = datetime.combine(today, time(23, 59, 59))
 
-    q = Appointment.query.filter(
+    eligible_statuses = ["agendado", "agendada", "confirmado", "confirmada"]
+
+    base_q = Appointment.query.join(Patient, Appointment.patient_id == Patient.id).filter(
         Appointment.start_time >= start_of_day,
         Appointment.start_time <= end_of_day,
         Appointment.start_time <= cutoff,
         Appointment.checked_in_time.is_(None),
         Appointment.waiting.is_(False),
-        Appointment.status.notin_(["atendido", "faltou"])
+        Appointment.status.in_(eligible_statuses),
     )
 
-    appts = q.all()
+    filters = [Patient.status_cadastral == "provisorio"]
+    if now_sp.time() >= BUSINESS_HOURS_END:
+        filters.append(Patient.status_cadastral != "provisorio")
+
+    appts = base_q.filter(db.or_(*filters)).all()
     changed = 0
 
     for a in appts:
