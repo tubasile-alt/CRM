@@ -70,8 +70,7 @@ run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=2", "--threads=2", "--worke
 
 [userenv.shared]
 VAPID_PUBLIC_KEY = "BB0Rb4wxmh8a_Hl5LvdiGJKXFJQDLqUqS9nwGYxCtJkz14jnJ05YcPlggYfSYc55NxG_cLaC8RMMjgkSrn9jQ1A"
-VAPID_PRIVATE_KEY = "kY4rSTAm2HbZaIR-OFtRV5_H0EZUWoS79wTmBF60Ox8"
-VAPID_CLAIMS_EMAIL = "mailto: tubasile@gmail.com"
+VAPID_CLAIMS_EMAIL = "mailto:tubasile@gmail.com"
 
 [postMerge]
 path = "scripts/post-merge.sh"
