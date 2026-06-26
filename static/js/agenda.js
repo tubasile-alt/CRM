@@ -500,8 +500,9 @@
 
         if (isProvisorio && (window.isSecretary || window.isDoctor)) {
             const existingPhone = app.extendedProps?.phone || '';
+            const existingCpf = app.extendedProps?.cpf || '';
             actionBadgeHtml += `<button class="btn btn-sm btn-warning ms-1 btn-ativar-provisorio"
-                    onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'}, '${(existingPhone || '').replace(/'/g,"\\'")}')"
+                    onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'}, '${(existingPhone || '').replace(/'/g,"\\'")}', '${(existingCpf || '').replace(/'/g,"\\'")}')"
                     title="Ativar cadastro deste paciente"><i class="bi bi-person-check"></i> Ativar</button>`;
         }
 
@@ -1616,6 +1617,36 @@
 // ── Ativação de cadastro provisório ──────────────────────────────────────────
 window._ativarCtx = { patientId: null, doctorId: null, warnings: [] };
 
+function getActivationRequiredValues() {
+    const phoneInput = document.getElementById('ativarTelefonePaciente');
+    const cpfInput = document.getElementById('ativarCpfPaciente');
+    return {
+        phone: (phoneInput?.value || '').trim(),
+        cpf: (cpfInput?.value || '').trim()
+    };
+}
+
+function validateActivationRequiredFields() {
+    const values = getActivationRequiredValues();
+    const phoneError = document.getElementById('ativarTelefoneErro');
+    const cpfError = document.getElementById('ativarCpfErro');
+    const phoneInput = document.getElementById('ativarTelefonePaciente');
+    const cpfInput = document.getElementById('ativarCpfPaciente');
+
+    phoneError?.classList.toggle('d-none', !!values.phone);
+    cpfError?.classList.toggle('d-none', !!values.cpf);
+
+    if (!values.phone) {
+        phoneInput?.focus();
+        return null;
+    }
+    if (!values.cpf) {
+        cpfInput?.focus();
+        return null;
+    }
+    return values;
+}
+
 function renderActivationWarnings(data, patientId, doctorId) {
     window._ativarCtx.warnings = data.warnings || [];
     const alertaDiv = document.getElementById('ativarAlertas');
@@ -1643,7 +1674,7 @@ function renderActivationWarnings(data, patientId, doctorId) {
         </div>`;
 
         mergeLista.innerHTML += `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
-            onclick="event.stopPropagation(); const phone = document.getElementById('ativarTelefonePaciente').value.trim(); if(!phone){document.getElementById('ativarTelefoneErro').classList.remove('d-none');return;}document.getElementById('ativarTelefoneErro').classList.add('d-none');_finalizarAtivacao(${patientId}, ${doctorId}, ${w.id}, true, phone)">
+            onclick="event.stopPropagation(); const values = validateActivationRequiredFields(); if(!values){return;}_finalizarAtivacao(${patientId}, ${doctorId}, ${w.id}, true, values.phone, values.cpf)">
             <span><strong>${w.name}</strong>
             ${w.phone ? `<span class='text-muted ms-2 small'>${w.phone}</span>` : ''}
             ${w.cpf ? `<span class='text-muted ms-2 small'>CPF: ${w.cpf}</span>` : ''}
@@ -1656,13 +1687,16 @@ function renderActivationWarnings(data, patientId, doctorId) {
         'Foram encontrados cadastros possivelmente duplicados. Escolha vincular a um existente ou ativar como novo.';
 }
 
-window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingPhone) {
+window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingPhone, existingCpf) {
     window._ativarCtx = { patientId, doctorId, warnings: [] };
 
     document.getElementById('ativarNomePaciente').textContent = patientName;
     const telInput = document.getElementById('ativarTelefonePaciente');
+    const cpfInput = document.getElementById('ativarCpfPaciente');
     telInput.value = existingPhone || '';
+    cpfInput.value = existingCpf || '';
     document.getElementById('ativarTelefoneErro').classList.add('d-none');
+    document.getElementById('ativarCpfErro').classList.add('d-none');
     document.getElementById('ativarAlertas').classList.add('d-none');
     document.getElementById('ativarAlertalista').innerHTML = '';
     document.getElementById('ativarMergeOpcoes').classList.add('d-none');
@@ -1679,7 +1713,7 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
     fetch(`/api/patients/${patientId}/activation-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
-        body: JSON.stringify({ doctor_id: doctorId, phone: existingPhone })
+        body: JSON.stringify({ doctor_id: doctorId, phone: existingPhone, cpf: existingCpf })
     })
     .then(r => r.json())
     .then(data => {
@@ -1688,9 +1722,13 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
                 'Revise os dados e confirme para ativar como novo paciente definitivo.';
             return;
         }
-        if (data.error === 'phone_required' || data.warning === 'phone_required') {
+        if (data.error === 'required_fields' || data.error === 'phone_required' || data.error === 'cpf_required') {
             document.getElementById('ativarInstrucao').textContent =
-                data.message || 'Informe o telefone do paciente e escolha uma opção para ativar.';
+                data.message || 'Informe telefone e CPF do paciente para ativar.';
+            (data.required || []).forEach(item => {
+                if (item.field === 'phone') document.getElementById('ativarTelefoneErro').classList.remove('d-none');
+                if (item.field === 'cpf') document.getElementById('ativarCpfErro').classList.remove('d-none');
+            });
             return;
         }
         if (data.warning === 'duplicates_found') {
@@ -1706,22 +1744,22 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
 
     document.getElementById('ativarDiretoBtn').onclick = function() {
         const ctx = window._ativarCtx;
-        const phone = document.getElementById('ativarTelefonePaciente').value.trim();
-        if (!phone) {
-            document.getElementById('ativarTelefoneErro').classList.remove('d-none');
-            telInput.focus();
+        const values = validateActivationRequiredFields();
+        if (!values) {
             return;
         }
         document.getElementById('ativarTelefoneErro').classList.add('d-none');
+        document.getElementById('ativarCpfErro').classList.add('d-none');
         const forceActivation = (ctx.warnings || []).length > 0;
-        _finalizarAtivacao(ctx.patientId, ctx.doctorId, null, forceActivation, phone);
+        _finalizarAtivacao(ctx.patientId, ctx.doctorId, null, forceActivation, values.phone, values.cpf);
     };
 };
 
-window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, phone) {
+window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, phone, cpf) {
     const payload = { doctor_id: doctorId, force: !!force };
     if (mergeIntoId) payload.merge_into_patient_id = mergeIntoId;
     if (phone) payload.phone = phone;
+    if (cpf) payload.cpf = cpf;
 
     fetch(`/api/patients/${patientId}/ativar`, {
         method: 'POST',
@@ -1738,6 +1776,12 @@ window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, ph
 	            loadAppointments();
 	        } else if (data.warning === 'duplicates_found') {
 	            renderActivationWarnings(data, patientId, doctorId);
+	        } else if (data.error === 'required_fields') {
+	            (data.required || []).forEach(item => {
+	                if (item.field === 'phone') document.getElementById('ativarTelefoneErro').classList.remove('d-none');
+	                if (item.field === 'cpf') document.getElementById('ativarCpfErro').classList.remove('d-none');
+	            });
+	            showAlert(data.message || 'Informe telefone e CPF antes de ativar.', 'danger');
 	        } else {
 	            showAlert(data.error || 'Erro ao ativar cadastro', 'danger');
 	        }
