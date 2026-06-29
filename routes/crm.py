@@ -1,12 +1,12 @@
 from flask import Blueprint, render_template, jsonify, request, send_file, redirect, url_for
 from flask_login import login_required, current_user
 from models import db, Patient, CosmeticProcedurePlan, ProcedureExecution, Note, User, Appointment, TransplantSurgeryRecord, PatientDoctor, PatientFunnelStatus
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, extract
-import pytz
 import os
+from services.clinic_time import clinic_today
 
 
 def _get_dp_id(patient_id, doctor_id):
@@ -95,7 +95,7 @@ def sales_funnel():
 @login_required
 def get_transplant_stats():
     # Atendimentos de transplante por mês (últimos 12 meses)
-    today = date.today()
+    today = clinic_today()
     start_date = today - relativedelta(months=11)
     start_date = start_date.replace(day=1)
     
@@ -236,7 +236,7 @@ def get_performed_procedures():
 @crm_bp.route('/api/crm/followups')
 @login_required
 def get_followups():
-    today = date.today()
+    today = clinic_today()
     
     # D1: follow-up por execução realizada
     query = db.session.query(ProcedureExecution, CosmeticProcedurePlan, Note, Patient).join(
@@ -866,7 +866,7 @@ def update_cosmetic_plan(plan_id):
 @crm_bp.route('/api/crm/stats')
 @login_required
 def get_crm_stats():
-    today = date.today()
+    today = clinic_today()
 
     plans_query = db.session.query(CosmeticProcedurePlan, Note).join(
         Note, CosmeticProcedurePlan.note_id == Note.id

@@ -8,6 +8,7 @@ ativos preservam a regra historica: apenas apos o fim do horario comercial.
 from datetime import datetime, timedelta, time
 import pytz
 from models import db, Appointment, Patient
+from services.statuses import AppointmentStatus, appointment_pending_status_values
 
 TZ = pytz.timezone("America/Sao_Paulo")
 
@@ -50,7 +51,7 @@ def mark_no_shows_grace_minutes(grace_minutes: int = 30):
     start_of_day = datetime.combine(today, time(0, 0, 0))
     end_of_day = datetime.combine(today, time(23, 59, 59))
 
-    eligible_statuses = ["agendado", "agendada", "confirmado", "confirmada"]
+    eligible_statuses = appointment_pending_status_values(include_aliases=True)
 
     base_q = Appointment.query.join(Patient, Appointment.patient_id == Patient.id).filter(
         Appointment.start_time >= start_of_day,
@@ -69,7 +70,7 @@ def mark_no_shows_grace_minutes(grace_minutes: int = 30):
     changed = 0
 
     for a in appts:
-        a.status = "faltou"
+        a.status = AppointmentStatus.NO_SHOW
         changed += 1
 
     if changed:

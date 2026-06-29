@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from models import db, TransplantSurgeryRecord, SurgeryEvolution
 from datetime import datetime
+from services.access_control import can_manage_owned_record
 
 patient_bp = Blueprint('patient', __name__, url_prefix='/api/patient')
 
@@ -67,11 +68,11 @@ def create_patient_surgery(patient_id):
 @login_required
 def delete_patient_surgery(surgery_id):
     """Deletar uma cirurgia"""
-    if not current_user.is_doctor():
+    if not (current_user.is_doctor() or current_user.is_admin()):
         return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
     
     surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
-    if surgery.doctor_id != current_user.id and not current_user.is_admin():
+    if not can_manage_owned_record(current_user, surgery.doctor_id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     db.session.delete(surgery)
@@ -208,11 +209,11 @@ def create_surgery_evolution(patient_id, surgery_id):
 @login_required
 def delete_surgery_evolution(evolution_id):
     """Deletar uma evolução de cirurgia"""
-    if not current_user.is_doctor():
+    if not (current_user.is_doctor() or current_user.is_admin()):
         return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
     
     evolution = SurgeryEvolution.query.get_or_404(evolution_id)
-    if evolution.doctor_id != current_user.id and not current_user.is_admin():
+    if not can_manage_owned_record(current_user, evolution.doctor_id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     db.session.delete(evolution)

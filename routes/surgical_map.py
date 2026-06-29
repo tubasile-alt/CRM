@@ -9,7 +9,7 @@ from services.surgery_service import SurgeryService
 from services.email_service import EmailService
 from utils.exports.pdf_export import PDFExporter
 from utils.exports.excel_export import ExcelExporter
-import pytz
+from services.clinic_time import clinic_today
 
 surgical_map_bp = Blueprint('surgical_map', __name__, url_prefix='/mapa-cirurgico')
 surgery_service = SurgeryService()
@@ -19,7 +19,7 @@ surgery_service = SurgeryService()
 def index():
     """Página principal do mapa cirúrgico"""
     # Pegar a segunda-feira da semana atual
-    today = datetime.now(pytz.timezone('America/Sao_Paulo')).date()
+    today = clinic_today()
     week_start = today - timedelta(days=today.weekday())
     
     # Buscar médicos para seletor
@@ -37,7 +37,7 @@ def get_weekly_map():
     if week_start_str:
         week_start = datetime.strptime(week_start_str, '%Y-%m-%d').date()
     else:
-        today = datetime.now(pytz.timezone('America/Sao_Paulo')).date()
+        today = clinic_today()
         week_start = today - timedelta(days=today.weekday())
     
     map_data = surgery_service.get_weekly_map(week_start)
@@ -239,7 +239,7 @@ def delete_surgery(surgery_id):
 def export_pdf():
     """Exporta mapa cirúrgico em PDF"""
     week_start_str = request.args.get('week_start')
-    week_start = datetime.strptime(week_start_str, '%Y-%m-%d').date() if week_start_str else datetime.now().date()
+    week_start = datetime.strptime(week_start_str, '%Y-%m-%d').date() if week_start_str else clinic_today()
     
     map_data = surgery_service.get_weekly_map(week_start)
     rooms = OperatingRoom.query.all()
@@ -257,7 +257,7 @@ def export_pdf():
 def export_excel():
     """Exporta mapa cirúrgico em Excel"""
     week_start_str = request.args.get('week_start')
-    week_start = datetime.strptime(week_start_str, '%Y-%m-%d').date() if week_start_str else datetime.now().date()
+    week_start = datetime.strptime(week_start_str, '%Y-%m-%d').date() if week_start_str else clinic_today()
     
     map_data = surgery_service.get_weekly_map(week_start)
     rooms = OperatingRoom.query.all()

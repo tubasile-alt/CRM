@@ -1,6 +1,7 @@
 from flask import abort
 from flask_login import current_user
 from models import db, PatientDoctor
+from services.access_control import is_admin_user
 
 
 def _get_dp(dp_id):
@@ -23,7 +24,7 @@ def can_view_dp(dp):
         (hasattr(current_user, 'is_secretary') and current_user.is_secretary())
     )
     
-    if is_sec or user_role == 'ADMIN' or user_role_clinico == 'ADMIN':
+    if is_sec or is_admin_user(current_user):
         return True
         
     return dp.doctor_id == current_user.id
@@ -48,7 +49,7 @@ def can_edit_dp(dp):
     if is_sec:
         return False
 
-    if user_role == 'ADMIN' or user_role_clinico == 'ADMIN':
+    if is_admin_user(current_user):
         return True
         
     return dp.doctor_id == current_user.id
