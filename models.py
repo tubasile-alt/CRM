@@ -1,14 +1,13 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
-import pytz
+from services.access_control import is_admin_user
+from services.clinic_time import clinic_now
 
 db = SQLAlchemy()
 
 def get_brazil_time():
-    tz = pytz.timezone('America/Sao_Paulo')
-    return datetime.now(tz)
+    return clinic_now()
 
 class User(UserMixin, db.Model):
     __tablename__ = 'user'
@@ -33,6 +32,9 @@ class User(UserMixin, db.Model):
     
     def is_secretary(self):
         return self.role == 'secretaria'
+
+    def is_admin(self):
+        return is_admin_user(self)
     
     def is_cp(self):
         return self.role_clinico == 'CP'

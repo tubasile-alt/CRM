@@ -12,6 +12,9 @@ from io import BytesIO
 from config import Config
 from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
 from utils.database_backup import backup_manager
+from services.access_control import can_manage_owned_record
+from services.clinic_time import clinic_now, clinic_today, clinic_wall_time_iso, utc_instant_to_clinic_iso
+from services.statuses import normalize_appointment_status
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -223,8 +226,7 @@ def service_worker():
     return response
 
 def get_brazil_time():
-    tz = pytz.timezone('America/Sao_Paulo')
-    return datetime.now(tz)
+    return clinic_now()
 
 def parse_datetime_with_tz(iso_string):
     """Parse ISO datetime string - retorna naive datetime para São Paulo.
@@ -1151,11 +1153,10 @@ def get_appointments():
     for surg in surgeries:
         try:
             from datetime import datetime
-            # Timezone offset -03:00
             surg_start_dt = datetime.combine(surg.date, surg.start_time)
             surg_end_dt = datetime.combine(surg.date, surg.end_time)
-            start_iso = surg_start_dt.isoformat() + '-03:00'
-            end_iso = surg_end_dt.isoformat() + '-03:00'
+            start_iso = clinic_wall_time_iso(surg_start_dt)
+            end_iso = clinic_wall_time_iso(surg_end_dt)
             
             # Tentar encontrar o paciente pelo nome para vincular o ID
             target_patient_id = None
@@ -1192,18 +1193,19 @@ def get_appointments():
             pref = DoctorPreference.query.filter_by(user_id=apt.doctor_id).first()
             doctor_color = pref.color if pref else '#0d6efd'
             
+            appointment_status = normalize_appointment_status(apt.status)
+
             # Use status color for border
             border_color = {
                 'agendado': '#6c757d',
                 'confirmado': '#0d6efd',
                 'atendido': '#198754',
                 'faltou': '#dc3545'
-            }.get(apt.status, '#6c757d')
+            }.get(appointment_status, '#6c757d')
             
-            # TIMEZONE: Banco armazena horários naive em São Paulo (sem conversão)
-            # Retornar com offset timezone correto (-03:00) para evitar conversão UTC
-            start_iso = apt.start_time.isoformat() + '-03:00' if apt.start_time else None
-            end_iso = apt.end_time.isoformat() + '-03:00' if apt.end_time else None
+            # Horários civis da agenda são interpretados no timezone da clínica.
+            start_iso = clinic_wall_time_iso(apt.start_time)
+            end_iso = clinic_wall_time_iso(apt.end_time)
             
             # Buscar código do paciente para este médico
             from models import PatientDoctor
@@ -1249,7 +1251,7 @@ def get_appointments():
                 'backgroundColor': '#0A66C2' if (apt.appointment_type or '') == 'Transplante Capilar' else doctor_color,
                 'borderColor': border_color,
                 'extendedProps': {
-                    'status': apt.status,
+                    'status': appointment_status,
                     'appointmentType': apt.appointment_type or 'Particular',
                     'patientId': apt.patient_id,
                     'patientCode': patient_code,
@@ -1257,7 +1259,7 @@ def get_appointments():
                     'doctorId': apt.doctor_id,
                     'doctorName': doctor_name,
                     'waiting': apt.waiting,
-                    'checkedInTime': apt.checked_in_time.isoformat() + '-03:00' if apt.checked_in_time else None,
+                    'checkedInTime': utc_instant_to_clinic_iso(apt.checked_in_time),
                     'phone': patient_phone,
                     'cpf': patient_cpf,
                     'birthDate': patient_birth_date,
@@ -1511,7 +1513,7 @@ def create_appointment():
         doctor_id=doctor_id,
         start_time=parse_datetime_with_tz(start_time),
         end_time=parse_datetime_with_tz(end_time),
-        status=data.get('status', 'agendado'),
+        status=normalize_appointment_status(data.get('status')),
         appointment_type=data.get('appointmentType', 'Particular'),
         notes=data.get('notes', '')
     )
@@ -1631,7 +1633,7 @@ def update_appointment(id):
     if 'end' in data:
         appointment.end_time = parse_datetime_with_tz(data['end'])
     if 'status' in data:
-        appointment.status = data['status']
+        appointment.status = normalize_appointment_status(data['status'])
     if 'notes' in data:
         appointment.notes = data['notes']
     if 'appointment_type' in data:
@@ -1957,8 +1959,8 @@ def export_agenda_pdf():
     """Exporta agenda em PDF"""
     from utils.exports.pdf_export import PDFExporter
     
-    start_date = request.args.get('start', datetime.now().strftime('%Y-%m-%d'))
-    end_date = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
+    start_date = request.args.get('start', clinic_today().isoformat())
+    end_date = request.args.get('end', clinic_today().isoformat())
     doctor_id_param = request.args.get('doctor_id', type=int)
     
     start = datetime.strptime(start_date, '%Y-%m-%d')
@@ -1996,8 +1998,8 @@ def export_agenda_excel():
     """Exporta agenda em Excel"""
     from utils.exports.excel_export import ExcelExporter
     
-    start_date = request.args.get('start', datetime.now().strftime('%Y-%m-%d'))
-    end_date = request.args.get('end', datetime.now().strftime('%Y-%m-%d'))
+    start_date = request.args.get('start', clinic_today().isoformat())
+    end_date = request.args.get('end', clinic_today().isoformat())
     doctor_id_param = request.args.get('doctor_id', type=int)
     
     start = datetime.strptime(start_date, '%Y-%m-%d')
@@ -2691,8 +2693,7 @@ def prontuario(patient_id):
 
         age = None
         if patient.birth_date:
-            from datetime import date as pydate
-            today = pydate.today()
+            today = clinic_today()
             age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
         
         # TIMELINE REFACTOR
@@ -2744,8 +2745,7 @@ def prontuario_dp(dp_id):
 
     age = None
     if patient.birth_date:
-        from datetime import date as pydate
-        today = pydate.today()
+        today = clinic_today()
         age = today.year - patient.birth_date.year - (
             (today.month, today.day) < (patient.birth_date.month, patient.birth_date.day)
         )
@@ -5135,7 +5135,7 @@ def create_evolution(patient_id):
 def update_evolution(evo_id):
     """Editar evolução"""
     evo = Evolution.query.get_or_404(evo_id)
-    if evo.doctor_id != current_user.id and not current_user.is_admin():
+    if not can_manage_owned_record(current_user, evo.doctor_id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     data = request.get_json()
@@ -5155,7 +5155,7 @@ def update_evolution(evo_id):
 def delete_evolution(evo_id):
     """Deletar evolução"""
     evo = Evolution.query.get_or_404(evo_id)
-    if evo.doctor_id != current_user.id and not current_user.is_admin():
+    if not can_manage_owned_record(current_user, evo.doctor_id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     db.session.delete(evo)
@@ -5378,11 +5378,11 @@ def create_patient_surgery(patient_id):
 def delete_patient_surgery(surgery_id):
     """Deletar uma cirurgia"""
     from models import TransplantSurgeryRecord
-    if not current_user.is_doctor():
+    if not (current_user.is_doctor() or current_user.is_admin()):
         return jsonify({'success': False, 'error': 'Apenas médicos'}), 403
     
     surgery = TransplantSurgeryRecord.query.get_or_404(surgery_id)
-    if surgery.doctor_id != current_user.id and not current_user.is_admin():
+    if not can_manage_owned_record(current_user, surgery.doctor_id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     db.session.delete(surgery)

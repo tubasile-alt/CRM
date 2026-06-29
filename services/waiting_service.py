@@ -4,6 +4,8 @@ Serviço de gerenciamento de espera de pacientes
 from datetime import datetime, timezone
 from models import db, Appointment
 import pytz
+from services.clinic_time import utc_instant_to_clinic_iso
+from services.statuses import AppointmentStatus
 
 class WaitingService:
     """Serviço para gerenciar lista de espera"""
@@ -40,7 +42,7 @@ class WaitingService:
         return {
             'id': appointment.id,
             'patient_name': appointment.patient.name,
-            'checked_in_time': now.isoformat(),
+            'checked_in_time': utc_instant_to_clinic_iso(now),
             'scheduled_time': appointment.start_time.strftime('%H:%M'),
             'wait_time_minutes': 0,
             'waiting': True
@@ -61,7 +63,7 @@ class WaitingService:
             raise ValueError("Agendamento não encontrado")
         
         appointment.waiting = False
-        appointment.status = 'atendido'
+        appointment.status = AppointmentStatus.COMPLETED
         
         # Calcular tempo de espera e registrar
         wait_time = None
@@ -158,7 +160,7 @@ class WaitingService:
                 current_time = datetime.now(timezone.utc)
                 delta = current_time - checkin_time
                 wait_time = max(0, int(delta.total_seconds() // 60))
-                checked_in_iso = checkin_time.isoformat()
+                checked_in_iso = utc_instant_to_clinic_iso(checkin_time)
             
             waiting_list.append({
                 'appointment_id': apt.id,
@@ -190,7 +192,7 @@ class WaitingService:
         
         query = Appointment.query.filter(
             Appointment.total_waiting_minutes.isnot(None),
-            Appointment.status == 'atendido'
+            Appointment.status == AppointmentStatus.COMPLETED
         )
         
         if doctor_id:
