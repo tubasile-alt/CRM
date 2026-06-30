@@ -74,6 +74,13 @@ class Patient(db.Model):
     appointments = db.relationship('Appointment', backref='patient', lazy=True, cascade='all, delete-orphan')
     notes = db.relationship('Note', backref='patient', lazy=True, cascade='all, delete-orphan')
     tags = db.relationship('PatientTag', backref='patient', lazy=True, cascade='all, delete-orphan')
+    photo_file = db.relationship(
+        'PatientPhoto',
+        back_populates='patient',
+        uselist=False,
+        cascade='all, delete-orphan',
+        passive_deletes=True,
+    )
 
     @property
     def is_provisorio(self):
@@ -81,6 +88,29 @@ class Patient(db.Model):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+
+
+class PatientPhoto(db.Model):
+    __tablename__ = 'patient_photo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(
+        db.Integer,
+        db.ForeignKey('patient.id', ondelete='CASCADE'),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    data = db.Column(db.LargeBinary, nullable=False)
+    mime_type = db.Column(db.String(50), nullable=False, default='image/jpeg')
+    updated_at = db.Column(
+        db.DateTime,
+        nullable=False,
+        default=get_brazil_time,
+        onupdate=get_brazil_time,
+    )
+
+    patient = db.relationship('Patient', back_populates='photo_file')
 
 class PatientDoctor(db.Model):
     __tablename__ = 'patient_doctor'
