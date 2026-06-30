@@ -18,6 +18,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    {% if current_user.is_authenticated and request.endpoint != 'chat' %}
+    <link href="{{ url_for('static', filename='css/chat-hub.css') }}" rel="stylesheet">
+    {% endif %}
     
     {% block extra_css %}{% endblock %}
 
@@ -187,10 +190,72 @@
     <!-- Toast container global -->
     <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
 
+    {% if current_user.is_authenticated and request.endpoint != 'chat' %}
+    <button
+        type="button"
+        id="chat-hub-fab"
+        class="chat-hub-fab"
+        aria-label="Abrir conversas"
+        aria-controls="chat-hub-drawer"
+        title="Conversas (Alt + N)"
+    >
+        <i class="bi bi-bell" aria-hidden="true"></i>
+        <span id="chat-hub-badge" class="chat-hub-badge" hidden>0</span>
+    </button>
+
+    <aside
+        class="offcanvas offcanvas-end chat-hub-drawer"
+        tabindex="-1"
+        id="chat-hub-drawer"
+        aria-labelledby="chat-hub-title"
+        data-bs-scroll="true"
+    >
+        <div class="chat-hub-header">
+            <button type="button" id="chat-hub-back" class="chat-hub-icon-button" aria-label="Voltar para contatos" hidden>
+                <i class="bi bi-arrow-left" aria-hidden="true"></i>
+            </button>
+            <div class="chat-hub-heading">
+                <h2 id="chat-hub-title">Conversas</h2>
+                <p id="chat-hub-subtitle">Comunicação interna da clínica</p>
+            </div>
+            <button type="button" class="chat-hub-icon-button" data-bs-dismiss="offcanvas" aria-label="Fechar conversas">
+                <i class="bi bi-x-lg" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <div class="chat-hub-body">
+            <section id="chat-hub-contacts-view" class="chat-hub-view" aria-label="Contatos">
+                <div id="chat-hub-contacts" class="chat-hub-contacts" aria-live="polite">
+                    <div class="chat-hub-state">
+                        <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+                        <span>Carregando contatos...</span>
+                    </div>
+                </div>
+            </section>
+
+            <section id="chat-hub-conversation-view" class="chat-hub-view chat-hub-conversation" aria-label="Conversa" hidden>
+                <div id="chat-hub-messages" class="chat-hub-messages" role="log" aria-live="polite" aria-relevant="additions">
+                    <div class="chat-hub-state">Selecione um contato para conversar.</div>
+                </div>
+                <form id="chat-hub-form" class="chat-hub-composer" autocomplete="off">
+                    <label class="visually-hidden" for="chat-hub-input">Digite sua mensagem</label>
+                    <textarea id="chat-hub-input" rows="1" maxlength="4000" placeholder="Digite sua mensagem..." required></textarea>
+                    <button type="submit" id="chat-hub-send" class="chat-hub-send" aria-label="Enviar mensagem">
+                        <i class="bi bi-send" aria-hidden="true"></i>
+                    </button>
+                </form>
+            </section>
+        </div>
+    </aside>
+    {% endif %}
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% if current_user.is_authenticated %}
     <script src="{{ url_for('static', filename='js/push-notifications.js') }}"></script>
+    {% if request.endpoint != 'chat' %}
+    <script src="{{ url_for('static', filename='js/chat-hub.js') }}"></script>
+    {% endif %}
     {% endif %}
     {% block extra_js %}{% endblock %}
 <div id="chat-toast-root"></div>

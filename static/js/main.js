@@ -54,9 +54,26 @@ function formatTime(date) {
     return new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-let lastUnreadCount = parseInt(localStorage.getItem('chatLastUnreadCount') || '0');
+const chatStorageScope = document.body.dataset.userId || 'anonymous';
+const chatUnreadCountKey = `chatLastUnreadCount:${chatStorageScope}`;
+const chatLastSeenMessageKey = `chatLastSeenMessageId:${chatStorageScope}`;
+const storedUnreadCount = Number.parseInt(localStorage.getItem(chatUnreadCountKey) || '0', 10);
+let lastUnreadCount = Number.isFinite(storedUnreadCount) ? storedUnreadCount : 0;
 let lastNotifiedAt = 0;
-let lastSeenMessageId = localStorage.getItem('chatLastSeenMessageId');
+let lastSeenMessageId = localStorage.getItem(chatLastSeenMessageKey);
+let hasSyncedChatBadge = false;
+
+function escapeChatHtml(value) {
+    const element = document.createElement('div');
+    element.textContent = String(value ?? '');
+    return element.innerHTML;
+}
+
+function openChatConversation(data = {}) {
+    if (window.ChatHub && typeof window.ChatHub.open === 'function') {
+        window.ChatHub.open(data.from_user_id || null);
+    }
+}
 
 const ChatNotifier = {
     activePopupId: null,
@@ -92,6 +109,9 @@ const ChatNotifier = {
     showUrgentPopup(data) {
         if (!data || !data.id) return;
 
+        const safeName = escapeChatHtml(data.from_name || 'Contato');
+        const safeMessage = escapeChatHtml(data.message || '');
+
         const oldPopup = document.getElementById('chat-urgent-popup');
         if (oldPopup) oldPopup.remove();
 
@@ -119,13 +139,13 @@ const ChatNotifier = {
                     <div style="font-size: 15px; font-weight: 700; letter-spacing: .2px;">
                         <i class="bi bi-bell-fill"></i> Nova mensagem para responder
                     </div>
-                    <div style="font-size: 13px; opacity: .9; margin-top: 2px;">${data.from_name || 'Contato'} acabou de te chamar.</div>
+                    <div style="font-size: 13px; opacity: .9; margin-top: 2px;">${safeName} acabou de te chamar.</div>
                 </div>
                 <button id="chat-urgent-close" class="btn btn-sm btn-light" style="line-height:1;">Fechar</button>
             </div>
             <div style="margin-top: 10px; background: rgba(255,255,255,.12); border-radius: 10px; padding: 10px 12px;">
-                <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${data.from_name || 'Contato'}</div>
-                <div style="font-size: 14px; line-height: 1.35;">${data.message || ''}</div>
+                <div style="font-weight: 600; font-size: 14px; margin-bottom: 4px;">${safeName}</div>
+                <div style="font-size: 14px; line-height: 1.35;">${safeMessage}</div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
                 <button id="chat-open-now" class="btn btn-warning btn-sm fw-semibold">Responder agora</button>
@@ -141,7 +161,8 @@ const ChatNotifier = {
         };
 
         document.getElementById('chat-open-now')?.addEventListener('click', () => {
-            window.location.href = '/chat';
+            openChatConversation(data);
+            closePopup();
         });
 
         document.getElementById('chat-urgent-close')?.addEventListener('click', closePopup);
@@ -234,7 +255,9 @@ const miniChatDockStyles = `
 
 function updateChatBadge() {
     const badge = document.getElementById('chat-badge');
-    if (!badge) return;
+    const hubBadge = document.getElementById('chat-hub-badge');
+    const hubFab = document.getElementById('chat-hub-fab');
+    if (!badge && !hubBadge) return;
     
     fetch('/api/chat/unread_count')
         .then(response => {
@@ -244,24 +267,41 @@ function updateChatBadge() {
             return response.json();
         })
         .then(data => {
-            const count = data.count;
-            badge.textContent = count;
+            const count = Number(data.count || 0);
+            if (badge) badge.textContent = count > 99 ? '99+' : String(count);
+            if (hubBadge) hubBadge.textContent = count > 99 ? '99+' : String(count);
             
             if (count > 0) {
-                badge.style.display = 'inline-block';
-                badge.classList.add('has-unread');
+                if (badge) {
+                    badge.style.display = 'inline-block';
+                    badge.classList.add('has-unread');
+                }
+                if (hubBadge) hubBadge.hidden = false;
+                if (hasSyncedChatBadge && count > lastUnreadCount && hubFab) {
+                    hubFab.classList.remove('is-new');
+                    void hubFab.offsetWidth;
+                    hubFab.classList.add('is-new');
+                    window.setTimeout(() => hubFab.classList.remove('is-new'), 700);
+                }
                 if (count > lastUnreadCount) {
                     handleChatNotification(count);
                 }
             } else {
-                badge.style.display = 'none';
-                badge.classList.remove('has-unread');
+                if (badge) {
+                    badge.style.display = 'none';
+                    badge.classList.remove('has-unread');
+                }
+                if (hubBadge) hubBadge.hidden = true;
             }
             lastUnreadCount = count;
-            localStorage.setItem('chatLastUnreadCount', lastUnreadCount);
+            hasSyncedChatBadge = true;
+            localStorage.setItem(chatUnreadCountKey, lastUnreadCount);
+            window.dispatchEvent(new CustomEvent('chat:unread-count', { detail: { count } }));
         })
         .catch(error => console.error('Erro badge:', error));
 }
+
+window.updateChatBadge = updateChatBadge;
 
 function handleChatNotification(currentCount) {
     const now = Date.now();
@@ -269,12 +309,17 @@ function handleChatNotification(currentCount) {
     lastNotifiedAt = now;
 
     fetch('/api/chat/latest_unread')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) {
+                throw new Error(`Falha ao consultar nova mensagem (${res.status})`);
+            }
+            return res.json();
+        })
         .then(data => {
             if (!data.id || data.id == lastSeenMessageId) return;
             
             lastSeenMessageId = data.id;
-            localStorage.setItem('chatLastSeenMessageId', lastSeenMessageId);
+            localStorage.setItem(chatLastSeenMessageKey, lastSeenMessageId);
 
             const isChatScreen = window.location.pathname === '/chat';
             if (!isChatScreen) {
@@ -283,14 +328,15 @@ function handleChatNotification(currentCount) {
             }
 
             if (document.hidden || window.location.pathname !== '/chat') {
-                if (Notification.permission === "granted") {
+                if (typeof Notification !== 'undefined' && Notification.permission === "granted") {
                     new Notification("Nova mensagem de " + data.from_name, { body: data.message });
                 }
             }
             if (localStorage.getItem('chatSoundEnabled') === 'true') {
                 ChatNotifier.playIcqAlert();
             }
-        });
+        })
+        .catch(error => console.error('[ChatNotifier] Erro ao consultar mensagem:', error));
 }
 
 function showToastNotification(data) {
@@ -303,16 +349,18 @@ function showToastNotification(data) {
     }
 
     const toastId = 'toast-' + Date.now();
+    const safeName = escapeChatHtml(data.from_name || 'Contato');
+    const safeMessage = escapeChatHtml(data.message || '');
     const toastHtml = `
         <div id="${toastId}" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="toast-header bg-primary text-white">
                 <i class="bi bi-chat-dots me-2"></i>
-                <strong class="me-auto">Nova mensagem — ${data.from_name}</strong>
+                <strong class="me-auto">Nova mensagem — ${safeName}</strong>
                 <small>Agora</small>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
-            <div class="toast-body" style="cursor: pointer;" onclick="window.location.href='/chat'">
-                ${data.message}
+            <div class="toast-body" style="cursor: pointer;">
+                ${safeMessage}
             </div>
         </div>
     `;
@@ -321,6 +369,11 @@ function showToastNotification(data) {
     const toastElement = document.getElementById(toastId);
     const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
     toast.show();
+
+    toastElement.querySelector('.toast-body')?.addEventListener('click', () => {
+        openChatConversation(data);
+        toast.hide();
+    });
 
     toastElement.addEventListener('hidden.bs.toast', () => {
         toastElement.remove();
