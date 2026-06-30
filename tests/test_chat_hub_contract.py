@@ -11,6 +11,7 @@ class ChatHubContractTests(unittest.TestCase):
         cls.base_template = (ROOT / 'templates' / 'base.html').read_text(encoding='utf-8')
         cls.hub_script = (ROOT / 'static' / 'js' / 'chat-hub.js').read_text(encoding='utf-8')
         cls.main_script = (ROOT / 'static' / 'js' / 'main.js').read_text(encoding='utf-8')
+        cls.app_source = (ROOT / 'app.py').read_text(encoding='utf-8')
 
     def test_drawer_is_global_but_not_duplicated_on_full_chat_page(self):
         self.assertIn("request.endpoint != 'chat'", self.base_template)
@@ -33,6 +34,22 @@ class ChatHubContractTests(unittest.TestCase):
         load_position = self.hub_script.index('const messagesChanged = renderMessages(Array.isArray(result) ? result : []);')
         read_position = self.hub_script.index('if (markRead && messagesChanged) await markConversationRead(contactId);')
         self.assertLess(load_position, read_position)
+
+    def test_notification_state_is_scoped_to_the_authenticated_user(self):
+        self.assertIn('`chatLastUnreadCount:${chatStorageScope}`', self.main_script)
+        self.assertIn('`chatLastSeenMessageId:${chatStorageScope}`', self.main_script)
+
+    def test_stale_contact_requests_are_ignored(self):
+        self.assertIn('sequence !== contactsRequestSequence', self.hub_script)
+        self.assertIn('contactsRequestSequence += 1;', self.hub_script)
+
+    def test_closed_drawer_invalidates_pending_poll(self):
+        self.assertIn('const generation = ++pollingGeneration;', self.hub_script)
+        self.assertIn('if (generation === pollingGeneration) pollingMessages = false;', self.hub_script)
+
+    def test_chat_api_rejects_invalid_and_oversized_messages(self):
+        self.assertIn("return jsonify({'error': 'Destinatário inválido'}), 400", self.app_source)
+        self.assertIn("if len(message_text) > 4000:", self.app_source)
 
 
 if __name__ == '__main__':

@@ -54,9 +54,13 @@ function formatTime(date) {
     return new Date(date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-let lastUnreadCount = parseInt(localStorage.getItem('chatLastUnreadCount') || '0');
+const chatStorageScope = document.body.dataset.userId || 'anonymous';
+const chatUnreadCountKey = `chatLastUnreadCount:${chatStorageScope}`;
+const chatLastSeenMessageKey = `chatLastSeenMessageId:${chatStorageScope}`;
+const storedUnreadCount = Number.parseInt(localStorage.getItem(chatUnreadCountKey) || '0', 10);
+let lastUnreadCount = Number.isFinite(storedUnreadCount) ? storedUnreadCount : 0;
 let lastNotifiedAt = 0;
-let lastSeenMessageId = localStorage.getItem('chatLastSeenMessageId');
+let lastSeenMessageId = localStorage.getItem(chatLastSeenMessageKey);
 let hasSyncedChatBadge = false;
 
 function escapeChatHtml(value) {
@@ -291,7 +295,7 @@ function updateChatBadge() {
             }
             lastUnreadCount = count;
             hasSyncedChatBadge = true;
-            localStorage.setItem('chatLastUnreadCount', lastUnreadCount);
+            localStorage.setItem(chatUnreadCountKey, lastUnreadCount);
             window.dispatchEvent(new CustomEvent('chat:unread-count', { detail: { count } }));
         })
         .catch(error => console.error('Erro badge:', error));
@@ -305,12 +309,17 @@ function handleChatNotification(currentCount) {
     lastNotifiedAt = now;
 
     fetch('/api/chat/latest_unread')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok || !res.headers.get('content-type')?.includes('application/json')) {
+                throw new Error(`Falha ao consultar nova mensagem (${res.status})`);
+            }
+            return res.json();
+        })
         .then(data => {
             if (!data.id || data.id == lastSeenMessageId) return;
             
             lastSeenMessageId = data.id;
-            localStorage.setItem('chatLastSeenMessageId', lastSeenMessageId);
+            localStorage.setItem(chatLastSeenMessageKey, lastSeenMessageId);
 
             const isChatScreen = window.location.pathname === '/chat';
             if (!isChatScreen) {
@@ -326,7 +335,8 @@ function handleChatNotification(currentCount) {
             if (localStorage.getItem('chatSoundEnabled') === 'true') {
                 ChatNotifier.playIcqAlert();
             }
-        });
+        })
+        .catch(error => console.error('[ChatNotifier] Erro ao consultar mensagem:', error));
 }
 
 function showToastNotification(data) {

@@ -4511,21 +4511,33 @@ def get_messages():
 @login_required
 def send_message():
     data = request.get_json(silent=True) or request.form
+    if not hasattr(data, 'get'):
+        return jsonify({'error': 'Dados inválidos'}), 400
     recipient_id = data.get('recipient_id')
     if not recipient_id:
         return jsonify({'error': 'recipient_id é obrigatório'}), 400
+
+    try:
+        recipient_id = int(recipient_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Destinatário inválido'}), 400
+
+    if recipient_id == current_user.id:
+        return jsonify({'error': 'Não é possível enviar mensagem para si mesmo'}), 400
     
-    recipient = db.session.get(User, int(recipient_id))
+    recipient = db.session.get(User, recipient_id)
     if not recipient:
         return jsonify({'error': 'Destinatário não encontrado'}), 404
     
-    message_text = data.get('message', '')
+    message_text = str(data.get('message') or '').strip()
     if not message_text:
         return jsonify({'error': 'Mensagem vazia'}), 400
+    if len(message_text) > 4000:
+        return jsonify({'error': 'Mensagem excede o limite de 4000 caracteres'}), 400
 
     message_obj = ChatMessage(
         sender_id=current_user.id,
-        recipient_id=int(recipient_id),
+        recipient_id=recipient_id,
         message=message_text,
         created_at=get_brazil_time().replace(tzinfo=None)
     )
@@ -4537,9 +4549,14 @@ def send_message():
 @login_required
 def mark_messages_read():
       data = request.get_json(silent=True) or request.form
+      if not hasattr(data, 'get'):
+          return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
       from_user_id = data.get('from_user_id')
       if from_user_id:
-          from_user_id = int(from_user_id)
+          try:
+              from_user_id = int(from_user_id)
+          except (TypeError, ValueError):
+              return jsonify({'success': False, 'error': 'Remetente inválido'}), 400
       
       query = db.session.query(ChatMessage.id).filter(ChatMessage.recipient_id == current_user.id)
       if from_user_id:

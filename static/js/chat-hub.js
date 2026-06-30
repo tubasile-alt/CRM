@@ -22,7 +22,14 @@
     let selectedContact = null;
     let pollTimer = null;
     let requestSequence = 0;
+    let contactsRequestSequence = 0;
+    let pollingMessages = false;
+    let pollingGeneration = 0;
     let lastMessagesSignature = '';
+
+    function drawerIsOpen() {
+        return drawerElement.classList.contains('show') || drawerElement.classList.contains('showing');
+    }
 
     function initials(name) {
         return String(name || '?')
@@ -104,9 +111,11 @@
     }
 
     async function loadContacts(preferredContactId = null) {
+        const sequence = ++contactsRequestSequence;
         setState(contactsElement, 'Carregando contatos...', true);
         try {
             const result = await fetchJson('/api/chat/contacts');
+            if (sequence !== contactsRequestSequence || !drawerIsOpen()) return;
             contacts = Array.isArray(result) ? result : [];
             renderContacts();
             if (preferredContactId) {
@@ -114,6 +123,7 @@
                 if (preferred) await selectContact(preferred);
             }
         } catch (error) {
+            if (sequence !== contactsRequestSequence || !drawerIsOpen()) return;
             console.error('[ChatHub] Erro ao carregar contatos:', error);
             setState(contactsElement, 'Não foi possível carregar os contatos. Tente novamente.');
         }
@@ -194,6 +204,7 @@
     }
 
     async function selectContact(contact) {
+        const contactId = Number(contact.id);
         selectedContact = contact;
         lastMessagesSignature = '';
         delete messagesElement.dataset.loaded;
@@ -203,6 +214,7 @@
         titleElement.textContent = contact.name;
         subtitleElement.textContent = contact.role === 'medico' ? 'Médico' : 'Secretaria';
         await loadMessages({ markRead: true });
+        if (!selectedContact || Number(selectedContact.id) !== contactId || !drawerIsOpen()) return;
         startPolling();
         input.focus({ preventScroll: true });
     }
@@ -210,8 +222,13 @@
     function startPolling() {
         stopPolling();
         pollTimer = window.setInterval(() => {
-            if (!document.hidden && drawerElement.classList.contains('show') && selectedContact) {
-                loadMessages({ markRead: true, quiet: true });
+            if (!document.hidden && drawerIsOpen() && selectedContact && !pollingMessages) {
+                pollingMessages = true;
+                const generation = ++pollingGeneration;
+                loadMessages({ markRead: true, quiet: true })
+                    .finally(() => {
+                        if (generation === pollingGeneration) pollingMessages = false;
+                    });
             }
         }, 5000);
     }
@@ -219,6 +236,8 @@
     function stopPolling() {
         if (pollTimer) window.clearInterval(pollTimer);
         pollTimer = null;
+        pollingGeneration += 1;
+        pollingMessages = false;
     }
 
     async function sendMessage(event) {
@@ -267,6 +286,7 @@
     });
     drawerElement.addEventListener('hidden.bs.offcanvas', () => {
         stopPolling();
+        contactsRequestSequence += 1;
         selectedContact = null;
         lastMessagesSignature = '';
         requestSequence += 1;
