@@ -1,5 +1,30 @@
 (function() {
     let appointmentsList = [];
+    const APPOINTMENT_TYPES = [
+        'Particular',
+        'Patologia',
+        'Botox',
+        'Retorno Botox',
+        'Laser',
+        'Preenchimento',
+        'Retorno Preenchimento',
+        'Sculptra',
+        'Ulthera',
+        'Retorno Ulthera',
+        'Morpheus',
+        'Retorno Morpheus',
+        'Infiltração Capilar',
+        'Soroterapia',
+        'Pequena Cirurgia',
+        'Retirada de Ponto',
+        'Nitrogênio Líquido',
+        'Transplante Capilar',
+        'Retorno 1 semana TX',
+        'Retorno Transplante',
+        'Retorno',
+        'UNIMED',
+        'Cortesia'
+    ];
     let waitingRoomData = [];
     let calendar = null;
     let selectedDate = new Date();
@@ -432,19 +457,39 @@
         miniCalendar.innerHTML = html;
     };
 
-    function getAppointmentTypeClass(type) {
-        const typeMap = {
-            'Particular': 'appointment-particular',
-            'Retorno': 'appointment-retorno',
-            'UNIMED': 'appointment-unimed',
-            'Cortesia': 'appointment-cortesia',
-            'Transplante Capilar': 'appointment-transplante',
-            'Cirurgia': 'appointment-cirurgia',
-            'Botox': 'appointment-botox',
-            'Laser': 'appointment-laser',
-            'Preenchimento': 'appointment-preenchimento'
-        };
-        return typeMap[type] || 'appointment-particular';
+    function normalizeAppointmentType(value) {
+        return String(value || '')
+            .trim()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+    }
+
+    function getAppointmentTypeClass(type, patientType) {
+        const normalizedType = normalizeAppointmentType(type || 'Particular');
+        const normalizedPatientType = normalizeAppointmentType(patientType);
+
+        if (normalizedType === 'particular' && normalizedPatientType === 'unimed') {
+            return 'appointment-unimed';
+        }
+        if (normalizedType.includes('pequena cirurgia')) return 'appointment-pequena-cirurgia';
+        if (normalizedType === 'cirurgia') return 'appointment-cirurgia';
+        if (normalizedType.includes('unimed')) return 'appointment-unimed';
+        if (normalizedType.includes('cortesia')) return 'appointment-cortesia';
+        if (normalizedType.includes('transplante') || /\btx\b/.test(normalizedType)) return 'appointment-transplante';
+        if (normalizedType.includes('preenchimento')) return 'appointment-preenchimento';
+        if (normalizedType.includes('botox')) return 'appointment-botox';
+        if (normalizedType.includes('laser')) return 'appointment-laser';
+        if (normalizedType.includes('sculptra')) return 'appointment-sculptra';
+        if (normalizedType.includes('ulthera')) return 'appointment-ulthera';
+        if (normalizedType.includes('morpheus')) return 'appointment-morpheus';
+        if (normalizedType.includes('infiltracao capilar')) return 'appointment-infiltracao-capilar';
+        if (normalizedType.includes('soroterapia')) return 'appointment-soroterapia';
+        if (normalizedType.includes('retirada de ponto')) return 'appointment-retirada-de-ponto';
+        if (normalizedType.includes('nitrogenio liquido')) return 'appointment-nitrogenio-liquido';
+        if (normalizedType.includes('patologia')) return 'appointment-patologia';
+        if (normalizedType.includes('retorno')) return 'appointment-retorno';
+        return 'appointment-particular';
     }
 
     function _buildAppointmentBlock(app) {
@@ -460,7 +505,7 @@
         const status = app.extendedProps?.status || app.status || 'agendado';
         const statusCadastral = app.extendedProps?.statusCadastral || 'ativo';
         const isProvisorio = statusCadastral === 'provisorio';
-        const typeClass = getAppointmentTypeClass(appointmentType);
+        const typeClass = getAppointmentTypeClass(appointmentType, patientType);
         const statusClass = `status-${status}`;
         const patientId = app.extendedProps?.patientId || app.patientId;
         const doctorId = app.extendedProps?.doctorId || app.doctorId;
@@ -1055,7 +1100,6 @@
             'faltou': 'Faltou'
         };
         
-        const appointmentTypes = ['Particular', 'Botox', 'Retorno Botox', 'Laser', 'Preenchimento', 'Ulthera', 'Infiltração Capilar', 'Soroterapia', 'Pequena Cirurgia', 'Retirada de Ponto', 'Nitrogênio Líquido', 'Transplante Capilar', 'Retorno', 'UNIMED', 'Cortesia'];
         const isSecretary = window.isSecretary === true;
         
         let detailsHtml = '';
@@ -1081,7 +1125,7 @@
                 <div class="mb-3">
                     <label class="form-label"><strong>Tipo de Consulta</strong></label>
                     <select class="form-select" id="modalEditAppointmentType">
-                        ${appointmentTypes.map(type => `<option value="${type}" ${props.appointmentType === type ? 'selected' : ''}>${type}</option>`).join('')}
+                        ${APPOINTMENT_TYPES.map(type => `<option value="${type}" ${props.appointmentType === type ? 'selected' : ''}>${type}</option>`).join('')}
                     </select>
                 </div>
                 <div class="mb-3">
