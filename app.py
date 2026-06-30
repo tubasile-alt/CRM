@@ -10,7 +10,9 @@ import os
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
+from models import db, User, Patient, PatientPhoto, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
+from services.patient_photo_service import delete_patient_photo as delete_stored_patient_photo
+from services.patient_photo_service import save_patient_photo, save_patient_photo_data_url
 from utils.database_backup import backup_manager
 from services.access_control import can_manage_owned_record
 from services.clinic_time import clinic_now, clinic_today, clinic_wall_time_iso, utc_instant_to_clinic_iso
@@ -1453,35 +1455,9 @@ def create_appointment():
         # Handle photo for new patient
         if 'photo_data' in data and data['photo_data']:
             try:
-                import base64
-                import os
-                from uuid import uuid4
-                from PIL import Image
-                from io import BytesIO
-
-                photo_data = data['photo_data']
-                if photo_data.startswith('data:image'):
-                    header, encoded = photo_data.split(",", 1)
-                    file_ext = header.split(";")[0].split("/")[1]
-                    if file_ext == 'jpeg': file_ext = 'jpg'
-
-                    image_bytes = base64.b64decode(encoded)
-                    img = Image.open(BytesIO(image_bytes))
-
-                    if img.mode in ("RGBA", "P"):
-                        img = img.convert("RGB")
-
-                    img.thumbnail((300, 400), Image.LANCZOS)
-
-                    filename = f"patient_{patient.id}_{uuid4().hex}.jpg"
-                    filepath = os.path.join('static/uploads/photos', filename)
-
-                    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                    img.save(filepath, "JPEG", quality=60, optimize=True)
-
-                    patient.photo_url = f"/{filepath}"
+                save_patient_photo_data_url(patient, data['photo_data'])
             except Exception as e:
-                print(f"Erro ao processar foto: {e}")
+                app.logger.warning(f"Erro ao processar foto do paciente {patient.id}: {e}")
     else:
         # Paciente existente: atualizar dados se fornecidos
         if 'patientType' in data:
@@ -1701,36 +1677,11 @@ def update_appointment(id):
     # Update patient photo if provided
     if 'photo_data' in data and data['photo_data']:
         try:
-            import base64
-            import os
-            from uuid import uuid4
-            from PIL import Image
-            from io import BytesIO
-            
-            photo_data = data['photo_data']
-            if photo_data.startswith('data:image'):
-                header, encoded = photo_data.split(",", 1)
-                image_bytes = base64.b64decode(encoded)
-                img = Image.open(BytesIO(image_bytes))
-                
-                # Converter para RGB se necessário (remover transparência)
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                
-                # Redimensionar para tamanho 3x4 (proporcional)
-                img.thumbnail((300, 400), Image.LANCZOS)
-                
-                filename = f"patient_{appointment.patient.id}_{uuid4().hex}.jpg"
-                filepath = os.path.join('static/uploads/photos', filename)
-                
-                os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                
-                # Salvar com compressão máxima
-                img.save(filepath, "JPEG", quality=60, optimize=True)
-                
-                appointment.patient.photo_url = f"/{filepath}"
+            save_patient_photo_data_url(appointment.patient, data['photo_data'])
         except Exception as e:
-            print(f"Erro ao processar foto na edicao: {e}")
+            app.logger.warning(
+                f"Erro ao processar foto do paciente {appointment.patient.id}: {e}"
+            )
 
     # Update patient name if provided.
     # Provisórios podem ter o cadastro corrigido diretamente na agenda.
@@ -1762,60 +1713,49 @@ def update_patient_photo(id):
         file = request.files['photo']
         if file:
             try:
-                from PIL import Image
-                from uuid import uuid4
-                import os
-                
-                img = Image.open(file.stream)
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                
-                img.thumbnail((300, 400), Image.LANCZOS)
-                
-                filename = f"patient_{patient.id}_{uuid4().hex}.jpg"
-                filepath = os.path.join('static/uploads/photos', filename)
-                os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                
-                img.save(filepath, "JPEG", quality=60, optimize=True)
-                patient.photo_url = f"/{filepath}"
+                photo_url = save_patient_photo(patient, file.read())
                 db.session.commit()
-                return jsonify({'success': True, 'photo_url': patient.photo_url})
-            except Exception as e:
-                return jsonify({'success': False, 'error': str(e)}), 500
+                return jsonify({'success': True, 'photo_url': photo_url})
+            except ValueError as e:
+                db.session.rollback()
+                return jsonify({'success': False, 'error': str(e)}), 400
+            except Exception:
+                db.session.rollback()
+                app.logger.exception(f"Erro ao salvar foto do paciente {patient.id}")
+                return jsonify({'success': False, 'error': 'Erro ao salvar foto'}), 500
     
     data = request.get_json(silent=True)
     if data and 'photo_data' in data:
         # Upload via base64 (webcam)
         try:
-            import base64
-            from PIL import Image
-            from io import BytesIO
-            from uuid import uuid4
-            import os
-            
-            photo_data = data['photo_data']
-            if photo_data.startswith('data:image'):
-                header, encoded = photo_data.split(",", 1)
-                image_bytes = base64.b64decode(encoded)
-                img = Image.open(BytesIO(image_bytes))
-                
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                
-                img.thumbnail((300, 400), Image.LANCZOS)
-                
-                filename = f"patient_{patient.id}_{uuid4().hex}.jpg"
-                filepath = os.path.join('static/uploads/photos', filename)
-                os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                
-                img.save(filepath, "JPEG", quality=60, optimize=True)
-                patient.photo_url = f"/{filepath}"
-                db.session.commit()
-                return jsonify({'success': True, 'photo_url': patient.photo_url})
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
+            photo_url = save_patient_photo_data_url(patient, data['photo_data'])
+            db.session.commit()
+            return jsonify({'success': True, 'photo_url': photo_url})
+        except ValueError as e:
+            db.session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 400
+        except Exception:
+            db.session.rollback()
+            app.logger.exception(f"Erro ao salvar foto do paciente {patient.id}")
+            return jsonify({'success': False, 'error': 'Erro ao salvar foto'}), 500
             
     return jsonify({'success': False, 'error': 'Nenhuma foto fornecida'}), 400
+
+
+@app.route('/api/patient/<int:patient_id>/photo/file', methods=['GET'])
+@login_required
+def get_patient_photo(patient_id):
+    photo = PatientPhoto.query.filter_by(patient_id=patient_id).first_or_404()
+    response = send_file(
+        BytesIO(photo.data),
+        mimetype=photo.mime_type,
+        conditional=True,
+        etag=True,
+        max_age=3600,
+    )
+    response.headers['Cache-Control'] = 'private, max-age=3600'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
 
 @app.route('/api/patients/search')
 @login_required
@@ -5179,60 +5119,13 @@ def delete_evolution(evo_id):
     db.session.commit()
     return jsonify({'success': True})
 
-# Upload de foto do paciente
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads', 'photos')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-@app.route('/api/patient/<int:patient_id>/photo', methods=['POST'])
-@login_required
-def upload_patient_photo(patient_id):
-    """Upload de foto 3x4 do paciente"""
-    patient = Patient.query.get_or_404(patient_id)
-    
-    if 'photo' not in request.files:
-        return jsonify({'success': False, 'error': 'Nenhuma foto enviada'}), 400
-    
-    file = request.files['photo']
-    if not file.filename:
-        return jsonify({'success': False, 'error': 'Nenhum arquivo selecionado'}), 400
-    
-    if file and allowed_file(file.filename):
-        import uuid
-        ext = file.filename.rsplit('.', 1)[1].lower()
-        filename = f"patient_{patient_id}_{uuid.uuid4().hex[:8]}.{ext}"
-        
-        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
-        
-        photo_url = f"/static/uploads/photos/{filename}"
-        patient.photo_url = photo_url
-        db.session.commit()
-        
-        return jsonify({'success': True, 'photo_url': photo_url})
-    
-    return jsonify({'success': False, 'error': 'Tipo de arquivo não permitido'}), 400
-
 @app.route('/api/patient/<int:patient_id>/photo', methods=['DELETE'])
 @login_required
 def delete_patient_photo(patient_id):
     """Remover foto do paciente"""
     patient = Patient.query.get_or_404(patient_id)
-    
-    if patient.photo_url:
-        try:
-            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), patient.photo_url.lstrip('/'))
-            if os.path.exists(filepath):
-                os.remove(filepath)
-        except:
-            pass
-        
-        patient.photo_url = None
-        db.session.commit()
-    
+    delete_stored_patient_photo(patient)
+    db.session.commit()
     return jsonify({'success': True})
 
 # ========== AUTO-FALTOU SCHEDULER ==========
