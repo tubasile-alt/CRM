@@ -3,6 +3,7 @@ import shutil
 from datetime import datetime
 from app import app, db
 from models import OperatingRoom, Surgery, DoctorPreference, User
+from services.push_schema_service import ensure_push_subscription_schema
 
 def backup_database():
     """Cria backup do banco de dados antes da migração"""
@@ -47,6 +48,9 @@ def migrate_database():
             # Criar novas tabelas (se não existirem)
             db.create_all()
             print('✓ Novas tabelas criadas com sucesso')
+
+            ensure_push_subscription_schema()
+            print('✓ Estrutura de notificações push criada/verificada')
             
             # Criar índice único parcial (FASE 1)
             print('  Verificando índice único parcial para patient_doctor...')

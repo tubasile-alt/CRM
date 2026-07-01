@@ -1,10 +1,32 @@
 """Rotas para registro de subscriptions Web Push do usuário autenticado."""
+import logging
+
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from models import PushSubscription, db, get_brazil_time
+from services.push_schema_service import ensure_push_subscription_schema
 
 push_bp = Blueprint('push', __name__, url_prefix='/api/push')
+logger = logging.getLogger(__name__)
+
+
+@push_bp.before_request
+def ensure_push_storage():
+    if request.endpoint == 'push.vapid_public_key':
+        return None
+
+    try:
+        ensure_push_subscription_schema()
+    except Exception:
+        logger.exception('Não foi possível preparar o armazenamento de Web Push.')
+        return jsonify({
+            'success': False,
+            'code': 'push_storage_unavailable',
+            'error': 'Banco de notificações indisponível. Publique novamente e tente de novo.',
+        }), 503
+
+    return None
 
 
 def _endpoint_partial(endpoint):
@@ -162,8 +184,18 @@ def test_push():
         user_id=current_user.id,
         is_active=True,
     ).order_by(PushSubscription.last_seen_at.desc()).first()
-    return jsonify({
-        'success': True,
+    response = {
+        'success': result.get('sent', 0) > 0,
         'result': result,
         'subscription': _subscription_payload(latest),
-    })
+    }
+    if result.get('skipped'):
+        response['error'] = result.get('error') or 'Configuração VAPID incompleta.'
+        return jsonify(response), 503
+    if result.get('failed', 0) > 0 and result.get('sent', 0) == 0:
+        response['error'] = (
+            latest.last_error if latest and latest.last_error
+            else 'O provedor push recusou a notificação.'
+        )
+        return jsonify(response), 502
+    return jsonify(response)
