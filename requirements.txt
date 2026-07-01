@@ -12,7 +12,7 @@ Pillow
 reportlab
 psycopg2-binary
 python-dateutil
-openai
+openai>=2.0.0,<3.0.0
 gunicorn
 Pillow
 openpyxl

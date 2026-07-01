@@ -5,6 +5,14 @@ from datetime import timedelta
 logger = logging.getLogger(__name__)
 
 
+def _positive_int_env(name, default):
+    try:
+        return max(1, int(os.environ.get(name, str(default))))
+    except (TypeError, ValueError):
+        logger.warning('Valor inválido em %s; usando %s.', name, default)
+        return default
+
+
 def _mask_db_url(url: str) -> str:
     """Return database URL with password replaced by ***."""
     if not url:
@@ -93,6 +101,10 @@ class Config:
     VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY')
     VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY')
     VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL')
+
+    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    OPENAI_VISION_MODEL = os.environ.get('OPENAI_VISION_MODEL', 'gpt-4.1-mini')
+    PHYSICAL_AGENDA_UPLOAD_MAX_MB = _positive_int_env('PHYSICAL_AGENDA_UPLOAD_MAX_MB', 10)
 
     DOCTOR_COLORS = ['#0d6efd', '#198754', '#dc3545', '#ffc107', '#6f42c1', '#20c997', '#fd7e14', '#0dcaf0']
     POLLING_INTERVAL = 30000

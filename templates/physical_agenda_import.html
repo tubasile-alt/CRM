@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Agenda Física - Clínica Basile{% endblock %}
+
+{% block extra_css %}
+<style>
+    .physical-agenda-page {
+        max-width: 1500px;
+        margin: 0 auto;
+    }
+    .physical-agenda-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+    .physical-agenda-header h1 {
+        font-size: 1.65rem;
+        margin: 0 0 4px;
+    }
+    .physical-agenda-header p {
+        color: #6c757d;
+        margin: 0;
+    }
+    .privacy-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        color: #146c43;
+        background: #d1e7dd;
+        border: 1px solid #a3cfbb;
+        border-radius: 6px;
+        padding: 7px 10px;
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+    .analysis-form {
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: #fff;
+        padding: 18px;
+        margin-bottom: 24px;
+    }
+    .analysis-actions {
+        display: flex;
+        align-items: end;
+        height: 100%;
+    }
+    .analysis-error {
+        margin-top: 14px;
+        margin-bottom: 0;
+    }
+    .result-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+    .result-toolbar h2 {
+        font-size: 1.2rem;
+        margin: 0;
+    }
+    .result-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .agenda-result-table {
+        min-width: 1180px;
+        table-layout: fixed;
+    }
+    .agenda-result-table th {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        color: #495057;
+        vertical-align: middle;
+    }
+    .agenda-result-table td {
+        vertical-align: middle;
+        padding: 6px;
+    }
+    .agenda-result-table .col-include { width: 72px; text-align: center; }
+    .agenda-result-table .col-time { width: 105px; }
+    .agenda-result-table .col-name { width: 190px; }
+    .agenda-result-table .col-phone { width: 150px; }
+    .agenda-result-table .col-type { width: 155px; }
+    .agenda-result-table .col-procedure { width: 175px; }
+    .agenda-result-table .col-notes { width: 250px; }
+    .agenda-result-table .col-confidence { width: 105px; text-align: center; }
+    .agenda-result-table input,
+    .agenda-result-table textarea {
+        font-size: 0.88rem;
+        min-width: 0;
+    }
+    .agenda-result-table textarea {
+        resize: vertical;
+        min-height: 38px;
+    }
+    .low-confidence-row td {
+        background: #fff3cd;
+    }
+    .confidence-badge {
+        display: inline-block;
+        min-width: 54px;
+        border-radius: 4px;
+        padding: 4px 7px;
+        font-weight: 700;
+    }
+    .confidence-high { background: #d1e7dd; color: #0f5132; }
+    .confidence-low { background: #f8d7da; color: #842029; }
+    .empty-analysis {
+        border: 1px dashed #adb5bd;
+        color: #6c757d;
+        padding: 28px;
+        text-align: center;
+    }
+    @media (max-width: 767px) {
+        .physical-agenda-header,
+        .result-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .privacy-state { white-space: normal; }
+        .result-actions .btn { flex: 1 1 auto; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="physical-agenda-page">
+    <header class="physical-agenda-header">
+        <div>
+            <h1><i class="bi bi-journal-arrow-up me-2"></i>Importar Agenda Física</h1>
+            <p>Transcrição por IA para conferência manual</p>
+        </div>
+        <span class="privacy-state"><i class="bi bi-shield-lock"></i> Sem gravação no CRM nesta etapa</span>
+    </header>
+
+    <form id="physical-agenda-form" class="analysis-form" enctype="multipart/form-data"
+          data-max-upload-mb="{{ max_upload_mb }}">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="agenda-date">Data da agenda</label>
+                <input class="form-control" type="date" id="agenda-date" name="date"
+                       value="{{ agenda_date }}" required>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="agenda-doctor">Médico responsável</label>
+                <select class="form-select" id="agenda-doctor" name="doctor_id" required
+                        {% if selected_doctor_id %}disabled{% endif %}>
+                    {% if not selected_doctor_id %}<option value="">Selecione</option>{% endif %}
+                    {% for doctor in doctors %}
+                    <option value="{{ doctor.id }}" {% if doctor.id == selected_doctor_id %}selected{% endif %}>
+                        {{ doctor.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="agenda-image">Foto ou imagem da página</label>
+                <input class="form-control" type="file" id="agenda-image" name="image"
+                       accept="image/jpeg,image/png,image/webp" required>
+                <div class="form-text">JPG, PNG ou WEBP, até {{ max_upload_mb }} MB.</div>
+            </div>
+            <div class="col-12 col-md-2 analysis-actions">
+                <button class="btn btn-primary w-100" type="submit" id="analyze-agenda-button">
+                    <i class="bi bi-stars me-1"></i>Analisar agenda
+                </button>
+            </div>
+        </div>
+        <div class="alert alert-danger analysis-error" id="analysis-error" role="alert" hidden></div>
+    </form>
+
+    <section id="analysis-result" hidden aria-live="polite">
+        <div class="result-toolbar">
+            <div>
+                <h2>Conferência da transcrição</h2>
+                <small class="text-muted" id="analysis-summary"></small>
+            </div>
+            <div class="result-actions">
+                <button class="btn btn-outline-secondary" type="button" id="copy-json-button">
+                    <i class="bi bi-clipboard me-1"></i>Copiar JSON
+                </button>
+                <button class="btn btn-outline-primary" type="button" id="download-json-button">
+                    <i class="bi bi-download me-1"></i>Baixar JSON
+                </button>
+                <button class="btn btn-secondary" type="button" disabled>
+                    <i class="bi bi-calendar-plus me-1"></i>Importação para agenda será ativada na etapa 2
+                </button>
+            </div>
+        </div>
+
+        <div class="alert alert-warning" id="analysis-warnings" hidden></div>
+        <div class="table-responsive" id="analysis-table-wrapper">
+            <table class="table table-bordered table-hover agenda-result-table">
+                <thead class="table-light">
+                    <tr>
+                        <th class="col-include">Importar?</th>
+                        <th class="col-time">Horário</th>
+                        <th class="col-name">Nome</th>
+                        <th class="col-phone">Telefone</th>
+                        <th class="col-type">Tipo</th>
+                        <th class="col-procedure">Procedimento</th>
+                        <th class="col-notes">Observações</th>
+                        <th class="col-confidence">Confiança</th>
+                    </tr>
+                </thead>
+                <tbody id="analysis-items"></tbody>
+            </table>
+        </div>
+        <div class="empty-analysis" id="empty-analysis" hidden>Nenhum compromisso legível foi encontrado.</div>
+    </section>
+</main>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/physical-agenda-import.js', v=asset_version('js/physical-agenda-import.js')) }}"></script>
+{% endblock %}
