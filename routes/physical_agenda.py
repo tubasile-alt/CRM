@@ -8,9 +8,14 @@ from flask import Blueprint, abort, current_app, jsonify, render_template, reque
 from flask_login import current_user, login_required
 from PIL import Image, UnidentifiedImageError
 
-from models import User
+from models import Patient, PatientDoctor, User, db
 from services.clinic_time import clinic_today
 from services.physical_agenda_ai import PhysicalAgendaAIError, analyze_physical_agenda_image
+from services.physical_agenda_matching import (
+    find_equivalent_provisional,
+    normalize_phone,
+    suggest_active_patients,
+)
 
 
 physical_agenda_bp = Blueprint('physical_agenda', __name__)
@@ -36,6 +41,14 @@ def _available_doctors():
 
 def _error(message, status=400):
     response = jsonify({'success': False, 'error': message})
+    response.headers['Cache-Control'] = 'no-store'
+    return response, status
+
+
+def _error_with_data(message, status, **data):
+    payload = {'success': False, 'error': message}
+    payload.update(data)
+    response = jsonify(payload)
     response.headers['Cache-Control'] = 'no-store'
     return response, status
 
@@ -159,3 +172,117 @@ def analyze():
     })
     response.headers['Cache-Control'] = 'no-store'
     return response
+
+
+@physical_agenda_bp.route('/api/agenda-fisica/sugerir-pacientes', methods=['POST'])
+@login_required
+def suggest_patients():
+    if not _can_use_importer(current_user):
+        return _error('Você não tem permissão para pesquisar pacientes.', 403)
+
+    data = request.get_json(silent=True) or {}
+    try:
+        doctor_id = int(data.get('doctor_id') or '')
+    except (TypeError, ValueError):
+        return _error('Selecione o médico responsável.')
+
+    _, doctor_error = _validated_doctor(doctor_id)
+    if doctor_error:
+        return doctor_error
+
+    items = data.get('items')
+    if not isinstance(items, list):
+        return _error('Lista de pacientes inválida.')
+
+    matches = []
+    for index, item in enumerate(items[:100]):
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get('patient_name') or '').strip()[:160]
+        phone = str(item.get('phone') or '').strip()[:40]
+        matches.append({
+            'row_index': index,
+            'suggestions': suggest_active_patients(name, phone, doctor_id),
+        })
+
+    response = jsonify({'success': True, 'matches': matches})
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@physical_agenda_bp.route('/api/agenda-fisica/pacientes-provisorios', methods=['POST'])
+@login_required
+def create_provisional_patient():
+    """Cria cadastro provisório somente após ação explícita na conferência."""
+    if not _can_use_importer(current_user):
+        return _error('Você não tem permissão para criar cadastro provisório.', 403)
+
+    data = request.get_json(silent=True) or {}
+    try:
+        doctor_id = int(data.get('doctor_id') or '')
+    except (TypeError, ValueError):
+        return _error('Selecione o médico responsável.')
+
+    _, doctor_error = _validated_doctor(doctor_id)
+    if doctor_error:
+        return doctor_error
+
+    patient_name = ' '.join(str(data.get('patient_name') or '').split()).strip()
+    phone = normalize_phone(data.get('phone')) or None
+    if not patient_name:
+        return _error('Informe o nome antes de criar o cadastro provisório.')
+    if len(patient_name) > 100:
+        return _error('O nome do paciente excede 100 caracteres.')
+
+    active_suggestions = suggest_active_patients(patient_name, phone, doctor_id)
+    strong_matches = [suggestion for suggestion in active_suggestions if suggestion['score'] >= 0.9]
+    if strong_matches:
+        return _error_with_data(
+            'Paciente ativo semelhante encontrado. Selecione o cadastro existente.',
+            409,
+            suggestions=strong_matches,
+        )
+
+    existing_provisional = find_equivalent_provisional(patient_name, phone, doctor_id)
+    if existing_provisional:
+        return _error_with_data(
+            'Já existe um cadastro provisório equivalente para este médico.',
+            409,
+            existing_provisional={
+                'patient_id': existing_provisional.id,
+                'patient_name': existing_provisional.name,
+                'patient_phone': existing_provisional.phone or '',
+            },
+        )
+
+    try:
+        patient = Patient(
+            name=patient_name,
+            phone=phone,
+            patient_type='particular',
+            status_cadastral='provisorio',
+        )
+        db.session.add(patient)
+        db.session.flush()
+        db.session.add(PatientDoctor(
+            patient_id=patient.id,
+            doctor_id=doctor_id,
+            patient_code=None,
+        ))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.error('Falha técnica ao criar cadastro provisório pela agenda física.')
+        return _error('Não foi possível criar o cadastro provisório.', 500)
+
+    response = jsonify({
+        'success': True,
+        'patient': {
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'patient_phone': patient.phone or '',
+            'status_cadastral': patient.status_cadastral,
+        },
+    })
+    response.headers['Cache-Control'] = 'no-store'
+    return response, 201

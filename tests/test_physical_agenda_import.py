@@ -1,5 +1,6 @@
 import io
 import json
+import inspect
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -8,8 +9,8 @@ from flask import Flask
 from flask_login import LoginManager
 from PIL import Image
 
-from models import User, db
-from routes.physical_agenda import physical_agenda_bp
+from models import Patient, PatientDoctor, User, db
+from routes.physical_agenda import analyze, physical_agenda_bp
 from services.physical_agenda_ai import _normalize_result, analyze_physical_agenda_image
 
 
@@ -53,6 +54,8 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
 
         with app.app_context():
             User.__table__.create(bind=db.engine)
+            Patient.__table__.create(bind=db.engine)
+            PatientDoctor.__table__.create(bind=db.engine)
             cls.doctor = User(
                 username='doctor',
                 email='doctor@example.com',
@@ -78,10 +81,36 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
                 role_clinico='SECRETARY',
             )
             db.session.add_all([cls.doctor, cls.other_doctor, cls.secretary])
+            active_patient = Patient(
+                name='Maria Silva',
+                phone='16999999999',
+                status_cadastral='ativo',
+            )
+            provisional_patient = Patient(
+                name='Ana Provisória',
+                phone='16888888888',
+                status_cadastral='provisorio',
+            )
+            db.session.add_all([active_patient, provisional_patient])
+            db.session.flush()
+            db.session.add_all([
+                PatientDoctor(
+                    patient_id=active_patient.id,
+                    doctor_id=cls.doctor.id,
+                    patient_code=1001,
+                ),
+                PatientDoctor(
+                    patient_id=provisional_patient.id,
+                    doctor_id=cls.doctor.id,
+                    patient_code=None,
+                ),
+            ])
             db.session.commit()
             cls.doctor_id = cls.doctor.id
             cls.other_doctor_id = cls.other_doctor.id
             cls.secretary_id = cls.secretary.id
+            cls.active_patient_id = active_patient.id
+            cls.provisional_patient_id = provisional_patient.id
 
     @classmethod
     def tearDownClass(cls):
@@ -158,23 +187,85 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         data['image'] = (io.BytesIO(png_bytes()), 'agenda.png')
 
         with self.app.app_context():
-            users_before = User.query.count()
+            patients_before = Patient.query.count()
         response = self.client.post('/api/agenda-fisica/analisar', data=data)
         with self.app.app_context():
-            users_after = User.query.count()
+            patients_after = Patient.query.count()
             self.assertFalse(db.session.new)
             self.assertFalse(db.session.dirty)
             self.assertFalse(db.session.deleted)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()['success'])
-        self.assertEqual(users_before, users_after)
+        self.assertEqual(patients_before, patients_after)
 
-    def test_route_source_has_no_database_write_calls(self):
-        source = (ROOT / 'routes' / 'physical_agenda.py').read_text(encoding='utf-8')
+    def test_analysis_route_has_no_database_write_calls(self):
+        source = inspect.getsource(analyze)
         self.assertNotIn('db.session', source)
         self.assertNotIn('Patient(', source)
         self.assertNotIn('Appointment(', source)
+
+    def test_suggestions_only_return_active_patients(self):
+        response = self.client.post('/api/agenda-fisica/sugerir-pacientes', json={
+            'doctor_id': self.doctor_id,
+            'items': [
+                {'patient_name': 'Maria Silva', 'phone': '16999999999'},
+                {'patient_name': 'Ana Provisória', 'phone': '16888888888'},
+            ],
+        })
+        self.assertEqual(response.status_code, 200)
+        matches = response.get_json()['matches']
+        self.assertEqual(matches[0]['suggestions'][0]['patient_id'], self.active_patient_id)
+        self.assertEqual(matches[1]['suggestions'], [])
+
+    def test_active_duplicate_blocks_provisional_creation(self):
+        with self.app.app_context():
+            patients_before = Patient.query.count()
+        response = self.client.post('/api/agenda-fisica/pacientes-provisorios', json={
+            'doctor_id': self.doctor_id,
+            'patient_name': 'Maria Silva',
+            'phone': '16999999999',
+        })
+        with self.app.app_context():
+            patients_after = Patient.query.count()
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(response.get_json()['suggestions'])
+        self.assertEqual(patients_before, patients_after)
+
+    def test_existing_provisional_is_reused_instead_of_duplicated(self):
+        response = self.client.post('/api/agenda-fisica/pacientes-provisorios', json={
+            'doctor_id': self.doctor_id,
+            'patient_name': 'Ana Provisória',
+            'phone': '16888888888',
+        })
+        self.assertEqual(response.status_code, 409)
+        existing = response.get_json()['existing_provisional']
+        self.assertEqual(existing['patient_id'], self.provisional_patient_id)
+
+    def test_explicit_action_creates_provisional_without_patient_code(self):
+        response = self.client.post('/api/agenda-fisica/pacientes-provisorios', json={
+            'doctor_id': self.doctor_id,
+            'patient_name': 'Nova Pessoa',
+            'phone': '16777777777',
+        })
+        self.assertEqual(response.status_code, 201)
+        patient_id = response.get_json()['patient']['patient_id']
+        with self.app.app_context():
+            patient = db.session.get(Patient, patient_id)
+            link = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=self.doctor_id).one()
+            self.assertEqual(patient.status_cadastral, 'provisorio')
+            self.assertIsNone(link.patient_code)
+            db.session.execute(
+                PatientDoctor.__table__.delete().where(PatientDoctor.patient_id == patient_id)
+            )
+            db.session.execute(Patient.__table__.delete().where(Patient.id == patient_id))
+            db.session.commit()
+
+    def test_drag_and_drop_is_available(self):
+        template = (ROOT / 'templates' / 'physical_agenda_import.html').read_text(encoding='utf-8')
+        script = (ROOT / 'static' / 'js' / 'physical-agenda-import.js').read_text(encoding='utf-8')
+        self.assertIn('id="agenda-drop-zone"', template)
+        self.assertIn("dropZone.addEventListener('drop'", script)
 
 class PhysicalAgendaAIValidationTests(unittest.TestCase):
     def test_result_is_normalized_after_model_response(self):
