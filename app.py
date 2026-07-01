@@ -186,6 +186,7 @@ from routes.crm import crm_bp
 from routes.dermascribe import dermascribe_bp
 from routes.cp import cp_bp
 from routes.push import push_bp
+from routes.physical_agenda import physical_agenda_bp
 
 app.register_blueprint(surgical_map_bp)
 app.register_blueprint(waiting_room_bp)
@@ -194,6 +195,7 @@ app.register_blueprint(crm_bp)
 app.register_blueprint(dermascribe_bp)
 app.register_blueprint(cp_bp)
 app.register_blueprint(push_bp)
+app.register_blueprint(physical_agenda_bp)
 
 @login_manager.user_loader
 def load_user(user_id):

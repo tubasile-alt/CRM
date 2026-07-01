@@ -85,6 +85,13 @@
                             <i class="bi bi-calendar3"></i> Agenda
                         </a>
                     </li>
+                    {% if current_user.is_doctor() or current_user.is_secretary() or current_user.is_admin() %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'physical_agenda.import_page' %}active{% endif %}" href="{{ url_for('physical_agenda.import_page') }}">
+                            <i class="bi bi-journal-arrow-up"></i> Importar Agenda Física
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link {% if request.endpoint == 'surgical_map.index' %}active{% endif %}" href="{{ url_for('surgical_map.index') }}">
                             <i class="bi bi-clipboard2-pulse"></i> Mapa Cirúrgico
