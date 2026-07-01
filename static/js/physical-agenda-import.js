@@ -11,7 +11,6 @@
     const tableBody = document.getElementById('analysis-items');
     const emptyState = document.getElementById('empty-analysis');
     const copyButton = document.getElementById('copy-json-button');
-    const downloadButton = document.getElementById('download-json-button');
     const fileInput = document.getElementById('agenda-image');
     const dropZone = document.getElementById('agenda-drop-zone');
     const chooseFileButton = document.getElementById('choose-agenda-file');
@@ -313,7 +312,6 @@
         tableWrapper.hidden = items.length === 0;
         emptyState.hidden = items.length !== 0;
         copyButton.disabled = items.length === 0;
-        downloadButton.disabled = items.length === 0;
         resultSection.hidden = false;
         loadPatientSuggestions();
     }
@@ -716,20 +714,6 @@
         if (window.showAlert) window.showAlert('JSON copiado para a área de transferência.', 'success');
     }
 
-    function downloadJson() {
-        const json = JSON.stringify(exportPayload(), null, 2);
-        const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        const suffix = analysisResult.agenda_dates.length === 1 ? analysisResult.agenda_dates[0] : 'lote';
-        link.download = `agenda-fisica-${suffix}.json`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-    }
-
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
         clearError();
@@ -790,7 +774,6 @@
     });
 
     copyButton.addEventListener('click', copyJson);
-    downloadButton.addEventListener('click', downloadJson);
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
     previewImportButton.addEventListener('click', requestImportPreview);
     confirmImportButton.addEventListener('click', confirmAppointmentImport);

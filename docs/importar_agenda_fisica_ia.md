@@ -39,7 +39,7 @@ O projeto requer `openai>=2.0.0,<3.0.0`. Depois de atualizar o código no Replit
 9. Ajusta a duração e desmarca linhas que não devem entrar na agenda.
 10. Seleciona **Pré-visualizar importação** e corrige eventuais conflitos.
 11. Quando todas as linhas estiverem prontas, seleciona **Criar agendamentos** e confirma a operação.
-12. Também pode copiar ou baixar o JSON revisado, agrupado por data.
+12. Também pode copiar o JSON revisado, agrupado por data.
 
 Médicos só podem analisar a própria agenda. Secretária e administrador podem selecionar qualquer usuário cadastrado como médico.
 
