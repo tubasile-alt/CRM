@@ -223,6 +223,7 @@ def manifest():
 def service_worker():
     response = send_file('static/service-worker.js', mimetype='application/javascript')
     response.headers['Service-Worker-Allowed'] = '/'
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
 
 def get_brazil_time():

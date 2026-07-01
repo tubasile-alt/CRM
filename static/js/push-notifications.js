@@ -12,6 +12,67 @@
         return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     }
 
+    function isStandalonePwa() {
+        return window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+    }
+
+    function getCsrfToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    }
+
+    async function readJsonResponse(response, fallbackMessage) {
+        const contentType = response.headers.get('content-type') || '';
+        let data = null;
+
+        if (contentType.includes('application/json')) {
+            data = await response.json();
+        }
+
+        if (response.redirected || (response.ok && !data)) {
+            throw new Error('Sua sessão expirou. Entre novamente no CRM e tente de novo.');
+        }
+        if (!response.ok) {
+            const error = new Error(data?.error || fallbackMessage);
+            error.code = data?.code || null;
+            error.status = response.status;
+            throw error;
+        }
+
+        return data;
+    }
+
+    async function fetchJson(url, options = {}, fallbackMessage = 'Falha na comunicação com o servidor.') {
+        const method = (options.method || 'GET').toUpperCase();
+        const headers = { ...(options.headers || {}) };
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+            headers['X-CSRFToken'] = getCsrfToken();
+        }
+
+        const response = await fetch(url, {
+            credentials: 'same-origin',
+            ...options,
+            headers,
+        });
+        return readJsonResponse(response, fallbackMessage);
+    }
+
+    function friendlyPushError(error) {
+        if (!isStandalonePwa()) {
+            return 'Abra o CRM pelo ícone adicionado à Tela de Início e tente novamente.';
+        }
+        if (error?.name === 'NotAllowedError') {
+            return 'A permissão de notificações está bloqueada nos Ajustes do iPhone.';
+        }
+        if (error?.name === 'AbortError') {
+            return 'O iPhone interrompeu a criação da notificação. Feche e abra a PWA e tente novamente.';
+        }
+        if (error?.name === 'InvalidAccessError' || error?.name === 'InvalidStateError') {
+            return 'A chave pública VAPID é inválida ou mudou. A subscription precisa ser renovada.';
+        }
+        return error?.message || 'Não foi possível ativar as notificações push.';
+    }
+
     function urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
         const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -37,53 +98,62 @@
     }
 
     async function registerServiceWorker() {
-        return navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
+        const registration = await navigator.serviceWorker.register('/service-worker.js', {
+            scope: '/',
+            updateViaCache: 'none',
+        });
+        registration.update().catch(() => undefined);
+        return navigator.serviceWorker.ready;
     }
 
     async function getVapidPublicKey() {
-        const response = await fetch(PUBLIC_KEY_URL, {
-            credentials: 'same-origin',
-        });
-        if (!response.ok) {
-            throw new Error('Não foi possível obter a chave pública VAPID.');
+        const data = await fetchJson(
+            PUBLIC_KEY_URL,
+            {},
+            'Não foi possível obter a chave pública VAPID.'
+        );
+        if (!data?.publicKey) {
+            throw new Error('A chave pública VAPID não está configurada no servidor.');
         }
-        const data = await response.json();
         return data.publicKey;
     }
 
     async function saveSubscription(subscription) {
-        const response = await fetch(SUBSCRIBE_URL, {
+        return fetchJson(SUBSCRIBE_URL, {
             method: 'POST',
-            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(subscription.toJSON()),
-        });
-
-        if (!response.ok) {
-            throw new Error('Não foi possível salvar a subscription push.');
-        }
-
-        return response.json();
+        }, 'Não foi possível salvar a subscription push.');
     }
 
     async function getPushStatus() {
-        const response = await fetch(STATUS_URL, {
-            credentials: 'same-origin',
-        });
-        if (!response.ok) {
-            throw new Error('Não foi possível obter status das notificações.');
-        }
-        return response.json();
+        return fetchJson(STATUS_URL, {}, 'Não foi possível obter status das notificações.');
+    }
+
+    function applicationServerKeysMatch(subscription, expectedKey) {
+        const currentKey = subscription?.options?.applicationServerKey;
+        if (!currentKey) return true;
+
+        const currentBytes = new Uint8Array(currentKey);
+        if (currentBytes.length !== expectedKey.length) return false;
+        return currentBytes.every((value, index) => value === expectedKey[index]);
     }
 
     async function syncPushSubscription() {
         const registration = await registerServiceWorker();
         const publicKey = await getVapidPublicKey();
         const applicationServerKey = urlBase64ToUint8Array(publicKey);
+        if (applicationServerKey.length !== 65 || applicationServerKey[0] !== 4) {
+            throw new DOMException('Chave pública VAPID inválida.', 'InvalidAccessError');
+        }
 
         let subscription = await registration.pushManager.getSubscription();
+        if (subscription && !applicationServerKeysMatch(subscription, applicationServerKey)) {
+            await subscription.unsubscribe();
+            subscription = null;
+        }
         if (!subscription) {
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
@@ -124,19 +194,13 @@
         }
 
         setTestButtonState('Enviando teste...', true);
-        const response = await fetch(TEST_URL, {
+        const data = await fetchJson(TEST_URL, {
             method: 'POST',
-            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({}),
-        });
-        if (!response.ok) {
-            throw new Error('Não foi possível enviar notificação de teste.');
-        }
-
-        const data = await response.json();
+        }, 'Não foi possível enviar notificação de teste.');
         const result = data.result || {};
         if (window.showAlert) {
             const type = result.sent > 0 ? 'success' : 'warning';
@@ -188,7 +252,7 @@
                 }
             } catch (error) {
                 console.error('[Push] Erro ao sincronizar subscription já permitida:', error);
-                setButtonState(ENABLE_BUTTON_ID, 'Sincronizar neste iPhone', false);
+                setButtonState(ENABLE_BUTTON_ID, 'Tentar sincronizar novamente', false);
                 setTestButtonState('Teste indisponível', true);
             }
         } else if (Notification.permission === 'denied') {
@@ -214,7 +278,7 @@
                 console.error('[Push] Erro ao ativar notificações:', error);
                 setButtonState(ENABLE_BUTTON_ID, 'Tentar ativar/sincronizar novamente', false);
                 if (window.showAlert) {
-                    window.showAlert('Erro ao ativar notificações push. Verifique HTTPS, PWA na Tela de Início e chaves VAPID.', 'warning');
+                    window.showAlert(friendlyPushError(error), 'warning');
                 }
             }
         });
@@ -227,7 +291,7 @@
                     console.error('[Push] Erro no teste push:', error);
                     setTestButtonState('Tentar teste novamente', false);
                     if (window.showAlert) {
-                        window.showAlert('Erro ao enviar teste push. Sincronize este iPhone e tente novamente.', 'warning');
+                        window.showAlert(friendlyPushError(error), 'warning');
                     }
                 }
             });

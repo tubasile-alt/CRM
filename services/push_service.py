@@ -64,7 +64,19 @@ def send_checkin_push_notification(doctor_id, patient_name, appointment_id, pati
 
     if not public_key or not private_key or not claims:
         logger.warning('Push de check-in ignorado: configuração VAPID incompleta.')
-        return {'sent': 0, 'failed': 0, 'skipped': True}
+        missing = []
+        if not public_key:
+            missing.append('VAPID_PUBLIC_KEY')
+        if not private_key:
+            missing.append('VAPID_PRIVATE_KEY')
+        if not claims:
+            missing.append('VAPID_CLAIMS_EMAIL')
+        return {
+            'sent': 0,
+            'failed': 0,
+            'skipped': True,
+            'error': f"Configuração VAPID incompleta: {', '.join(missing)}.",
+        }
 
     subscriptions = PushSubscription.query.filter_by(
         user_id=doctor_id,
