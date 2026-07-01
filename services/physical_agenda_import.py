@@ -253,6 +253,7 @@ def _appointment_notes(row):
 
 def import_appointments(items, doctor_id, performed_by_user_id):
     """Importa agendamentos criando pacientes provisórios automaticamente quando necessário."""
+    ensure_physical_agenda_import_schema()
     if not isinstance(items, list) or not items:
         raise PhysicalAgendaImportError('Selecione ao menos uma linha para importar.')
     if len(items) > MAX_IMPORT_ITEMS:
