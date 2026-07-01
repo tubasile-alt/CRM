@@ -50,7 +50,9 @@
     }
 
     function onDataChanged() {
+        console.log('[PAI] onDataChanged called');
         confirmImportButton.disabled = false;
+        console.log('[PAI] confirmImportButton disabled after onDataChanged:', confirmImportButton.disabled);
     }
 
     function validateImageFile(file) {
@@ -655,6 +657,8 @@
 
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
     confirmImportButton.addEventListener('click', confirmAppointmentImport);
+    window.confirmPhysicalAgendaImport = confirmAppointmentImport;
+    console.log('[PAI] confirmImportButton click listener registered on', confirmImportButton);
     tableBody.addEventListener('input', (event) => {
         if (!event.target.matches('input, textarea, select')) return;
         const row = event.target.closest('tr[data-row-index]');
