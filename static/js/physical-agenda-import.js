@@ -10,7 +10,6 @@
     const tableWrapper = document.getElementById('analysis-table-wrapper');
     const tableBody = document.getElementById('analysis-items');
     const emptyState = document.getElementById('empty-analysis');
-    const copyButton = document.getElementById('copy-json-button');
     const fileInput = document.getElementById('agenda-image');
     const dropZone = document.getElementById('agenda-drop-zone');
     const chooseFileButton = document.getElementById('choose-agenda-file');
@@ -179,7 +178,7 @@
         include.type = 'checkbox';
         include.className = 'form-check-input agenda-include-row';
         include.checked = true;
-        include.setAttribute('aria-label', `Incluir linha ${rowIndex + 1} no JSON`);
+        include.setAttribute('aria-label', `Incluir linha ${rowIndex + 1} na importação`);
         includeCell.appendChild(include);
 
         const dateCell = document.createElement('td');
@@ -298,9 +297,7 @@
         analysisResult = {
             doctor_id: successfulAnalyses[0]?.doctor_id,
             doctor_name: successfulAnalyses[0]?.doctor_name,
-            agenda_dates: agendaDates,
             items,
-            warnings,
         };
         importPreviewReady = false;
         confirmImportButton.disabled = true;
@@ -311,7 +308,6 @@
         renderWarnings(warnings);
         tableWrapper.hidden = items.length === 0;
         emptyState.hidden = items.length !== 0;
-        copyButton.disabled = items.length === 0;
         resultSection.hidden = false;
         loadPatientSuggestions();
     }
@@ -509,13 +505,13 @@
         }
     }
 
-    function editedItems(includeImported = true) {
+    function editedItems() {
         if (!analysisResult) return [];
         const rows = Array.from(tableBody.querySelectorAll('tr[data-row-index]'));
         return rows
             .filter((row) => (
                 row.querySelector('.agenda-include-row')?.checked
-                && (includeImported || row.dataset.imported !== 'true')
+                && row.dataset.imported !== 'true'
             ))
             .map((row) => {
                 const index = Number.parseInt(row.dataset.rowIndex, 10);
@@ -542,24 +538,6 @@
                     raw_text: original.raw_text,
                 };
             });
-    }
-
-    function exportPayload() {
-        const items = editedItems();
-        const agendas = [...new Set(items.map((item) => item.agenda_date).filter(Boolean))].map((agendaDate) => ({
-            agenda_date: agendaDate,
-            items: items
-                .filter((item) => item.agenda_date === agendaDate)
-                .map(({ agenda_date: ignoredDate, ...item }) => item),
-        }));
-        return {
-            success: true,
-            doctor_id: analysisResult.doctor_id,
-            doctor_name: analysisResult.doctor_name,
-            agenda_dates: agendas.map((agenda) => agenda.agenda_date),
-            agendas,
-            warnings: analysisResult.warnings || [],
-        };
     }
 
     function selectedImportRows() {
@@ -599,7 +577,7 @@
     async function requestImportPreview() {
         clearError();
         const rows = selectedImportRows();
-        const items = editedItems(false);
+        const items = editedItems();
         if (items.length === 0) {
             showError('Selecione ao menos uma linha para importar.');
             return;
@@ -645,7 +623,7 @@
             return;
         }
         const rows = selectedImportRows();
-        const items = editedItems(false);
+        const items = editedItems();
         if (!window.confirm(`Criar ${items.length} agendamento(s) na agenda do médico selecionado?`)) {
             return;
         }
@@ -695,23 +673,6 @@
             previewImportButton.disabled = false;
             confirmImportButton.disabled = true;
         }
-    }
-
-    async function copyJson() {
-        const json = JSON.stringify(exportPayload(), null, 2);
-        try {
-            await navigator.clipboard.writeText(json);
-        } catch (error) {
-            const textarea = document.createElement('textarea');
-            textarea.value = json;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            textarea.remove();
-        }
-        if (window.showAlert) window.showAlert('JSON copiado para a área de transferência.', 'success');
     }
 
     form.addEventListener('submit', async (event) => {
@@ -773,7 +734,6 @@
         }
     });
 
-    copyButton.addEventListener('click', copyJson);
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
     previewImportButton.addEventListener('click', requestImportPreview);
     confirmImportButton.addEventListener('click', confirmAppointmentImport);

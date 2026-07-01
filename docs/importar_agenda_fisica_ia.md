@@ -38,8 +38,7 @@ O projeto requer `openai>=2.0.0,<3.0.0`. Depois de atualizar o código no Replit
 8. Quando nenhum paciente corresponder, pode confirmar a criação de um cadastro provisório.
 9. Ajusta a duração e desmarca linhas que não devem entrar na agenda.
 10. Seleciona **Pré-visualizar importação** e corrige eventuais conflitos.
-11. Quando todas as linhas estiverem prontas, seleciona **Criar agendamentos** e confirma a operação.
-12. Também pode copiar o JSON revisado, agrupado por data.
+11. Quando todas as linhas estiverem prontas, seleciona **Importar para agenda** e confirma a operação.
 
 Médicos só podem analisar a própria agenda. Secretária e administrador podem selecionar qualquer usuário cadastrado como médico.
 
@@ -63,7 +62,7 @@ Médicos só podem analisar a própria agenda. Secretária e administrador podem
 - Manuscritos pouco legíveis podem gerar campos nulos ou baixa confiança.
 - O matching é determinístico por nome, telefone, CPF e código e sempre exige conferência humana.
 - O telefone normalizado deve ser conferido contra o texto da agenda.
-- O checkbox **Importar?** controla tanto o JSON quanto as linhas enviadas para a agenda.
+- O checkbox **Importar?** controla as linhas enviadas para a agenda.
 - Não existe persistência do resultado depois que a página é fechada.
 - Conflitos de horário bloqueiam a importação e não podem ser forçados nesta fase.
 - A importação cria `Appointment`; integrações específicas de cirurgia, Google Sheets e Google Calendar continuam no fluxo manual da agenda.
