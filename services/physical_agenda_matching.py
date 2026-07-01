@@ -16,6 +16,10 @@ def normalize_phone(value):
     return re.sub(r'\D', '', str(value or ''))[:15]
 
 
+def normalize_cpf(value):
+    return re.sub(r'\D', '', str(value or ''))[:11]
+
+
 def _digits_expression(column):
     expression = db.func.coalesce(column, '')
     for character in ['(', ')', '-', '.', '/', ' ', '+']:
@@ -23,9 +27,10 @@ def _digits_expression(column):
     return expression
 
 
-def _candidate_patients(patient_name, phone):
+def _candidate_patients(patient_name, phone, cpf=None, patient_code=None, doctor_id=None):
     normalized_name = normalize_name(patient_name)
     phone_digits = normalize_phone(phone)
+    cpf_digits = normalize_cpf(cpf)
     filters = []
 
     name_tokens = [token for token in normalized_name.split() if len(token) >= 2]
@@ -34,6 +39,23 @@ def _candidate_patients(patient_name, phone):
         filters.append(Patient.name.ilike(f'%{name_tokens[0][:3]}%'))
     if len(phone_digits) >= 8:
         filters.append(_digits_expression(Patient.phone).ilike(f'%{phone_digits[-8:]}'))
+    if len(cpf_digits) == 11:
+        filters.append(_digits_expression(Patient.cpf) == cpf_digits)
+
+    code_patient_ids = []
+    try:
+        normalized_code = int(patient_code) if str(patient_code or '').strip() else None
+    except (TypeError, ValueError):
+        normalized_code = None
+    if normalized_code is not None and doctor_id:
+        code_patient_ids = [
+            link.patient_id for link in PatientDoctor.query.filter_by(
+                doctor_id=doctor_id,
+                patient_code=normalized_code,
+            ).all()
+        ]
+        if code_patient_ids:
+            filters.append(Patient.id.in_(code_patient_ids))
 
     if not filters:
         return []
@@ -43,11 +65,16 @@ def _candidate_patients(patient_name, phone):
     ).limit(50).all()
 
 
-def suggest_active_patients(patient_name, phone, doctor_id, limit=3):
+def suggest_active_patients(patient_name, phone, doctor_id, cpf=None, patient_code=None, limit=3):
     """Retorna sugestões ativas sem alterar vínculos ou cadastros."""
     normalized_name = normalize_name(patient_name)
     phone_digits = normalize_phone(phone)
-    candidates = _candidate_patients(patient_name, phone)
+    cpf_digits = normalize_cpf(cpf)
+    try:
+        normalized_code = int(patient_code) if str(patient_code or '').strip() else None
+    except (TypeError, ValueError):
+        normalized_code = None
+    candidates = _candidate_patients(patient_name, phone, cpf, normalized_code, doctor_id)
     if not candidates:
         return []
 
@@ -62,6 +89,7 @@ def suggest_active_patients(patient_name, phone, doctor_id, limit=3):
     for patient in candidates:
         candidate_name = normalize_name(patient.name)
         candidate_phone = normalize_phone(patient.phone)
+        candidate_cpf = normalize_cpf(patient.cpf)
         name_ratio = SequenceMatcher(None, normalized_name, candidate_name).ratio() if normalized_name else 0
         score = 0.0
         reasons = []
@@ -73,6 +101,14 @@ def suggest_active_patients(patient_name, phone, doctor_id, limit=3):
             score = 0.97
             reasons.append('telefone compatível')
 
+        link = links_by_patient.get(patient.id)
+        if len(cpf_digits) == 11 and candidate_cpf == cpf_digits:
+            score = 1.0
+            reasons.append('CPF exato')
+        if normalized_code is not None and link and link.patient_code == normalized_code:
+            score = 1.0
+            reasons.append('código exato')
+
         if normalized_name and candidate_name == normalized_name:
             score = max(score, 0.95)
             reasons.append('nome exato')
@@ -80,7 +116,6 @@ def suggest_active_patients(patient_name, phone, doctor_id, limit=3):
             score = max(score, round(name_ratio * 0.9, 2))
             reasons.append('nome semelhante')
 
-        link = links_by_patient.get(patient.id)
         if link and score:
             score = min(1.0, score + 0.01)
         if score < 0.65:
@@ -90,6 +125,7 @@ def suggest_active_patients(patient_name, phone, doctor_id, limit=3):
             'patient_id': patient.id,
             'patient_name': patient.name,
             'patient_phone': patient.phone or '',
+            'patient_cpf_suffix': candidate_cpf[-2:] if candidate_cpf else '',
             'patient_code': link.patient_code if link else None,
             'linked_to_doctor': bool(link),
             'score': round(score, 2),

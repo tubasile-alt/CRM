@@ -18,6 +18,8 @@
     const fileName = document.getElementById('agenda-file-name');
     const imageList = document.getElementById('agenda-image-list');
     const refreshMatchesButton = document.getElementById('refresh-patient-matches');
+    const previewImportButton = document.getElementById('preview-import-button');
+    const confirmImportButton = document.getElementById('confirm-import-button');
     const doctorSelect = document.getElementById('agenda-doctor');
     const dateInput = document.getElementById('agenda-date');
     const maxUploadMb = Number.parseInt(form.dataset.maxUploadMb || '10', 10);
@@ -25,6 +27,7 @@
     let analysisResult = null;
     let imageQueue = [];
     let nextImageId = 1;
+    let importPreviewReady = false;
 
     function setLoading(loading, progress = '') {
         analyzeButton.disabled = loading;
@@ -41,6 +44,20 @@
     function clearError() {
         errorBox.textContent = '';
         errorBox.hidden = true;
+    }
+
+    function newImportKey(rowIndex) {
+        if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+        return `${Date.now()}-${rowIndex}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    function invalidateImportPreview() {
+        importPreviewReady = false;
+        confirmImportButton.disabled = true;
+        tableBody.querySelectorAll('.import-validation-cell').forEach((cell) => {
+            cell.className = 'col-validation import-validation-cell text-muted';
+            cell.textContent = 'Prévia desatualizada';
+        });
     }
 
     function validateImageFile(file) {
@@ -154,6 +171,7 @@
         const row = document.createElement('tr');
         const confidence = Number(item.confidence || 0);
         row.dataset.rowIndex = String(rowIndex);
+        row.dataset.importKey = item.idempotency_key || newImportKey(rowIndex);
         if (confidence < 0.8) row.classList.add('low-confidence-row');
 
         const includeCell = document.createElement('td');
@@ -180,11 +198,28 @@
         phone.inputMode = 'numeric';
         phoneCell.appendChild(phone);
 
+        const cpfCell = document.createElement('td');
+        const cpf = createField('text', item.cpf, 'cpf', rowIndex, 'CPF');
+        cpf.inputMode = 'numeric';
+        cpfCell.appendChild(cpf);
+
+        const codeCell = document.createElement('td');
+        const patientCode = createField('number', item.patient_code, 'patient_code', rowIndex, 'Código do paciente');
+        patientCode.min = '1';
+        codeCell.appendChild(patientCode);
+
         const typeCell = document.createElement('td');
         typeCell.appendChild(createField('text', item.appointment_type, 'appointment_type', rowIndex, 'Tipo'));
 
         const procedureCell = document.createElement('td');
         procedureCell.appendChild(createField('text', item.procedure, 'procedure', rowIndex, 'Procedimento'));
+
+        const durationCell = document.createElement('td');
+        const duration = createField('number', item.duration_minutes || 15, 'duration_minutes', rowIndex, 'Duração em minutos');
+        duration.min = '5';
+        duration.max = '480';
+        duration.step = '5';
+        durationCell.appendChild(duration);
 
         const notesCell = document.createElement('td');
         const notes = document.createElement('textarea');
@@ -200,6 +235,10 @@
         matchCell.dataset.patientMatchIndex = String(rowIndex);
         matchCell.textContent = 'Aguardando sugestões...';
 
+        const validationCell = document.createElement('td');
+        validationCell.className = 'col-validation import-validation-cell text-muted';
+        validationCell.textContent = 'Aguardando prévia';
+
         const confidenceCell = document.createElement('td');
         confidenceCell.className = 'col-confidence';
         const confidenceBadge = document.createElement('span');
@@ -207,7 +246,22 @@
         confidenceBadge.textContent = `${Math.round(confidence * 100)}%`;
         confidenceCell.appendChild(confidenceBadge);
 
-        [includeCell, dateCell, timeCell, nameCell, phoneCell, typeCell, procedureCell, notesCell, matchCell, confidenceCell]
+        [
+            includeCell,
+            dateCell,
+            timeCell,
+            nameCell,
+            phoneCell,
+            cpfCell,
+            codeCell,
+            typeCell,
+            procedureCell,
+            durationCell,
+            notesCell,
+            matchCell,
+            validationCell,
+            confidenceCell,
+        ]
             .forEach((cell) => row.appendChild(cell));
         return row;
     }
@@ -249,6 +303,8 @@
             items,
             warnings,
         };
+        importPreviewReady = false;
+        confirmImportButton.disabled = true;
         tableBody.replaceChildren();
         items.forEach((item, index) => tableBody.appendChild(renderItem(item, index)));
 
@@ -270,6 +326,7 @@
         const cell = row.querySelector('.patient-match-cell');
         row.dataset.patientId = String(patient.patient_id);
         row.dataset.patientStatus = status;
+        invalidateImportPreview();
         cell.replaceChildren();
 
         const badge = document.createElement('span');
@@ -392,11 +449,13 @@
             const patient = JSON.parse(option.dataset.patient);
             row.dataset.patientId = String(patient.patient_id);
             row.dataset.patientStatus = 'ativo';
+            invalidateImportPreview();
             const meta = document.createElement('span');
             meta.className = 'patient-match-meta';
             const contact = patient.patient_phone || 'sem telefone';
             const link = patient.linked_to_doctor ? `cód. ${patient.patient_code || '-'}` : 'sem vínculo com este médico';
-            meta.textContent = `${contact} · ${link}`;
+            const cpf = patient.patient_cpf_suffix ? `CPF final ${patient.patient_cpf_suffix}` : 'CPF não informado';
+            meta.textContent = `${contact} · ${cpf} · ${link}`;
             actionArea.appendChild(meta);
         });
         cell.append(select, actionArea);
@@ -405,6 +464,7 @@
     async function loadPatientSuggestions() {
         if (!analysisResult) return;
         clearError();
+        invalidateImportPreview();
         refreshMatchesButton.disabled = true;
         const rows = Array.from(tableBody.querySelectorAll('tr[data-row-index]'));
         rows.forEach((row) => {
@@ -425,6 +485,8 @@
                     items: rows.map((row) => ({
                         patient_name: rowValue(row, 'patient_name'),
                         phone: rowValue(row, 'phone'),
+                        cpf: rowValue(row, 'cpf'),
+                        patient_code: rowValue(row, 'patient_code'),
                     })),
                 }),
             });
@@ -449,11 +511,14 @@
         }
     }
 
-    function editedItems() {
+    function editedItems(includeImported = true) {
         if (!analysisResult) return [];
         const rows = Array.from(tableBody.querySelectorAll('tr[data-row-index]'));
         return rows
-            .filter((row) => row.querySelector('.agenda-include-row')?.checked)
+            .filter((row) => (
+                row.querySelector('.agenda-include-row')?.checked
+                && (includeImported || row.dataset.imported !== 'true')
+            ))
             .map((row) => {
                 const index = Number.parseInt(row.dataset.rowIndex, 10);
                 const original = analysisResult.items[index];
@@ -466,9 +531,15 @@
                     time: value('time'),
                     patient_name: value('patient_name'),
                     phone: value('phone'),
+                    cpf: value('cpf'),
+                    patient_code: value('patient_code'),
                     appointment_type: value('appointment_type'),
                     procedure: value('procedure'),
+                    duration_minutes: Number.parseInt(value('duration_minutes') || '15', 10),
                     notes: value('notes'),
+                    patient_id: row.dataset.patientId ? Number.parseInt(row.dataset.patientId, 10) : null,
+                    patient_status: row.dataset.patientStatus || null,
+                    idempotency_key: row.dataset.importKey,
                     confidence: original.confidence,
                     raw_text: original.raw_text,
                 };
@@ -491,6 +562,141 @@
             agendas,
             warnings: analysisResult.warnings || [],
         };
+    }
+
+    function selectedImportRows() {
+        return Array.from(tableBody.querySelectorAll('tr[data-row-index]'))
+            .filter((row) => row.querySelector('.agenda-include-row')?.checked && row.dataset.imported !== 'true');
+    }
+
+    function renderImportPreview(rows, previewRows) {
+        rows.forEach((row, index) => {
+            const validation = previewRows[index];
+            const cell = row.querySelector('.import-validation-cell');
+            cell.replaceChildren();
+            if (validation?.ready) {
+                cell.className = 'col-validation import-validation-cell import-validation-ready';
+                const ready = document.createElement('strong');
+                ready.textContent = 'Pronto para importar';
+                const interval = document.createElement('span');
+                interval.className = 'd-block';
+                interval.textContent = `${validation.start?.slice(11)} - ${validation.end?.slice(11)}`;
+                cell.append(ready, interval);
+                return;
+            }
+
+            cell.className = 'col-validation import-validation-cell import-validation-error';
+            const title = document.createElement('strong');
+            title.textContent = 'Revisar';
+            const list = document.createElement('ul');
+            (validation?.issues || ['Linha inválida.']).forEach((issue) => {
+                const item = document.createElement('li');
+                item.textContent = issue;
+                list.appendChild(item);
+            });
+            cell.append(title, list);
+        });
+    }
+
+    async function requestImportPreview() {
+        clearError();
+        const rows = selectedImportRows();
+        const items = editedItems(false);
+        if (items.length === 0) {
+            showError('Selecione ao menos uma linha para importar.');
+            return;
+        }
+        if (items.some((item) => !item.patient_id)) {
+            showError('Selecione ou crie o paciente de todas as linhas marcadas.');
+            return;
+        }
+
+        previewImportButton.disabled = true;
+        confirmImportButton.disabled = true;
+        try {
+            const response = await fetch('/api/agenda-fisica/previsualizar-importacao', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': window.getCSRFToken?.() || '',
+                },
+                body: JSON.stringify({ doctor_id: doctorSelect.value, items }),
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.success) {
+                throw new Error(data?.error || 'Não foi possível pré-visualizar a importação.');
+            }
+            renderImportPreview(rows, data.rows || []);
+            importPreviewReady = data.ready === true;
+            confirmImportButton.disabled = !importPreviewReady;
+            if (importPreviewReady && window.showAlert) {
+                window.showAlert(`${items.length} agendamento(s) pronto(s) para criação.`, 'success');
+            }
+        } catch (error) {
+            importPreviewReady = false;
+            showError(error.message || 'Não foi possível pré-visualizar a importação.');
+        } finally {
+            previewImportButton.disabled = false;
+        }
+    }
+
+    async function confirmAppointmentImport() {
+        if (!importPreviewReady) {
+            showError('Atualize a prévia antes de criar os agendamentos.');
+            return;
+        }
+        const rows = selectedImportRows();
+        const items = editedItems(false);
+        if (!window.confirm(`Criar ${items.length} agendamento(s) na agenda do médico selecionado?`)) {
+            return;
+        }
+
+        previewImportButton.disabled = true;
+        confirmImportButton.disabled = true;
+        try {
+            const response = await fetch('/api/agenda-fisica/importar', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': window.getCSRFToken?.() || '',
+                },
+                body: JSON.stringify({
+                    doctor_id: doctorSelect.value,
+                    confirmed: true,
+                    items,
+                }),
+            });
+            const data = await response.json().catch(() => null);
+            if (response.status === 409 && Array.isArray(data?.rows)) {
+                renderImportPreview(rows, data.rows);
+                throw new Error(data.error);
+            }
+            if (!response.ok || !data?.success) {
+                throw new Error(data?.error || 'Não foi possível criar os agendamentos.');
+            }
+
+            rows.forEach((row, index) => {
+                row.dataset.imported = 'true';
+                row.querySelectorAll('input, textarea, select, button').forEach((control) => {
+                    control.disabled = true;
+                });
+                const cell = row.querySelector('.import-validation-cell');
+                cell.className = 'col-validation import-validation-cell import-validation-ready';
+                cell.textContent = `Criado #${data.appointments[index]?.appointment_id || ''}`;
+            });
+            importPreviewReady = false;
+            if (window.showAlert) {
+                window.showAlert(`${data.created_count} agendamento(s) criado(s) com sucesso.`, 'success');
+            }
+        } catch (error) {
+            importPreviewReady = false;
+            showError(error.message || 'Não foi possível criar os agendamentos.');
+        } finally {
+            previewImportButton.disabled = false;
+            confirmImportButton.disabled = true;
+        }
     }
 
     async function copyJson() {
@@ -586,6 +792,21 @@
     copyButton.addEventListener('click', copyJson);
     downloadButton.addEventListener('click', downloadJson);
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
+    previewImportButton.addEventListener('click', requestImportPreview);
+    confirmImportButton.addEventListener('click', confirmAppointmentImport);
+    tableBody.addEventListener('input', (event) => {
+        if (!event.target.matches('input, textarea, select')) return;
+        const row = event.target.closest('tr[data-row-index]');
+        const identityFields = ['patient_name', 'phone', 'cpf', 'patient_code'];
+        if (row && identityFields.includes(event.target.dataset.field)) {
+            delete row.dataset.patientId;
+            delete row.dataset.patientStatus;
+            const matchCell = row.querySelector('.patient-match-cell');
+            matchCell.className = 'col-match patient-match-cell text-muted';
+            matchCell.textContent = 'Atualize as sugestões';
+        }
+        invalidateImportPreview();
+    });
     fileInput.addEventListener('change', () => addImageFiles(fileInput.files));
     chooseFileButton.addEventListener('click', (event) => {
         event.stopPropagation();

@@ -2,6 +2,7 @@ import io
 import json
 import inspect
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,7 +10,7 @@ from flask import Flask
 from flask_login import LoginManager
 from PIL import Image
 
-from models import Patient, PatientDoctor, User, db
+from models import Appointment, Patient, PatientDoctor, PhysicalAgendaImportLog, User, db
 from routes.physical_agenda import analyze, physical_agenda_bp
 from services.physical_agenda_ai import _normalize_result, analyze_physical_agenda_image
 
@@ -56,6 +57,8 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
             User.__table__.create(bind=db.engine)
             Patient.__table__.create(bind=db.engine)
             PatientDoctor.__table__.create(bind=db.engine)
+            Appointment.__table__.create(bind=db.engine)
+            PhysicalAgendaImportLog.__table__.create(bind=db.engine)
             cls.doctor = User(
                 username='doctor',
                 email='doctor@example.com',
@@ -84,6 +87,7 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
             active_patient = Patient(
                 name='Maria Silva',
                 phone='16999999999',
+                cpf='123.456.789-01',
                 status_cadastral='ativo',
             )
             provisional_patient = Patient(
@@ -122,6 +126,10 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         self.client = self.app.test_client()
         self.login(self.secretary_id)
         self.app.config['OPENAI_API_KEY'] = 'test-key'
+        with self.app.app_context():
+            db.session.execute(PhysicalAgendaImportLog.__table__.delete())
+            db.session.execute(Appointment.__table__.delete())
+            db.session.commit()
 
     def login(self, user_id):
         with self.client.session_transaction() as session:
@@ -130,6 +138,20 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
 
     def base_form(self):
         return {'date': '2026-07-01', 'doctor_id': str(self.doctor_id)}
+
+    def import_item(self, **overrides):
+        item = {
+            'agenda_date': '2026-07-02',
+            'time': '09:00',
+            'duration_minutes': 15,
+            'patient_id': self.active_patient_id,
+            'appointment_type': 'retorno',
+            'procedure': '',
+            'notes': '',
+            'idempotency_key': 'test-import-key-000000000001',
+        }
+        item.update(overrides)
+        return item
 
     @patch('routes.physical_agenda.render_template', return_value='physical agenda page')
     def test_get_page_loads_template(self, render_template_mock):
@@ -218,6 +240,21 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         self.assertEqual(matches[0]['suggestions'][0]['patient_id'], self.active_patient_id)
         self.assertEqual(matches[1]['suggestions'], [])
 
+    def test_suggestions_match_exact_cpf_or_patient_code(self):
+        response = self.client.post('/api/agenda-fisica/sugerir-pacientes', json={
+            'doctor_id': self.doctor_id,
+            'items': [
+                {'patient_name': '', 'phone': '', 'cpf': '12345678901'},
+                {'patient_name': '', 'phone': '', 'patient_code': '1001'},
+            ],
+        })
+        self.assertEqual(response.status_code, 200)
+        matches = response.get_json()['matches']
+        self.assertEqual(matches[0]['suggestions'][0]['patient_id'], self.active_patient_id)
+        self.assertEqual(matches[1]['suggestions'][0]['patient_id'], self.active_patient_id)
+        self.assertIn('CPF exato', matches[0]['suggestions'][0]['reason'])
+        self.assertIn('código exato', matches[1]['suggestions'][0]['reason'])
+
     def test_active_duplicate_blocks_provisional_creation(self):
         with self.app.app_context():
             patients_before = Patient.query.count()
@@ -276,6 +313,142 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         self.assertIn('for (let index = 0; index < imageQueue.length; index += 1)', script)
         self.assertIn('agenda_dates:', script)
         self.assertIn('agendas,', script)
+        self.assertIn('id="preview-import-button"', template)
+        self.assertIn('id="confirm-import-button"', template)
+        self.assertIn("fetch('/api/agenda-fisica/previsualizar-importacao'", script)
+        self.assertIn("fetch('/api/agenda-fisica/importar'", script)
+        self.assertIn("'duration_minutes'", script)
+
+    def test_import_preview_requires_selected_patient(self):
+        response = self.client.post('/api/agenda-fisica/previsualizar-importacao', json={
+            'doctor_id': self.doctor_id,
+            'items': [self.import_item(patient_id=None)],
+        })
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertFalse(payload['ready'])
+        self.assertIn('Selecione um paciente', payload['rows'][0]['issues'][0])
+
+    def test_import_preview_detects_existing_appointment_conflict(self):
+        with self.app.app_context():
+            start = datetime(2026, 7, 2, 9, 5)
+            db.session.add(Appointment(
+                patient_id=self.active_patient_id,
+                doctor_id=self.doctor_id,
+                start_time=start,
+                end_time=start + timedelta(minutes=15),
+                status='agendado',
+            ))
+            db.session.commit()
+
+        response = self.client.post('/api/agenda-fisica/previsualizar-importacao', json={
+            'doctor_id': self.doctor_id,
+            'items': [self.import_item()],
+        })
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertFalse(payload['ready'])
+        self.assertTrue(payload['rows'][0]['conflicts'])
+
+    def test_import_preview_ignores_cancelled_appointment(self):
+        with self.app.app_context():
+            start = datetime(2026, 7, 2, 9, 5)
+            db.session.add(Appointment(
+                patient_id=self.active_patient_id,
+                doctor_id=self.doctor_id,
+                start_time=start,
+                end_time=start + timedelta(minutes=15),
+                status='cancelado',
+            ))
+            db.session.commit()
+
+        response = self.client.post('/api/agenda-fisica/previsualizar-importacao', json={
+            'doctor_id': self.doctor_id,
+            'items': [self.import_item()],
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()['ready'])
+
+    def test_import_preview_blocks_overlaps_inside_batch(self):
+        response = self.client.post('/api/agenda-fisica/previsualizar-importacao', json={
+            'doctor_id': self.doctor_id,
+            'items': [
+                self.import_item(duration_minutes=30),
+                self.import_item(
+                    time='09:15',
+                    idempotency_key='test-import-key-000000000002',
+                ),
+            ],
+        })
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertFalse(payload['ready'])
+        self.assertIn('Conflito com a linha 2', payload['rows'][0]['issues'][0])
+
+    def test_conflicting_batch_is_atomic(self):
+        response = self.client.post('/api/agenda-fisica/importar', json={
+            'doctor_id': self.doctor_id,
+            'confirmed': True,
+            'items': [
+                self.import_item(duration_minutes=30),
+                self.import_item(
+                    time='09:15',
+                    idempotency_key='test-import-key-000000000003',
+                ),
+            ],
+        })
+        self.assertEqual(response.status_code, 409)
+        with self.app.app_context():
+            self.assertEqual(Appointment.query.count(), 0)
+            self.assertEqual(PhysicalAgendaImportLog.query.count(), 0)
+
+    def test_import_requires_explicit_confirmation(self):
+        response = self.client.post('/api/agenda-fisica/importar', json={
+            'doctor_id': self.doctor_id,
+            'items': [self.import_item()],
+        })
+        self.assertEqual(response.status_code, 400)
+        with self.app.app_context():
+            self.assertEqual(Appointment.query.count(), 0)
+
+    def test_doctor_cannot_import_for_another_doctor(self):
+        self.login(self.doctor_id)
+        response = self.client.post('/api/agenda-fisica/previsualizar-importacao', json={
+            'doctor_id': self.other_doctor_id,
+            'items': [self.import_item()],
+        })
+        self.assertEqual(response.status_code, 403)
+
+    def test_confirmed_import_creates_appointment_and_audit_log(self):
+        response = self.client.post('/api/agenda-fisica/importar', json={
+            'doctor_id': self.doctor_id,
+            'confirmed': True,
+            'items': [self.import_item(procedure='Botox', notes='Retorno')],
+        })
+        self.assertEqual(response.status_code, 201)
+        payload = response.get_json()
+        self.assertEqual(payload['created_count'], 1)
+        with self.app.app_context():
+            appointment = db.session.get(Appointment, payload['appointments'][0]['appointment_id'])
+            self.assertEqual(appointment.patient_id, self.active_patient_id)
+            self.assertEqual(appointment.status, 'agendado')
+            self.assertIn('Procedimento: Botox', appointment.notes)
+            audit = PhysicalAgendaImportLog.query.filter_by(appointment_id=appointment.id).one()
+            self.assertEqual(audit.performed_by_user_id, self.secretary_id)
+
+    def test_reimport_is_blocked_without_duplicate_appointment(self):
+        request_data = {
+            'doctor_id': self.doctor_id,
+            'confirmed': True,
+            'items': [self.import_item()],
+        }
+        first = self.client.post('/api/agenda-fisica/importar', json=request_data)
+        second = self.client.post('/api/agenda-fisica/importar', json=request_data)
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 409)
+        with self.app.app_context():
+            self.assertEqual(Appointment.query.count(), 1)
+            self.assertEqual(PhysicalAgendaImportLog.query.count(), 1)
 
 class PhysicalAgendaAIValidationTests(unittest.TestCase):
     def test_result_is_normalized_after_model_response(self):

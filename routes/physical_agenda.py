@@ -11,6 +11,11 @@ from PIL import Image, UnidentifiedImageError
 from models import Patient, PatientDoctor, User, db
 from services.clinic_time import clinic_today
 from services.physical_agenda_ai import PhysicalAgendaAIError, analyze_physical_agenda_image
+from services.physical_agenda_import import (
+    PhysicalAgendaImportError,
+    build_import_preview,
+    import_appointments,
+)
 from services.physical_agenda_matching import (
     find_equivalent_provisional,
     normalize_phone,
@@ -200,9 +205,17 @@ def suggest_patients():
             continue
         name = str(item.get('patient_name') or '').strip()[:160]
         phone = str(item.get('phone') or '').strip()[:40]
+        cpf = str(item.get('cpf') or '').strip()[:20]
+        patient_code = str(item.get('patient_code') or '').strip()[:20]
         matches.append({
             'row_index': index,
-            'suggestions': suggest_active_patients(name, phone, doctor_id),
+            'suggestions': suggest_active_patients(
+                name,
+                phone,
+                doctor_id,
+                cpf=cpf,
+                patient_code=patient_code,
+            ),
         })
 
     response = jsonify({'success': True, 'matches': matches})
@@ -283,6 +296,89 @@ def create_provisional_patient():
             'patient_phone': patient.phone or '',
             'status_cadastral': patient.status_cadastral,
         },
+    })
+    response.headers['Cache-Control'] = 'no-store'
+    return response, 201
+
+
+def _import_request_data():
+    data = request.get_json(silent=True) or {}
+    try:
+        doctor_id = int(data.get('doctor_id') or '')
+    except (TypeError, ValueError):
+        return None, None, _error('Selecione o médico responsável.')
+
+    _, doctor_error = _validated_doctor(doctor_id)
+    if doctor_error:
+        return None, None, doctor_error
+    return data, doctor_id, None
+
+
+@physical_agenda_bp.route('/api/agenda-fisica/previsualizar-importacao', methods=['POST'])
+@login_required
+def preview_import():
+    if not _can_use_importer(current_user):
+        return _error('Você não tem permissão para importar agendamentos.', 403)
+
+    data, doctor_id, validation_error = _import_request_data()
+    if validation_error:
+        return validation_error
+
+    try:
+        preview = build_import_preview(data.get('items'), doctor_id)
+    except PhysicalAgendaImportError as exc:
+        return _error(str(exc))
+    except Exception:
+        logger.exception('Falha técnica na prévia da importação de agenda física.')
+        return _error('Não foi possível validar os agendamentos.', 500)
+
+    response = jsonify({
+        'success': True,
+        'ready': preview['ready'],
+        'rows': preview['rows'],
+    })
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@physical_agenda_bp.route('/api/agenda-fisica/importar', methods=['POST'])
+@login_required
+def confirm_import():
+    if not _can_use_importer(current_user):
+        return _error('Você não tem permissão para importar agendamentos.', 403)
+
+    data, doctor_id, validation_error = _import_request_data()
+    if validation_error:
+        return validation_error
+    if data.get('confirmed') is not True:
+        return _error('Confirme explicitamente a criação dos agendamentos.')
+
+    try:
+        created, preview = import_appointments(
+            data.get('items'),
+            doctor_id,
+            current_user.id,
+        )
+        if created is None:
+            db.session.rollback()
+            return _error_with_data(
+                'Existem pendências ou conflitos. Revise a prévia antes de importar.',
+                409,
+                ready=False,
+                rows=preview['rows'],
+            )
+    except PhysicalAgendaImportError as exc:
+        db.session.rollback()
+        return _error(str(exc))
+    except Exception:
+        db.session.rollback()
+        logger.exception('Falha técnica ao importar agenda física.')
+        return _error('Não foi possível criar os agendamentos. Nenhuma linha foi importada.', 500)
+
+    response = jsonify({
+        'success': True,
+        'created_count': len(created),
+        'appointments': created,
     })
     response.headers['Cache-Control'] = 'no-store'
     return response, 201
