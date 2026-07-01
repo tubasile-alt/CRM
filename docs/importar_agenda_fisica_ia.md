@@ -1,4 +1,4 @@
-# Importar Agenda Física por IA - Etapa 1
+# Importar Agenda Física por IA - Etapas 1 e 2
 
 ## Objetivo
 
@@ -6,7 +6,9 @@ A etapa 1 transcreve uma ou mais imagens JPG, PNG ou WEBP de páginas da agenda 
 
 A análise não cria pacientes, não cria agendamentos e não altera registros existentes. A imagem não é persistida pelo CRM. A requisição à Responses API usa `store=False`.
 
-Depois da conferência, o usuário pode pesquisar correspondências entre as linhas transcritas e pacientes ativos. Quando não houver correspondência, uma ação manual e confirmada pode criar somente um cadastro provisório, sem prontuário, código ou agendamento.
+Depois da conferência, o usuário pode pesquisar correspondências entre as linhas transcritas e pacientes ativos. Quando não houver correspondência, uma ação manual e confirmada pode criar somente um cadastro provisório, sem prontuário ou código.
+
+A etapa 2 permite pré-visualizar conflitos e criar os agendamentos selecionados. A gravação só ocorre depois de uma segunda confirmação explícita e o lote inteiro é transacional: se uma linha falhar, nenhuma é criada.
 
 ## Configuração
 
@@ -32,10 +34,11 @@ O projeto requer `openai>=2.0.0,<3.0.0`. Depois de atualizar o código no Replit
 4. Confere ou altera a data individual de cada foto adicionada.
 5. Seleciona **Analisar agenda**. As fotos são processadas uma por vez e reunidas na mesma conferência.
 6. Confere e corrige data, horário, nome, telefone, tipo, procedimento e observações.
-7. Confere as sugestões de pacientes ativos por nome e telefone.
+7. Confere as sugestões de pacientes ativos por nome, telefone, CPF ou código.
 8. Quando nenhum paciente corresponder, pode confirmar a criação de um cadastro provisório.
-9. Desmarca linhas que não devem entrar no JSON de conferência.
-10. Copia ou baixa o JSON revisado, agrupado por data.
+9. Ajusta a duração e desmarca linhas que não devem entrar na agenda.
+10. Seleciona **Pré-visualizar importação** e corrige eventuais conflitos.
+11. Quando todas as linhas estiverem prontas, seleciona **Importar para agenda** e confirma a operação.
 
 Médicos só podem analisar a própria agenda. Secretária e administrador podem selecionar qualquer usuário cadastrado como médico.
 
@@ -45,6 +48,9 @@ Médicos só podem analisar a própria agenda. Secretária e administrador podem
 - O lote permanece apenas na memória da página enquanto ela estiver aberta.
 - O endpoint de análise não executa `INSERT`, `UPDATE` ou `DELETE`.
 - A criação provisória existe em endpoint separado, exige ação explícita e não cria agendamento.
+- A criação de agendamentos exige prévia válida e confirmação explícita.
+- A confirmação recalcula conflitos dentro de uma transação antes de gravar.
+- Cada agendamento importado recebe uma chave idempotente e um registro técnico de auditoria.
 - Nomes, telefones, imagem e resposta da IA não são registrados em logs.
 - Arquivos são limitados por tamanho, extensão e formato real da imagem.
 - A interface aceita até 10 fotos por lote para limitar consumo de memória e chamadas acidentais.
@@ -54,17 +60,19 @@ Médicos só podem analisar a própria agenda. Secretária e administrador podem
 ## Limitações
 
 - Manuscritos pouco legíveis podem gerar campos nulos ou baixa confiança.
-- O matching é determinístico por nome/telefone e sempre exige conferência humana.
+- O matching é determinístico por nome, telefone, CPF e código e sempre exige conferência humana.
 - O telefone normalizado deve ser conferido contra o texto da agenda.
-- O checkbox **Importar?** controla apenas o JSON exportado nesta etapa.
+- O checkbox **Importar?** controla as linhas enviadas para a agenda.
 - Não existe persistência do resultado depois que a página é fechada.
+- Conflitos de horário bloqueiam a importação e não podem ser forçados nesta fase.
+- A importação cria `Appointment`; integrações específicas de cirurgia, Google Sheets e Google Calendar continuam no fluxo manual da agenda.
 
-## Etapa 2
+## Banco de dados
 
-A próxima etapa poderá adicionar, sempre após confirmação explícita:
+A etapa 2 adiciona a tabela `physical_agenda_import_log` pela migration:
 
-- matching ampliado por CPF e código;
-- uso do paciente ativo/provisório selecionado na prévia de importação;
-- detecção de conflitos de horário;
-- criação dos agendamentos selecionados;
-- trilha de auditoria da importação.
+```text
+e2f3a4b5c6d7_create_physical_agenda_import_log.py
+```
+
+Como compatibilidade com deploys que não executam Alembic automaticamente, a tabela também é criada com `checkfirst=True` no primeiro uso. Nenhuma imagem ou transcrição é armazenada nessa tabela; apenas IDs técnicos, data de origem, usuário responsável e chave de idempotência.

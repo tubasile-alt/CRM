@@ -161,6 +161,48 @@ class Appointment(db.Model):
     
     doctor = db.relationship('User', backref='appointments')
 
+
+class PhysicalAgendaImportLog(db.Model):
+    """Trilha técnica de agendamentos criados pela importação física."""
+    __tablename__ = 'physical_agenda_import_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    idempotency_key = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    appointment_id = db.Column(
+        db.Integer,
+        db.ForeignKey('appointment.id', ondelete='SET NULL'),
+        unique=True,
+        nullable=True,
+    )
+    doctor_id = db.Column(
+        db.Integer,
+        db.ForeignKey('user.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    patient_id = db.Column(
+        db.Integer,
+        db.ForeignKey('patient.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    performed_by_user_id = db.Column(
+        db.Integer,
+        db.ForeignKey('user.id', ondelete='SET NULL'),
+        nullable=True,
+    )
+    source_date = db.Column(db.Date, nullable=False)
+    created_at = db.Column(db.DateTime, default=get_brazil_time, nullable=False)
+
+    appointment = db.relationship(
+        'Appointment',
+        backref=db.backref('physical_import_log', uselist=False),
+        passive_deletes=True,
+    )
+    doctor = db.relationship('User', foreign_keys=[doctor_id])
+    patient = db.relationship('Patient')
+    performed_by = db.relationship('User', foreign_keys=[performed_by_user_id])
+
 class Note(db.Model):
     __tablename__ = 'note'
     id = db.Column(db.Integer, primary_key=True)

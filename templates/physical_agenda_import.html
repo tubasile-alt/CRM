@@ -135,7 +135,7 @@
         gap: 8px;
     }
     .agenda-result-table {
-        min-width: 1515px;
+        min-width: 1990px;
         table-layout: fixed;
     }
     .agenda-result-table th {
@@ -153,10 +153,14 @@
     .agenda-result-table .col-time { width: 105px; }
     .agenda-result-table .col-name { width: 190px; }
     .agenda-result-table .col-phone { width: 150px; }
+    .agenda-result-table .col-cpf { width: 145px; }
+    .agenda-result-table .col-code { width: 95px; }
     .agenda-result-table .col-type { width: 155px; }
     .agenda-result-table .col-procedure { width: 175px; }
+    .agenda-result-table .col-duration { width: 100px; }
     .agenda-result-table .col-notes { width: 250px; }
     .agenda-result-table .col-match { width: 225px; }
+    .agenda-result-table .col-validation { width: 210px; }
     .agenda-result-table .col-confidence { width: 105px; text-align: center; }
     .agenda-result-table input,
     .agenda-result-table textarea {
@@ -190,6 +194,15 @@
         display: block;
         margin-top: 4px;
     }
+    .import-validation-cell {
+        font-size: 0.78rem;
+    }
+    .import-validation-cell ul {
+        margin: 5px 0 0;
+        padding-left: 16px;
+    }
+    .import-validation-ready { color: #146c43; }
+    .import-validation-error { color: #842029; }
     .empty-analysis {
         border: 1px dashed #adb5bd;
         color: #6c757d;
@@ -298,14 +311,11 @@
                 <button class="btn btn-outline-success" type="button" id="refresh-patient-matches">
                     <i class="bi bi-person-check me-1"></i>Atualizar sugestões
                 </button>
-                <button class="btn btn-outline-secondary" type="button" id="copy-json-button">
-                    <i class="bi bi-clipboard me-1"></i>Copiar JSON
+                <button class="btn btn-outline-dark" type="button" id="preview-import-button">
+                    <i class="bi bi-shield-check me-1"></i>Pré-visualizar importação
                 </button>
-                <button class="btn btn-outline-primary" type="button" id="download-json-button">
-                    <i class="bi bi-download me-1"></i>Baixar JSON
-                </button>
-                <button class="btn btn-secondary" type="button" disabled>
-                    <i class="bi bi-calendar-plus me-1"></i>Importação para agenda será ativada na etapa 2
+                <button class="btn btn-success" type="button" id="confirm-import-button" disabled>
+                    <i class="bi bi-calendar-plus me-1"></i>Importar para agenda
                 </button>
             </div>
         </div>
@@ -320,10 +330,14 @@
                         <th class="col-time">Horário</th>
                         <th class="col-name">Nome</th>
                         <th class="col-phone">Telefone</th>
+                        <th class="col-cpf">CPF</th>
+                        <th class="col-code">Código</th>
                         <th class="col-type">Tipo</th>
                         <th class="col-procedure">Procedimento</th>
+                        <th class="col-duration">Duração</th>
                         <th class="col-notes">Observações</th>
                         <th class="col-match">Paciente no CRM</th>
+                        <th class="col-validation">Validação</th>
                         <th class="col-confidence">Confiança</th>
                     </tr>
                 </thead>
