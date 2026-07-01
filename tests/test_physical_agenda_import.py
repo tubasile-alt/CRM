@@ -267,6 +267,16 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         self.assertIn('id="agenda-drop-zone"', template)
         self.assertIn("dropZone.addEventListener('drop'", script)
 
+    def test_multiple_images_have_individual_dates(self):
+        template = (ROOT / 'templates' / 'physical_agenda_import.html').read_text(encoding='utf-8')
+        script = (ROOT / 'static' / 'js' / 'physical-agenda-import.js').read_text(encoding='utf-8')
+        self.assertIn('id="agenda-image-list"', template)
+        self.assertIn('accept="image/jpeg,image/png,image/webp" multiple', template)
+        self.assertIn("date.className = 'form-control form-control-sm agenda-image-date'", script)
+        self.assertIn('for (let index = 0; index < imageQueue.length; index += 1)', script)
+        self.assertIn('agenda_dates:', script)
+        self.assertIn('agendas,', script)
+
 class PhysicalAgendaAIValidationTests(unittest.TestCase):
     def test_result_is_normalized_after_model_response(self):
         result = _normalize_result({

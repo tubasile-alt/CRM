@@ -16,17 +16,20 @@
     const dropZone = document.getElementById('agenda-drop-zone');
     const chooseFileButton = document.getElementById('choose-agenda-file');
     const fileName = document.getElementById('agenda-file-name');
+    const imageList = document.getElementById('agenda-image-list');
     const refreshMatchesButton = document.getElementById('refresh-patient-matches');
     const doctorSelect = document.getElementById('agenda-doctor');
     const dateInput = document.getElementById('agenda-date');
     const maxUploadMb = Number.parseInt(form.dataset.maxUploadMb || '10', 10);
+    const maxBatchImages = 10;
     let analysisResult = null;
-    let selectedImageFile = null;
+    let imageQueue = [];
+    let nextImageId = 1;
 
-    function setLoading(loading) {
+    function setLoading(loading, progress = '') {
         analyzeButton.disabled = loading;
         analyzeButton.innerHTML = loading
-            ? '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Analisando...'
+            ? `<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Analisando${progress ? ` ${progress}` : '...'}`
             : '<i class="bi bi-stars me-1"></i>Analisar agenda';
     }
 
@@ -54,20 +57,86 @@
         return null;
     }
 
-    function selectImageFile(file) {
-        const validationError = validateImageFile(file);
-        if (validationError) {
-            selectedImageFile = null;
-            dropZone.classList.remove('has-file');
-            showError(validationError);
-            return false;
-        }
+    function renderImageQueue() {
+        imageList.replaceChildren();
+        dropZone.classList.toggle('has-file', imageQueue.length > 0);
+        fileName.textContent = imageQueue.length
+            ? `${imageQueue.length} foto(s) adicionada(s). Você ainda pode adicionar mais.`
+            : `Até ${maxBatchImages} fotos; JPG, PNG ou WEBP, ${maxUploadMb} MB por imagem.`;
 
-        clearError();
-        selectedImageFile = file;
-        dropZone.classList.add('has-file');
-        fileName.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(2)} MB`;
-        return true;
+        imageQueue.forEach((entry, index) => {
+            const item = document.createElement('div');
+            item.className = 'agenda-image-item';
+            item.dataset.imageId = String(entry.id);
+
+            const details = document.createElement('div');
+            details.className = 'agenda-image-item-name';
+            const name = document.createElement('strong');
+            name.textContent = entry.file.name;
+            const size = document.createElement('small');
+            size.textContent = `${(entry.file.size / 1024 / 1024).toFixed(2)} MB · foto ${index + 1}`;
+            details.append(name, size);
+
+            const date = document.createElement('input');
+            date.type = 'date';
+            date.className = 'form-control form-control-sm agenda-image-date';
+            date.value = entry.date;
+            date.required = true;
+            date.setAttribute('aria-label', `Data da foto ${entry.file.name}`);
+            date.addEventListener('change', () => {
+                entry.date = date.value;
+            });
+
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn btn-sm btn-outline-danger';
+            remove.title = 'Remover foto';
+            remove.setAttribute('aria-label', `Remover ${entry.file.name}`);
+            remove.innerHTML = '<i class="bi bi-trash" aria-hidden="true"></i>';
+            remove.addEventListener('click', () => {
+                imageQueue = imageQueue.filter((candidate) => candidate.id !== entry.id);
+                renderImageQueue();
+            });
+
+            item.append(details, date, remove);
+            imageList.appendChild(item);
+        });
+    }
+
+    function addImageFiles(files) {
+        const incoming = Array.from(files || []);
+        if (incoming.length === 0) return false;
+
+        const errors = [];
+        incoming.forEach((file) => {
+            if (imageQueue.length >= maxBatchImages) {
+                errors.push(`O lote aceita até ${maxBatchImages} fotos por vez.`);
+                return;
+            }
+            const validationError = validateImageFile(file);
+            if (validationError) {
+                errors.push(`${file.name || 'Arquivo'}: ${validationError}`);
+                return;
+            }
+            const duplicate = imageQueue.some((entry) => (
+                entry.file.name === file.name
+                && entry.file.size === file.size
+                && entry.file.lastModified === file.lastModified
+            ));
+            if (!duplicate) {
+                imageQueue.push({ id: nextImageId, file, date: dateInput.value });
+                nextImageId += 1;
+            }
+        });
+
+        renderImageQueue();
+        if (errors.length) {
+            showError(errors.join(' '));
+        } else {
+            clearError();
+        }
+        fileInput.value = '';
+        return imageQueue.length > 0;
     }
 
     function createField(type, value, field, rowIndex, label) {
@@ -95,6 +164,10 @@
         include.checked = true;
         include.setAttribute('aria-label', `Incluir linha ${rowIndex + 1} no JSON`);
         includeCell.appendChild(include);
+
+        const dateCell = document.createElement('td');
+        dateCell.className = 'col-date';
+        dateCell.appendChild(createField('date', item.agenda_date, 'agenda_date', rowIndex, 'Data da agenda'));
 
         const timeCell = document.createElement('td');
         timeCell.appendChild(createField('time', item.time, 'time', rowIndex, 'Horário'));
@@ -134,7 +207,7 @@
         confidenceBadge.textContent = `${Math.round(confidence * 100)}%`;
         confidenceCell.appendChild(confidenceBadge);
 
-        [includeCell, timeCell, nameCell, phoneCell, typeCell, procedureCell, notesCell, matchCell, confidenceCell]
+        [includeCell, dateCell, timeCell, nameCell, phoneCell, typeCell, procedureCell, notesCell, matchCell, confidenceCell]
             .forEach((cell) => row.appendChild(cell));
         return row;
     }
@@ -157,14 +230,30 @@
         warningsBox.hidden = false;
     }
 
-    function renderResult(data) {
-        analysisResult = data;
+    function renderResult(analyses) {
+        const successfulAnalyses = Array.isArray(analyses) ? analyses : [analyses];
+        const items = successfulAnalyses.flatMap((analysis) => (
+            (Array.isArray(analysis.items) ? analysis.items : []).map((item) => ({
+                ...item,
+                agenda_date: analysis.agenda_date,
+            }))
+        ));
+        const warnings = successfulAnalyses.flatMap((analysis) => (
+            (analysis.warnings || []).map((warning) => `${analysis.agenda_date}: ${warning}`)
+        ));
+        const agendaDates = [...new Set(successfulAnalyses.map((analysis) => analysis.agenda_date))];
+        analysisResult = {
+            doctor_id: successfulAnalyses[0]?.doctor_id,
+            doctor_name: successfulAnalyses[0]?.doctor_name,
+            agenda_dates: agendaDates,
+            items,
+            warnings,
+        };
         tableBody.replaceChildren();
-        const items = Array.isArray(data.items) ? data.items : [];
         items.forEach((item, index) => tableBody.appendChild(renderItem(item, index)));
 
-        summary.textContent = `${data.agenda_date} · ${data.doctor_name} · ${items.length} item(ns)`;
-        renderWarnings(data.warnings);
+        summary.textContent = `${agendaDates.length} dia(s) · ${analysisResult.doctor_name} · ${items.length} item(ns)`;
+        renderWarnings(warnings);
         tableWrapper.hidden = items.length === 0;
         emptyState.hidden = items.length !== 0;
         copyButton.disabled = items.length === 0;
@@ -373,6 +462,7 @@
                     return text || null;
                 };
                 return {
+                    agenda_date: value('agenda_date'),
                     time: value('time'),
                     patient_name: value('patient_name'),
                     phone: value('phone'),
@@ -386,12 +476,19 @@
     }
 
     function exportPayload() {
+        const items = editedItems();
+        const agendas = [...new Set(items.map((item) => item.agenda_date).filter(Boolean))].map((agendaDate) => ({
+            agenda_date: agendaDate,
+            items: items
+                .filter((item) => item.agenda_date === agendaDate)
+                .map(({ agenda_date: ignoredDate, ...item }) => item),
+        }));
         return {
             success: true,
-            agenda_date: analysisResult.agenda_date,
             doctor_id: analysisResult.doctor_id,
             doctor_name: analysisResult.doctor_name,
-            items: editedItems(),
+            agenda_dates: agendas.map((agenda) => agenda.agenda_date),
+            agendas,
             warnings: analysisResult.warnings || [],
         };
     }
@@ -419,7 +516,8 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `agenda-fisica-${analysisResult.agenda_date}.json`;
+        const suffix = analysisResult.agenda_dates.length === 1 ? analysisResult.agenda_dates[0] : 'lote';
+        link.download = `agenda-fisica-${suffix}.json`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -430,38 +528,56 @@
         event.preventDefault();
         clearError();
 
-        const image = selectedImageFile || fileInput.files?.[0];
-        if (!image) {
-            showError('Selecione uma imagem da agenda física.');
+        if (imageQueue.length === 0) {
+            showError('Adicione pelo menos uma imagem da agenda física.');
             return;
         }
-        const validationError = validateImageFile(image);
-        if (validationError) {
-            showError(validationError);
+        if (!doctorSelect.value) {
+            showError('Selecione o médico responsável.');
             return;
         }
-
-        const formData = new FormData();
-        formData.append('date', dateInput.value);
-        formData.append('doctor_id', doctorSelect.value);
-        formData.append('image', image, image.name);
+        if (imageQueue.some((entry) => !entry.date)) {
+            showError('Informe a data de todas as fotos antes de analisar.');
+            return;
+        }
 
         setLoading(true);
         resultSection.hidden = true;
+        const analyses = [];
+        const failures = [];
         try {
-            const response = await fetch('/api/agenda-fisica/analisar', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'X-CSRFToken': window.getCSRFToken?.() || '' },
-                body: formData,
-            });
-            const data = await response.json().catch(() => null);
-            if (!response.ok || !data?.success) {
-                throw new Error(data?.error || 'Não foi possível analisar a imagem.');
+            for (let index = 0; index < imageQueue.length; index += 1) {
+                const entry = imageQueue[index];
+                setLoading(true, `${index + 1}/${imageQueue.length}`);
+                const formData = new FormData();
+                formData.append('date', entry.date);
+                formData.append('doctor_id', doctorSelect.value);
+                formData.append('image', entry.file, entry.file.name);
+
+                try {
+                    const response = await fetch('/api/agenda-fisica/analisar', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'X-CSRFToken': window.getCSRFToken?.() || '' },
+                        body: formData,
+                    });
+                    const data = await response.json().catch(() => null);
+                    if (!response.ok || !data?.success) {
+                        throw new Error(data?.error || 'Não foi possível analisar esta imagem.');
+                    }
+                    analyses.push(data);
+                } catch (error) {
+                    failures.push(`${entry.file.name}: ${error.message || 'falha na análise'}`);
+                }
             }
-            renderResult(data);
-        } catch (error) {
-            showError(error.message || 'Não foi possível analisar a imagem.');
+            if (analyses.length > 0) {
+                renderResult(analyses);
+            }
+            if (failures.length > 0) {
+                showError(`Algumas fotos não foram analisadas. ${failures.join(' ')}`);
+            } else if (analyses.length === 0) {
+                showError('Não foi possível analisar as imagens.');
+            }
         } finally {
             setLoading(false);
         }
@@ -470,7 +586,7 @@
     copyButton.addEventListener('click', copyJson);
     downloadButton.addEventListener('click', downloadJson);
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
-    fileInput.addEventListener('change', () => selectImageFile(fileInput.files?.[0]));
+    fileInput.addEventListener('change', () => addImageFiles(fileInput.files));
     chooseFileButton.addEventListener('click', (event) => {
         event.stopPropagation();
         fileInput.click();
@@ -497,6 +613,7 @@
         });
     });
     dropZone.addEventListener('drop', (event) => {
-        selectImageFile(event.dataTransfer?.files?.[0]);
+        addImageFiles(event.dataTransfer?.files);
     });
+    renderImageQueue();
 }());

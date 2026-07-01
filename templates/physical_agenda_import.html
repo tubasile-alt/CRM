@@ -90,6 +90,30 @@
         overflow-wrap: anywhere;
         margin-top: 3px;
     }
+    .agenda-image-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+    }
+    .agenda-image-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 155px 36px;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 9px 10px;
+        background: #fff;
+    }
+    .agenda-image-item-name {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        font-size: 0.85rem;
+    }
+    .agenda-image-item-name small {
+        display: block;
+        color: #6c757d;
+    }
     .analysis-error {
         margin-top: 14px;
         margin-bottom: 0;
@@ -111,7 +135,7 @@
         gap: 8px;
     }
     .agenda-result-table {
-        min-width: 1390px;
+        min-width: 1515px;
         table-layout: fixed;
     }
     .agenda-result-table th {
@@ -125,6 +149,7 @@
         padding: 6px;
     }
     .agenda-result-table .col-include { width: 72px; text-align: center; }
+    .agenda-result-table .col-date { width: 125px; }
     .agenda-result-table .col-time { width: 105px; }
     .agenda-result-table .col-name { width: 190px; }
     .agenda-result-table .col-phone { width: 150px; }
@@ -190,6 +215,13 @@
         #choose-agenda-file {
             width: 100%;
         }
+        .agenda-image-item {
+            grid-template-columns: minmax(0, 1fr) 36px;
+        }
+        .agenda-image-item .agenda-image-date {
+            grid-column: 1 / -1;
+            grid-row: 2;
+        }
     }
     @media (max-width: 360px) {
         .physical-agenda-page {
@@ -213,7 +245,7 @@
           data-max-upload-mb="{{ max_upload_mb }}">
         <div class="row g-3 align-items-end">
             <div class="col-12 col-md-3">
-                <label class="form-label" for="agenda-date">Data da agenda</label>
+                <label class="form-label" for="agenda-date">Data para novas fotos</label>
                 <input class="form-control" type="date" id="agenda-date" name="date"
                        value="{{ agenda_date }}" required>
             </div>
@@ -230,21 +262,21 @@
                 </select>
             </div>
             <div class="col-12 col-md-4">
-                <label class="form-label" for="agenda-image">Foto ou imagem da página</label>
+                <label class="form-label" for="agenda-image">Fotos ou imagens das páginas</label>
                 <div class="agenda-drop-zone" id="agenda-drop-zone" role="button" tabindex="0"
                      aria-label="Selecionar ou arrastar imagem da agenda">
                     <i class="bi bi-cloud-arrow-up agenda-drop-zone-icon" aria-hidden="true"></i>
                     <div class="agenda-drop-zone-copy">
-                        <strong>Arraste a imagem aqui</strong>
-                        <span class="text-muted small">ou selecione no dispositivo</span>
-                        <span class="agenda-file-name" id="agenda-file-name">JPG, PNG ou WEBP, até {{ max_upload_mb }} MB.</span>
+                        <strong>Arraste uma ou mais imagens aqui</strong>
+                        <span class="text-muted small">cada foto poderá ter uma data diferente</span>
+                        <span class="agenda-file-name" id="agenda-file-name">Até 10 fotos; JPG, PNG ou WEBP, {{ max_upload_mb }} MB por imagem.</span>
                     </div>
                     <button class="btn btn-sm btn-outline-primary" type="button" id="choose-agenda-file">
-                        Selecionar
+                        Adicionar fotos
                     </button>
                 </div>
                 <input class="visually-hidden" type="file" id="agenda-image" name="image"
-                       accept="image/jpeg,image/png,image/webp">
+                       accept="image/jpeg,image/png,image/webp" multiple>
             </div>
             <div class="col-12 col-md-2 analysis-actions">
                 <button class="btn btn-primary w-100" type="submit" id="analyze-agenda-button">
@@ -252,6 +284,7 @@
                 </button>
             </div>
         </div>
+        <div class="agenda-image-list" id="agenda-image-list" aria-live="polite"></div>
         <div class="alert alert-danger analysis-error" id="analysis-error" role="alert" hidden></div>
     </form>
 
@@ -283,6 +316,7 @@
                 <thead class="table-light">
                     <tr>
                         <th class="col-include">Importar?</th>
+                        <th class="col-date">Data</th>
                         <th class="col-time">Horário</th>
                         <th class="col-name">Nome</th>
                         <th class="col-phone">Telefone</th>
