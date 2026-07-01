@@ -135,41 +135,54 @@
         gap: 8px;
     }
     .agenda-result-table {
-        min-width: 1990px;
+        min-width: 1260px;
         table-layout: fixed;
+        width: 100%;
     }
     .agenda-result-table th {
-        font-size: 0.78rem;
+        font-size: 0.75rem;
         text-transform: uppercase;
         color: #495057;
         vertical-align: middle;
+        letter-spacing: 0.3px;
     }
     .agenda-result-table td {
         vertical-align: middle;
-        padding: 6px;
+        padding: 5px 4px;
     }
-    .agenda-result-table .col-include { width: 72px; text-align: center; }
-    .agenda-result-table .col-date { width: 125px; }
-    .agenda-result-table .col-time { width: 105px; }
-    .agenda-result-table .col-name { width: 190px; }
-    .agenda-result-table .col-phone { width: 150px; }
-    .agenda-result-table .col-cpf { width: 145px; }
-    .agenda-result-table .col-code { width: 95px; }
-    .agenda-result-table .col-type { width: 155px; }
-    .agenda-result-table .col-procedure { width: 175px; }
-    .agenda-result-table .col-duration { width: 100px; }
-    .agenda-result-table .col-notes { width: 250px; }
-    .agenda-result-table .col-match { width: 225px; }
-    .agenda-result-table .col-validation { width: 210px; }
-    .agenda-result-table .col-confidence { width: 105px; text-align: center; }
+    .agenda-result-table .col-include { width: 44px; text-align: center; }
+    .agenda-result-table .col-date { width: 100px; }
+    .agenda-result-table .col-time { width: 68px; }
+    .agenda-result-table .col-name { width: 170px; }
+    .agenda-result-table .col-phone { width: 105px; }
+    .agenda-result-table .col-cpf { width: 105px; }
+    .agenda-result-table .col-code { width: 65px; }
+    .agenda-result-table .col-type { width: 110px; }
+    .agenda-result-table .col-procedure { width: 130px; }
+    .agenda-result-table .col-notes { width: 140px; }
+    .agenda-result-table .col-match { width: 155px; }
+    .agenda-result-table .col-validation { width: 130px; }
+    .agenda-result-table .col-confidence { width: 70px; text-align: center; }
     .agenda-result-table input,
     .agenda-result-table textarea {
-        font-size: 0.88rem;
+        font-size: 0.84rem;
         min-width: 0;
     }
     .agenda-result-table textarea {
         resize: vertical;
-        min-height: 38px;
+        min-height: 34px;
+    }
+    .agenda-result-table .col-name input {
+        font-weight: 600;
+        font-size: 0.92rem;
+    }
+    .agenda-result-table .col-time input {
+        font-weight: 600;
+        font-size: 0.92rem;
+        text-align: center;
+    }
+    .agenda-result-table .col-type input {
+        font-weight: 600;
     }
     .low-confidence-row td {
         background: #fff3cd;
@@ -325,20 +338,19 @@
             <table class="table table-bordered table-hover agenda-result-table">
                 <thead class="table-light">
                     <tr>
-                        <th class="col-include">Importar?</th>
+                        <th class="col-include"><i class="bi bi-check-square" title="Importar?"></i></th>
                         <th class="col-date">Data</th>
                         <th class="col-time">Horário</th>
                         <th class="col-name">Nome</th>
                         <th class="col-phone">Telefone</th>
                         <th class="col-cpf">CPF</th>
-                        <th class="col-code">Código</th>
+                        <th class="col-code">Cód.</th>
                         <th class="col-type">Tipo</th>
                         <th class="col-procedure">Procedimento</th>
-                        <th class="col-duration">Duração</th>
                         <th class="col-notes">Observações</th>
                         <th class="col-match">Paciente no CRM</th>
                         <th class="col-validation">Validação</th>
-                        <th class="col-confidence">Confiança</th>
+                        <th class="col-confidence">%</th>
                     </tr>
                 </thead>
                 <tbody id="analysis-items"></tbody>

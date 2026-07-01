@@ -212,13 +212,6 @@
         const procedureCell = document.createElement('td');
         procedureCell.appendChild(createField('text', item.procedure, 'procedure', rowIndex, 'Procedimento'));
 
-        const durationCell = document.createElement('td');
-        const duration = createField('number', item.duration_minutes || 15, 'duration_minutes', rowIndex, 'Duração em minutos');
-        duration.min = '5';
-        duration.max = '480';
-        duration.step = '5';
-        durationCell.appendChild(duration);
-
         const notesCell = document.createElement('td');
         const notes = document.createElement('textarea');
         notes.className = 'form-control form-control-sm';
@@ -254,7 +247,6 @@
             codeCell,
             typeCell,
             procedureCell,
-            durationCell,
             notesCell,
             matchCell,
             validationCell,
@@ -529,7 +521,7 @@
                     patient_code: value('patient_code'),
                     appointment_type: value('appointment_type'),
                     procedure: value('procedure'),
-                    duration_minutes: Number.parseInt(value('duration_minutes') || '15', 10),
+                    duration_minutes: 15,
                     notes: value('notes'),
                     patient_id: row.dataset.patientId ? Number.parseInt(row.dataset.patientId, 10) : null,
                     patient_status: row.dataset.patientStatus || null,
