@@ -1,4 +1,5 @@
 (function () {
+    console.log('[PAI] v20260701-direct loaded');
     const form = document.getElementById('physical-agenda-form');
     if (!form) return;
 
@@ -17,6 +18,7 @@
     const imageList = document.getElementById('agenda-image-list');
     const refreshMatchesButton = document.getElementById('refresh-patient-matches');
     const confirmImportButton = document.getElementById('confirm-import-button');
+    console.log('[PAI] confirmImportButton found:', confirmImportButton, 'disabled:', confirmImportButton?.disabled);
     const doctorSelect = document.getElementById('agenda-doctor');
     const dateInput = document.getElementById('agenda-date');
     const maxUploadMb = Number.parseInt(form.dataset.maxUploadMb || '10', 10);
@@ -530,14 +532,17 @@
     }
 
     async function confirmAppointmentImport() {
+        console.log('[PAI] confirmAppointmentImport() clicked');
         clearError();
         const rows = selectedImportRows();
         const items = editedItems();
+        console.log('[PAI] rows:', rows.length, 'items:', items.length);
         if (items.length === 0) {
             showError('Selecione ao menos uma linha para importar.');
             return;
         }
         if (!window.confirm(`Criar ${items.length} agendamento(s) na agenda do médico selecionado? Pacientes sem match serão criados como provisórios automaticamente.`)) {
+            console.log('[PAI] user cancelled');
             return;
         }
 
