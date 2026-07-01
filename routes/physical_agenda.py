@@ -354,19 +354,11 @@ def confirm_import():
         return _error('Confirme explicitamente a criação dos agendamentos.')
 
     try:
-        created, preview = import_appointments(
+        created = import_appointments(
             data.get('items'),
             doctor_id,
             current_user.id,
         )
-        if created is None:
-            db.session.rollback()
-            return _error_with_data(
-                'Existem pendências ou conflitos. Revise a prévia antes de importar.',
-                409,
-                ready=False,
-                rows=preview['rows'],
-            )
     except PhysicalAgendaImportError as exc:
         db.session.rollback()
         return _error(str(exc))

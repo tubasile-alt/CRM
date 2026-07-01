@@ -2,6 +2,12 @@
 from datetime import datetime, timedelta
 
 from models import Appointment, Patient, PatientDoctor, PhysicalAgendaImportLog, db
+from services.physical_agenda_matching import (
+    find_equivalent_provisional,
+    normalize_name,
+    normalize_phone,
+    suggest_active_patients,
+)
 from services.physical_agenda_schema_service import ensure_physical_agenda_import_schema
 from services.statuses import AppointmentStatus, normalize_appointment_status
 
@@ -26,11 +32,6 @@ def _parse_item(item, row_index):
     if not isinstance(item, dict):
         raise PhysicalAgendaImportError('Linha inválida.')
 
-    try:
-        patient_id = int(item.get('patient_id') or '')
-    except (TypeError, ValueError) as exc:
-        raise PhysicalAgendaImportError('Selecione um paciente para esta linha.') from exc
-
     agenda_date = _clean_text(item.get('agenda_date'), 10)
     time_value = _clean_text(item.get('time'), 5)
     try:
@@ -54,7 +55,10 @@ def _parse_item(item, row_index):
 
     return {
         'row_index': row_index,
-        'patient_id': patient_id,
+        'patient_name': _clean_text(item.get('patient_name'), 100),
+        'phone': _clean_text(item.get('phone'), 20),
+        'cpf': _clean_text(item.get('cpf'), 14),
+        'patient_code': _clean_text(item.get('patient_code'), 20),
         'agenda_date': agenda_date,
         'start_time': start_time,
         'end_time': start_time + timedelta(minutes=duration),
@@ -66,6 +70,52 @@ def _parse_item(item, row_index):
         'issues': [],
         'conflicts': [],
     }
+
+
+def _resolve_or_create_patient(item, doctor_id, next_code):
+    """Resolve paciente: usa seleção explícita, auto-match forte, provisório existente, ou cria provisório novo."""
+    patient_name = item.get('patient_name')
+    phone = item.get('phone')
+
+    # 1) Paciente explicitamente selecionado pelo usuário no frontend
+    explicit_patient_id = item.get('patient_id')
+    if explicit_patient_id:
+        patient = Patient.query.get(int(explicit_patient_id))
+        if patient and patient.status_cadastral in {'ativo', 'provisorio'}:
+            status = 'ativo_selecionado' if patient.status_cadastral == 'ativo' else 'provisorio_selecionado'
+            return patient, status, next_code
+
+    if not patient_name:
+        return None, None, next_code
+
+    # 2) Buscar ativo com match forte (score >= 0.9)
+    suggestions = suggest_active_patients(patient_name, phone, doctor_id, limit=5)
+    strong_match = next((s for s in suggestions if s['score'] >= 0.9), None)
+    if strong_match:
+        patient = Patient.query.get(strong_match['patient_id'])
+        if patient and patient.status_cadastral == 'ativo':
+            return patient, 'ativo_encontrado', next_code
+
+    # 3) Buscar provisório equivalente
+    existing = find_equivalent_provisional(patient_name, phone, doctor_id)
+    if existing:
+        return existing, 'provisorio_existente', next_code
+
+    # 4) Criar provisório novo
+    patient = Patient(
+        name=patient_name,
+        phone=phone or None,
+        patient_type='particular',
+        status_cadastral='provisorio',
+    )
+    db.session.add(patient)
+    db.session.flush()
+    db.session.add(PatientDoctor(
+        patient_id=patient.id,
+        doctor_id=doctor_id,
+        patient_code=None,
+    ))
+    return patient, 'provisorio_criado', next_code
 
 
 def _serialize_conflict(appointment):
@@ -202,31 +252,93 @@ def _appointment_notes(row):
 
 
 def import_appointments(items, doctor_id, performed_by_user_id):
-    """Revalida e cria o lote inteiro em uma única transação."""
+    """Importa agendamentos criando pacientes provisórios automaticamente quando necessário."""
+    if not isinstance(items, list) or not items:
+        raise PhysicalAgendaImportError('Selecione ao menos uma linha para importar.')
+    if len(items) > MAX_IMPORT_ITEMS:
+        raise PhysicalAgendaImportError(f'O lote aceita até {MAX_IMPORT_ITEMS} linhas.')
+
     if db.engine.dialect.name == 'postgresql':
         db.session.execute(db.text('LOCK TABLE appointment IN SHARE ROW EXCLUSIVE MODE'))
 
-    preview = build_import_preview(items, doctor_id)
-    if not preview['ready']:
-        return None, preview
+    # 1) Parsear todos os itens
+    rows = []
+    for index, item in enumerate(items):
+        try:
+            rows.append(_parse_item(item, index))
+        except PhysicalAgendaImportError as exc:
+            raise PhysicalAgendaImportError(f'Linha {index + 1}: {exc}') from exc
 
-    normalized_rows = preview['normalized_rows']
-    patient_ids = {row['patient_id'] for row in normalized_rows}
-    patients = Patient.query.filter(Patient.id.in_(patient_ids)).all()
-    patients_by_id = {patient.id: patient for patient in patients}
-    links = PatientDoctor.query.filter(
-        PatientDoctor.patient_id.in_(patient_ids),
-        PatientDoctor.doctor_id == doctor_id,
-    ).all()
-    linked_patient_ids = {link.patient_id for link in links}
+    # 2) Resolver pacientes (ativo, provisório existente, ou criar provisório)
     next_code = None
+    for row in rows:
+        patient, resolution, next_code = _resolve_or_create_patient(
+            row, doctor_id, next_code
+        )
+        if patient is None:
+            raise PhysicalAgendaImportError(
+                f'Linha {row["row_index"] + 1}: Não foi possível resolver o paciente.'
+            )
+        row['patient'] = patient
+        row['patient_id'] = patient.id
+        row['resolution'] = resolution
+
+    # 3) Verificar idempotência
+    keys = [row['idempotency_key'] for row in rows]
+    existing_logs = {
+        log.idempotency_key: log
+        for log in PhysicalAgendaImportLog.query.filter(
+            PhysicalAgendaImportLog.idempotency_key.in_(keys)
+        ).all()
+    }
+    for row in rows:
+        if row['idempotency_key'] in existing_logs:
+            raise PhysicalAgendaImportError(
+                f'Linha {row["row_index"] + 1}: Esta linha já foi importada.'
+            )
+
+    # 4) Verificar conflitos de horário com agendamentos existentes
+    if rows:
+        window_start = min(row['start_time'] for row in rows)
+        window_end = max(row['end_time'] for row in rows)
+        existing = Appointment.query.filter(
+            Appointment.doctor_id == doctor_id,
+            Appointment.start_time < window_end,
+            Appointment.end_time > window_start,
+        ).all()
+        existing = [
+            a for a in existing
+            if normalize_appointment_status(a.status) != AppointmentStatus.CANCELLED
+        ]
+        for row in rows:
+            for apt in existing:
+                if apt.start_time < row['end_time'] and apt.end_time > row['start_time']:
+                    pname = apt.patient.name if apt.patient else 'Paciente'
+                    raise PhysicalAgendaImportError(
+                        f'Linha {row["row_index"] + 1}: Conflito com agendamento existente '
+                        f'({pname} {apt.start_time.strftime("%H:%M")}-{apt.end_time.strftime("%H:%M")}).'
+                    )
+
+    # 5) Verificar conflitos internos
+    for i, left in enumerate(rows):
+        for right in rows[i + 1:]:
+            if left['start_time'] < right['end_time'] and left['end_time'] > right['start_time']:
+                raise PhysicalAgendaImportError(
+                    f'Linha {left["row_index"] + 1}: Conflito com linha {right["row_index"] + 1}.'
+                )
+
+    # 6) Criar vínculos para pacientes ativos sem vínculo, e agendamentos
+    linked_patient_ids = {
+        link.patient_id for link in PatientDoctor.query.filter(
+            PatientDoctor.doctor_id == doctor_id
+        ).all()
+    }
 
     created = []
-    for row in normalized_rows:
-        patient = patients_by_id[row['patient_id']]
-        if patient.id not in linked_patient_ids:
-            if patient.status_cadastral != 'ativo':
-                raise PhysicalAgendaImportError('Vínculo inválido para paciente provisório.')
+    for row in rows:
+        patient = row['patient']
+
+        if patient.status_cadastral == 'ativo' and patient.id not in linked_patient_ids:
             if next_code is None:
                 max_code = db.session.query(db.func.max(PatientDoctor.patient_code)).filter(
                     PatientDoctor.doctor_id == doctor_id,
@@ -265,7 +377,8 @@ def import_appointments(items, doctor_id, performed_by_user_id):
             'patient_id': patient.id,
             'start': appointment.start_time.isoformat(timespec='minutes'),
             'end': appointment.end_time.isoformat(timespec='minutes'),
+            'patient_resolution': row['resolution'],
         })
 
     db.session.commit()
-    return created, preview
+    return created

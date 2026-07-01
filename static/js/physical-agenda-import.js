@@ -16,7 +16,6 @@
     const fileName = document.getElementById('agenda-file-name');
     const imageList = document.getElementById('agenda-image-list');
     const refreshMatchesButton = document.getElementById('refresh-patient-matches');
-    const previewImportButton = document.getElementById('preview-import-button');
     const confirmImportButton = document.getElementById('confirm-import-button');
     const doctorSelect = document.getElementById('agenda-doctor');
     const dateInput = document.getElementById('agenda-date');
@@ -25,7 +24,6 @@
     let analysisResult = null;
     let imageQueue = [];
     let nextImageId = 1;
-    let importPreviewReady = false;
 
     function setLoading(loading, progress = '') {
         analyzeButton.disabled = loading;
@@ -49,13 +47,8 @@
         return `${Date.now()}-${rowIndex}-${Math.random().toString(36).slice(2)}`;
     }
 
-    function invalidateImportPreview() {
-        importPreviewReady = false;
-        confirmImportButton.disabled = true;
-        tableBody.querySelectorAll('.import-validation-cell').forEach((cell) => {
-            cell.className = 'col-validation import-validation-cell text-muted';
-            cell.textContent = 'Prévia desatualizada';
-        });
+    function onDataChanged() {
+        confirmImportButton.disabled = false;
     }
 
     function validateImageFile(file) {
@@ -228,7 +221,7 @@
 
         const validationCell = document.createElement('td');
         validationCell.className = 'col-validation import-validation-cell text-muted';
-        validationCell.textContent = 'Aguardando prévia';
+        validationCell.textContent = 'Aguardando importação';
 
         const confidenceCell = document.createElement('td');
         confidenceCell.className = 'col-confidence';
@@ -291,8 +284,7 @@
             doctor_name: successfulAnalyses[0]?.doctor_name,
             items,
         };
-        importPreviewReady = false;
-        confirmImportButton.disabled = true;
+        confirmImportButton.disabled = false;
         tableBody.replaceChildren();
         items.forEach((item, index) => tableBody.appendChild(renderItem(item, index)));
 
@@ -312,7 +304,7 @@
         const cell = row.querySelector('.patient-match-cell');
         row.dataset.patientId = String(patient.patient_id);
         row.dataset.patientStatus = status;
-        invalidateImportPreview();
+        onDataChanged();
         cell.replaceChildren();
 
         const badge = document.createElement('span');
@@ -435,7 +427,7 @@
             const patient = JSON.parse(option.dataset.patient);
             row.dataset.patientId = String(patient.patient_id);
             row.dataset.patientStatus = 'ativo';
-            invalidateImportPreview();
+            onDataChanged();
             const meta = document.createElement('span');
             meta.className = 'patient-match-meta';
             const contact = patient.patient_phone || 'sem telefone';
@@ -450,7 +442,7 @@
     async function loadPatientSuggestions() {
         if (!analysisResult) return;
         clearError();
-        invalidateImportPreview();
+        onDataChanged();
         refreshMatchesButton.disabled = true;
         const rows = Array.from(tableBody.querySelectorAll('tr[data-row-index]'));
         rows.forEach((row) => {
@@ -537,36 +529,7 @@
             .filter((row) => row.querySelector('.agenda-include-row')?.checked && row.dataset.imported !== 'true');
     }
 
-    function renderImportPreview(rows, previewRows) {
-        rows.forEach((row, index) => {
-            const validation = previewRows[index];
-            const cell = row.querySelector('.import-validation-cell');
-            cell.replaceChildren();
-            if (validation?.ready) {
-                cell.className = 'col-validation import-validation-cell import-validation-ready';
-                const ready = document.createElement('strong');
-                ready.textContent = 'Pronto para importar';
-                const interval = document.createElement('span');
-                interval.className = 'd-block';
-                interval.textContent = `${validation.start?.slice(11)} - ${validation.end?.slice(11)}`;
-                cell.append(ready, interval);
-                return;
-            }
-
-            cell.className = 'col-validation import-validation-cell import-validation-error';
-            const title = document.createElement('strong');
-            title.textContent = 'Revisar';
-            const list = document.createElement('ul');
-            (validation?.issues || ['Linha inválida.']).forEach((issue) => {
-                const item = document.createElement('li');
-                item.textContent = issue;
-                list.appendChild(item);
-            });
-            cell.append(title, list);
-        });
-    }
-
-    async function requestImportPreview() {
+    async function confirmAppointmentImport() {
         clearError();
         const rows = selectedImportRows();
         const items = editedItems();
@@ -574,53 +537,10 @@
             showError('Selecione ao menos uma linha para importar.');
             return;
         }
-        if (items.some((item) => !item.patient_id)) {
-            showError('Selecione ou crie o paciente de todas as linhas marcadas.');
+        if (!window.confirm(`Criar ${items.length} agendamento(s) na agenda do médico selecionado? Pacientes sem match serão criados como provisórios automaticamente.`)) {
             return;
         }
 
-        previewImportButton.disabled = true;
-        confirmImportButton.disabled = true;
-        try {
-            const response = await fetch('/api/agenda-fisica/previsualizar-importacao', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': window.getCSRFToken?.() || '',
-                },
-                body: JSON.stringify({ doctor_id: doctorSelect.value, items }),
-            });
-            const data = await response.json().catch(() => null);
-            if (!response.ok || !data?.success) {
-                throw new Error(data?.error || 'Não foi possível pré-visualizar a importação.');
-            }
-            renderImportPreview(rows, data.rows || []);
-            importPreviewReady = data.ready === true;
-            confirmImportButton.disabled = !importPreviewReady;
-            if (importPreviewReady && window.showAlert) {
-                window.showAlert(`${items.length} agendamento(s) pronto(s) para criação.`, 'success');
-            }
-        } catch (error) {
-            importPreviewReady = false;
-            showError(error.message || 'Não foi possível pré-visualizar a importação.');
-        } finally {
-            previewImportButton.disabled = false;
-        }
-    }
-
-    async function confirmAppointmentImport() {
-        if (!importPreviewReady) {
-            showError('Atualize a prévia antes de criar os agendamentos.');
-            return;
-        }
-        const rows = selectedImportRows();
-        const items = editedItems();
-        if (!window.confirm(`Criar ${items.length} agendamento(s) na agenda do médico selecionado?`)) {
-            return;
-        }
-
-        previewImportButton.disabled = true;
         confirmImportButton.disabled = true;
         try {
             const response = await fetch('/api/agenda-fisica/importar', {
@@ -637,10 +557,6 @@
                 }),
             });
             const data = await response.json().catch(() => null);
-            if (response.status === 409 && Array.isArray(data?.rows)) {
-                renderImportPreview(rows, data.rows);
-                throw new Error(data.error);
-            }
             if (!response.ok || !data?.success) {
                 throw new Error(data?.error || 'Não foi possível criar os agendamentos.');
             }
@@ -651,19 +567,25 @@
                     control.disabled = true;
                 });
                 const cell = row.querySelector('.import-validation-cell');
-                cell.className = 'col-validation import-validation-cell import-validation-ready';
-                cell.textContent = `Criado #${data.appointments[index]?.appointment_id || ''}`;
+                const apt = data.appointments?.[index];
+                if (apt?.patient_resolution === 'ativo_encontrado') {
+                    cell.className = 'col-validation import-validation-cell import-validation-ready';
+                    cell.textContent = 'Ativo \u2713';
+                } else if (apt?.patient_resolution === 'provisorio_existente') {
+                    cell.className = 'col-validation import-validation-cell text-warning';
+                    cell.textContent = 'Prov. existente \u2713';
+                } else {
+                    cell.className = 'col-validation import-validation-cell text-warning';
+                    cell.textContent = 'Provisório \u2713';
+                }
             });
-            importPreviewReady = false;
             if (window.showAlert) {
                 window.showAlert(`${data.created_count} agendamento(s) criado(s) com sucesso.`, 'success');
             }
         } catch (error) {
-            importPreviewReady = false;
             showError(error.message || 'Não foi possível criar os agendamentos.');
         } finally {
-            previewImportButton.disabled = false;
-            confirmImportButton.disabled = true;
+            confirmImportButton.disabled = false;
         }
     }
 
@@ -727,7 +649,6 @@
     });
 
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
-    previewImportButton.addEventListener('click', requestImportPreview);
     confirmImportButton.addEventListener('click', confirmAppointmentImport);
     tableBody.addEventListener('input', (event) => {
         if (!event.target.matches('input, textarea, select')) return;
@@ -740,7 +661,7 @@
             matchCell.className = 'col-match patient-match-cell text-muted';
             matchCell.textContent = 'Atualize as sugestões';
         }
-        invalidateImportPreview();
+        onDataChanged();
     });
     fileInput.addEventListener('change', () => addImageFiles(fileInput.files));
     chooseFileButton.addEventListener('click', (event) => {
