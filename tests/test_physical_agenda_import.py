@@ -320,6 +320,9 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         self.assertNotIn('downloadJson', script)
         self.assertIn("fetch('/api/agenda-fisica/importar'", script)
         self.assertIn('duration_minutes: 5', script)
+        self.assertNotIn('col-confidence', template)
+        self.assertNotIn('confidenceBadge', script)
+        self.assertIn("setValidationState(row, 'Paciente ativo confirmado \\u2713'", script)
 
     def test_import_preview_allows_automatic_patient_resolution(self):
         response = self.client.post('/api/agenda-fisica/previsualizar-importacao', json={
