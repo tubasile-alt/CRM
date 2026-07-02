@@ -69,8 +69,11 @@ def _ensure_patient_doctor_partial_index():
 @app.before_request
 def _ensure_index_on_startup():
     _ensure_patient_doctor_partial_index()
-    # Remove o handler após a primeira execução
-    app.before_request_funcs[None].remove(_ensure_index_on_startup)
+    # Remove o handler após a primeira execução (safe para workers concorrentes)
+    try:
+        app.before_request_funcs[None].remove(_ensure_index_on_startup)
+    except ValueError:
+        pass
 
 
 # Faixa inicial da nova política de códigos de paciente (FASE 1).

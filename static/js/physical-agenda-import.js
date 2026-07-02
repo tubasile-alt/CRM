@@ -656,9 +656,7 @@
     });
 
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
-    confirmImportButton.addEventListener('click', confirmAppointmentImport);
-    window.confirmPhysicalAgendaImport = confirmAppointmentImport;
-    console.log('[PAI] confirmImportButton click listener registered on', confirmImportButton);
+    console.log('[PAI] refreshMatchesButton listener registered');
     tableBody.addEventListener('input', (event) => {
         if (!event.target.matches('input, textarea, select')) return;
         const row = event.target.closest('tr[data-row-index]');
