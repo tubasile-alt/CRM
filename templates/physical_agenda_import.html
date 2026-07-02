@@ -135,7 +135,7 @@
         gap: 8px;
     }
     .agenda-result-table {
-        min-width: 1260px;
+        min-width: 1190px;
         table-layout: fixed;
         width: 100%;
     }
@@ -162,7 +162,6 @@
     .agenda-result-table .col-notes { width: 140px; }
     .agenda-result-table .col-match { width: 155px; }
     .agenda-result-table .col-validation { width: 130px; }
-    .agenda-result-table .col-confidence { width: 70px; text-align: center; }
     .agenda-result-table input,
     .agenda-result-table textarea {
         font-size: 0.84rem;
@@ -187,15 +186,6 @@
     .low-confidence-row td {
         background: #fff3cd;
     }
-    .confidence-badge {
-        display: inline-block;
-        min-width: 54px;
-        border-radius: 4px;
-        padding: 4px 7px;
-        font-weight: 700;
-    }
-    .confidence-high { background: #d1e7dd; color: #0f5132; }
-    .confidence-low { background: #f8d7da; color: #842029; }
     .patient-match-cell {
         font-size: 0.78rem;
     }
@@ -348,7 +338,6 @@
                         <th class="col-notes">Observações</th>
                         <th class="col-match">Paciente no CRM</th>
                         <th class="col-validation">Validação</th>
-                        <th class="col-confidence">%</th>
                     </tr>
                 </thead>
                 <tbody id="analysis-items"></tbody>
@@ -360,7 +349,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/physical-agenda-import.js') }}?v=20260702a"></script>
+<script src="{{ url_for('static', filename='js/physical-agenda-import.js') }}?v=20260702b"></script>
 <script>
 window.confirmPhysicalAgendaImport = async function() {
     console.log('[PAI-INLINE] confirmPhysicalAgendaImport called');

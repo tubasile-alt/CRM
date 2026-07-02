@@ -227,14 +227,7 @@
 
         const validationCell = document.createElement('td');
         validationCell.className = 'col-validation import-validation-cell text-muted';
-        validationCell.textContent = 'Aguardando importação';
-
-        const confidenceCell = document.createElement('td');
-        confidenceCell.className = 'col-confidence';
-        const confidenceBadge = document.createElement('span');
-        confidenceBadge.className = `confidence-badge ${confidence < 0.8 ? 'confidence-low' : 'confidence-high'}`;
-        confidenceBadge.textContent = `${Math.round(confidence * 100)}%`;
-        confidenceCell.appendChild(confidenceBadge);
+        validationCell.textContent = 'Aguardando paciente';
 
         [
             includeCell,
@@ -249,7 +242,6 @@
             notesCell,
             matchCell,
             validationCell,
-            confidenceCell,
         ]
             .forEach((cell) => row.appendChild(cell));
         return row;
@@ -306,10 +298,21 @@
         return row.querySelector(`[data-field="${field}"]`)?.value.trim() || '';
     }
 
+    function setValidationState(row, text, className = 'text-muted') {
+        const cell = row.querySelector('.import-validation-cell');
+        cell.className = `col-validation import-validation-cell ${className}`;
+        cell.textContent = text;
+    }
+
     function markMatchedPatient(row, patient, status) {
         const cell = row.querySelector('.patient-match-cell');
         row.dataset.patientId = String(patient.patient_id);
         row.dataset.patientStatus = status;
+        setValidationState(
+            row,
+            status === 'ativo' ? 'Paciente ativo confirmado \u2713' : 'Provisório confirmado \u2713',
+            status === 'ativo' ? 'import-validation-ready' : 'text-warning',
+        );
         onDataChanged();
         cell.replaceChildren();
 
@@ -387,6 +390,7 @@
         cell.replaceChildren();
         delete row.dataset.patientId;
         delete row.dataset.patientStatus;
+        setValidationState(row, 'Aguardando seleção');
 
         if (!Array.isArray(suggestions) || suggestions.length === 0) {
             const empty = document.createElement('span');
@@ -394,6 +398,7 @@
             empty.textContent = 'Nenhum paciente ativo encontrado.';
             cell.appendChild(empty);
             createProvisionalButton(row, cell);
+            setValidationState(row, 'Criará provisório', 'text-warning');
             return;
         }
 
@@ -421,6 +426,9 @@
         select.addEventListener('change', () => {
             actionArea.replaceChildren();
             if (select.value === '__new__') {
+                delete row.dataset.patientId;
+                delete row.dataset.patientStatus;
+                setValidationState(row, 'Criará provisório', 'text-warning');
                 createProvisionalButton(row, actionArea);
                 return;
             }
@@ -428,11 +436,13 @@
             if (!option?.dataset.patient) {
                 delete row.dataset.patientId;
                 delete row.dataset.patientStatus;
+                setValidationState(row, 'Aguardando seleção');
                 return;
             }
             const patient = JSON.parse(option.dataset.patient);
             row.dataset.patientId = String(patient.patient_id);
             row.dataset.patientStatus = 'ativo';
+            setValidationState(row, 'Paciente ativo confirmado \u2713', 'import-validation-ready');
             onDataChanged();
             const meta = document.createElement('span');
             meta.className = 'patient-match-meta';
@@ -461,6 +471,7 @@
         rows.forEach((row) => {
             const cell = row.querySelector('.patient-match-cell');
             cell.textContent = 'Buscando pacientes ativos...';
+            setValidationState(row, 'Buscando paciente...');
         });
 
         try {
@@ -495,6 +506,7 @@
         } catch (error) {
             rows.forEach((row) => {
                 row.querySelector('.patient-match-cell').textContent = 'Sugestões indisponíveis.';
+                setValidationState(row, 'Validação indisponível', 'import-validation-error');
             });
             showError(error.message || 'Não foi possível buscar pacientes ativos.');
         } finally {
@@ -680,6 +692,7 @@
             const matchCell = row.querySelector('.patient-match-cell');
             matchCell.className = 'col-match patient-match-cell text-muted';
             matchCell.textContent = 'Atualize as sugestões';
+            setValidationState(row, 'Revalidar paciente', 'text-warning');
         }
         if (row && event.target.dataset.field === 'time') {
             row.querySelector('.agenda-include-row').checked = Boolean(event.target.value);
