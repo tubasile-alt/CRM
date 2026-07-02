@@ -326,6 +326,7 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         self.assertIn('nameField.value = patient.patient_name', script)
         self.assertIn('window.confirmPhysicalAgendaImport = confirmAppointmentImport', script)
         self.assertNotIn('window.confirmPhysicalAgendaImport = async function', template)
+        self.assertIn("setValidationState(row, 'Nome obrigatório'", script)
 
     def test_import_preview_allows_automatic_patient_resolution(self):
         response = self.client.post('/api/agenda-fisica/previsualizar-importacao', json={

@@ -402,6 +402,15 @@
 
         if (!Array.isArray(suggestions) || suggestions.length === 0) {
             const empty = document.createElement('span');
+            const patientName = rowValue(row, 'patient_name');
+            if (!patientName) {
+                empty.className = 'text-danger';
+                empty.textContent = 'Informe o nome do paciente.';
+                row.querySelector('.agenda-include-row').checked = false;
+                cell.appendChild(empty);
+                setValidationState(row, 'Nome obrigatório', 'import-validation-error');
+                return;
+            }
             empty.className = 'text-muted';
             empty.textContent = 'Nenhum paciente ativo encontrado.';
             cell.appendChild(empty);
@@ -692,6 +701,10 @@
             matchCell.className = 'col-match patient-match-cell text-muted';
             matchCell.textContent = 'Atualize as sugestões';
             setValidationState(row, 'Revalidar paciente', 'text-warning');
+            if (event.target.dataset.field === 'patient_name' && event.target.value.trim()) {
+                const timeField = row.querySelector('[data-field="time"]');
+                row.querySelector('.agenda-include-row').checked = Boolean(timeField?.value);
+            }
         }
         if (row && event.target.dataset.field === 'time') {
             row.querySelector('.agenda-include-row').checked = Boolean(event.target.value);
