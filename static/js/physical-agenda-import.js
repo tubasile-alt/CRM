@@ -304,16 +304,24 @@
         cell.textContent = text;
     }
 
-    function markMatchedPatient(row, patient, status) {
-        const cell = row.querySelector('.patient-match-cell');
+    function selectPatientForRow(row, patient, status) {
         row.dataset.patientId = String(patient.patient_id);
         row.dataset.patientStatus = status;
+        const nameField = row.querySelector('[data-field="patient_name"]');
+        if (nameField && patient.patient_name) {
+            nameField.value = patient.patient_name;
+        }
         setValidationState(
             row,
             status === 'ativo' ? 'Paciente ativo confirmado \u2713' : 'Provisório confirmado \u2713',
             status === 'ativo' ? 'import-validation-ready' : 'text-warning',
         );
         onDataChanged();
+    }
+
+    function markMatchedPatient(row, patient, status) {
+        const cell = row.querySelector('.patient-match-cell');
+        selectPatientForRow(row, patient, status);
         cell.replaceChildren();
 
         const badge = document.createElement('span');
@@ -440,10 +448,7 @@
                 return;
             }
             const patient = JSON.parse(option.dataset.patient);
-            row.dataset.patientId = String(patient.patient_id);
-            row.dataset.patientStatus = 'ativo';
-            setValidationState(row, 'Paciente ativo confirmado \u2713', 'import-validation-ready');
-            onDataChanged();
+            selectPatientForRow(row, patient, 'ativo');
             const meta = document.createElement('span');
             meta.className = 'patient-match-meta';
             const contact = patient.patient_phone || 'sem telefone';
@@ -600,16 +605,9 @@
                 if (apt?.start && timeField) {
                     timeField.value = apt.start.slice(11, 16);
                 }
-                if (apt?.patient_resolution === 'ativo_encontrado') {
-                    cell.className = 'col-validation import-validation-cell import-validation-ready';
-                    cell.textContent = 'Ativo \u2713';
-                } else if (apt?.patient_resolution === 'provisorio_existente') {
-                    cell.className = 'col-validation import-validation-cell text-warning';
-                    cell.textContent = 'Prov. existente \u2713';
-                } else {
-                    cell.className = 'col-validation import-validation-cell text-warning';
-                    cell.textContent = 'Provisório \u2713';
-                }
+                const activePatient = apt?.patient_resolution?.startsWith('ativo_');
+                cell.className = `col-validation import-validation-cell ${activePatient ? 'import-validation-ready' : 'text-warning'}`;
+                cell.textContent = `Importado: ${apt?.patient_name || 'Provisório'} \u2713`;
             });
             if (window.showAlert) {
                 window.showAlert(`${data.created_count} agendamento(s) criado(s) com sucesso.`, 'success');
@@ -682,6 +680,7 @@
 
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
     console.log('[PAI] refreshMatchesButton listener registered');
+    window.confirmPhysicalAgendaImport = confirmAppointmentImport;
     tableBody.addEventListener('input', (event) => {
         if (!event.target.matches('input, textarea, select')) return;
         const row = event.target.closest('tr[data-row-index]');

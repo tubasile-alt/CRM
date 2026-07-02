@@ -322,7 +322,10 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         self.assertIn('duration_minutes: 5', script)
         self.assertNotIn('col-confidence', template)
         self.assertNotIn('confidenceBadge', script)
-        self.assertIn("setValidationState(row, 'Paciente ativo confirmado \\u2713'", script)
+        self.assertIn('Paciente ativo confirmado \\u2713', script)
+        self.assertIn('nameField.value = patient.patient_name', script)
+        self.assertIn('window.confirmPhysicalAgendaImport = confirmAppointmentImport', script)
+        self.assertNotIn('window.confirmPhysicalAgendaImport = async function', template)
 
     def test_import_preview_allows_automatic_patient_resolution(self):
         response = self.client.post('/api/agenda-fisica/previsualizar-importacao', json={
@@ -444,6 +447,22 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
             self.assertIn('Procedimento: Botox', appointment.notes)
             audit = PhysicalAgendaImportLog.query.filter_by(appointment_id=appointment.id).one()
             self.assertEqual(audit.performed_by_user_id, self.secretary_id)
+
+    def test_selected_patient_overrides_transcribed_name(self):
+        response = self.client.post('/api/agenda-fisica/importar', json={
+            'doctor_id': self.doctor_id,
+            'confirmed': True,
+            'items': [self.import_item(patient_name='Nome transcrito incorreto')],
+        })
+        self.assertEqual(response.status_code, 201)
+        imported = response.get_json()['appointments'][0]
+        self.assertEqual(imported['patient_id'], self.active_patient_id)
+        self.assertEqual(imported['patient_name'], 'Maria Silva')
+        self.assertEqual(imported['patient_resolution'], 'ativo_selecionado')
+
+        with self.app.app_context():
+            appointment = db.session.get(Appointment, imported['appointment_id'])
+            self.assertEqual(appointment.patient.name, 'Maria Silva')
 
     def test_reimport_is_blocked_without_duplicate_appointment(self):
         request_data = {

@@ -391,6 +391,7 @@ def import_appointments(items, doctor_id, performed_by_user_id):
             'row_index': row['row_index'],
             'appointment_id': appointment.id,
             'patient_id': patient.id,
+            'patient_name': patient.name,
             'start': appointment.start_time.isoformat(timespec='minutes'),
             'end': appointment.end_time.isoformat(timespec='minutes'),
             'requested_start': row['requested_start_time'].isoformat(timespec='minutes'),
