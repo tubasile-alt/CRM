@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from models import Appointment, Patient, PatientDoctor, PhysicalAgendaImportLog, db
 from services.physical_agenda_matching import (
     find_equivalent_provisional,
-    normalize_name,
     normalize_phone,
     suggest_active_patients,
 )
@@ -13,6 +12,8 @@ from services.statuses import AppointmentStatus, normalize_appointment_status
 
 
 MAX_IMPORT_ITEMS = 100
+DEFAULT_DURATION_MINUTES = 5
+SLOT_MINUTES = 5
 MIN_DURATION_MINUTES = 5
 MAX_DURATION_MINUTES = 480
 
@@ -40,7 +41,7 @@ def _parse_item(item, row_index):
         raise PhysicalAgendaImportError('Data ou horário inválido.') from exc
 
     try:
-        duration = int(item.get('duration_minutes') or 15)
+        duration = int(item.get('duration_minutes') or DEFAULT_DURATION_MINUTES)
     except (TypeError, ValueError) as exc:
         raise PhysicalAgendaImportError('Duração inválida.') from exc
     if not MIN_DURATION_MINUTES <= duration <= MAX_DURATION_MINUTES:
@@ -55,6 +56,7 @@ def _parse_item(item, row_index):
 
     return {
         'row_index': row_index,
+        'patient_id': item.get('patient_id'),
         'patient_name': _clean_text(item.get('patient_name'), 100),
         'phone': _clean_text(item.get('phone'), 20),
         'cpf': _clean_text(item.get('cpf'), 14),
@@ -76,11 +78,16 @@ def _resolve_or_create_patient(item, doctor_id, next_code):
     """Resolve paciente: usa seleção explícita, auto-match forte, provisório existente, ou cria provisório novo."""
     patient_name = item.get('patient_name')
     phone = item.get('phone')
+    cpf = item.get('cpf')
+    patient_code = item.get('patient_code')
+    phone_digits = normalize_phone(phone)
+    if not patient_code and 1 <= len(phone_digits) <= 6:
+        patient_code = phone_digits
 
     # 1) Paciente explicitamente selecionado pelo usuário no frontend
     explicit_patient_id = item.get('patient_id')
     if explicit_patient_id:
-        patient = Patient.query.get(int(explicit_patient_id))
+        patient = db.session.get(Patient, int(explicit_patient_id))
         if patient and patient.status_cadastral in {'ativo', 'provisorio'}:
             status = 'ativo_selecionado' if patient.status_cadastral == 'ativo' else 'provisorio_selecionado'
             return patient, status, next_code
@@ -89,10 +96,19 @@ def _resolve_or_create_patient(item, doctor_id, next_code):
         return None, None, next_code
 
     # 2) Buscar ativo com match forte (score >= 0.9)
-    suggestions = suggest_active_patients(patient_name, phone, doctor_id, limit=5)
-    strong_match = next((s for s in suggestions if s['score'] >= 0.9), None)
+    suggestions = suggest_active_patients(
+        patient_name,
+        phone,
+        doctor_id,
+        cpf=cpf,
+        patient_code=patient_code,
+        limit=5,
+    )
+    strong_match = suggestions[0] if suggestions and suggestions[0]['score'] >= 0.9 else None
+    if strong_match and len(suggestions) > 1 and suggestions[1]['score'] == strong_match['score']:
+        strong_match = None
     if strong_match:
-        patient = Patient.query.get(strong_match['patient_id'])
+        patient = db.session.get(Patient, strong_match['patient_id'])
         if patient and patient.status_cadastral == 'ativo':
             return patient, 'ativo_encontrado', next_code
 
@@ -118,18 +134,63 @@ def _resolve_or_create_patient(item, doctor_id, next_code):
     return patient, 'provisorio_criado', next_code
 
 
-def _serialize_conflict(appointment):
-    return {
-        'appointment_id': appointment.id,
-        'start': appointment.start_time.isoformat(timespec='minutes'),
-        'end': appointment.end_time.isoformat(timespec='minutes'),
-        'patient_name': appointment.patient.name if appointment.patient else 'Paciente',
-        'status': normalize_appointment_status(appointment.status),
-    }
+def _floor_to_slot(value):
+    return value.replace(
+        minute=value.minute - (value.minute % SLOT_MINUTES),
+        second=0,
+        microsecond=0,
+    )
+
+
+def _overlaps(start_time, end_time, intervals):
+    return any(start_time < interval_end and end_time > interval_start
+               for interval_start, interval_end in intervals)
+
+
+def _assign_available_slots(rows, doctor_id):
+    """Encaixa as linhas em blocos de cinco minutos sem sobreposição."""
+    if not rows:
+        return
+
+    first_date = min(row['start_time'].date() for row in rows)
+    last_date = max(row['start_time'].date() for row in rows)
+    window_start = datetime.combine(first_date, datetime.min.time())
+    window_end = datetime.combine(last_date + timedelta(days=1), datetime.min.time())
+    existing = Appointment.query.filter(
+        Appointment.doctor_id == doctor_id,
+        Appointment.start_time < window_end,
+        Appointment.end_time > window_start,
+    ).all()
+    intervals = [
+        (appointment.start_time, appointment.end_time)
+        for appointment in existing
+        if normalize_appointment_status(appointment.status) != AppointmentStatus.CANCELLED
+    ]
+
+    ordered_rows = sorted(rows, key=lambda row: (row['start_time'], row['row_index']))
+    for row in ordered_rows:
+        requested_start = row['start_time']
+        candidate_start = _floor_to_slot(requested_start)
+        duration = timedelta(minutes=row['duration_minutes'])
+        candidate_end = candidate_start + duration
+
+        while _overlaps(candidate_start, candidate_end, intervals):
+            candidate_start += timedelta(minutes=SLOT_MINUTES)
+            candidate_end = candidate_start + duration
+            if candidate_start.date() != requested_start.date():
+                raise PhysicalAgendaImportError(
+                    f'Linha {row["row_index"] + 1}: Não há horário livre neste dia.'
+                )
+
+        row['requested_start_time'] = requested_start
+        row['start_time'] = candidate_start
+        row['end_time'] = candidate_end
+        row['time_adjusted'] = candidate_start != requested_start
+        intervals.append((candidate_start, candidate_end))
 
 
 def build_import_preview(items, doctor_id):
-    """Valida pacientes e sobreposições sem alterar o banco."""
+    """Valida e calcula os encaixes sem alterar o banco."""
     ensure_physical_agenda_import_schema()
     if not isinstance(items, list) or not items:
         raise PhysicalAgendaImportError('Selecione ao menos uma linha para importar.')
@@ -155,7 +216,7 @@ def build_import_preview(items, doctor_id):
             row['issues'].append('Identificador de importação repetido no lote.')
         keys_seen.add(row['idempotency_key'])
 
-    patient_ids = {row['patient_id'] for row in parsed_rows}
+    patient_ids = {row['patient_id'] for row in parsed_rows if row.get('patient_id')}
     patients = Patient.query.filter(Patient.id.in_(patient_ids)).all() if patient_ids else []
     patients_by_id = {patient.id: patient for patient in patients}
     links = PatientDoctor.query.filter(
@@ -165,9 +226,11 @@ def build_import_preview(items, doctor_id):
     linked_patient_ids = {link.patient_id for link in links}
 
     for row in parsed_rows:
+        if not row.get('patient_id'):
+            continue
         patient = patients_by_id.get(row['patient_id'])
         if not patient:
-            row['issues'].append('Paciente não encontrado.')
+            row['issues'].append('Paciente selecionado não encontrado.')
             continue
         if patient.status_cadastral not in {'ativo', 'provisorio'}:
             row['issues'].append('Situação cadastral do paciente não permite agendamento.')
@@ -175,21 +238,6 @@ def build_import_preview(items, doctor_id):
             row['issues'].append('Paciente provisório não pertence ao médico selecionado.')
         row['patient_name'] = patient.name
         row['patient_status'] = patient.status_cadastral
-
-    if parsed_rows:
-        window_start = min(row['start_time'] for row in parsed_rows)
-        window_end = max(row['end_time'] for row in parsed_rows)
-        existing_appointments = Appointment.query.filter(
-            Appointment.doctor_id == doctor_id,
-            Appointment.start_time < window_end,
-            Appointment.end_time > window_start,
-        ).all()
-        existing_appointments = [
-            appointment for appointment in existing_appointments
-            if normalize_appointment_status(appointment.status) != AppointmentStatus.CANCELLED
-        ]
-    else:
-        existing_appointments = []
 
     existing_keys = {
         log.idempotency_key: log
@@ -206,15 +254,7 @@ def build_import_preview(items, doctor_id):
             row['issues'].append('Esta linha já foi importada.')
             row['existing_appointment_id'] = prior_log.appointment_id
 
-        for appointment in existing_appointments:
-            if appointment.start_time < row['end_time'] and appointment.end_time > row['start_time']:
-                row['conflicts'].append(_serialize_conflict(appointment))
-
-    for index, left in enumerate(parsed_rows):
-        for right in parsed_rows[index + 1:]:
-            if left['start_time'] < right['end_time'] and left['end_time'] > right['start_time']:
-                left['issues'].append(f'Conflito com a linha {right["row_index"] + 1} do lote.')
-                right['issues'].append(f'Conflito com a linha {left["row_index"] + 1} do lote.')
+    _assign_available_slots(parsed_rows, doctor_id)
 
     response_rows = []
     for row in rows:
@@ -230,6 +270,8 @@ def build_import_preview(items, doctor_id):
             'patient_status': row.get('patient_status'),
             'start': row.get('start_time').isoformat(timespec='minutes') if row.get('start_time') else None,
             'end': row.get('end_time').isoformat(timespec='minutes') if row.get('end_time') else None,
+            'requested_start': row.get('requested_start_time').isoformat(timespec='minutes') if row.get('requested_start_time') else None,
+            'time_adjusted': bool(row.get('time_adjusted')),
             'issues': issues,
             'conflicts': conflicts,
             'existing_appointment_id': row.get('existing_appointment_id'),
@@ -298,35 +340,8 @@ def import_appointments(items, doctor_id, performed_by_user_id):
                 f'Linha {row["row_index"] + 1}: Esta linha já foi importada.'
             )
 
-    # 4) Verificar conflitos de horário com agendamentos existentes
-    if rows:
-        window_start = min(row['start_time'] for row in rows)
-        window_end = max(row['end_time'] for row in rows)
-        existing = Appointment.query.filter(
-            Appointment.doctor_id == doctor_id,
-            Appointment.start_time < window_end,
-            Appointment.end_time > window_start,
-        ).all()
-        existing = [
-            a for a in existing
-            if normalize_appointment_status(a.status) != AppointmentStatus.CANCELLED
-        ]
-        for row in rows:
-            for apt in existing:
-                if apt.start_time < row['end_time'] and apt.end_time > row['start_time']:
-                    pname = apt.patient.name if apt.patient else 'Paciente'
-                    raise PhysicalAgendaImportError(
-                        f'Linha {row["row_index"] + 1}: Conflito com agendamento existente '
-                        f'({pname} {apt.start_time.strftime("%H:%M")}-{apt.end_time.strftime("%H:%M")}).'
-                    )
-
-    # 5) Verificar conflitos internos
-    for i, left in enumerate(rows):
-        for right in rows[i + 1:]:
-            if left['start_time'] < right['end_time'] and left['end_time'] > right['start_time']:
-                raise PhysicalAgendaImportError(
-                    f'Linha {left["row_index"] + 1}: Conflito com linha {right["row_index"] + 1}.'
-                )
+    # 4) Encaixar conflitos e duplicidades no próximo bloco livre de cinco minutos
+    _assign_available_slots(rows, doctor_id)
 
     # 6) Criar vínculos para pacientes ativos sem vínculo, e agendamentos
     linked_patient_ids = {
@@ -378,6 +393,8 @@ def import_appointments(items, doctor_id, performed_by_user_id):
             'patient_id': patient.id,
             'start': appointment.start_time.isoformat(timespec='minutes'),
             'end': appointment.end_time.isoformat(timespec='minutes'),
+            'requested_start': row['requested_start_time'].isoformat(timespec='minutes'),
+            'time_adjusted': row['time_adjusted'],
             'patient_resolution': row['resolution'],
         })
 
