@@ -9,6 +9,8 @@ from services.statuses import AppointmentStatus, normalize_appointment_status
 MAX_IMPORT_ITEMS = 100
 MIN_DURATION_MINUTES = 5
 MAX_DURATION_MINUTES = 480
+DEFAULT_DURATION_MINUTES = 5
+SLOT_MINUTES = 5
 
 
 class PhysicalAgendaImportError(ValueError):
@@ -39,7 +41,7 @@ def _parse_item(item, row_index):
         raise PhysicalAgendaImportError('Data ou horário inválido.') from exc
 
     try:
-        duration = int(item.get('duration_minutes') or 15)
+        duration = int(item.get('duration_minutes') or DEFAULT_DURATION_MINUTES)
     except (TypeError, ValueError) as exc:
         raise PhysicalAgendaImportError('Duração inválida.') from exc
     if not MIN_DURATION_MINUTES <= duration <= MAX_DURATION_MINUTES:
@@ -76,6 +78,15 @@ def _serialize_conflict(appointment):
         'patient_name': appointment.patient.name if appointment.patient else 'Paciente',
         'status': normalize_appointment_status(appointment.status),
     }
+
+
+def _floor_to_slot(value):
+    minute = value.minute - (value.minute % SLOT_MINUTES)
+    return value.replace(minute=minute, second=0, microsecond=0)
+
+
+def _overlaps(start_time, end_time, interval):
+    return interval['start'] < end_time and interval['end'] > start_time
 
 
 def build_import_preview(items, doctor_id):
@@ -127,8 +138,10 @@ def build_import_preview(items, doctor_id):
         row['patient_status'] = patient.status_cadastral
 
     if parsed_rows:
-        window_start = min(row['start_time'] for row in parsed_rows)
-        window_end = max(row['end_time'] for row in parsed_rows)
+        first_date = min(row['start_time'].date() for row in parsed_rows)
+        last_date = max(row['start_time'].date() for row in parsed_rows)
+        window_start = datetime.combine(first_date, datetime.min.time())
+        window_end = datetime.combine(last_date + timedelta(days=1), datetime.min.time())
         existing_appointments = Appointment.query.filter(
             Appointment.doctor_id == doctor_id,
             Appointment.start_time < window_end,
@@ -156,22 +169,55 @@ def build_import_preview(items, doctor_id):
             row['issues'].append('Esta linha já foi importada.')
             row['existing_appointment_id'] = prior_log.appointment_id
 
-        for appointment in existing_appointments:
-            if appointment.start_time < row['end_time'] and appointment.end_time > row['start_time']:
-                row['conflicts'].append(_serialize_conflict(appointment))
+    occupied = [
+        {
+            'start': appointment.start_time,
+            'end': appointment.end_time,
+            'appointment': appointment,
+        }
+        for appointment in existing_appointments
+    ]
+    for row in sorted(parsed_rows, key=lambda item: (item['start_time'], item['row_index'])):
+        if row['issues']:
+            continue
 
-    for index, left in enumerate(parsed_rows):
-        for right in parsed_rows[index + 1:]:
-            if left['start_time'] < right['end_time'] and left['end_time'] > right['start_time']:
-                left['issues'].append(f'Conflito com a linha {right["row_index"] + 1} do lote.')
-                right['issues'].append(f'Conflito com a linha {left["row_index"] + 1} do lote.')
+        requested_start = row['start_time']
+        proposed_start = _floor_to_slot(requested_start)
+        proposed_end = proposed_start + timedelta(minutes=row['duration_minutes'])
+        encountered_appointments = {}
+
+        while True:
+            collisions = [
+                interval for interval in occupied
+                if _overlaps(proposed_start, proposed_end, interval)
+            ]
+            if not collisions:
+                break
+            for interval in collisions:
+                appointment = interval.get('appointment')
+                if appointment:
+                    encountered_appointments[appointment.id] = appointment
+            proposed_start += timedelta(minutes=SLOT_MINUTES)
+            proposed_end = proposed_start + timedelta(minutes=row['duration_minutes'])
+            if proposed_start.date() != requested_start.date():
+                row['issues'].append('Não há espaço livre neste dia para encaixar o horário.')
+                break
+
+        row['requested_start_time'] = requested_start
+        row['start_time'] = proposed_start
+        row['end_time'] = proposed_end
+        row['adjusted'] = proposed_start != requested_start
+        row['conflicts'] = [
+            _serialize_conflict(appointment)
+            for appointment in encountered_appointments.values()
+        ]
+        if not row['issues']:
+            occupied.append({'start': proposed_start, 'end': proposed_end, 'appointment': None})
 
     response_rows = []
     for row in rows:
         conflicts = row.get('conflicts', [])
         issues = list(dict.fromkeys(row.get('issues', [])))
-        if conflicts:
-            issues.append('Horário sobreposto a um agendamento existente.')
         response_rows.append({
             'row_index': row['row_index'],
             'ready': not issues,
@@ -180,6 +226,11 @@ def build_import_preview(items, doctor_id):
             'patient_status': row.get('patient_status'),
             'start': row.get('start_time').isoformat(timespec='minutes') if row.get('start_time') else None,
             'end': row.get('end_time').isoformat(timespec='minutes') if row.get('end_time') else None,
+            'requested_start': (
+                row.get('requested_start_time').isoformat(timespec='minutes')
+                if row.get('requested_start_time') else None
+            ),
+            'adjusted': bool(row.get('adjusted')),
             'issues': issues,
             'conflicts': conflicts,
             'existing_appointment_id': row.get('existing_appointment_id'),

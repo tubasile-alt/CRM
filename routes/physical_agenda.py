@@ -207,6 +207,10 @@ def suggest_patients():
         phone = str(item.get('phone') or '').strip()[:40]
         cpf = str(item.get('cpf') or '').strip()[:20]
         patient_code = str(item.get('patient_code') or '').strip()[:20]
+        phone_digits = normalize_phone(phone)
+        if not patient_code and 1 <= len(phone_digits) <= 6:
+            patient_code = phone_digits
+            phone = ''
         matches.append({
             'row_index': index,
             'suggestions': suggest_active_patients(

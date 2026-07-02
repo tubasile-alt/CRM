@@ -34,10 +34,10 @@ O projeto requer `openai>=2.0.0,<3.0.0`. Depois de atualizar o código no Replit
 4. Confere ou altera a data individual de cada foto adicionada.
 5. Seleciona **Analisar agenda**. As fotos são processadas uma por vez e reunidas na mesma conferência.
 6. Confere e corrige data, horário, nome, telefone, tipo, procedimento e observações.
-7. Confere as sugestões de pacientes ativos por nome, telefone, CPF ou código.
+7. Confere as sugestões de pacientes ativos por nome, telefone, CPF ou código. Correspondências únicas com alta confiança são vinculadas automaticamente e podem ser alteradas.
 8. Quando nenhum paciente corresponder, pode confirmar a criação de um cadastro provisório.
-9. Ajusta a duração e desmarca linhas que não devem entrar na agenda.
-10. Seleciona **Pré-visualizar importação** e corrige eventuais conflitos.
+9. Ajusta a duração, que começa em 5 minutos, e desmarca linhas que não devem entrar na agenda. Linhas sem horário já começam desmarcadas.
+10. Seleciona **Pré-visualizar importação**. Horários repetidos ou ocupados são encaixados automaticamente na próxima posição livre de 5 minutos.
 11. Quando todas as linhas estiverem prontas, seleciona **Importar para agenda** e confirma a operação.
 
 Médicos só podem analisar a própria agenda. Secretária e administrador podem selecionar qualquer usuário cadastrado como médico.
@@ -64,7 +64,7 @@ Médicos só podem analisar a própria agenda. Secretária e administrador podem
 - O telefone normalizado deve ser conferido contra o texto da agenda.
 - O checkbox **Importar?** controla as linhas enviadas para a agenda.
 - Não existe persistência do resultado depois que a página é fechada.
-- Conflitos de horário bloqueiam a importação e não podem ser forçados nesta fase.
+- Horários repetidos ou ocupados são deslocados automaticamente em passos de 5 minutos; a prévia mostra cada ajuste antes da confirmação.
 - A importação cria `Appointment`; integrações específicas de cirurgia, Google Sheets e Google Calendar continuam no fluxo manual da agenda.
 
 ## Banco de dados

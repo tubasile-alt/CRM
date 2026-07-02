@@ -177,7 +177,7 @@
         const include = document.createElement('input');
         include.type = 'checkbox';
         include.className = 'form-check-input agenda-include-row';
-        include.checked = true;
+        include.checked = Boolean(item.time);
         include.setAttribute('aria-label', `Incluir linha ${rowIndex + 1} na importação`);
         includeCell.appendChild(include);
 
@@ -186,7 +186,8 @@
         dateCell.appendChild(createField('date', item.agenda_date, 'agenda_date', rowIndex, 'Data da agenda'));
 
         const timeCell = document.createElement('td');
-        timeCell.appendChild(createField('time', item.time, 'time', rowIndex, 'Horário'));
+        const time = createField('time', item.time, 'time', rowIndex, 'Horário');
+        timeCell.appendChild(time);
 
         const nameCell = document.createElement('td');
         nameCell.appendChild(createField('text', item.patient_name, 'patient_name', rowIndex, 'Nome do paciente'));
@@ -213,7 +214,7 @@
         procedureCell.appendChild(createField('text', item.procedure, 'procedure', rowIndex, 'Procedimento'));
 
         const durationCell = document.createElement('td');
-        const duration = createField('number', item.duration_minutes || 15, 'duration_minutes', rowIndex, 'Duração em minutos');
+        const duration = createField('number', item.duration_minutes || 5, 'duration_minutes', rowIndex, 'Duração em minutos');
         duration.min = '5';
         duration.max = '480';
         duration.step = '5';
@@ -235,7 +236,7 @@
 
         const validationCell = document.createElement('td');
         validationCell.className = 'col-validation import-validation-cell text-muted';
-        validationCell.textContent = 'Aguardando prévia';
+        validationCell.textContent = item.time ? 'Aguardando prévia' : 'Informe o horário para incluir';
 
         const confidenceCell = document.createElement('td');
         confidenceCell.className = 'col-confidence';
@@ -316,7 +317,7 @@
         return row.querySelector(`[data-field="${field}"]`)?.value.trim() || '';
     }
 
-    function markMatchedPatient(row, patient, status) {
+    function markMatchedPatient(row, patient, status, automatic = false) {
         const cell = row.querySelector('.patient-match-cell');
         row.dataset.patientId = String(patient.patient_id);
         row.dataset.patientStatus = status;
@@ -325,7 +326,9 @@
 
         const badge = document.createElement('span');
         badge.className = `badge ${status === 'ativo' ? 'text-bg-success' : 'text-bg-warning'}`;
-        badge.textContent = status === 'ativo' ? 'Paciente ativo selecionado' : 'Cadastro provisório';
+        badge.textContent = status === 'ativo'
+            ? (automatic ? 'Paciente vinculado automaticamente' : 'Paciente ativo selecionado')
+            : 'Cadastro provisório';
         const name = document.createElement('span');
         name.className = 'patient-match-meta';
         name.textContent = patient.patient_name;
@@ -333,7 +336,10 @@
         changeButton.type = 'button';
         changeButton.className = 'btn btn-link btn-sm p-0 mt-1';
         changeButton.textContent = 'Alterar sugestão';
-        changeButton.addEventListener('click', () => loadPatientSuggestions());
+        changeButton.addEventListener('click', () => {
+            row.dataset.skipAutoMatch = 'true';
+            loadPatientSuggestions();
+        });
         cell.append(badge, name, changeButton);
     }
 
@@ -404,6 +410,14 @@
             empty.textContent = 'Nenhum paciente ativo encontrado.';
             cell.appendChild(empty);
             createProvisionalButton(row, cell);
+            return;
+        }
+
+        const best = suggestions[0];
+        const runnerUp = suggestions[1];
+        const safelyAhead = !runnerUp || Number(best.score) - Number(runnerUp.score) >= 0.05;
+        if (row.dataset.skipAutoMatch !== 'true' && Number(best.score) >= 0.9 && safelyAhead) {
+            markMatchedPatient(row, best, 'ativo', true);
             return;
         }
 
@@ -551,12 +565,19 @@
             const cell = row.querySelector('.import-validation-cell');
             cell.replaceChildren();
             if (validation?.ready) {
+                const adjustedDate = validation.start?.slice(0, 10);
+                const adjustedTime = validation.start?.slice(11, 16);
+                if (adjustedDate) row.querySelector('[data-field="agenda_date"]').value = adjustedDate;
+                if (adjustedTime) row.querySelector('[data-field="time"]').value = adjustedTime;
                 cell.className = 'col-validation import-validation-cell import-validation-ready';
                 const ready = document.createElement('strong');
-                ready.textContent = 'Pronto para importar';
+                ready.textContent = validation.adjusted ? 'Horário encaixado automaticamente' : 'Pronto para importar';
                 const interval = document.createElement('span');
                 interval.className = 'd-block';
-                interval.textContent = `${validation.start?.slice(11)} - ${validation.end?.slice(11)}`;
+                const requested = validation.requested_start?.slice(11, 16);
+                interval.textContent = validation.adjusted
+                    ? `${requested} → ${adjustedTime}`
+                    : `${adjustedTime} - ${validation.end?.slice(11, 16)}`;
                 cell.append(ready, interval);
                 return;
             }
@@ -741,9 +762,13 @@
         if (!event.target.matches('input, textarea, select')) return;
         const row = event.target.closest('tr[data-row-index]');
         const identityFields = ['patient_name', 'phone', 'cpf', 'patient_code'];
+        if (row && event.target.dataset.field === 'time') {
+            row.querySelector('.agenda-include-row').checked = Boolean(event.target.value);
+        }
         if (row && identityFields.includes(event.target.dataset.field)) {
             delete row.dataset.patientId;
             delete row.dataset.patientStatus;
+            delete row.dataset.skipAutoMatch;
             const matchCell = row.querySelector('.patient-match-cell');
             matchCell.className = 'col-match patient-match-cell text-muted';
             matchCell.textContent = 'Atualize as sugestões';
