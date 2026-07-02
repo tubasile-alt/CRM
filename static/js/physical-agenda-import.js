@@ -174,7 +174,7 @@
         const include = document.createElement('input');
         include.type = 'checkbox';
         include.className = 'form-check-input agenda-include-row';
-        include.checked = true;
+        include.checked = Boolean(item.time);
         include.setAttribute('aria-label', `Incluir linha ${rowIndex + 1} na importação`);
         includeCell.appendChild(include);
 
@@ -183,7 +183,9 @@
         dateCell.appendChild(createField('date', item.agenda_date, 'agenda_date', rowIndex, 'Data da agenda'));
 
         const timeCell = document.createElement('td');
-        timeCell.appendChild(createField('time', item.time, 'time', rowIndex, 'Horário'));
+        const time = createField('time', item.time, 'time', rowIndex, 'Horário');
+        time.step = '300';
+        timeCell.appendChild(time);
 
         const nameCell = document.createElement('td');
         nameCell.appendChild(createField('text', item.patient_name, 'patient_name', rowIndex, 'Nome do paciente'));
@@ -441,6 +443,13 @@
             actionArea.appendChild(meta);
         });
         cell.append(select, actionArea);
+
+        const best = suggestions[0];
+        const second = suggestions[1];
+        if (best.score >= 0.9 && (!second || second.score < best.score)) {
+            select.value = String(best.patient_id);
+            select.dispatchEvent(new Event('change'));
+        }
     }
 
     async function loadPatientSuggestions() {
@@ -517,7 +526,7 @@
                     patient_code: value('patient_code'),
                     appointment_type: value('appointment_type'),
                     procedure: value('procedure'),
-                    duration_minutes: 15,
+                    duration_minutes: 5,
                     notes: value('notes'),
                     patient_id: row.dataset.patientId ? Number.parseInt(row.dataset.patientId, 10) : null,
                     patient_status: row.dataset.patientStatus || null,
@@ -575,6 +584,10 @@
                 });
                 const cell = row.querySelector('.import-validation-cell');
                 const apt = data.appointments?.[index];
+                const timeField = row.querySelector('[data-field="time"]');
+                if (apt?.start && timeField) {
+                    timeField.value = apt.start.slice(11, 16);
+                }
                 if (apt?.patient_resolution === 'ativo_encontrado') {
                     cell.className = 'col-validation import-validation-cell import-validation-ready';
                     cell.textContent = 'Ativo \u2713';
@@ -667,6 +680,9 @@
             const matchCell = row.querySelector('.patient-match-cell');
             matchCell.className = 'col-match patient-match-cell text-muted';
             matchCell.textContent = 'Atualize as sugestões';
+        }
+        if (row && event.target.dataset.field === 'time') {
+            row.querySelector('.agenda-include-row').checked = Boolean(event.target.value);
         }
         onDataChanged();
     });

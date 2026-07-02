@@ -264,7 +264,7 @@
             <h1><i class="bi bi-journal-arrow-up me-2"></i>Importar Agenda Física</h1>
             <p>Transcrição por IA para conferência manual</p>
         </div>
-        <span class="privacy-state"><i class="bi bi-shield-lock"></i> Análise sem gravação automática</span>
+        <span class="privacy-state"><i class="bi bi-shield-lock"></i> Importação somente após confirmação</span>
     </header>
 
     <form id="physical-agenda-form" class="analysis-form" enctype="multipart/form-data"
@@ -385,7 +385,7 @@ window.confirmPhysicalAgendaImport = async function() {
             patient_code: value('patient_code'),
             appointment_type: value('appointment_type'),
             procedure: value('procedure'),
-            duration_minutes: 15,
+            duration_minutes: 5,
             notes: value('notes'),
             patient_id: row.dataset.patientId ? parseInt(row.dataset.patientId, 10) : null,
             idempotency_key: row.dataset.importKey,
@@ -408,11 +408,18 @@ window.confirmPhysicalAgendaImport = async function() {
         if (!resp.ok || !data?.success) {
             throw new Error(data?.error || 'Não foi possível criar os agendamentos.');
         }
-        rows.forEach((row) => {
+        rows.forEach((row, index) => {
             row.dataset.imported = 'true';
             row.querySelectorAll('input, textarea, select, button').forEach(c => c.disabled = true);
             const cell = row.querySelector('.import-validation-cell');
-            if (cell) cell.textContent = 'Importado \u2713';
+            const appointment = data.appointments?.[index];
+            const timeField = row.querySelector('[data-field="time"]');
+            if (appointment?.start && timeField) timeField.value = appointment.start.slice(11, 16);
+            if (cell) {
+                cell.textContent = appointment?.time_adjusted
+                    ? `Importado às ${appointment.start.slice(11, 16)} \u2713`
+                    : 'Importado \u2713';
+            }
         });
         alert(`${data.created_count || items.length} agendamento(s) criado(s) com sucesso!`);
     } catch (e) {
