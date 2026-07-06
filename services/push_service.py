@@ -18,7 +18,7 @@ def _vapid_claims():
         email = email.split(':', 1)[1].strip()
     subject = f'mailto:{email}'
     import time
-    return {'sub': subject, 'exp': int(time.time()) + 86400}
+    return {'sub': subject, 'exp': int(time.time()) + 43200}
 
 
 def _subscription_info(subscription):
