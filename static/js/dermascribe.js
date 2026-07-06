@@ -399,22 +399,32 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==============================
     async function handleSaveAndPrint(e) {
         if (e) e.preventDefault();
-        
+
+        // Abre janela IMEDIATAMENTE (no gesto do clique) para evitar bloqueio do Safari
+        const printWin = window.open('', '_blank');
+
         // Evita duplo clique
-        if (savePrescriptionBtn && savePrescriptionBtn.dataset.loading === '1') return;
+        if (savePrescriptionBtn && savePrescriptionBtn.dataset.loading === '1') {
+            printWin.close();
+            return;
+        }
 
         const patient_id = patientIdInput?.value?.trim();
         const patient_name = patientNameInput?.value?.trim() || '';
 
         if (!patient_id) {
             alert('ID do paciente é obrigatório. Abra esta página a partir do prontuário.');
+            printWin.close();
             return;
         }
 
         // Coleta medicamentos das variáveis locais (medications.oral / medications.topical)
         if (medications.oral.length === 0 && medications.topical.length === 0) {
             const ok = confirm('Nenhum medicamento foi adicionado. Deseja salvar mesmo assim?');
-            if (!ok) return;
+            if (!ok) {
+                printWin.close();
+                return;
+            }
         }
 
         const setButtonLoading = (isLoading) => {
@@ -449,11 +459,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (data.status === 'success') {
                 const prescriptionId = data.prescription_id;
-                
-                if (prescriptionId) {
-                    // Abrir impressão em nova aba (rota profissional)
-                    const pdfUrl = `/dermascribe/prescription/${prescriptionId}/pdf`;
-                    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+
+                if (prescriptionId && printWin) {
+                    // Navega a janela já aberta para a rota de impressão
+                    printWin.location = `/dermascribe/prescription/${prescriptionId}/print`;
+                } else if (printWin) {
+                    printWin.close();
                 }
 
                 if (window.opener && !window.opener.closed) {
@@ -463,15 +474,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         patient_id: patient_id
                     }, '*');
                 }
-                
-                alert('Receita salva com sucesso!');
+
                 setTimeout(() => window.close(), 500);
             } else {
                 alert('Erro ao salvar receita: ' + (data.message || 'Erro desconhecido'));
+                printWin.close();
             }
         } catch (error) {
             console.error('Erro ao salvar receita:', error);
             alert('Falha ao salvar: ' + error.message);
+            printWin.close();
         } finally {
             setButtonLoading(false);
         }
