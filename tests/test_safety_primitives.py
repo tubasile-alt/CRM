@@ -1,5 +1,7 @@
 import unittest
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 from services.access_control import can_manage_owned_record, is_admin_user
@@ -14,6 +16,9 @@ from services.statuses import (
     appointment_pending_status_values,
     normalize_appointment_status,
 )
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class AccessControlTests(unittest.TestCase):
@@ -74,6 +79,26 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(values, frozenset({'agendado', 'agendada', 'confirmado', 'confirmada'}))
         self.assertNotIn(AppointmentStatus.COMPLETED, values)
         self.assertNotIn(AppointmentStatus.NO_SHOW, values)
+
+
+class AppointmentDeletionSafetyTests(unittest.TestCase):
+    def test_physical_agenda_log_backref_uses_passive_deletes(self):
+        source = (ROOT / 'models.py').read_text(encoding='utf-8')
+        self.assertIn(
+            "backref=db.backref('physical_import_log', uselist=False, passive_deletes=True)",
+            source,
+        )
+        self.assertNotIn("passive_deletes=True,\n    )\n    doctor = db.relationship", source)
+
+    def test_only_one_delete_appointment_route_is_registered_in_app_source(self):
+        source = (ROOT / 'app.py').read_text(encoding='utf-8')
+        routes = re.findall(r"@app\.route\('/api/appointments/<int:[^>]+>', methods=\['DELETE'\]\)", source)
+        self.assertEqual(len(routes), 1)
+        self.assertEqual(
+            source.count("@app.route('/api/appointments/<int:appointment_id>', methods=['DELETE'])"),
+            1,
+        )
+        self.assertNotIn("@app.route('/api/appointments/<int:id>', methods=['DELETE'])", source)
 
 
 if __name__ == '__main__':
