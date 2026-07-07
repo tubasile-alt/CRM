@@ -63,12 +63,21 @@ def _ensure_patient_doctor_partial_index():
         app.logger.warning(f"Não foi possível garantir idx_unique_new_code: {e}")
 
 
+def _ensure_physical_agenda_import_log_schema():
+    try:
+        from services.physical_agenda_schema_service import ensure_physical_agenda_import_schema
+        ensure_physical_agenda_import_schema()
+    except Exception as e:
+        app.logger.warning(f"Não foi possível garantir physical_agenda_import_log: {e}")
+
+
 # Executar a verificação do índice uma vez no startup (idempotente)
 # Adiado para evitar que falhas de conexão no import do módulo
 # quebrem o startup em produção. Rodará no primeiro request.
 @app.before_request
 def _ensure_index_on_startup():
     _ensure_patient_doctor_partial_index()
+    _ensure_physical_agenda_import_log_schema()
     # Remove o handler após a primeira execução (safe para workers concorrentes)
     try:
         app.before_request_funcs[None].remove(_ensure_index_on_startup)
@@ -1378,7 +1387,11 @@ def delete_appointment_api(appointment_id):
         return jsonify({'success': True})
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        app.logger.exception(f"Erro ao excluir agendamento {appointment_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Não foi possível excluir o agendamento. Tente novamente ou acione o suporte.'
+        }), 500
 
 @app.route('/api/appointments', methods=['POST'])
 @login_required
@@ -1884,20 +1897,6 @@ def update_note(note_id):
         db.session.rollback()
         print(f"Erro ao atualizar nota: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/appointments/<int:id>', methods=['DELETE'])
-@login_required
-def delete_appointment(id):
-    appointment = Appointment.query.get_or_404(id)
-    
-    # Deletar todas as notas associadas
-    Note.query.filter_by(appointment_id=id).delete()
-    
-    # Deletar o agendamento
-    db.session.delete(appointment)
-    db.session.commit()
-    
-    return jsonify({'success': True})
 
 @app.route('/agenda/export/pdf', methods=['GET'])
 @login_required

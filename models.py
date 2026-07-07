@@ -196,8 +196,7 @@ class PhysicalAgendaImportLog(db.Model):
 
     appointment = db.relationship(
         'Appointment',
-        backref=db.backref('physical_import_log', uselist=False),
-        passive_deletes=True,
+        backref=db.backref('physical_import_log', uselist=False, passive_deletes=True),
     )
     doctor = db.relationship('User', foreign_keys=[doctor_id])
     patient = db.relationship('Patient')
