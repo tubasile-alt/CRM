@@ -932,6 +932,26 @@
         });
     };
 
+    // Busca com Enter + foco automático ao abrir o modal (leitura
+    // apenas; abre /prontuario/dp/<id> e não cria agendamento).
+    (function initPatientSearchUX() {
+        const input = document.getElementById('patientSearchInput');
+        const modalEl = document.getElementById('searchPatientModal');
+        if (input) {
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    window.searchPatientsDetailed();
+                }
+            });
+        }
+        if (modalEl) {
+            modalEl.addEventListener('shown.bs.modal', function() {
+                if (input) { input.focus(); input.select(); }
+            });
+        }
+    })();
+
     window.searchPatientsDetailed = function() {
         const q = document.getElementById('patientSearchInput').value.trim();
         if (q.length < 2) return;

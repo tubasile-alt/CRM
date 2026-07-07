@@ -630,11 +630,9 @@
             <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
                 <i class="bi bi-printer"></i> <span class="d-none d-md-inline">Imprimir</span>
             </button>
-            {% if not current_user.is_doctor() %}
             <button class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#searchPatientModal">
                 <i class="bi bi-search"></i> Procurar Paciente
             </button>
-            {% endif %}
         </div>
     </div>
 </div>
