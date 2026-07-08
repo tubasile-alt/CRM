@@ -4,249 +4,316 @@
 <meta charset="utf-8">
 <title>Prescrição Médica</title>
 <style>
-@page { size: A4; margin: 0; }
+@page { size: A4; margin: 12mm 14mm; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
   font-family: Arial, Helvetica, sans-serif;
   color: #111;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .via {
   width: 100%;
-  height: 112mm;
+  border: 1px solid #ccc;
+  padding: 10mm 14mm 12mm;
   position: relative;
-  padding: 10mm 18mm 8mm;
-  overflow: hidden;
+  min-height: 118mm;
 }
 
 .via-top {
-  border-bottom: 2px dashed #333;
+  border-bottom: 2px dotted #999;
+  margin-bottom: 8mm;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* Logo BASILE DERMATOLOGIA */
+.logo-topo {
+  text-align: center;
+  margin-bottom: 6mm;
+}
+
+.logo-texto {
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 3px;
+  color: #333;
+  line-height: 1;
+}
+
+.logo-mais {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  position: relative;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.logo-mais::before,
+.logo-mais::after {
+  content: '';
+  position: absolute;
+  background: #333;
+  border-radius: 1px;
+}
+
+.logo-mais::before {
+  width: 2px;
+  height: 14px;
+  left: 6px;
+  top: 0;
+}
+
+.logo-mais::after {
+  width: 14px;
+  height: 2px;
+  left: 0;
+  top: 6px;
+}
+
+.logo-sub {
+  font-size: 10px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #444;
+  margin-top: 1mm;
+}
+
+/* Nome do paciente */
+.nome-linha {
+  margin-bottom: 5mm;
+  font-size: 11px;
+}
+
+.nome-linha strong {
+  font-weight: 700;
+}
+
+.nome-underline {
+  display: inline-block;
+  border-bottom: 1px solid #000;
+  min-width: 160px;
+  padding-left: 2px;
+}
+
+/* Seções */
+.secao {
   margin-bottom: 4mm;
 }
 
-.header img {
-  width: 50px;
-  height: auto;
-}
-
-.header-info {
-  line-height: 1.3;
-}
-
-.header-info strong {
-  font-size: 14px;
-}
-
-.titulo {
-  text-align: center;
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 3mm;
-  text-transform: uppercase;
-}
-
-.patient-line {
-  margin-bottom: 3mm;
-  font-size: 12px;
-}
-
-.medications {
-  margin-top: 2mm;
-}
-
-.section-title {
+.secao-titulo {
   font-weight: 700;
   font-size: 11px;
-  margin: 2mm 0 1mm;
-  text-transform: uppercase;
-}
-
-.med-item {
   margin-bottom: 2mm;
-  font-size: 11.5px;
-  line-height: 1.3;
 }
 
-.med-name {
+ol.meds {
+  padding-left: 18px;
+  margin: 0;
+}
+
+ol.meds li {
+  margin-bottom: 2mm;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.med-nome {
   font-weight: 700;
 }
 
-.footer {
+/* Footer da via (assinatura) */
+.via-footer {
   position: absolute;
-  left: 18mm;
-  right: 18mm;
-  bottom: 5mm;
-  font-size: 10px;
-}
-
-.signature-block {
+  left: 14mm;
+  right: 14mm;
+  bottom: 6mm;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 2mm;
 }
 
-.sig-left {
-  line-height: 1.25;
+.sig-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.sig-block img {
+  width: 32px;
+  height: auto;
+}
+
+.sig-texto {
+  font-size: 9.5px;
+  line-height: 1.3;
+}
+
+.sig-texto strong {
+  font-size: 10px;
 }
 
 .sig-line {
   border-top: 1px solid #000;
-  width: 200px;
+  width: 140px;
   margin-bottom: 1mm;
 }
 
-.sig-right {
+.data-block {
+  font-size: 10px;
   text-align: right;
+  white-space: nowrap;
 }
 
+/* Rodapé da folha */
 .rodape-folha {
   text-align: center;
+  font-size: 9px;
+  color: #444;
+  margin-top: 4mm;
+  padding-top: 2mm;
+  line-height: 1.5;
+}
+
+.rodape-folha strong {
   font-size: 9.5px;
-  color: #555;
-  margin-top: 2mm;
-  padding-top: 1mm;
-  border-top: 1px solid #ddd;
 }
 </style>
 </head>
 <body>
 
-<!-- VIA 1 -->
+<!-- ============ VIA 1 ============ -->
 <div class="via via-top">
 
-  <div class="header">
-    <img src="{{ url_for('static', filename='images/logo-basile.jpg') }}" onerror="this.style.display='none'" alt="Basile">
-    <div class="header-info">
-      <strong>Basile Dermatologia</strong><br>
-      Dr. Arthur Basile – CRM 125.217 | RQE 125.217
-    </div>
+  <div class="logo-topo">
+    <div class="logo-texto">BASILE<span class="logo-mais"></span></div>
+    <div class="logo-sub">DERMATOLOGIA</div>
   </div>
 
-  <div class="titulo">Dermatologia</div>
-
-  <div class="patient-line">
-    <strong>Paciente:</strong> {{ patient.name }}
+  <div class="nome-linha">
+    <strong>Nome:</strong> <span class="nome-underline">{{ patient.name }}</span>
   </div>
 
-  <div class="medications">
+  <div class="secao">
+    <div class="secao-titulo">Uso Oral</div>
     {% set oral = medications | selectattr('type', 'equalto', 'oral') | list if medications else [] %}
-    {% set topical = medications | selectattr('type', 'equalto', 'topical') | list if medications else [] %}
-    {% if not oral and medications %}
-      {% set oral = medications %}
-    {% endif %}
-
+    {% if not oral and medications %}{% set oral = medications %}{% endif %}
     {% if oral %}
-    <div class="section-title">Uso Oral</div>
-    <ol>
+    <ol class="meds">
       {% for med in oral %}
-      <li class="med-item">
-        <span class="med-name">{{ med.medication }}</span>
-        {% if med.instructions %}<br><span>{{ med.instructions }}</span>{% endif %}
+      <li>
+        <span class="med-nome">{{ med.medication }}</span>
+        {% if med.instructions %} - {{ med.instructions }}{% endif %}
       </li>
       {% endfor %}
     </ol>
-    {% endif %}
-
-    {% if topical %}
-    <div class="section-title">Uso Tópico</div>
-    <ol>
-      {% for med in topical %}
-      <li class="med-item">
-        <span class="med-name">{{ med.medication }}</span>
-        {% if med.instructions %}<br><span>{{ med.instructions }}</span>{% endif %}
-      </li>
-      {% endfor %}
-    </ol>
+    {% else %}
+    <ol class="meds"><li><span class="med-nome">Nenhum medicamento oral adicionado</span></li></ol>
     {% endif %}
   </div>
 
-  <div class="footer">
-    <div class="signature-block">
-      <div class="sig-left">
+  <div class="secao">
+    <div class="secao-titulo">Uso Tópico</div>
+    {% set topical = medications | selectattr('type', 'equalto', 'topical') | list if medications else [] %}
+    {% if topical %}
+    <ol class="meds">
+      {% for med in topical %}
+      <li>
+        <span class="med-nome">{{ med.medication }}</span>
+        {% if med.instructions %} - {{ med.instructions }}{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <ol class="meds"><li><span class="med-nome">Nenhum medicamento tópico adicionado</span></li></ol>
+    {% endif %}
+  </div>
+
+  <div class="via-footer">
+    <div class="sig-block">
+      <img src="{{ url_for('static', filename='img/logo-sbd.png') }}" onerror="this.style.display='none'" alt="SBD">
+      <div class="sig-texto">
         <div class="sig-line"></div>
         <div><strong>Dr. Arthur Basile</strong></div>
         <div>CRM 125.217</div>
         <div>Dermatologista</div>
       </div>
-      <div class="sig-right">
-        Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
-      </div>
+    </div>
+    <div class="data-block">
+      Data: ___/___/________
     </div>
   </div>
 
 </div>
 
-<!-- VIA 2 -->
+<!-- ============ VIA 2 ============ -->
 <div class="via">
 
-  <div class="header">
-    <img src="{{ url_for('static', filename='images/logo-basile.jpg') }}" onerror="this.style.display='none'" alt="Basile">
-    <div class="header-info">
-      <strong>Basile Dermatologia</strong><br>
-      Dr. Arthur Basile – CRM 125.217 | RQE 125.217
-    </div>
+  <div class="logo-topo">
+    <div class="logo-texto">BASILE<span class="logo-mais"></span></div>
+    <div class="logo-sub">DERMATOLOGIA</div>
   </div>
 
-  <div class="titulo">Dermatologia</div>
-
-  <div class="patient-line">
-    <strong>Paciente:</strong> {{ patient.name }}
+  <div class="nome-linha">
+    <strong>Nome:</strong> <span class="nome-underline">{{ patient.name }}</span>
   </div>
 
-  <div class="medications">
+  <div class="secao">
+    <div class="secao-titulo">Uso Oral</div>
     {% if oral %}
-    <div class="section-title">Uso Oral</div>
-    <ol>
+    <ol class="meds">
       {% for med in oral %}
-      <li class="med-item">
-        <span class="med-name">{{ med.medication }}</span>
-        {% if med.instructions %}<br><span>{{ med.instructions }}</span>{% endif %}
+      <li>
+        <span class="med-nome">{{ med.medication }}</span>
+        {% if med.instructions %} - {{ med.instructions }}{% endif %}
       </li>
       {% endfor %}
     </ol>
-    {% endif %}
-
-    {% if topical %}
-    <div class="section-title">Uso Tópico</div>
-    <ol>
-      {% for med in topical %}
-      <li class="med-item">
-        <span class="med-name">{{ med.medication }}</span>
-        {% if med.instructions %}<br><span>{{ med.instructions }}</span>{% endif %}
-      </li>
-      {% endfor %}
-    </ol>
+    {% else %}
+    <ol class="meds"><li><span class="med-nome">Nenhum medicamento oral adicionado</span></li></ol>
     {% endif %}
   </div>
 
-  <div class="footer">
-    <div class="signature-block">
-      <div class="sig-left">
+  <div class="secao">
+    <div class="secao-titulo">Uso Tópico</div>
+    {% if topical %}
+    <ol class="meds">
+      {% for med in topical %}
+      <li>
+        <span class="med-nome">{{ med.medication }}</span>
+        {% if med.instructions %} - {{ med.instructions }}{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <ol class="meds"><li><span class="med-nome">Nenhum medicamento tópico adicionado</span></li></ol>
+    {% endif %}
+  </div>
+
+  <div class="via-footer">
+    <div class="sig-block">
+      <img src="{{ url_for('static', filename='img/logo-sbd.png') }}" onerror="this.style.display='none'" alt="SBD">
+      <div class="sig-texto">
         <div class="sig-line"></div>
         <div><strong>Dr. Arthur Basile</strong></div>
         <div>CRM 125.217</div>
         <div>Dermatologista</div>
       </div>
-      <div class="sig-right">
-        Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
-      </div>
+    </div>
+    <div class="data-block">
+      Data: ___/___/________
     </div>
   </div>
 
 </div>
 
+<!-- ============ RODAPÉ DA FOLHA ============ -->
 <div class="rodape-folha">
-  Av. Prof. João Fiúsa, 2300 – Ribeirão Preto, SP – www.clinicabasile.com.br | Instagram: @clinicabasilemed
+  <strong>Especialista em dermatologia SBD</strong><br>
+  Av. Prof. João Fiúsa, 2300, Ribeirão Preto, SP, Brasil<br>
+  www.clinicabasile.com.br | Fone/Fax: (16) 3602-7785
 </div>
 
 <script>
