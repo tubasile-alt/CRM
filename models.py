@@ -593,7 +593,7 @@ class ProcedureRecord(db.Model):
 # Modelos para DermaScribe (Sistema de Receitas)
 class Medication(db.Model):
     __tablename__ = 'medications'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     purpose = db.Column(db.Text)
@@ -601,6 +601,10 @@ class Medication(db.Model):
     brand = db.Column(db.String(100))
     instructions = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
+    # Etiquetas (Bloco 1)
+    categoria = db.Column(db.String(100), nullable=True, default=None)
+    indicacoes = db.Column(db.JSON, nullable=True, default=None)
+    etiqueta_revisada = db.Column(db.Boolean, default=False)
     
     def __repr__(self):
         return f'<Medication {self.name}>'

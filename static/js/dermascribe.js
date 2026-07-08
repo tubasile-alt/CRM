@@ -109,6 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             item.addEventListener('click', () => {
                 addMedication(suggestion);
+                saveMedicationToDatabase(suggestion);
                 medicationInput.value = '';
                 suggestionsList.innerHTML = '';
                 suggestionsList.classList.add('d-none');
@@ -285,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window._dermascribeUpdatePreview = updatePreview;
 
-    function saveMedicationToDatabase(medication) {
+    function saveMedicationToDatabase(medication, onCategorized) {
         fetch('/dermascribe/api/save-medication', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -296,6 +297,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.status === 'success') {
                 const saveToast = new bootstrap.Toast(document.getElementById('saveToast'));
                 saveToast.show();
+                // Abrir modal de categorização para medicamento NOVO
+                if (window._openCategorizarModal) {
+                    window._openCategorizarModal(medication.medication, medication.type, medication.instructions, function(didCategorize) {
+                        if (onCategorized) onCategorized(didCategorize);
+                    });
+                } else if (onCategorized) {
+                    onCategorized(false);
+                }
+            } else if (data.status === 'exists') {
+                // Medicamento já existe — modal NÃO abre
+                if (onCategorized) onCategorized(false);
             }
         })
         .catch(error => console.error('Erro ao salvar medicamento:', error));
@@ -486,6 +498,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Notifica sucesso sem fechar a janela do DermaScribe
                 const saveToast = new bootstrap.Toast(document.getElementById('saveToast'));
                 if (saveToast) saveToast.show();
+
+                // Bloco 3: Modal de categorização para medicamentos NOVOS criados via receita
+                if (data.new_medications && data.new_medications.length > 0 && window._openCategorizarModal) {
+                    data.new_medications.forEach(function(nm) {
+                        window._openCategorizarModal(nm.name, nm.type, nm.instructions || '', function(){});
+                    });
+                }
             } else {
                 alert('Erro ao salvar receita: ' + (data.message || 'Erro desconhecido'));
                 printWin.close();
@@ -847,6 +866,316 @@ function initSpecialtyTab(tabType) {
     }
 }
 
+// ==========================================================
+// BLOCO 3 — Modal de Categorização + BLOCO 4 — Descoberta
+// ==========================================================
+(function() {
+    let taxonomia = { categorias: [], indicacoes: [] };
+    let catModalInstance = null;
+    let catMedNomeAtual = '';
+    let catMedTypeAtual = '';
+    let catMedInstrAtual = '';
+    let catIndicacoesSelecionadas = [];
+    let pendingCategorizeCallback = null;
+
+    function loadTaxonomia() {
+        fetch('/dermascribe/api/taxonomia')
+            .then(r => r.json())
+            .then(data => {
+                taxonomia = data;
+                renderDescobrirCategorias();
+                renderDescobrirIndicacoes();
+            })
+            .catch(e => console.error('Erro taxonomia:', e));
+    }
+
+    // -------- Modal de Categorização --------
+    function openCategorizarModal(medName, medType, medInstr, onDone) {
+        catMedNomeAtual = medName;
+        catMedTypeAtual = medType;
+        catMedInstrAtual = medInstr;
+        pendingCategorizeCallback = onDone || function(){};
+        catIndicacoesSelecionadas = [];
+
+        document.getElementById('catMedNome').textContent = medName;
+        const sel = document.getElementById('catCategoriaSelect');
+        sel.innerHTML = '<option value="">Selecione...</option>';
+        (taxonomia.categorias || []).forEach(function(c) {
+            sel.innerHTML += '<option value="' + c + '">' + c + '</option>';
+        });
+        document.getElementById('catCategoriaNova').classList.add('d-none');
+        document.getElementById('catCategoriaNova').value = '';
+        document.getElementById('catCategoriaSelect').classList.remove('d-none');
+        renderCatIndicacoesChips();
+        document.getElementById('catIndicacoesSelecionadas').innerHTML = '';
+        document.getElementById('catIndicacaoNova').value = '';
+
+        if (!catModalInstance) {
+            catModalInstance = new bootstrap.Modal(document.getElementById('categorizarModal'));
+        }
+        catModalInstance.show();
+    }
+
+    function renderCatIndicacoesChips() {
+        const container = document.getElementById('catIndicacoesChips');
+        container.innerHTML = '';
+        (taxonomia.indicacoes || []).forEach(function(ind) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-info';
+            btn.textContent = ind;
+            btn.addEventListener('click', function() {
+                toggleIndicacao(ind);
+            });
+            container.appendChild(btn);
+        });
+    }
+
+    function toggleIndicacao(ind) {
+        const idx = catIndicacoesSelecionadas.indexOf(ind);
+        if (idx >= 0) {
+            catIndicacoesSelecionadas.splice(idx, 1);
+        } else {
+            catIndicacoesSelecionadas.push(ind);
+        }
+        renderIndicacoesSelecionadas();
+    }
+
+    function renderIndicacoesSelecionadas() {
+        const container = document.getElementById('catIndicacoesSelecionadas');
+        container.innerHTML = '';
+        catIndicacoesSelecionadas.forEach(function(ind) {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-info text-dark me-1';
+            badge.innerHTML = ind + ' <i class="fas fa-times" style="cursor:pointer"></i>';
+            badge.querySelector('i').addEventListener('click', function() {
+                toggleIndicacao(ind);
+            });
+            container.appendChild(badge);
+        });
+    }
+
+    function salvarCategorizacao() {
+        const catSel = document.getElementById('catCategoriaSelect').value;
+        const catNova = document.getElementById('catCategoriaNova').value.trim();
+        const categoria = catNova || catSel;
+        if (!categoria) {
+            alert('Selecione ou digite uma categoria.');
+            return;
+        }
+        fetch('/dermascribe/api/save-medication', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                medication: catMedNomeAtual,
+                type: catMedTypeAtual || 'topical',
+                instructions: catMedInstrAtual || '',
+                categoria: categoria,
+                indicacoes: catIndicacoesSelecionadas.length ? catIndicacoesSelecionadas : null,
+                etiqueta_revisada: true
+            })
+        })
+        .then(r => r.json())
+        .then(function(data) {
+            if (data.status === 'success' || data.status === 'exists') {
+                catModalInstance.hide();
+                pendingCategorizeCallback(true);
+                loadTaxonomia(); // atualizar chips descoberta
+            }
+        })
+        .catch(e => console.error('Erro salvar cat:', e));
+    }
+
+    // -------- Descoberta por filtros (Bloco 4) --------
+    let descobrirCatAtiva = null;
+    let descobrirIndAtiva = null;
+    let descobrirMostrarMais = { cat: false, ind: false };
+
+    function renderDescobrirCategorias() {
+        const container = document.getElementById('descobrirCategorias');
+        if (!container) return;
+        const cats = taxonomia.categorias || [];
+        const mostrar = descobrirMostrarMais.cat ? cats : cats.slice(0, 10);
+        container.innerHTML = '';
+        mostrar.forEach(function(c) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm ' + (descobrirCatAtiva === c ? 'btn-primary' : 'btn-outline-primary');
+            btn.textContent = c;
+            btn.addEventListener('click', function() {
+                descobrirCatAtiva = descobrirCatAtiva === c ? null : c;
+                renderDescobrirCategorias();
+                renderDescobrirIndicacoes();
+                buscarDescobrir();
+            });
+            container.appendChild(btn);
+        });
+        if (cats.length > 10) {
+            const mais = document.createElement('button');
+            mais.type = 'button';
+            mais.className = 'btn btn-sm btn-link';
+            mais.textContent = descobrirMostrarMais.cat ? 'menos...' : 'mais...';
+            mais.addEventListener('click', function() {
+                descobrirMostrarMais.cat = !descobrirMostrarMais.cat;
+                renderDescobrirCategorias();
+            });
+            container.appendChild(mais);
+        }
+    }
+
+    function renderDescobrirIndicacoes() {
+        const container = document.getElementById('descobrirIndicacoes');
+        if (!container) return;
+        const inds = taxonomia.indicacoes || [];
+        const mostrar = descobrirMostrarMais.ind ? inds : inds.slice(0, 10);
+        container.innerHTML = '';
+        mostrar.forEach(function(ind) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm ' + (descobrirIndAtiva === ind ? 'btn-success' : 'btn-outline-success');
+            btn.textContent = ind;
+            btn.addEventListener('click', function() {
+                descobrirIndAtiva = descobrirIndAtiva === ind ? null : ind;
+                renderDescobrirIndicacoes();
+                buscarDescobrir();
+            });
+            container.appendChild(btn);
+        });
+        if (inds.length > 10) {
+            const mais = document.createElement('button');
+            mais.type = 'button';
+            mais.className = 'btn btn-sm btn-link';
+            mais.textContent = descobrirMostrarMais.ind ? 'menos...' : 'mais...';
+            mais.addEventListener('click', function() {
+                descobrirMostrarMais.ind = !descobrirMostrarMais.ind;
+                renderDescobrirIndicacoes();
+            });
+            container.appendChild(mais);
+        }
+    }
+
+    function buscarDescobrir() {
+        const container = document.getElementById('descobrirResultados');
+        const aviso = document.getElementById('descobrirAviso');
+        if (!descobrirCatAtiva && !descobrirIndAtiva) {
+            container.innerHTML = '<div class="list-group-item text-muted text-center py-2">Selecione uma categoria ou indicação</div>';
+            if (aviso) aviso.classList.add('d-none');
+            return;
+        }
+        let url = '/dermascribe/api/descobrir?';
+        if (descobrirCatAtiva) url += 'categoria=' + encodeURIComponent(descobrirCatAtiva) + '&';
+        if (descobrirIndAtiva) url += 'indicacao=' + encodeURIComponent(descobrirIndAtiva);
+        fetch(url)
+            .then(r => r.json())
+            .then(function(data) {
+                container.innerHTML = '';
+                if (!data.medicamentos || data.medicamentos.length === 0) {
+                    container.innerHTML = '<div class="list-group-item text-muted text-center py-2">Nenhum medicamento encontrado</div>';
+                } else {
+                    data.medicamentos.forEach(function(med) {
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item list-group-item-action py-2';
+                        const inds = (med.indicacoes || []).join(', ');
+                        item.innerHTML = '<div class="d-flex justify-content-between"><strong>' + med.name + '</strong><small class="text-muted">' + (med.brand || '') + '</small></div>' +
+                            '<small class="text-muted">' + inds + '</small>';
+                        item.addEventListener('click', function() {
+                            addMedication({
+                                medication: med.name,
+                                type: med.type,
+                                instructions: med.instructions || ''
+                            });
+                        });
+                        container.appendChild(item);
+                    });
+                }
+                if (aviso) {
+                    if (data.sem_etiqueta > 0) {
+                        aviso.textContent = data.sem_etiqueta + ' medicamento(s) ainda sem categoria não aparecem nos filtros';
+                        aviso.classList.remove('d-none');
+                    } else {
+                        aviso.classList.add('d-none');
+                    }
+                }
+            })
+            .catch(e => console.error('Erro descobrir:', e));
+    }
+
+    // -------- Bindings DOM --------
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTaxonomia();
+
+        // Toggle descobrir panel
+        const toggleDesc = document.getElementById('toggleDescobrir');
+        if (toggleDesc) {
+            toggleDesc.addEventListener('click', function() {
+                const panel = document.getElementById('descobrirPanel');
+                const bsCollapse = bootstrap.Collapse.getInstance(panel);
+                if (bsCollapse) {
+                    bsCollapse.toggle();
+                } else {
+                    new bootstrap.Collapse(panel, { toggle: true });
+                }
+                const icon = this.querySelector('i');
+                icon.classList.toggle('fa-chevron-down');
+                icon.classList.toggle('fa-chevron-up');
+            });
+        }
+
+        // Modal: toggle nova categoria
+        const catToggleNova = document.getElementById('catToggleNova');
+        if (catToggleNova) {
+            catToggleNova.addEventListener('click', function() {
+                const sel = document.getElementById('catCategoriaSelect');
+                const inp = document.getElementById('catCategoriaNova');
+                if (inp.classList.contains('d-none')) {
+                    sel.classList.add('d-none');
+                    inp.classList.remove('d-none');
+                    inp.focus();
+                    catToggleNova.innerHTML = '<i class="fas fa-list me-1"></i>Escolher existente...';
+                } else {
+                    sel.classList.remove('d-none');
+                    inp.classList.add('d-none');
+                    catToggleNova.innerHTML = '<i class="fas fa-plus me-1"></i>Nova categoria...';
+                }
+            });
+        }
+
+        // Modal: nova indicação por Enter
+        const catIndicacaoNova = document.getElementById('catIndicacaoNova');
+        if (catIndicacaoNova) {
+            catIndicacaoNova.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const val = this.value.trim().toLowerCase();
+                    if (val) {
+                        if (catIndicacoesSelecionadas.indexOf(val) < 0) {
+                            catIndicacoesSelecionadas.push(val);
+                        }
+                        renderIndicacoesSelecionadas();
+                        this.value = '';
+                    }
+                }
+            });
+        }
+
+        // Modal: botões
+        const catBtnSalvar = document.getElementById('catBtnSalvar');
+        if (catBtnSalvar) catBtnSalvar.addEventListener('click', salvarCategorizacao);
+
+        const catBtnDepois = document.getElementById('catBtnDepois');
+        if (catBtnDepois) {
+            catBtnDepois.addEventListener('click', function() {
+                if (catModalInstance) catModalInstance.hide();
+                pendingCategorizeCallback(false);
+            });
+        }
+    });
+
+    // Expor funções globais para o código existente
+    window._openCategorizarModal = openCategorizarModal;
+    window._loadTaxonomia = loadTaxonomia;
+})();
+
 // Inicializar ambas as abas especializadas
 document.addEventListener('DOMContentLoaded', function() {
     initSpecialtyTab('antibiotico');
@@ -860,7 +1189,6 @@ document.addEventListener('DOMContentLoaded', function() {
             var input = document.getElementById(targetId);
             if (input) {
                 input.value = text;
-                // Destacar visualmente o botão clicado por 200ms (efeito 3D pressionado)
                 this.classList.add('pos-btn-pressed');
                 setTimeout(function() {
                     btn.classList.remove('pos-btn-pressed');

@@ -66,31 +66,127 @@ def api_suggest_medications():
 @login_required
 def api_save_medication():
     data = request.get_json()
-    
+
     medication_name = data.get('medication', '')
     medication_type = data.get('type', 'topical')
     instructions = data.get('instructions', '')
-    
+    categoria = data.get('categoria', None)
+    indicacoes = data.get('indicacoes', None)
+    etiqueta_revisada = data.get('etiqueta_revisada', False)
+
     if not medication_name:
         return jsonify({'status': 'error', 'message': 'Nome do medicamento é obrigatório'})
-    
+
     existing = Medication.query.filter(
         Medication.name.ilike(medication_name)
     ).first()
-    
+
     if existing:
-        return jsonify({'status': 'exists', 'message': 'Medicamento já existe no banco'})
-    
+        # Se veio categoria/indicações, atualizar o medicamento existente
+        updated = False
+        if categoria and (not existing.categoria or not existing.etiqueta_revisada):
+            existing.categoria = categoria
+            updated = True
+        if indicacoes:
+            existing.indicacoes = indicacoes
+            updated = True
+        if etiqueta_revisada:
+            existing.etiqueta_revisada = True
+            updated = True
+        if updated:
+            db.session.commit()
+        return jsonify({'status': 'exists', 'message': 'Medicamento já existe no banco', 'id': existing.id, 'updated': updated})
+
     new_medication = Medication(
         name=medication_name,
         type=medication_type,
-        instructions=instructions
+        instructions=instructions,
+        categoria=categoria,
+        indicacoes=indicacoes,
+        etiqueta_revisada=bool(etiqueta_revisada)
     )
-    
+
     db.session.add(new_medication)
     db.session.commit()
-    
+
     return jsonify({'status': 'success', 'message': 'Medicamento salvo com sucesso', 'id': new_medication.id})
+
+
+@dermascribe_bp.route('/api/taxonomia', methods=['GET'])
+@login_required
+def api_taxonomia():
+    """Retorna categorias e indicações existentes no banco."""
+    from sqlalchemy import func
+
+    cats = db.session.query(Medication.categoria).filter(
+        Medication.categoria.isnot(None)
+    ).distinct().order_by(Medication.categoria).all()
+    categorias = [c[0] for c in cats if c[0]]
+
+    # Indicações: extrair de JSON arrays
+    meds_with_ind = Medication.query.filter(Medication.indicacoes.isnot(None)).all()
+    indicacoes_set = set()
+    for m in meds_with_ind:
+        if isinstance(m.indicacoes, list):
+            for item in m.indicacoes:
+                if item:
+                    indicacoes_set.add(item)
+        elif isinstance(m.indicacoes, str):
+            indicacoes_set.add(m.indicacoes)
+
+    return jsonify({
+        'categorias': sorted(categorias),
+        'indicacoes': sorted(indicacoes_set)
+    })
+
+
+@dermascribe_bp.route('/api/descobrir', methods=['GET'])
+@login_required
+def api_descobrir():
+    """Descoberta de medicamentos por categoria e/ou indicação."""
+    from sqlalchemy import func
+    categoria = request.args.get('categoria', '').strip().lower()
+    indicacao = request.args.get('indicacao', '').strip().lower()
+
+    q = db.session.query(Medication, func.count(MedicationUsage.id).label('use_count'))\
+        .outerjoin(MedicationUsage)\
+        .group_by(Medication.id)
+
+    if categoria:
+        q = q.filter(func.lower(Medication.categoria) == categoria)
+
+    meds = q.order_by(func.count(MedicationUsage.id).desc()).all()
+
+    results = []
+    for med, count in meds:
+        inds = []
+        if isinstance(med.indicacoes, list):
+            inds = med.indicacoes
+        elif isinstance(med.indicacoes, str):
+            inds = [med.indicacoes]
+
+        if indicacao:
+            if not any(indicacao in (i or '').lower() for i in inds):
+                continue
+
+        results.append({
+            'id': med.id,
+            'name': med.name,
+            'brand': med.brand,
+            'type': med.type,
+            'categoria': med.categoria,
+            'indicacoes': inds,
+            'use_count': count
+        })
+
+    sem_etiqueta = Medication.query.filter(
+        (Medication.etiqueta_revisada == False) | (Medication.etiqueta_revisada.is_(None))
+    ).count()
+
+    return jsonify({
+        'medicamentos': results,
+        'sem_etiqueta': sem_etiqueta
+    })
 
 @dermascribe_bp.route('/api/track-prescription', methods=['POST'])
 @login_required
@@ -197,12 +293,13 @@ def api_save_prescription():
     db.session.add(prescription)
     
     all_medications = oral_medications + topical_medications
+    new_medications = []
     for med in all_medications:
         med_name = med.get('medication', '')
         existing = Medication.query.filter(
             Medication.name.ilike(med_name)
         ).first()
-        
+
         if existing:
             usage = MedicationUsage(medication_id=existing.id)
             db.session.add(usage)
@@ -216,13 +313,19 @@ def api_save_prescription():
             db.session.flush()
             usage = MedicationUsage(medication_id=new_med.id)
             db.session.add(usage)
-    
+            new_medications.append({
+                'name': new_med.name,
+                'type': new_med.type,
+                'instructions': new_med.instructions or ''
+            })
+
     db.session.commit()
-    
+
     return jsonify({
         'status': 'success',
         'message': 'Receita salva com sucesso',
-        'prescription_id': prescription.id
+        'prescription_id': prescription.id,
+        'new_medications': new_medications
     })
 
 @dermascribe_bp.route('/api/patient/<int:patient_id>/prescriptions')

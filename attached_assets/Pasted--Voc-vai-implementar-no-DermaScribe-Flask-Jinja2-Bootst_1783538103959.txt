@@ -1,0 +1,60 @@
+
+Você vai implementar no DermaScribe (Flask + Jinja2 + Bootstrap 5 + vanilla JS) o sistema de etiquetas de medicamentos por Categoria e Indicações, importando a base revisada em anexo, e a descoberta por filtros. São 4 blocos de trabalho. Leia as regras antes.
+
+## Regras invioláveis
+- NÃO delete nenhum registro do banco. A importação só ATUALIZA.
+- NÃO altere o fluxo de impressão nem os templates de receita.
+- Migração apenas ADITIVA (colunas novas, nulas por padrão).
+- A planilha anexa é a fonte da verdade das etiquetas: use as categorias e indicações EXATAMENTE como estão lá (apenas normalizadas: minúsculas e sem espaços nas pontas). Não invente valores novos.
+
+## Bloco 1 — Schema
+Adicionar ao modelo `Medication` (tabela `medications`) em `models.py`:
+- `categoria` — String(100), nullable, default None.
+- `indicacoes` — JSON (lista de strings), nullable, default None.
+- `etiqueta_revisada` — Boolean, default False.
+
+Crie a migração/ALTER correspondente ao padrão que o projeto já usa. Nenhuma outra tabela.
+
+O vocabulário NÃO é hardcoded: as listas de categorias e indicações disponíveis são derivadas dinamicamente do banco (`SELECT DISTINCT` de `categoria` e dos valores dentro de `indicacoes`, ignorando nulos). Assim a taxonomia evolui sozinha conforme o uso.
+
+## Bloco 2 — Importar a planilha anexa
+Crie um script único `scripts/importar_etiquetas.py` que:
+1. Lê a aba "Revisão etiquetas" do xlsx anexo. Colunas relevantes:
+   - `ID` → corresponde a `medications.id`
+   - `Categoria sugerida` → vai para `categoria`
+   - `Indicações sugeridas` → string com valores separados por `;` (às vezes `,`) → separar, normalizar (strip + minúsculas) e gravar como lista JSON em `indicacoes`
+2. Normalização: minúsculas e trim em categoria e em cada indicação. Não traduza, não corrija, não reagrupe.
+3. Para cada linha: localizar o medicamento pelo `id`; se existir, gravar `categoria`, `indicacoes` e `etiqueta_revisada = True`. Se o `id` não existir no banco, apenas registrar no log (não criar).
+4. Medicamentos que existem no banco mas NÃO estão na planilha (o médico deixou 72 de fora de propósito): não tocar nos dados, apenas garantir `etiqueta_revisada = False`. Ao final, imprimir a lista desses itens (id + nome) para o médico decidir depois.
+5. O script é idempotente: rodar duas vezes produz o mesmo resultado.
+6. Rode o script e me mostre o resumo: quantos atualizados, quantos ids não encontrados, quantos ficaram pendentes.
+
+## Bloco 3 — Modal de categorização ao adicionar medicamento novo (PONTO CRÍTICO)
+Sempre que um medicamento NOVO for criado no DermaScribe, deve abrir uma janela (modal Bootstrap) para categorizá-lo antes de concluir. Especificação:
+
+- Gatilho: em todo caminho do frontend que resulta em criação de medicamento novo na base (adição manual e o fluxo em que uma prescrição salva registra medicamento inexistente). Se o medicamento já existe na base, o modal NÃO abre.
+- Conteúdo do modal:
+  - Título: "Categorizar novo medicamento" + nome do medicamento.
+  - Campo Categoria: select com as categorias existentes (dinâmicas, ordem alfabética) + opção "➕ Nova categoria…" que revela um input de texto. Obrigatório.
+  - Campo Indicações: chips/multi-select com as indicações existentes + possibilidade de digitar uma nova. Opcional, zero ou mais.
+  - Botões: "Salvar" (grava categoria/indicações e `etiqueta_revisada = True`) e "Categorizar depois" (cria o medicamento mesmo assim, com `etiqueta_revisada = False`).
+- O modal NUNCA bloqueia a prescrição: se o médico escolher "Categorizar depois", o fluxo de receita segue normalmente.
+- Backend: ajustar o endpoint de criação de medicamento para aceitar `categoria` e `indicacoes` opcionais no payload; criar endpoint leve `GET /dermascribe/api/taxonomia` que devolve `{categorias: [...], indicacoes: [...]}` para popular o modal.
+
+## Bloco 4 — Descoberta por filtros na aba Personalizada
+Na aba Personalizada do DermaScribe, ao lado da busca por texto atual (que permanece intacta), adicionar um painel colapsável "Descobrir por categoria":
+- Chips de Categoria (deriva do banco; mostrar as 10 mais usadas + botão "mais…" que expande o restante).
+- Chips de Indicação (mesma lógica).
+- Seleção combinável: Categoria E Indicação estreitam juntas (interseção).
+- Resultado: lista dos medicamentos daquele recorte, mostrando nome + marca + indicações, ordenada por número de usos (mais prescritos primeiro). Tocar num item o adiciona à receita exatamente pelo fluxo existente.
+- Incluir na lista um aviso discreto quando existirem medicamentos sem etiqueta (`etiqueta_revisada = False`), com contagem, ex.: "12 medicamentos ainda sem categoria não aparecem nos filtros".
+- Endpoint: `GET /dermascribe/api/descobrir?categoria=...&indicacao=...` retornando os medicamentos do recorte.
+
+## Verificação final
+1. Rodar o app sem erro de import/migração.
+2. Importação executada com resumo apresentado.
+3. Testar: adicionar medicamento novo → modal abre; medicamento existente → modal não abre; "Categorizar depois" não trava a receita.
+4. Testar descoberta: filtrar por uma categoria com itens (ex.: "clareador") e por uma interseção (ex.: "clareador" + "melasma").
+5. Confirmar que a impressão de receitas continua idêntica.
+
+Ao terminar, liste os arquivos alterados/criados e o resumo da importação.
