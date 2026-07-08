@@ -3446,7 +3446,10 @@ def api_audit_patients():
         string no SQLite dos testes)."""
         return value.isoformat() if hasattr(value, 'isoformat') else value
 
-    # ── 1. Coleta agregada de todos os pacientes com contadores ──
+    # ── 1. FASE 1: query leve só com dados de identidade e vínculos ──
+    # Os contadores (consultas, notas etc.) são calculados na FASE 2,
+    # apenas para os pacientes flagados — evita 8 subqueries
+    # correlacionadas por paciente da base inteira.
     sql = """
     SELECT
         p.id,
@@ -3459,15 +3462,7 @@ def api_audit_patients():
         pd.id AS pd_id,
         pd.doctor_id,
         pd.patient_code,
-        u.name AS doctor_name,
-        (SELECT COUNT(*) FROM appointment a WHERE a.patient_id = p.id) AS count_appointments,
-        (SELECT COUNT(*) FROM note n WHERE n.patient_id = p.id) AS count_notes,
-        (SELECT COUNT(*) FROM evolution e WHERE e.patient_id = p.id) AS count_evolutions,
-        (SELECT COUNT(*) FROM surgery s WHERE s.patient_id = p.id) AS count_surgeries,
-        (SELECT COUNT(*) FROM transplant_surgery_record tsr WHERE tsr.patient_id = p.id) AS count_transplant_surgeries,
-        (SELECT COUNT(*) FROM follow_up_reminder f WHERE f.patient_id = p.id) AS count_followups,
-        (SELECT COUNT(*) FROM prescription pr WHERE pr.patient_id = p.id) AS count_prescriptions,
-        (SELECT MAX(a.start_time) FROM appointment a WHERE a.patient_id = p.id) AS last_appointment
+        u.name AS doctor_name
     FROM patient p
     LEFT JOIN patient_doctor pd ON pd.patient_id = p.id
     LEFT JOIN "user" u ON u.id = pd.doctor_id
@@ -3492,14 +3487,6 @@ def api_audit_patients():
                 'cpf_digits': normalize_digits(row.cpf),
                 'city': row.city,
                 'created_at': _iso(row.created_at) if row.created_at else None,
-                'last_appointment': _iso(row.last_appointment) if row.last_appointment else None,
-                'count_appointments': row.count_appointments,
-                'count_notes': row.count_notes,
-                'count_evolutions': row.count_evolutions,
-                'count_surgeries': row.count_surgeries,
-                'count_transplant_surgeries': row.count_transplant_surgeries,
-                'count_followups': row.count_followups,
-                'count_prescriptions': row.count_prescriptions,
                 'links': [],
                 'has_code': False,
             }
@@ -3519,12 +3506,18 @@ def api_audit_patients():
     by_cpf = defaultdict(list)
     by_code = defaultdict(list)
     by_first_token = defaultdict(list)
+    by_last_token4 = defaultdict(list)
     for p in patients_list:
         nn = p['normalized_name']
         if nn:
-            token = nn.split(' ')[0]
-            if token:
-                by_first_token[token].append(p)
+            tokens = nn.split(' ')
+            if tokens[0]:
+                by_first_token[tokens[0]].append(p)
+            # Segunda chave de blocking: primeiras 4 letras do ÚLTIMO token.
+            # Pega pares com primeiro nome divergente mas sobrenome igual
+            # ('ana silva' vs 'anna silva') que o first-token perderia.
+            if tokens[-1]:
+                by_last_token4[tokens[-1][:4]].append(p)
         # Agrupar por dígitos: '(11) 98888-7777' e '11988887777' caem na
         # mesma chave. Telefones com menos de 8 dígitos são ignorados
         # (valores truncados/lixo geram falsos agrupamentos).
@@ -3562,14 +3555,8 @@ def api_audit_patients():
             'birth_date': p['birth_date'],
             'city': p['city'],
             'created_at': p['created_at'],
-            'last_appointment': p['last_appointment'],
-            'count_appointments': p['count_appointments'],
-            'count_notes': p['count_notes'],
-            'count_evolutions': p['count_evolutions'],
-            'count_surgeries': p['count_surgeries'],
-            'count_transplant_surgeries': p['count_transplant_surgeries'],
-            'count_followups': p['count_followups'],
-            'count_prescriptions': p['count_prescriptions'],
+            # count_*/last_appointment são preenchidos na FASE 2, só para
+            # os pacientes flagados (ver bloco de contadores no passo 5).
             'links': p['links'],
             'category': cat,
             'risk': risk,
@@ -3587,21 +3574,29 @@ def api_audit_patients():
                 _add_alert(p, 'mesmo_código', 'alto', f'Código {code} duplicado com médico {doctor_id}', ids)
 
     # 4b-4e. Duplicidade por SCORE composto por par de pacientes.
-    # Candidatos vêm de blocking por nome (primeiro token) e dos grupos de
-    # telefone/CPF por dígitos; cada par recebe um score somando sinais a
-    # favor e contra, e só é reportado com score >= 3 (3-4 médio, >= 5 alto).
+    # Candidatos vêm de blocking por nome (primeiro token OU 4 primeiras
+    # letras do último token) e dos grupos de telefone/CPF por dígitos;
+    # cada par recebe um score somando sinais a favor e contra, e só é
+    # reportado com score >= 3 (3-4 médio, >= 5 alto).
     candidate_pairs = set()
 
-    def _collect_pairs(groups):
-        for group in groups:
+    def _collect_pairs(block_map, block_label):
+        for key, group in block_map.items():
+            if len(group) > 300:
+                app.logger.warning(
+                    'audit-patients: bloco %s=%r com %d candidatos '
+                    '(acima do cap de 300); comparando mesmo assim',
+                    block_label, key, len(group)
+                )
             for i in range(len(group)):
                 for j in range(i + 1, len(group)):
                     a, b = group[i]['id'], group[j]['id']
                     candidate_pairs.add((min(a, b), max(a, b)))
 
-    _collect_pairs(by_first_token.values())
-    _collect_pairs(by_phone.values())
-    _collect_pairs(by_cpf.values())
+    _collect_pairs(by_first_token, 'primeiro_token')
+    _collect_pairs(by_last_token4, 'ultimo_token4')
+    _collect_pairs(by_phone, 'telefone')
+    _collect_pairs(by_cpf, 'cpf')
 
     def _score_pair(p, q):
         score = 0
@@ -3733,11 +3728,44 @@ def api_audit_patients():
                 if p:
                     _add_alert(p, 'revisar_manualmente', 'baixo', f'Gap de {gap} códigos após {codes[i][0]} (médico {doctor_id})', [])
 
-    # ── 5. Flatten: um paciente pode aparecer múltiplas vezes (cada alerta) ──
+    # ── 5. FASE 2: contadores calculados apenas para os pacientes flagados ──
+    flagged_ids = sorted(alerts.keys())
+    counters = {}
+    if flagged_ids:
+        counters_sql = """
+        SELECT
+            p.id,
+            (SELECT COUNT(*) FROM appointment a WHERE a.patient_id = p.id) AS count_appointments,
+            (SELECT COUNT(*) FROM note n WHERE n.patient_id = p.id) AS count_notes,
+            (SELECT COUNT(*) FROM evolution e WHERE e.patient_id = p.id) AS count_evolutions,
+            (SELECT COUNT(*) FROM surgery s WHERE s.patient_id = p.id) AS count_surgeries,
+            (SELECT COUNT(*) FROM transplant_surgery_record tsr WHERE tsr.patient_id = p.id) AS count_transplant_surgeries,
+            (SELECT COUNT(*) FROM follow_up_reminder f WHERE f.patient_id = p.id) AS count_followups,
+            (SELECT COUNT(*) FROM prescription pr WHERE pr.patient_id = p.id) AS count_prescriptions,
+            (SELECT MAX(a.start_time) FROM appointment a WHERE a.patient_id = p.id) AS last_appointment
+        FROM patient p
+        WHERE p.id IN :ids
+        """
+        stmt = db.text(counters_sql).bindparams(db.bindparam('ids', expanding=True))
+        for row in db.session.execute(stmt, {'ids': flagged_ids}):
+            counters[row.id] = row
+
+    # ── 6. Flatten: um paciente pode aparecer múltiplas vezes (cada alerta) ──
     # Ordenar por gravidade
     categories = []
     for pid, alert_list in alerts.items():
         categories.extend(alert_list)
+
+    for rec in categories:
+        c = counters.get(rec['id'])
+        rec['count_appointments'] = c.count_appointments if c else 0
+        rec['count_notes'] = c.count_notes if c else 0
+        rec['count_evolutions'] = c.count_evolutions if c else 0
+        rec['count_surgeries'] = c.count_surgeries if c else 0
+        rec['count_transplant_surgeries'] = c.count_transplant_surgeries if c else 0
+        rec['count_followups'] = c.count_followups if c else 0
+        rec['count_prescriptions'] = c.count_prescriptions if c else 0
+        rec['last_appointment'] = _iso(c.last_appointment) if c and c.last_appointment else None
 
     risk_order = {'alto': 0, 'médio': 1, 'baixo': 2}
     categories.sort(key=lambda r: (risk_order.get(r['risk'], 3), r['name'] or ''))
