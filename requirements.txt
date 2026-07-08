@@ -12,6 +12,7 @@ Pillow
 reportlab
 psycopg2-binary
 python-dateutil
+rapidfuzz==3.14.5
 openai>=2.0.0,<3.0.0
 gunicorn
 Pillow

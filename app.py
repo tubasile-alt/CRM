@@ -3438,8 +3438,13 @@ def api_audit_patients():
     NÃO mescla, exclui ou altera nenhum paciente.
     """
     _audit_access_required()
-    from difflib import SequenceMatcher
     from collections import defaultdict
+    from rapidfuzz import fuzz
+
+    def _iso(value):
+        """Serializa datas vindas de SQL cru (date/datetime no Postgres,
+        string no SQLite dos testes)."""
+        return value.isoformat() if hasattr(value, 'isoformat') else value
 
     # ── 1. Coleta agregada de todos os pacientes com contadores ──
     sql = """
@@ -3448,6 +3453,7 @@ def api_audit_patients():
         p.name,
         p.phone,
         p.cpf,
+        p.birth_date,
         p.city,
         p.created_at,
         pd.id AS pd_id,
@@ -3481,9 +3487,12 @@ def api_audit_patients():
                 'normalized_name': normalize_patient_name(row.name),
                 'phone': row.phone,
                 'cpf': row.cpf,
+                'birth_date': _iso(row.birth_date) if row.birth_date else None,
+                'phone_digits': normalize_digits(row.phone),
+                'cpf_digits': normalize_digits(row.cpf),
                 'city': row.city,
-                'created_at': row.created_at.isoformat() if row.created_at else None,
-                'last_appointment': row.last_appointment.isoformat() if row.last_appointment else None,
+                'created_at': _iso(row.created_at) if row.created_at else None,
+                'last_appointment': _iso(row.last_appointment) if row.last_appointment else None,
                 'count_appointments': row.count_appointments,
                 'count_notes': row.count_notes,
                 'count_evolutions': row.count_evolutions,
@@ -3506,7 +3515,6 @@ def api_audit_patients():
     patients_list = list(patients_map.values())
 
     # ── 3. Índices para rápida busca ──
-    by_normalized = defaultdict(list)
     by_phone = defaultdict(list)
     by_cpf = defaultdict(list)
     by_code = defaultdict(list)
@@ -3514,17 +3522,16 @@ def api_audit_patients():
     for p in patients_list:
         nn = p['normalized_name']
         if nn:
-            by_normalized[nn].append(p)
             token = nn.split(' ')[0]
             if token:
                 by_first_token[token].append(p)
         # Agrupar por dígitos: '(11) 98888-7777' e '11988887777' caem na
         # mesma chave. Telefones com menos de 8 dígitos são ignorados
         # (valores truncados/lixo geram falsos agrupamentos).
-        ph = normalize_digits(p['phone'])
+        ph = p['phone_digits']
         if len(ph) >= 8:
             by_phone[ph].append(p)
-        cp = normalize_digits(p['cpf'])
+        cp = p['cpf_digits']
         if cp:
             by_cpf[cp].append(p)
         seen_code_keys = set()
@@ -3539,7 +3546,7 @@ def api_audit_patients():
     # Isso garante que um paciente seja reportado em todas as categorias relevantes.
     alerts = defaultdict(list)
     alert_keys = set()
-    def _add_alert(p, cat, risk, reason, related_ids=None):
+    def _add_alert(p, cat, risk, reason, related_ids=None, score=None, evidence=None):
         key = (p['id'], cat, reason)
         if key in alert_keys:
             return
@@ -3552,6 +3559,7 @@ def api_audit_patients():
             'doctor_name': p['links'][0]['doctor_name'] if p['links'] else None,
             'phone': p['phone'],
             'cpf': p['cpf'],
+            'birth_date': p['birth_date'],
             'city': p['city'],
             'created_at': p['created_at'],
             'last_appointment': p['last_appointment'],
@@ -3567,6 +3575,8 @@ def api_audit_patients():
             'risk': risk,
             'reason': reason,
             'related_ids': related_ids or [],
+            'score': score,
+            'evidence': evidence or [],
         })
 
     # 4a. Códigos duplicados
@@ -3576,65 +3586,128 @@ def api_audit_patients():
             for p in group:
                 _add_alert(p, 'mesmo_código', 'alto', f'Código {code} duplicado com médico {doctor_id}', ids)
 
-    # 4b. Nomes idênticos
-    for nn, group in by_normalized.items():
-        if len(group) > 1:
-            # Verificar se algum par de pacientes do grupo compartilha médico:
-            # registros homônimos sob o MESMO médico têm chance alta de ser o
-            # mesmo paciente cadastrado duas vezes (risco alto). Homônimos com
-            # médicos distintos ainda podem ser duplicados (paciente atendido
-            # por mais de um médico) — reportar com risco médio, nunca pular.
-            doctor_ids_per_patient = []
-            for p in group:
-                d_ids = [link['doctor_id'] for link in p['links']]
-                doctor_ids_per_patient.append(d_ids)
-            shares_doctor = False
-            for i in range(len(doctor_ids_per_patient)):
-                for j in range(i+1, len(doctor_ids_per_patient)):
-                    if set(doctor_ids_per_patient[i]) & set(doctor_ids_per_patient[j]):
-                        shares_doctor = True
-                        break
-                if shares_doctor:
-                    break
-            ids = [p['id'] for p in group]
-            if shares_doctor:
-                for p in group:
-                    _add_alert(p, 'provável_duplicado', 'alto', 'Nomes idênticos', ids)
+    # 4b-4e. Duplicidade por SCORE composto por par de pacientes.
+    # Candidatos vêm de blocking por nome (primeiro token) e dos grupos de
+    # telefone/CPF por dígitos; cada par recebe um score somando sinais a
+    # favor e contra, e só é reportado com score >= 3 (3-4 médio, >= 5 alto).
+    candidate_pairs = set()
+
+    def _collect_pairs(groups):
+        for group in groups:
+            for i in range(len(group)):
+                for j in range(i + 1, len(group)):
+                    a, b = group[i]['id'], group[j]['id']
+                    candidate_pairs.add((min(a, b), max(a, b)))
+
+    _collect_pairs(by_first_token.values())
+    _collect_pairs(by_phone.values())
+    _collect_pairs(by_cpf.values())
+
+    def _score_pair(p, q):
+        score = 0
+        evidence = []
+        signals = {'name_identical': False, 'name_ratio': None,
+                   'phone_equal': False, 'cpf_equal': False}
+        nn_p, nn_q = p['normalized_name'], q['normalized_name']
+        if nn_p and nn_p == nn_q:
+            signals['name_identical'] = True
+            score += 3
+            evidence.append('nome normalizado idêntico (+3)')
+        elif nn_p and nn_q:
+            # token_sort_ratio tolera inversão de sobrenomes
+            # ('maria silva santos' vs 'maria santos silva').
+            ratio = fuzz.token_sort_ratio(nn_p, nn_q) / 100
+            if ratio >= 0.85:
+                signals['name_ratio'] = round(ratio, 2)
+                score += 2
+                evidence.append(f'similaridade de nome {round(ratio, 2)} (+2)')
+        if p['birth_date'] and q['birth_date']:
+            if p['birth_date'] == q['birth_date']:
+                score += 3
+                evidence.append('mesma data de nascimento (+3)')
             else:
-                for p in group:
-                    _add_alert(p, 'provável_duplicado', 'médio', 'Nomes idênticos (médicos distintos)', ids)
+                score -= 2
+                evidence.append('datas de nascimento diferentes (-2)')
+        ph_p, ph_q = p['phone_digits'], q['phone_digits']
+        if len(ph_p) >= 8 and ph_p == ph_q:
+            signals['phone_equal'] = True
+            score += 2
+            evidence.append('mesmo telefone (+2)')
+        if p['cpf_digits'] and q['cpf_digits']:
+            if p['cpf_digits'] == q['cpf_digits']:
+                signals['cpf_equal'] = True
+                score += 5
+                evidence.append('mesmo CPF (+5)')
+            else:
+                score -= 5
+                evidence.append('CPFs preenchidos e diferentes (-5)')
+        return score, evidence, signals
 
-    # 4c. Nomes parecidos (candidate blocking com first-token)
-    checked_pairs = set()
-    for token, candidates in by_first_token.items():
-        for i, p in enumerate(candidates):
-            for j in range(i + 1, len(candidates)):
-                q = candidates[j]
-                key = (min(p['id'], q['id']), max(p['id'], q['id']))
-                if key in checked_pairs:
-                    continue
-                checked_pairs.add(key)
-                if not p['normalized_name'] or not q['normalized_name']:
-                    continue
-                ratio = SequenceMatcher(None, p['normalized_name'], q['normalized_name']).ratio()
-                if ratio >= 0.85 and p['normalized_name'] != q['normalized_name']:
-                    ids = [p['id'], q['id']]
-                    _add_alert(p, 'possível_duplicado', 'médio', f'Nome parecido (sim={round(ratio,2)})', ids)
-                    _add_alert(q, 'possível_duplicado', 'médio', f'Nome parecido (sim={round(ratio,2)})', ids)
+    # Union-find para agrupar pares conectados em clusters: se A~B e B~C,
+    # os três aparecem juntos em related_ids.
+    uf_parent = {}
 
-    # 4d. Mesmo telefone
-    for ph, group in by_phone.items():
-        if len(group) > 1:
-            ids = [p['id'] for p in group]
-            for p in group:
-                _add_alert(p, 'mesmo_telefone', 'médio', f'Telefone {ph} compartilhado', ids)
+    def _find(x):
+        uf_parent.setdefault(x, x)
+        while uf_parent[x] != x:
+            uf_parent[x] = uf_parent[uf_parent[x]]
+            x = uf_parent[x]
+        return x
 
-    # 4e. Mesmo CPF
-    for cp, group in by_cpf.items():
-        if len(group) > 1:
-            ids = [p['id'] for p in group]
-            for p in group:
-                _add_alert(p, 'mesmo_cpf', 'alto', f'CPF {cp} compartilhado', ids)
+    def _union(a, b):
+        ra, rb = _find(a), _find(b)
+        if ra != rb:
+            uf_parent[rb] = ra
+
+    reported_pairs = []
+    for a, b in candidate_pairs:
+        p, q = patients_map[a], patients_map[b]
+        score, evidence, signals = _score_pair(p, q)
+        if score < 3:
+            continue
+        _union(a, b)
+        reported_pairs.append((p, q, score, evidence, signals))
+
+    clusters = defaultdict(list)
+    for pid in uf_parent:
+        clusters[_find(pid)].append(pid)
+    for members in clusters.values():
+        members.sort()
+
+    def _shares_doctor(p, q):
+        docs_p = {link['doctor_id'] for link in p['links']}
+        docs_q = {link['doctor_id'] for link in q['links']}
+        return bool(docs_p & docs_q)
+
+    for p, q, score, evidence, signals in reported_pairs:
+        cluster_ids = clusters[_find(p['id'])]
+        shares_doctor = signals['name_identical'] and _shares_doctor(p, q)
+        # Homônimos sob o MESMO médico continuam risco alto mesmo com score
+        # intermediário (regra herdada do bloco de nomes idênticos).
+        risk = 'alto' if (score >= 5 or shares_doctor) else 'médio'
+        pair_evidence = list(evidence)
+        if shares_doctor:
+            pair_evidence.append('compartilham médico')
+        if signals['name_identical']:
+            reason = 'Nomes idênticos' if shares_doctor else 'Nomes idênticos (médicos distintos)'
+            for x in (p, q):
+                _add_alert(x, 'provável_duplicado', risk, reason,
+                           cluster_ids, score=score, evidence=pair_evidence)
+        elif signals['name_ratio'] is not None:
+            for x in (p, q):
+                _add_alert(x, 'possível_duplicado', risk,
+                           f"Nome parecido (sim={signals['name_ratio']})",
+                           cluster_ids, score=score, evidence=pair_evidence)
+        if signals['cpf_equal']:
+            for x in (p, q):
+                _add_alert(x, 'mesmo_cpf', risk,
+                           f"CPF {p['cpf_digits']} compartilhado",
+                           cluster_ids, score=score, evidence=pair_evidence)
+        if signals['phone_equal']:
+            for x in (p, q):
+                _add_alert(x, 'mesmo_telefone', risk,
+                           f"Telefone {p['phone_digits']} compartilhado",
+                           cluster_ids, score=score, evidence=pair_evidence)
 
     # 4f. Sem código
     for p in patients_list:
