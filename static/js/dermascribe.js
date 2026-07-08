@@ -340,12 +340,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             medications.oral.push({
-                medication: 'NEOSIL ATTACK',
-                type: 'oral',
-                instructions: 'TOMAR 01 CP VO POR DIA POR 3 MESES'
-            });
-
-            medications.oral.push({
                 medication: 'MINOXIDIL 2,5MG',
                 type: 'oral',
                 instructions: 'TOMAR 01 CP VO POR DIA'
