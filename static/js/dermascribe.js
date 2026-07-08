@@ -336,7 +336,7 @@ document.addEventListener('DOMContentLoaded', function() {
             medications.oral.push({
                 medication: 'MINOXIDIL 2,5MG',
                 type: 'oral',
-                instructions: 'TOMAR 01 CP VO POR DIA'
+                instructions: 'TOMAR 01 CP VO POR DIA (USO CONTÍNUO)'
             });
 
             patientNameInput.value = patientName;
