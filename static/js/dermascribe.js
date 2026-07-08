@@ -515,8 +515,50 @@ document.addEventListener('DOMContentLoaded', function() {
         savePrescriptionBtn.addEventListener('click', handleSaveAndPrint);
     }
 
+    // Botão Imprimir = imprime sem salvar (funciona sem patient_id)
     if (printPrescription) {
-        printPrescription.addEventListener('click', handleSaveAndPrint);
+        printPrescription.addEventListener('click', async function(e) {
+            if (e) e.preventDefault();
+
+            if (medications.oral.length === 0 && medications.topical.length === 0) {
+                alert('Adicione pelo menos um medicamento antes de imprimir.');
+                return;
+            }
+
+            const patient_name = patientNameInput?.value?.trim() || '';
+
+            let printWin;
+            try {
+                printWin = window.open('about:blank', '_blank');
+            } catch (err) {
+                console.error('Falha ao abrir janela:', err);
+            }
+            if (!printWin) {
+                alert('O navegador bloqueou a janela de impressão. Permita popups para este site.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/dermascribe/preview-print', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patient_name: patient_name,
+                        oral: medications.oral,
+                        topical: medications.topical,
+                        prescription_type: 'standard'
+                    })
+                });
+                const html = await res.text();
+                printWin.document.open();
+                printWin.document.write(html);
+                printWin.document.close();
+            } catch (err) {
+                console.error('Erro ao gerar preview de impressão:', err);
+                alert('Falha ao gerar impressão.');
+                printWin.close();
+            }
+        });
     }
 });
 
@@ -530,6 +572,7 @@ function initSpecialtyTab(tabType) {
     const medInstrInput = document.getElementById(tabType + 'MedInstr');
     const addBtn = document.getElementById(tabType + 'AddMed');
     const saveBtn = document.getElementById(tabType + 'Save');
+    const printBtn = document.getElementById(tabType + 'Print');
     const listEl = document.getElementById(tabType + 'MedList');
     if (!addBtn || !saveBtn || !listEl) return;
 
@@ -656,6 +699,52 @@ function initSpecialtyTab(tabType) {
     }
 
     saveBtn.addEventListener('click', saveAndPrint);
+
+    // Botão Imprimir sem salvar (funciona sem patient_id)
+    if (printBtn) {
+        printBtn.addEventListener('click', async function(e) {
+            if (e) e.preventDefault();
+
+            if (meds.length === 0) {
+                alert('Adicione pelo menos um medicamento antes de imprimir.');
+                return;
+            }
+
+            const patient_name = pnameInput?.value?.trim() || '';
+
+            let printWin;
+            try {
+                printWin = window.open('about:blank', '_blank');
+            } catch (err) {
+                console.error('Falha ao abrir janela:', err);
+            }
+            if (!printWin) {
+                alert('O navegador bloqueou a janela de impressão. Permita popups para este site.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/dermascribe/preview-print', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patient_name: patient_name,
+                        oral: meds,
+                        topical: [],
+                        prescription_type: tabType
+                    })
+                });
+                const html = await res.text();
+                printWin.document.open();
+                printWin.document.write(html);
+                printWin.document.close();
+            } catch (err) {
+                console.error('Erro ao gerar preview:', err);
+                alert('Falha ao gerar impressão.');
+                printWin.close();
+            }
+        });
+    }
 }
 
 // Inicializar ambas as abas especializadas

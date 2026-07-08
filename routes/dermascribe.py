@@ -285,6 +285,53 @@ def print_prescription(prescription_id):
         medications=medications,
     )
 
+@dermascribe_bp.route('/preview-print', methods=['POST'])
+@login_required
+def preview_print():
+    """Renderiza a receita para impressão sem salvar no banco."""
+    data = request.get_json() or {}
+
+    patient_name = data.get('patient_name', 'Paciente')
+    oral_medications = data.get('oral', [])
+    topical_medications = data.get('topical', [])
+    prescription_type = data.get('prescription_type', 'standard')
+
+    VALID_TYPES = {'dermascribe', 'standard', 'antibiotico', 'isotretinoina'}
+    if prescription_type not in VALID_TYPES:
+        prescription_type = 'standard'
+
+    class DummyPrescription:
+        def __init__(self):
+            self.id = 0
+            self.created_at = datetime.now()
+            self.prescription_type = prescription_type
+
+    class DummyPatient:
+        def __init__(self, name):
+            self.name = name
+
+    # Limpeza de citações
+    for med in oral_medications:
+        med["medication"] = strip_citations(med.get("medication", ""))
+        med["instructions"] = strip_citations(med.get("instructions", ""))
+    for med in topical_medications:
+        med["medication"] = strip_citations(med.get("medication", ""))
+        med["instructions"] = strip_citations(med.get("instructions", ""))
+
+    template = PRINT_TEMPLATE_MAP.get(prescription_type, DEFAULT_PRINT_TEMPLATE)
+    medications = oral_medications + topical_medications
+
+    return render_template(
+        template,
+        prescription=DummyPrescription(),
+        patient=DummyPatient(patient_name),
+        doctor=current_user,
+        oral_medications=oral_medications,
+        topical_medications=topical_medications,
+        medications=medications,
+    )
+
+
 @dermascribe_bp.route('/prescription/<int:prescription_id>/pdf')
 @login_required
 def prescription_pdf(prescription_id):
