@@ -407,8 +407,17 @@ document.addEventListener('DOMContentLoaded', function() {
     async function handleSaveAndPrint(e) {
         if (e) e.preventDefault();
 
-        // Abre janela IMEDIATAMENTE (no gesto do clique) para evitar bloqueio do Safari
-        const printWin = window.open('', '_blank');
+        // Abre janela IMEDIATAMENTE (no gesto do clique) para evitar bloqueio do popup
+        let printWin;
+        try {
+            printWin = window.open('about:blank', '_blank');
+        } catch (err) {
+            console.error('Falha ao abrir janela de impressão:', err);
+        }
+        if (!printWin) {
+            alert('O navegador bloqueou a janela de impressão. Permita popups para este site.');
+            return;
+        }
 
         // Evita duplo clique
         if (savePrescriptionBtn && savePrescriptionBtn.dataset.loading === '1') {
@@ -467,10 +476,14 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.status === 'success') {
                 const prescriptionId = data.prescription_id;
 
-                if (prescriptionId && printWin) {
-                    // Navega a janela já aberta para a rota de impressão
-                    printWin.location = `/dermascribe/prescription/${prescriptionId}/print`;
-                } else if (printWin) {
+                if (prescriptionId && printWin && !printWin.closed) {
+                    try {
+                        printWin.location.href = `/dermascribe/prescription/${prescriptionId}/print`;
+                    } catch (err) {
+                        console.error('Erro ao navegar janela de impressão:', err);
+                        printWin.close();
+                    }
+                } else if (printWin && !printWin.closed) {
                     printWin.close();
                 }
 
@@ -482,7 +495,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, '*');
                 }
 
-                setTimeout(() => window.close(), 500);
+                // Notifica sucesso sem fechar a janela do DermaScribe
+                const saveToast = new bootstrap.Toast(document.getElementById('saveToast'));
+                if (saveToast) saveToast.show();
             } else {
                 alert('Erro ao salvar receita: ' + (data.message || 'Erro desconhecido'));
                 printWin.close();
@@ -574,7 +589,16 @@ function initSpecialtyTab(tabType) {
     async function saveAndPrint(e) {
         if (e) e.preventDefault();
 
-        const printWin = window.open('', '_blank');
+        let printWin;
+        try {
+            printWin = window.open('about:blank', '_blank');
+        } catch (err) {
+            console.error('Falha ao abrir janela de impressão:', err);
+        }
+        if (!printWin) {
+            alert('O navegador bloqueou a janela de impressão. Permita popups para este site.');
+            return;
+        }
 
         const patient_id = pidInput?.value?.trim();
         const patient_name = pnameInput?.value?.trim() || '';
@@ -608,9 +632,14 @@ function initSpecialtyTab(tabType) {
 
             if (data.status === 'success') {
                 const prescriptionId = data.prescription_id;
-                if (prescriptionId && printWin) {
-                    printWin.location = '/dermascribe/prescription/' + prescriptionId + '/print';
-                } else if (printWin) {
+                if (prescriptionId && printWin && !printWin.closed) {
+                    try {
+                        printWin.location.href = '/dermascribe/prescription/' + prescriptionId + '/print';
+                    } catch (err) {
+                        console.error('Erro ao navegar janela:', err);
+                        printWin.close();
+                    }
+                } else if (printWin && !printWin.closed) {
                     printWin.close();
                 }
                 meds = [];
