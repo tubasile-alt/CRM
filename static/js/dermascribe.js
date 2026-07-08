@@ -245,30 +245,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function updatePreview() {
-        const patientName = patientNameInput.value.trim() || '______________________';
+    function updatePreview(oralMeds, topicalMeds, patientNameOverride) {
+        const patientName = patientNameOverride !== undefined
+            ? patientNameOverride
+            : (patientNameInput.value.trim() || '______________________');
         previewPatientName.textContent = patientName;
 
-        if (medications.oral.length === 0) {
+        const oMeds = oralMeds !== undefined ? oralMeds : medications.oral;
+        const tMeds = topicalMeds !== undefined ? topicalMeds : medications.topical;
+
+        if (oMeds.length === 0) {
             previewOralMedications.classList.add('d-none');
         } else {
             previewOralMedications.classList.remove('d-none');
             const list = previewOralMedications.querySelector('.medication-list');
             list.innerHTML = '';
-            medications.oral.forEach(med => {
+            oMeds.forEach(med => {
                 const item = document.createElement('li');
                 item.innerHTML = `<strong>${med.medication}</strong>${med.instructions ? `<br><span>${med.instructions}</span>` : ''}`;
                 list.appendChild(item);
             });
         }
 
-        if (medications.topical.length === 0) {
+        if (tMeds.length === 0) {
             previewTopicalMedications.classList.add('d-none');
         } else {
             previewTopicalMedications.classList.remove('d-none');
             const list = previewTopicalMedications.querySelector('.medication-list');
             list.innerHTML = '';
-            medications.topical.forEach(med => {
+            tMeds.forEach(med => {
                 const item = document.createElement('li');
                 item.innerHTML = `<strong>${med.medication}</strong>${med.instructions ? `<br><span>${med.instructions}</span>` : ''}`;
                 list.appendChild(item);
@@ -276,7 +281,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    patientNameInput.addEventListener('input', updatePreview);
+    patientNameInput.addEventListener('input', function() { updatePreview(); });
+
+    window._dermascribeUpdatePreview = updatePreview;
 
     function saveMedicationToDatabase(medication) {
         fetch('/dermascribe/api/save-medication', {
@@ -530,6 +537,10 @@ function initSpecialtyTab(tabType) {
             icon.addEventListener('click', function() {
                 meds.splice(parseInt(this.dataset.idx), 1);
                 renderList();
+                if (typeof window._dermascribeUpdatePreview === 'function') {
+                    const pname = (pnameInput.value || '').trim();
+                    window._dermascribeUpdatePreview(meds, [], pname || undefined);
+                }
             });
         });
     }
@@ -552,6 +563,12 @@ function initSpecialtyTab(tabType) {
         medInstrInput.value = '';
         medNameInput.focus();
         renderList();
+
+        // Atualizar pré-visualização principal com os dados desta aba
+        if (typeof window._dermascribeUpdatePreview === 'function') {
+            const pname = (pnameInput.value || '').trim();
+            window._dermascribeUpdatePreview(meds, [], pname || undefined);
+        }
     });
 
     async function saveAndPrint(e) {

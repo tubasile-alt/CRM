@@ -16,90 +16,106 @@ body {
 
 .via {
   width: 100%;
-  height: 50%;
+  height: 112mm;
   position: relative;
-  padding: 18mm 20mm 14mm;
+  padding: 10mm 18mm 8mm;
+  overflow: hidden;
 }
 
-.via-top { border-bottom: 1px dashed #999; }
+.via-top {
+  border-bottom: 2px dashed #333;
+}
 
 .header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8mm;
+  gap: 10px;
+  margin-bottom: 4mm;
 }
 
 .header img {
-  width: 55px;
+  width: 50px;
   height: auto;
 }
 
 .header-info {
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
 .header-info strong {
-  font-size: 13px;
+  font-size: 14px;
+}
+
+.titulo {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 3mm;
+  text-transform: uppercase;
 }
 
 .patient-line {
-  margin-bottom: 6mm;
-  font-size: 12.5px;
+  margin-bottom: 3mm;
+  font-size: 12px;
 }
 
 .medications {
-  margin-top: 4mm;
+  margin-top: 2mm;
+}
+
+.section-title {
+  font-weight: 700;
+  font-size: 11px;
+  margin: 2mm 0 1mm;
+  text-transform: uppercase;
 }
 
 .med-item {
-  margin-bottom: 4mm;
+  margin-bottom: 2mm;
+  font-size: 11.5px;
+  line-height: 1.3;
 }
 
 .med-name {
   font-weight: 700;
-  font-size: 12px;
-}
-
-.med-inst {
-  font-size: 11.5px;
-  line-height: 1.35;
-  white-space: pre-wrap;
 }
 
 .footer {
   position: absolute;
-  left: 20mm;
-  right: 20mm;
-  bottom: 8mm;
-  font-size: 10.5px;
+  left: 18mm;
+  right: 18mm;
+  bottom: 5mm;
+  font-size: 10px;
 }
 
 .signature-block {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin-bottom: 3mm;
+  margin-bottom: 2mm;
 }
 
 .sig-left {
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 .sig-line {
   border-top: 1px solid #000;
-  width: 220px;
-  margin-bottom: 2mm;
+  width: 200px;
+  margin-bottom: 1mm;
 }
 
 .sig-right {
   text-align: right;
 }
 
-.rodape {
+.rodape-folha {
   text-align: center;
-  font-size: 10px;
+  font-size: 9.5px;
   color: #555;
+  margin-top: 2mm;
+  padding-top: 1mm;
+  border-top: 1px solid #ddd;
 }
 </style>
 </head>
@@ -109,24 +125,49 @@ body {
 <div class="via via-top">
 
   <div class="header">
-    <img src="{{ url_for('static', filename='img/logo_3d.png') }}" onerror="this.style.display='none'" alt="Basile">
+    <img src="{{ url_for('static', filename='images/logo-basile.jpg') }}" onerror="this.style.display='none'" alt="Basile">
     <div class="header-info">
       <strong>Basile Dermatologia</strong><br>
       Dr. Arthur Basile – CRM 125.217 | RQE 125.217
     </div>
   </div>
 
+  <div class="titulo">Dermatologia</div>
+
   <div class="patient-line">
     <strong>Paciente:</strong> {{ patient.name }}
   </div>
 
   <div class="medications">
-    {% for med in medications %}
-    <div class="med-item">
-      <div class="med-name">{{ med.medication }}</div>
-      <div class="med-inst">{{ med.instructions }}</div>
-    </div>
-    {% endfor %}
+    {% set oral = medications | selectattr('type', 'equalto', 'oral') | list if medications else [] %}
+    {% set topical = medications | selectattr('type', 'equalto', 'topical') | list if medications else [] %}
+    {% if not oral and medications %}
+      {% set oral = medications %}
+    {% endif %}
+
+    {% if oral %}
+    <div class="section-title">Uso Oral</div>
+    <ol>
+      {% for med in oral %}
+      <li class="med-item">
+        <span class="med-name">{{ med.medication }}</span>
+        {% if med.instructions %}<br><span>{{ med.instructions }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+
+    {% if topical %}
+    <div class="section-title">Uso Tópico</div>
+    <ol>
+      {% for med in topical %}
+      <li class="med-item">
+        <span class="med-name">{{ med.medication }}</span>
+        {% if med.instructions %}<br><span>{{ med.instructions }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
   </div>
 
   <div class="footer">
@@ -135,14 +176,11 @@ body {
         <div class="sig-line"></div>
         <div><strong>Dr. Arthur Basile</strong></div>
         <div>CRM 125.217</div>
+        <div>Dermatologista</div>
       </div>
       <div class="sig-right">
         Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
       </div>
-    </div>
-    <div class="rodape">
-      Av. Prof. João Fiúsa, 2300 – Ribeirão Preto, SP<br>
-      www.clinicabasile.com.br | Instagram: @clinicabasilemed
     </div>
   </div>
 
@@ -152,24 +190,43 @@ body {
 <div class="via">
 
   <div class="header">
-    <img src="{{ url_for('static', filename='img/logo_3d.png') }}" onerror="this.style.display='none'" alt="Basile">
+    <img src="{{ url_for('static', filename='images/logo-basile.jpg') }}" onerror="this.style.display='none'" alt="Basile">
     <div class="header-info">
       <strong>Basile Dermatologia</strong><br>
       Dr. Arthur Basile – CRM 125.217 | RQE 125.217
     </div>
   </div>
 
+  <div class="titulo">Dermatologia</div>
+
   <div class="patient-line">
     <strong>Paciente:</strong> {{ patient.name }}
   </div>
 
   <div class="medications">
-    {% for med in medications %}
-    <div class="med-item">
-      <div class="med-name">{{ med.medication }}</div>
-      <div class="med-inst">{{ med.instructions }}</div>
-    </div>
-    {% endfor %}
+    {% if oral %}
+    <div class="section-title">Uso Oral</div>
+    <ol>
+      {% for med in oral %}
+      <li class="med-item">
+        <span class="med-name">{{ med.medication }}</span>
+        {% if med.instructions %}<br><span>{{ med.instructions }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+
+    {% if topical %}
+    <div class="section-title">Uso Tópico</div>
+    <ol>
+      {% for med in topical %}
+      <li class="med-item">
+        <span class="med-name">{{ med.medication }}</span>
+        {% if med.instructions %}<br><span>{{ med.instructions }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
   </div>
 
   <div class="footer">
@@ -178,17 +235,18 @@ body {
         <div class="sig-line"></div>
         <div><strong>Dr. Arthur Basile</strong></div>
         <div>CRM 125.217</div>
+        <div>Dermatologista</div>
       </div>
       <div class="sig-right">
         Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
       </div>
     </div>
-    <div class="rodape">
-      Av. Prof. João Fiúsa, 2300 – Ribeirão Preto, SP<br>
-      www.clinicabasile.com.br | Instagram: @clinicabasilemed
-    </div>
   </div>
 
+</div>
+
+<div class="rodape-folha">
+  Av. Prof. João Fiúsa, 2300 – Ribeirão Preto, SP – www.clinicabasile.com.br | Instagram: @clinicabasilemed
 </div>
 
 <script>
