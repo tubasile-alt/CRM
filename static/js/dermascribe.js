@@ -333,12 +333,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             medications = { oral: [], topical: [] };
 
-            medications.topical.push({
-                medication: 'CAPPY',
-                type: 'topical',
-                instructions: 'APLICAR NO COURO CABELUDO 1X/DIA'
-            });
-
             medications.oral.push({
                 medication: 'MINOXIDIL 2,5MG',
                 type: 'oral',
