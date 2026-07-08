@@ -25,8 +25,6 @@ document.addEventListener('DOMContentLoaded', function() {
     previewDate.textContent = new Date().toLocaleDateString('pt-BR');
 
     let medications = { oral: [], topical: [] };
-    // Expõe no window para sincronização com abas Antibiótico/Isotretinoína
-    window.medications = medications;
 
     function updateMedicationCount() {
         const totalCount = medications.oral.length + medications.topical.length;
@@ -251,42 +249,32 @@ document.addEventListener('DOMContentLoaded', function() {
         const patientName = patientNameInput.value.trim() || '______________________';
         previewPatientName.textContent = patientName;
 
-        // Uso Oral
         if (medications.oral.length === 0) {
-            previewOralMedications.innerHTML = `
-                <div class="rx-section-title">Uso Oral</div>
-                <div class="rx-empty-msg">1. Nenhum medicamento oral adicionado</div>`;
+            previewOralMedications.classList.add('d-none');
         } else {
-            let html = '<div class="rx-section-title">Uso Oral</div>';
-            medications.oral.forEach((med, idx) => {
-                html += `<div class="rx-med-item">
-                    <span class="rx-num">${idx + 1}.</span>
-                    <span class="rx-name">${med.medication}</span>
-                    ${med.instructions ? `<div class="rx-inst">${med.instructions}</div>` : ''}
-                </div>`;
+            previewOralMedications.classList.remove('d-none');
+            const list = previewOralMedications.querySelector('.medication-list');
+            list.innerHTML = '';
+            medications.oral.forEach(med => {
+                const item = document.createElement('li');
+                item.innerHTML = `<strong>${med.medication}</strong>${med.instructions ? `<br><span>${med.instructions}</span>` : ''}`;
+                list.appendChild(item);
             });
-            previewOralMedications.innerHTML = html;
         }
 
-        // Uso Tópico
         if (medications.topical.length === 0) {
-            previewTopicalMedications.innerHTML = `
-                <div class="rx-section-title">Uso Tópico</div>
-                <div class="rx-empty-msg">1. Nenhum medicamento tópico adicionado</div>`;
+            previewTopicalMedications.classList.add('d-none');
         } else {
-            let html = '<div class="rx-section-title">Uso Tópico</div>';
-            medications.topical.forEach((med, idx) => {
-                html += `<div class="rx-med-item">
-                    <span class="rx-num">${idx + 1}.</span>
-                    <span class="rx-name">${med.medication}</span>
-                    ${med.instructions ? `<div class="rx-inst">${med.instructions}</div>` : ''}
-                </div>`;
+            previewTopicalMedications.classList.remove('d-none');
+            const list = previewTopicalMedications.querySelector('.medication-list');
+            list.innerHTML = '';
+            medications.topical.forEach(med => {
+                const item = document.createElement('li');
+                item.innerHTML = `<strong>${med.medication}</strong>${med.instructions ? `<br><span>${med.instructions}</span>` : ''}`;
+                list.appendChild(item);
             });
-            previewTopicalMedications.innerHTML = html;
         }
     }
-    // Expõe no window para sincronização com abas Antibiótico/Isotretinoína
-    window.updatePreview = updatePreview;
 
     patientNameInput.addEventListener('input', updatePreview);
 
@@ -508,191 +496,4 @@ document.addEventListener('DOMContentLoaded', function() {
     if (printPrescription) {
         printPrescription.addEventListener('click', handleSaveAndPrint);
     }
-});
-
-// ==============================
-// MODOS ANTIBIÓTICO / ISOTRETINOÍNA (layout BASILE 2 vias)
-// Controlador isolado — usa apenas classes dentro de .rx-mode-pane
-// ==============================
-document.addEventListener('DOMContentLoaded', function() {
-    const panes = document.querySelectorAll('.rx-mode-pane');
-    if (panes.length === 0) return;
-
-    panes.forEach(function(pane) {
-        const rxType = pane.dataset.rxType;
-        const patientNameInput = pane.querySelector('.rx-patient-name');
-        const medNameInput = pane.querySelector('.rx-med-name');
-        const medTypeSelect = pane.querySelector('.rx-med-type');
-        const medInstructionsInput = pane.querySelector('.rx-med-instructions');
-        const addMedBtn = pane.querySelector('.rx-add-med');
-        const medList = pane.querySelector('.rx-med-list');
-        const savePrintBtn = pane.querySelector('.rx-save-print');
-
-        let meds = [];
-
-        // Sincroniza nome do paciente com a pré-visualização principal
-        if (patientNameInput) {
-            patientNameInput.addEventListener('input', function() {
-                const mainPatientInput = document.getElementById('patientName');
-                const previewNameEl = document.getElementById('previewPatientName');
-                if (mainPatientInput) mainPatientInput.value = patientNameInput.value;
-                if (previewNameEl) previewNameEl.textContent = patientNameInput.value.trim() || '______________________';
-            });
-        }
-
-        // Quando esta aba é mostrada, sincroniza medicamentos no preview
-        const tabTrigger = document.querySelector('[data-bs-target="#' + pane.id + '"]');
-        if (tabTrigger) {
-            tabTrigger.addEventListener('shown.bs.tab', function() {
-                syncToPreview();
-                // Também sincroniza o nome do paciente ao trocar de aba
-                const mainPatientInput = document.getElementById('patientName');
-                const previewNameEl = document.getElementById('previewPatientName');
-                if (patientNameInput && mainPatientInput) mainPatientInput.value = patientNameInput.value;
-                if (patientNameInput && previewNameEl) previewNameEl.textContent = patientNameInput.value.trim() || '______________________';
-            });
-        }
-
-        pane.querySelectorAll('.rx-chip').forEach(function(chip) {
-            chip.addEventListener('click', function() {
-                medInstructionsInput.value = this.dataset.instructions || '';
-                medInstructionsInput.focus();
-            });
-        });
-
-        function syncToPreview() {
-            // Sincroniza medicamentos do modo rx-mode com a pré-visualização principal
-            if (typeof medications !== 'undefined' && typeof updatePreview === 'function') {
-                medications.oral = meds.filter(m => m.type === 'oral');
-                medications.topical = meds.filter(m => m.type === 'topical');
-                updatePreview();
-            }
-        }
-
-        function renderMeds() {
-            medList.innerHTML = '';
-
-            if (meds.length === 0) {
-                const empty = document.createElement('li');
-                empty.className = 'list-group-item text-muted rx-empty';
-                empty.textContent = 'Nenhum medicamento adicionado';
-                medList.appendChild(empty);
-                syncToPreview();
-                return;
-            }
-
-            meds.forEach(function(med, index) {
-                const item = document.createElement('li');
-                item.className = 'list-group-item d-flex justify-content-between align-items-center';
-
-                const info = document.createElement('div');
-                const name = document.createElement('strong');
-                name.textContent = (index + 1) + '. ' + med.medication;
-                const inst = document.createElement('small');
-                inst.className = 'text-muted d-block';
-                inst.textContent = (med.type === 'oral' ? 'Uso Oral — ' : 'Uso Tópico — ') + (med.instructions || '');
-                info.appendChild(name);
-                info.appendChild(inst);
-
-                const removeBtn = document.createElement('button');
-                removeBtn.type = 'button';
-                removeBtn.className = 'btn btn-sm btn-outline-danger';
-                removeBtn.innerHTML = '<i class="fas fa-times"></i>';
-                removeBtn.addEventListener('click', function() {
-                    meds.splice(index, 1);
-                    renderMeds();
-                });
-
-                item.appendChild(info);
-                item.appendChild(removeBtn);
-                medList.appendChild(item);
-            });
-            syncToPreview();
-        }
-
-        addMedBtn.addEventListener('click', function() {
-            const medName = medNameInput.value.trim();
-            const medType = medTypeSelect.value;
-            const medInstructions = medInstructionsInput.value.trim();
-
-            if (!medName) {
-                alert('Por favor, digite o nome do medicamento.');
-                return;
-            }
-
-            if (!medInstructions) {
-                alert('Por favor, informe a posologia (ou use um chip de posologia rápida).');
-                return;
-            }
-
-            meds.push({ medication: medName, type: medType, instructions: medInstructions });
-            renderMeds();
-
-            medNameInput.value = '';
-            medInstructionsInput.value = '';
-        });
-
-        savePrintBtn.addEventListener('click', async function() {
-            // Abre a janela imediatamente (no gesto do clique) para evitar bloqueio de popup
-            const printWin = window.open('', '_blank');
-
-            if (savePrintBtn.dataset.loading === '1') {
-                if (printWin) printWin.close();
-                return;
-            }
-
-            const patientId = document.getElementById('patientId')?.value?.trim();
-            const patientName = patientNameInput.value.trim();
-
-            if (!patientId) {
-                alert('ID do paciente é obrigatório. Abra esta página a partir do prontuário.');
-                if (printWin) printWin.close();
-                return;
-            }
-
-            if (meds.length === 0) {
-                alert('Adicione ao menos um medicamento antes de salvar.');
-                if (printWin) printWin.close();
-                return;
-            }
-
-            const originalHtml = savePrintBtn.innerHTML;
-            savePrintBtn.disabled = true;
-            savePrintBtn.dataset.loading = '1';
-            savePrintBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
-
-            try {
-                const res = await fetch('/dermascribe/api/save-prescription', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        patient_id: Number(patientId),
-                        patient_name: patientName,
-                        prescription_type: rxType,
-                        oral: meds.filter(m => m.type === 'oral'),
-                        topical: meds.filter(m => m.type === 'topical')
-                    })
-                });
-
-                const data = await res.json();
-
-                if (data.status === 'success' && data.prescription_id) {
-                    if (printWin) {
-                        printWin.location = `/dermascribe/prescription/${data.prescription_id}/print`;
-                    }
-                } else {
-                    alert('Erro ao salvar receita: ' + (data.message || 'Erro desconhecido'));
-                    if (printWin) printWin.close();
-                }
-            } catch (error) {
-                console.error('Erro ao salvar receita:', error);
-                alert('Falha ao salvar: ' + error.message);
-                if (printWin) printWin.close();
-            } finally {
-                savePrintBtn.disabled = false;
-                savePrintBtn.dataset.loading = '0';
-                savePrintBtn.innerHTML = originalHtml;
-            }
-        });
-    });
 });

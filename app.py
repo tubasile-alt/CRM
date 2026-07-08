@@ -4,14 +4,13 @@ from flask_wtf.csrf import CSRFProtect
 from flask_mail import Mail
 from werkzeug.security import generate_password_hash
 from datetime import datetime, timedelta, date
-from sqlalchemy.exc import IntegrityError
 import pytz
 import click
 import os
 from io import BytesIO
 
 from config import Config
-from models import db, User, Patient, PatientPhoto, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog, normalize_identity_digits
+from models import db, User, Patient, PatientPhoto, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
 from services.patient_photo_service import delete_patient_photo as delete_stored_patient_photo
 from services.patient_photo_service import save_patient_photo, save_patient_photo_data_url
 from utils.database_backup import backup_manager
@@ -118,67 +117,12 @@ def normalize_patient_name(name):
     """Normaliza um nome de paciente para comparação:
     - remove espaços nas extremidades
     - colapsa espaços internos múltiplos em um único espaço
-    - remove acentos (NFKD, descartando marcas de combinação)
     - ignora maiúsculas/minúsculas (retorna em minúsculas)
-
-    O retorno é usado apenas para COMPARAR nomes — nunca para gravar
-    o nome no banco.
     """
     import re
-    import unicodedata
     if not name:
         return ''
-    decomposed = unicodedata.normalize('NFKD', str(name))
-    without_accents = ''.join(
-        ch for ch in decomposed if not unicodedata.combining(ch)
-    )
-    return re.sub(r'\s+', ' ', without_accents.strip()).lower()
-
-
-def normalize_digits(value):
-    """Extrai apenas os dígitos de um valor (telefone/CPF).
-
-    Retorna '' para valores vazios/None. Diferente de
-    models.normalize_identity_digits, nunca retorna None — facilita
-    usar o resultado como chave de agrupamento.
-    """
-    import re
-    if not value:
-        return ''
-    return re.sub(r'\D', '', str(value))
-
-
-def _invalid_cpf_response(value):
-    """Valida CPF recebido em endpoint: quando não vazio, precisa ter 11 dígitos.
-
-    Retorna uma resposta 400 pronta para devolver ao cliente, ou None se o
-    valor é aceitável (vazio/None ou 11 dígitos, com ou sem máscara).
-    """
-    digits = normalize_identity_digits(value)
-    if value not in (None, '') and (not digits or len(digits) != 11):
-        return jsonify({
-            'success': False,
-            'error': 'CPF inválido: informe 11 dígitos.'
-        }), 400
-    return None
-
-
-def _handle_patient_integrity_error(exc):
-    """Trata IntegrityError de commits que gravam dados de paciente.
-
-    Se a violação veio do índice único de CPF (uq_patient_cpf), devolve o 409
-    padrão de duplicidade. Qualquer outra violação é re-levantada para não
-    mascarar bugs de constraints não relacionadas.
-    """
-    db.session.rollback()
-    detail = str(getattr(exc, 'orig', exc)).lower()
-    if 'uq_patient_cpf' in detail or 'cpf' in detail:
-        return jsonify({
-            'success': False,
-            'warning': 'duplicate_found',
-            'error': 'Já existe paciente com este CPF.'
-        }), 409
-    raise exc
+    return re.sub(r'\s+', ' ', str(name).strip()).lower()
 
 
 def find_possible_duplicate_patients(name, doctor_id=None, limit=8):
@@ -1467,27 +1411,23 @@ def create_appointment():
     if not doctor_id:
         return jsonify({'success': False, 'error': 'Médico não especificado'}), 400
     
-    invalid_cpf = _invalid_cpf_response(data.get('cpf'))
-    if invalid_cpf:
-        return invalid_cpf
-
-    # Vínculo com paciente existente SOMENTE via patient_id explícito.
-    # Não há mais fallback por nome: homônimo exato passa pelo alerta de
-    # duplicidade abaixo e exige escolha explícita da secretaria.
+    # Priorizar busca por ID se fornecido
     patient_id_input = data.get('patient_id')
     patient = None
     if patient_id_input:
         patient = Patient.query.get(patient_id_input)
-
+    
     if not patient:
+        # Fallback: Buscar por nome normalizado (case-insensitive) para evitar duplicatas
         patient_name_input = data.get('patientName', '').strip()
         if not patient_name_input:
             return jsonify({'success': False, 'error': 'patientName é obrigatório'}), 400
+        patient = Patient.query.filter(db.func.lower(Patient.name) == db.func.lower(patient_name_input)).first()
 
-    # Alerta de possível duplicidade: qualquer match (exato ou parecido) exige
-    # escolha explícita — abrir a ficha existente (patient_id) ou confirmar a
-    # criação (force_create). NÃO mescla/altera nada.
-    if not patient and not data.get('force_create'):
+    # Alerta de possível duplicidade: só ao criar paciente NOVO (sem patient_id
+    # selecionado e sem correspondência exata), e somente se o usuário ainda não
+    # confirmou criar mesmo assim (force_create). NÃO mescla/altera nada.
+    if not patient and not patient_id_input and not data.get('force_create'):
         possible = find_possible_duplicate_patients(
             data.get('patientName', ''), doctor_id=doctor_id
         )
@@ -1538,25 +1478,24 @@ def create_appointment():
             except Exception as e:
                 app.logger.warning(f"Erro ao processar foto do paciente {patient.id}: {e}")
     else:
-        # Paciente existente: NUNCA sobrescrever dados cadastrais pelo fluxo
-        # de agendamento — apenas preencher campos ainda vazios.
+        # Paciente existente: atualizar dados se fornecidos
         if 'patientType' in data:
             patient.patient_type = data['patientType']
-        if data.get('phone') and not patient.phone:
+        if 'phone' in data and data['phone']:
             patient.phone = data['phone']
-        if data.get('cpf') and not patient.cpf:
+        if 'cpf' in data:
             patient.cpf = data['cpf']
-        if data.get('birth_date') and not patient.birth_date:
+        if 'birth_date' in data and data['birth_date']:
             patient.birth_date = data['birth_date']
-        if data.get('address') and not patient.address:
+        if 'address' in data:
             patient.address = data['address']
-        if data.get('city') and not patient.city:
+        if 'city' in data:
             patient.city = data['city']
-        if data.get('mother_name') and not patient.mother_name:
+        if 'mother_name' in data:
             patient.mother_name = data['mother_name']
-        if data.get('indication_source') and not patient.indication_source:
+        if 'indication_source' in data:
             patient.indication_source = data['indication_source']
-        if data.get('occupation') and not patient.occupation:
+        if 'occupation' in data:
             patient.occupation = data['occupation']
 
     start_time = data.get('start')
@@ -1618,11 +1557,8 @@ def create_appointment():
         )
         db.session.add(surgery)
         surgery_created = True
-
-    try:
-        db.session.commit()
-    except IntegrityError as e:
-        return _handle_patient_integrity_error(e)
+    
+    db.session.commit()
     
     # === GOOGLE SHEETS: Agendamento de Cirurgia (Transplante Capilar) ===
     if data.get('appointmentType') == 'Transplante Capilar' and data.get('status', 'agendado') == 'agendado':
@@ -1736,10 +1672,6 @@ def update_appointment(id):
         appointment.patient and appointment.patient.status_cadastral == 'provisorio'
     )
     if patient_is_provisional:
-        if 'cpf' in data:
-            invalid_cpf = _invalid_cpf_response(data.get('cpf'))
-            if invalid_cpf:
-                return invalid_cpf
         if 'phone' in data:
             appointment.patient.phone = data.get('phone') or None
         if 'cpf' in data:
@@ -1772,8 +1704,7 @@ def update_appointment(id):
 
     # Update patient name if provided.
     # Provisórios podem ter o cadastro corrigido diretamente na agenda.
-    # Ativos NÃO são renomeados nem re-vinculados por nome aqui: o relink
-    # legado por nome exato anexava o agendamento a homônimos silenciosamente.
+    # Ativos preservam o comportamento legado de vincular por nome existente.
     if 'patientName' in data and data['patientName'] != appointment.patient.name:
         if patient_is_provisional:
             new_name = (data.get('patientName') or '').strip()
@@ -1781,16 +1712,14 @@ def update_appointment(id):
                 return jsonify({'success': False, 'error': 'Nome do paciente é obrigatório'}), 400
             appointment.patient.name = new_name
         else:
-            return jsonify({
-                'success': False,
-                'error': 'Paciente ativo: altere o nome pelo prontuário.'
-            }), 409
-
-    try:
-        db.session.commit()
-    except IntegrityError as e:
-        return _handle_patient_integrity_error(e)
-
+            existing_patient = Patient.query.filter_by(name=data['patientName']).first()
+            if existing_patient:
+                appointment.patient_id = existing_patient.id
+            else:
+                appointment.patient.name = data['patientName']
+    
+    db.session.commit()
+    
     return jsonify({'success': True})
 
 @app.route('/api/patient/<int:id>/photo', methods=['POST'])
@@ -2146,49 +2075,7 @@ def update_patient(patient_id):
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
     
     patient = Patient.query.get_or_404(patient_id)
-
-    if 'cpf' in data:
-        invalid_cpf = _invalid_cpf_response(data.get('cpf'))
-        if invalid_cpf:
-            return invalid_cpf
-
-    # Guarda de colisão: mudança de name/cpf/phone pode transformar este
-    # cadastro em duplicata de outro paciente. Sem confirmação explícita
-    # (force), devolver os possíveis conflitos para o usuário decidir.
-    new_name = (data.get('name') or '').strip()
-    name_changed = bool(new_name) and (
-        normalize_patient_name(new_name) != normalize_patient_name(patient.name)
-    )
-    new_cpf = normalize_identity_digits(data.get('cpf')) if 'cpf' in data else None
-    cpf_changed = 'cpf' in data and new_cpf != normalize_identity_digits(patient.cpf)
-    new_phone = normalize_identity_digits(data.get('phone')) if 'phone' in data else None
-    phone_changed = 'phone' in data and new_phone != normalize_identity_digits(patient.phone)
-
-    if (name_changed or cpf_changed or phone_changed) and not data.get('force'):
-        warnings = []
-        check_name = new_name if name_changed else patient.name
-        name_dups = find_possible_duplicate_patients(check_name)
-        for d in name_dups:
-            if d['id'] != patient.id:
-                warnings.append({**d, 'reason': 'nome_semelhante'})
-        check_cpf = new_cpf if cpf_changed else normalize_identity_digits(patient.cpf)
-        if check_cpf:
-            cpf_dups = Patient.query.filter(
-                Patient.cpf == check_cpf,
-                Patient.id != patient.id
-            ).all()
-            for p in cpf_dups:
-                if not any(w['id'] == p.id for w in warnings):
-                    warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_cpf',
-                                     'phone': p.phone, 'cpf': p.cpf})
-        if warnings:
-            return jsonify({
-                'success': False,
-                'warning': 'duplicates_found',
-                'warnings': warnings,
-                'message': 'Possíveis cadastros duplicados encontrados. Confirme para salvar mesmo assim.'
-            }), 409
-
+    
     if data.get('name'):
         patient.name = data['name']
     if 'email' in data:
@@ -2219,11 +2106,8 @@ def update_patient(patient_id):
         patient.indication_source = data['indication_source'] or None
     if 'patient_type' in data:
         patient.patient_type = data['patient_type'] or 'particular'
-
-    try:
-        db.session.commit()
-    except IntegrityError as e:
-        return _handle_patient_integrity_error(e)
+    
+    db.session.commit()
     return jsonify({'success': True})
 
 @app.route('/api/patient/<int:patient_id>/transplant-indication', methods=['POST'])
@@ -3089,9 +2973,7 @@ def _activation_warnings_for(provisional, doctor_id, phone_value=None, cpf_value
     if name_dups:
         warnings.extend([{**d, 'reason': 'nome_semelhante'} for d in name_dups])
 
-    # Comparação por dígitos: o banco guarda CPF normalizado, mas o valor
-    # informado pode chegar mascarado ('123.456.789-00').
-    cpf_to_check = normalize_identity_digits(cpf_value or provisional.cpf)
+    cpf_to_check = cpf_value or provisional.cpf
     if cpf_to_check:
         cpf_dups = Patient.query.filter(
             Patient.cpf == cpf_to_check,
@@ -3103,7 +2985,7 @@ def _activation_warnings_for(provisional, doctor_id, phone_value=None, cpf_value
                 warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_cpf',
                                  'phone': p.phone, 'cpf': p.cpf})
 
-    phone_to_check = normalize_identity_digits(phone_value or provisional.phone)
+    phone_to_check = phone_value or provisional.phone
     if phone_to_check:
         phone_dups = Patient.query.filter(
             Patient.phone == phone_to_check,
@@ -3235,9 +3117,6 @@ def ativar_paciente(patient_id):
             'required': required_errors,
             'message': 'Telefone e CPF são obrigatórios para ativar o cadastro provisório.'
         }), 400
-    invalid_cpf = _invalid_cpf_response(cpf_input)
-    if invalid_cpf:
-        return invalid_cpf
     if phone_input:
         provisional.phone = phone_input
     if cpf_input:
@@ -3345,17 +3224,6 @@ def ativar_paciente(patient_id):
                 'patient_code': pd.patient_code,
             })
 
-    except IntegrityError as e:
-        db.session.rollback()
-        detail = str(getattr(e, 'orig', e)).lower()
-        if 'uq_patient_cpf' in detail or 'cpf' in detail:
-            return jsonify({
-                'success': False,
-                'warning': 'duplicate_found',
-                'error': 'Já existe paciente com este CPF.'
-            }), 409
-        app.logger.exception('Erro ao ativar paciente %s', patient_id)
-        return jsonify({'error': str(e)}), 500
     except Exception as e:
         db.session.rollback()
         app.logger.exception('Erro ao ativar paciente %s', patient_id)
@@ -3438,31 +3306,30 @@ def api_audit_patients():
     NÃO mescla, exclui ou altera nenhum paciente.
     """
     _audit_access_required()
+    from difflib import SequenceMatcher
     from collections import defaultdict
-    from rapidfuzz import fuzz
 
-    def _iso(value):
-        """Serializa datas vindas de SQL cru (date/datetime no Postgres,
-        string no SQLite dos testes)."""
-        return value.isoformat() if hasattr(value, 'isoformat') else value
-
-    # ── 1. FASE 1: query leve só com dados de identidade e vínculos ──
-    # Os contadores (consultas, notas etc.) são calculados na FASE 2,
-    # apenas para os pacientes flagados — evita 8 subqueries
-    # correlacionadas por paciente da base inteira.
+    # ── 1. Coleta agregada de todos os pacientes com contadores ──
     sql = """
     SELECT
         p.id,
         p.name,
         p.phone,
         p.cpf,
-        p.birth_date,
         p.city,
         p.created_at,
         pd.id AS pd_id,
         pd.doctor_id,
         pd.patient_code,
-        u.name AS doctor_name
+        u.name AS doctor_name,
+        (SELECT COUNT(*) FROM appointment a WHERE a.patient_id = p.id) AS count_appointments,
+        (SELECT COUNT(*) FROM note n WHERE n.patient_id = p.id) AS count_notes,
+        (SELECT COUNT(*) FROM evolution e WHERE e.patient_id = p.id) AS count_evolutions,
+        (SELECT COUNT(*) FROM surgery s WHERE s.patient_id = p.id) AS count_surgeries,
+        (SELECT COUNT(*) FROM transplant_surgery_record tsr WHERE tsr.patient_id = p.id) AS count_transplant_surgeries,
+        (SELECT COUNT(*) FROM follow_up_reminder f WHERE f.patient_id = p.id) AS count_followups,
+        (SELECT COUNT(*) FROM prescription pr WHERE pr.patient_id = p.id) AS count_prescriptions,
+        (SELECT MAX(a.start_time) FROM appointment a WHERE a.patient_id = p.id) AS last_appointment
     FROM patient p
     LEFT JOIN patient_doctor pd ON pd.patient_id = p.id
     LEFT JOIN "user" u ON u.id = pd.doctor_id
@@ -3482,11 +3349,16 @@ def api_audit_patients():
                 'normalized_name': normalize_patient_name(row.name),
                 'phone': row.phone,
                 'cpf': row.cpf,
-                'birth_date': _iso(row.birth_date) if row.birth_date else None,
-                'phone_digits': normalize_digits(row.phone),
-                'cpf_digits': normalize_digits(row.cpf),
                 'city': row.city,
-                'created_at': _iso(row.created_at) if row.created_at else None,
+                'created_at': row.created_at.isoformat() if row.created_at else None,
+                'last_appointment': row.last_appointment.isoformat() if row.last_appointment else None,
+                'count_appointments': row.count_appointments,
+                'count_notes': row.count_notes,
+                'count_evolutions': row.count_evolutions,
+                'count_surgeries': row.count_surgeries,
+                'count_transplant_surgeries': row.count_transplant_surgeries,
+                'count_followups': row.count_followups,
+                'count_prescriptions': row.count_prescriptions,
                 'links': [],
                 'has_code': False,
             }
@@ -3502,29 +3374,22 @@ def api_audit_patients():
     patients_list = list(patients_map.values())
 
     # ── 3. Índices para rápida busca ──
+    by_normalized = defaultdict(list)
     by_phone = defaultdict(list)
     by_cpf = defaultdict(list)
     by_code = defaultdict(list)
     by_first_token = defaultdict(list)
-    by_last_token4 = defaultdict(list)
     for p in patients_list:
         nn = p['normalized_name']
         if nn:
-            tokens = nn.split(' ')
-            if tokens[0]:
-                by_first_token[tokens[0]].append(p)
-            # Segunda chave de blocking: primeiras 4 letras do ÚLTIMO token.
-            # Pega pares com primeiro nome divergente mas sobrenome igual
-            # ('ana silva' vs 'anna silva') que o first-token perderia.
-            if tokens[-1]:
-                by_last_token4[tokens[-1][:4]].append(p)
-        # Agrupar por dígitos: '(11) 98888-7777' e '11988887777' caem na
-        # mesma chave. Telefones com menos de 8 dígitos são ignorados
-        # (valores truncados/lixo geram falsos agrupamentos).
-        ph = p['phone_digits']
-        if len(ph) >= 8:
+            by_normalized[nn].append(p)
+            token = nn.split(' ')[0]
+            if token:
+                by_first_token[token].append(p)
+        ph = (p['phone'] or '').strip()
+        if ph:
             by_phone[ph].append(p)
-        cp = p['cpf_digits']
+        cp = (p['cpf'] or '').strip()
         if cp:
             by_cpf[cp].append(p)
         seen_code_keys = set()
@@ -3539,7 +3404,7 @@ def api_audit_patients():
     # Isso garante que um paciente seja reportado em todas as categorias relevantes.
     alerts = defaultdict(list)
     alert_keys = set()
-    def _add_alert(p, cat, risk, reason, related_ids=None, score=None, evidence=None):
+    def _add_alert(p, cat, risk, reason, related_ids=None):
         key = (p['id'], cat, reason)
         if key in alert_keys:
             return
@@ -3552,18 +3417,21 @@ def api_audit_patients():
             'doctor_name': p['links'][0]['doctor_name'] if p['links'] else None,
             'phone': p['phone'],
             'cpf': p['cpf'],
-            'birth_date': p['birth_date'],
             'city': p['city'],
             'created_at': p['created_at'],
-            # count_*/last_appointment são preenchidos na FASE 2, só para
-            # os pacientes flagados (ver bloco de contadores no passo 5).
+            'last_appointment': p['last_appointment'],
+            'count_appointments': p['count_appointments'],
+            'count_notes': p['count_notes'],
+            'count_evolutions': p['count_evolutions'],
+            'count_surgeries': p['count_surgeries'],
+            'count_transplant_surgeries': p['count_transplant_surgeries'],
+            'count_followups': p['count_followups'],
+            'count_prescriptions': p['count_prescriptions'],
             'links': p['links'],
             'category': cat,
             'risk': risk,
             'reason': reason,
             'related_ids': related_ids or [],
-            'score': score,
-            'evidence': evidence or [],
         })
 
     # 4a. Códigos duplicados
@@ -3573,136 +3441,71 @@ def api_audit_patients():
             for p in group:
                 _add_alert(p, 'mesmo_código', 'alto', f'Código {code} duplicado com médico {doctor_id}', ids)
 
-    # 4b-4e. Duplicidade por SCORE composto por par de pacientes.
-    # Candidatos vêm de blocking por nome (primeiro token OU 4 primeiras
-    # letras do último token) e dos grupos de telefone/CPF por dígitos;
-    # cada par recebe um score somando sinais a favor e contra, e só é
-    # reportado com score >= 3 (3-4 médio, >= 5 alto).
-    candidate_pairs = set()
+    # 4b. Nomes idênticos
+    for nn, group in by_normalized.items():
+        if len(group) > 1:
+            # Skip if the same patient is linked to multiple doctors (different doctor_ids)
+            # This is a normal case: one patient with multiple doctors, not a duplicate.
+            all_doctor_ids = set()
+            for p in group:
+                for link in p['links']:
+                    all_doctor_ids.add(link['doctor_id'])
+            # If there are multiple doctors AND the patient has multiple doctor links,
+            # it might be the same patient across doctors. Only flag if the same doctor
+            # has the same patient multiple times.
+            # Simpler: skip if there are 2+ doctors and all patients in group have unique ids
+            # Actually, skip when ALL patients in the group have different doctor_ids
+            # (meaning no two patients share the same doctor)
+            doctor_ids_per_patient = []
+            for p in group:
+                d_ids = [link['doctor_id'] for link in p['links']]
+                doctor_ids_per_patient.append(d_ids)
+            # Check if any two patients share at least one doctor
+            shares_doctor = False
+            for i in range(len(doctor_ids_per_patient)):
+                for j in range(i+1, len(doctor_ids_per_patient)):
+                    if set(doctor_ids_per_patient[i]) & set(doctor_ids_per_patient[j]):
+                        shares_doctor = True
+                        break
+                if shares_doctor:
+                    break
+            if not shares_doctor:
+                continue
+            ids = [p['id'] for p in group]
+            for p in group:
+                _add_alert(p, 'provável_duplicado', 'alto', 'Nomes idênticos', ids)
 
-    def _collect_pairs(block_map, block_label):
-        for key, group in block_map.items():
-            if len(group) > 300:
-                app.logger.warning(
-                    'audit-patients: bloco %s=%r com %d candidatos '
-                    '(acima do cap de 300); comparando mesmo assim',
-                    block_label, key, len(group)
-                )
-            for i in range(len(group)):
-                for j in range(i + 1, len(group)):
-                    a, b = group[i]['id'], group[j]['id']
-                    candidate_pairs.add((min(a, b), max(a, b)))
+    # 4c. Nomes parecidos (candidate blocking com first-token)
+    checked_pairs = set()
+    for token, candidates in by_first_token.items():
+        for i, p in enumerate(candidates):
+            for j in range(i + 1, len(candidates)):
+                q = candidates[j]
+                key = (min(p['id'], q['id']), max(p['id'], q['id']))
+                if key in checked_pairs:
+                    continue
+                checked_pairs.add(key)
+                if not p['normalized_name'] or not q['normalized_name']:
+                    continue
+                ratio = SequenceMatcher(None, p['normalized_name'], q['normalized_name']).ratio()
+                if ratio >= 0.85 and p['normalized_name'] != q['normalized_name']:
+                    ids = [p['id'], q['id']]
+                    _add_alert(p, 'possível_duplicado', 'médio', f'Nome parecido (sim={round(ratio,2)})', ids)
+                    _add_alert(q, 'possível_duplicado', 'médio', f'Nome parecido (sim={round(ratio,2)})', ids)
 
-    _collect_pairs(by_first_token, 'primeiro_token')
-    _collect_pairs(by_last_token4, 'ultimo_token4')
-    _collect_pairs(by_phone, 'telefone')
-    _collect_pairs(by_cpf, 'cpf')
+    # 4d. Mesmo telefone
+    for ph, group in by_phone.items():
+        if len(group) > 1:
+            ids = [p['id'] for p in group]
+            for p in group:
+                _add_alert(p, 'mesmo_telefone', 'médio', f'Telefone {ph} compartilhado', ids)
 
-    def _score_pair(p, q):
-        score = 0
-        evidence = []
-        signals = {'name_identical': False, 'name_ratio': None,
-                   'phone_equal': False, 'cpf_equal': False}
-        nn_p, nn_q = p['normalized_name'], q['normalized_name']
-        if nn_p and nn_p == nn_q:
-            signals['name_identical'] = True
-            score += 3
-            evidence.append('nome normalizado idêntico (+3)')
-        elif nn_p and nn_q:
-            # token_sort_ratio tolera inversão de sobrenomes
-            # ('maria silva santos' vs 'maria santos silva').
-            ratio = fuzz.token_sort_ratio(nn_p, nn_q) / 100
-            if ratio >= 0.85:
-                signals['name_ratio'] = round(ratio, 2)
-                score += 2
-                evidence.append(f'similaridade de nome {round(ratio, 2)} (+2)')
-        if p['birth_date'] and q['birth_date']:
-            if p['birth_date'] == q['birth_date']:
-                score += 3
-                evidence.append('mesma data de nascimento (+3)')
-            else:
-                score -= 2
-                evidence.append('datas de nascimento diferentes (-2)')
-        ph_p, ph_q = p['phone_digits'], q['phone_digits']
-        if len(ph_p) >= 8 and ph_p == ph_q:
-            signals['phone_equal'] = True
-            score += 2
-            evidence.append('mesmo telefone (+2)')
-        if p['cpf_digits'] and q['cpf_digits']:
-            if p['cpf_digits'] == q['cpf_digits']:
-                signals['cpf_equal'] = True
-                score += 5
-                evidence.append('mesmo CPF (+5)')
-            else:
-                score -= 5
-                evidence.append('CPFs preenchidos e diferentes (-5)')
-        return score, evidence, signals
-
-    # Union-find para agrupar pares conectados em clusters: se A~B e B~C,
-    # os três aparecem juntos em related_ids.
-    uf_parent = {}
-
-    def _find(x):
-        uf_parent.setdefault(x, x)
-        while uf_parent[x] != x:
-            uf_parent[x] = uf_parent[uf_parent[x]]
-            x = uf_parent[x]
-        return x
-
-    def _union(a, b):
-        ra, rb = _find(a), _find(b)
-        if ra != rb:
-            uf_parent[rb] = ra
-
-    reported_pairs = []
-    for a, b in candidate_pairs:
-        p, q = patients_map[a], patients_map[b]
-        score, evidence, signals = _score_pair(p, q)
-        if score < 3:
-            continue
-        _union(a, b)
-        reported_pairs.append((p, q, score, evidence, signals))
-
-    clusters = defaultdict(list)
-    for pid in uf_parent:
-        clusters[_find(pid)].append(pid)
-    for members in clusters.values():
-        members.sort()
-
-    def _shares_doctor(p, q):
-        docs_p = {link['doctor_id'] for link in p['links']}
-        docs_q = {link['doctor_id'] for link in q['links']}
-        return bool(docs_p & docs_q)
-
-    for p, q, score, evidence, signals in reported_pairs:
-        cluster_ids = clusters[_find(p['id'])]
-        shares_doctor = signals['name_identical'] and _shares_doctor(p, q)
-        # Homônimos sob o MESMO médico continuam risco alto mesmo com score
-        # intermediário (regra herdada do bloco de nomes idênticos).
-        risk = 'alto' if (score >= 5 or shares_doctor) else 'médio'
-        pair_evidence = list(evidence)
-        if shares_doctor:
-            pair_evidence.append('compartilham médico')
-        if signals['name_identical']:
-            reason = 'Nomes idênticos' if shares_doctor else 'Nomes idênticos (médicos distintos)'
-            for x in (p, q):
-                _add_alert(x, 'provável_duplicado', risk, reason,
-                           cluster_ids, score=score, evidence=pair_evidence)
-        elif signals['name_ratio'] is not None:
-            for x in (p, q):
-                _add_alert(x, 'possível_duplicado', risk,
-                           f"Nome parecido (sim={signals['name_ratio']})",
-                           cluster_ids, score=score, evidence=pair_evidence)
-        if signals['cpf_equal']:
-            for x in (p, q):
-                _add_alert(x, 'mesmo_cpf', risk,
-                           f"CPF {p['cpf_digits']} compartilhado",
-                           cluster_ids, score=score, evidence=pair_evidence)
-        if signals['phone_equal']:
-            for x in (p, q):
-                _add_alert(x, 'mesmo_telefone', risk,
-                           f"Telefone {p['phone_digits']} compartilhado",
-                           cluster_ids, score=score, evidence=pair_evidence)
+    # 4e. Mesmo CPF
+    for cp, group in by_cpf.items():
+        if len(group) > 1:
+            ids = [p['id'] for p in group]
+            for p in group:
+                _add_alert(p, 'mesmo_cpf', 'alto', f'CPF {cp} compartilhado', ids)
 
     # 4f. Sem código
     for p in patients_list:
@@ -3728,44 +3531,11 @@ def api_audit_patients():
                 if p:
                     _add_alert(p, 'revisar_manualmente', 'baixo', f'Gap de {gap} códigos após {codes[i][0]} (médico {doctor_id})', [])
 
-    # ── 5. FASE 2: contadores calculados apenas para os pacientes flagados ──
-    flagged_ids = sorted(alerts.keys())
-    counters = {}
-    if flagged_ids:
-        counters_sql = """
-        SELECT
-            p.id,
-            (SELECT COUNT(*) FROM appointment a WHERE a.patient_id = p.id) AS count_appointments,
-            (SELECT COUNT(*) FROM note n WHERE n.patient_id = p.id) AS count_notes,
-            (SELECT COUNT(*) FROM evolution e WHERE e.patient_id = p.id) AS count_evolutions,
-            (SELECT COUNT(*) FROM surgery s WHERE s.patient_id = p.id) AS count_surgeries,
-            (SELECT COUNT(*) FROM transplant_surgery_record tsr WHERE tsr.patient_id = p.id) AS count_transplant_surgeries,
-            (SELECT COUNT(*) FROM follow_up_reminder f WHERE f.patient_id = p.id) AS count_followups,
-            (SELECT COUNT(*) FROM prescription pr WHERE pr.patient_id = p.id) AS count_prescriptions,
-            (SELECT MAX(a.start_time) FROM appointment a WHERE a.patient_id = p.id) AS last_appointment
-        FROM patient p
-        WHERE p.id IN :ids
-        """
-        stmt = db.text(counters_sql).bindparams(db.bindparam('ids', expanding=True))
-        for row in db.session.execute(stmt, {'ids': flagged_ids}):
-            counters[row.id] = row
-
-    # ── 6. Flatten: um paciente pode aparecer múltiplas vezes (cada alerta) ──
+    # ── 5. Flatten: um paciente pode aparecer múltiplas vezes (cada alerta) ──
     # Ordenar por gravidade
     categories = []
     for pid, alert_list in alerts.items():
         categories.extend(alert_list)
-
-    for rec in categories:
-        c = counters.get(rec['id'])
-        rec['count_appointments'] = c.count_appointments if c else 0
-        rec['count_notes'] = c.count_notes if c else 0
-        rec['count_evolutions'] = c.count_evolutions if c else 0
-        rec['count_surgeries'] = c.count_surgeries if c else 0
-        rec['count_transplant_surgeries'] = c.count_transplant_surgeries if c else 0
-        rec['count_followups'] = c.count_followups if c else 0
-        rec['count_prescriptions'] = c.count_prescriptions if c else 0
-        rec['last_appointment'] = _iso(c.last_appointment) if c and c.last_appointment else None
 
     risk_order = {'alto': 0, 'médio': 1, 'baixo': 2}
     categories.sort(key=lambda r: (risk_order.get(r['risk'], 3), r['name'] or ''))

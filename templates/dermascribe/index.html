@@ -17,102 +17,19 @@
     .medication-actions i:hover { color: #dc3545; }
     .medication-actions .fa-edit:hover { color: #0d6efd; }
     .prescription-preview {
-        font-family: Arial, Helvetica, sans-serif;
+        font-family: 'Times New Roman', Times, serif;
         background: #fff;
-        padding: 20px;
+        padding: 30px;
         border: 1px solid #ddd;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        color: #111;
     }
-    .rx-preview-logo {
-        text-align: center;
-        margin-bottom: 15px;
-    }
-    .rx-preview-logo img {
-        height: 50px;
-        width: auto;
-    }
-    .rx-preview-logo-text {
-        font-size: 14px;
-        letter-spacing: 3px;
-        color: #00bcd4;
-        font-weight: 700;
-    }
-    .rx-preview-logo-sub {
-        font-size: 11px;
-        color: #666;
-        letter-spacing: 2px;
-    }
-    .rx-preview-name {
-        font-size: 15px;
-        font-weight: 700;
-        margin-bottom: 18px;
-    }
-    .rx-preview-name span {
-        border-bottom: 1px solid #000;
-        display: inline-block;
-        min-width: 220px;
-        padding-left: 5px;
-        font-weight: 400;
-    }
-    .rx-section-title {
-        font-size: 15px;
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
-    .rx-med-item {
-        font-size: 14px;
-        margin-bottom: 8px;
-        line-height: 1.4;
-    }
-    .rx-med-item .rx-num {
-        font-weight: 700;
-        margin-right: 4px;
-    }
-    .rx-med-item .rx-name {
-        font-weight: 700;
-    }
-    .rx-med-item .rx-inst {
-        font-size: 13px;
-        color: #333;
-    }
-    .rx-empty-msg {
-        font-size: 14px;
-        font-weight: 700;
-        color: #555;
-    }
-    .rx-preview-footer {
-        margin-top: 40px;
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-end;
-    }
-    .rx-signature-line {
-        border-top: 1px solid #000;
-        width: 200px;
-        margin-bottom: 6px;
-    }
-    .rx-doctor-info {
-        font-size: 12px;
-        line-height: 1.5;
-    }
-    .rx-doctor-info strong {
-        font-size: 13px;
-    }
-    .rx-preview-date {
-        font-size: 13px;
-    }
-    .rx-preview-date span {
-        border-bottom: 1px solid #000;
-        display: inline-block;
-        min-width: 80px;
-        text-align: center;
-    }
-    .rx-sbd-logo {
-        width: 35px;
-        height: auto;
-        margin-right: 8px;
-    }
+    .prescription-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+    .prescription-header h4 { margin-bottom: 5px; }
+    .medication-section { margin: 20px 0; }
+    .medication-section h5 { border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
+    .medication-list { list-style-type: none; padding-left: 0; }
+    .medication-list li { margin-bottom: 10px; padding-left: 20px; position: relative; }
+    .medication-list li::before { content: "•"; position: absolute; left: 0; color: #333; }
     @media print {
         .no-print { display: none !important; }
         .prescription-preview { border: none; box-shadow: none; }
@@ -141,16 +58,6 @@
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates-tab-content" type="button">Modelos</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="antibiotico-tab" data-bs-toggle="tab" data-bs-target="#antibiotico-tab-content" type="button">
-                        <i class="fas fa-capsules me-1"></i>Antibiótico
-                    </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="isotretinoina-tab" data-bs-toggle="tab" data-bs-target="#isotretinoina-tab-content" type="button">
-                        <i class="fas fa-tablets me-1"></i>Isotretinoína
-                    </button>
                 </li>
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics-tab-content" type="button">
@@ -302,109 +209,6 @@
                     </div>
                 </div>
 
-                <div class="tab-pane fade rx-mode-pane" id="antibiotico-tab-content" role="tabpanel" data-rx-type="antibiotico">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-warning">
-                            <h5 class="mb-0"><i class="fas fa-capsules me-2"></i>Receita de Antibiótico (layout BASILE, 2 vias)</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label class="form-label">Nome do Paciente</label>
-                                <input type="text" class="form-control rx-patient-name" placeholder="Nome completo do paciente" value="{{ patient_name }}">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Medicamento</label>
-                                <input type="text" class="form-control mb-2 rx-med-name" placeholder="Nome do antibiótico (ex.: DOXICICLINA 100MG)">
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <select class="form-select rx-med-type">
-                                            <option value="oral" selected>Uso oral</option>
-                                            <option value="topical">Uso tópico</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-8">
-                                        <input type="text" class="form-control rx-med-instructions" placeholder="Posologia">
-                                    </div>
-                                </div>
-                                <div class="mt-2 rx-chips">
-                                    <small class="text-muted d-block mb-1">Posologia rápida:</small>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO DE 12/12H POR 7 DIAS">12/12h por 7 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO DE 12/12H POR 10 DIAS">12/12h por 10 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA POR 30 DIAS">1x/dia por 30 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA POR 60 DIAS">1x/dia por 60 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA POR 90 DIAS">1x/dia por 90 dias</button>
-                                </div>
-                                <button type="button" class="btn btn-primary w-100 mt-2 rx-add-med">
-                                    <i class="fas fa-plus me-1"></i> Adicionar Medicamento
-                                </button>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Medicamentos da Receita</label>
-                                <ul class="list-group rx-med-list">
-                                    <li class="list-group-item text-muted rx-empty">Nenhum medicamento adicionado</li>
-                                </ul>
-                            </div>
-
-                            <button type="button" class="btn btn-success w-100 rx-save-print">
-                                <i class="fas fa-print me-2"></i>Salvar e Imprimir (2 vias)
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="tab-pane fade rx-mode-pane" id="isotretinoina-tab-content" role="tabpanel" data-rx-type="isotretinoina">
-                    <div class="card shadow-sm mb-4">
-                        <div class="card-header bg-danger text-white">
-                            <h5 class="mb-0"><i class="fas fa-tablets me-2"></i>Receita de Isotretinoína (layout BASILE, 2 vias)</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="mb-3">
-                                <label class="form-label">Nome do Paciente</label>
-                                <input type="text" class="form-control rx-patient-name" placeholder="Nome completo do paciente" value="{{ patient_name }}">
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Medicamento</label>
-                                <input type="text" class="form-control mb-2 rx-med-name" placeholder="Nome do medicamento (ex.: ISOTRETINOÍNA 20MG)" value="ISOTRETINOÍNA 20MG">
-                                <div class="row g-2">
-                                    <div class="col-md-4">
-                                        <select class="form-select rx-med-type">
-                                            <option value="oral" selected>Uso oral</option>
-                                            <option value="topical">Uso tópico</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-8">
-                                        <input type="text" class="form-control rx-med-instructions" placeholder="Posologia">
-                                    </div>
-                                </div>
-                                <div class="mt-2 rx-chips">
-                                    <small class="text-muted d-block mb-1">Posologia rápida:</small>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA, APÓS O ALMOÇO, POR 30 DIAS">1 cp/dia por 30 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 02 CP VO 1X/DIA, APÓS O ALMOÇO, POR 30 DIAS">2 cp/dia por 30 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO EM DIAS ALTERNADOS, APÓS O ALMOÇO, POR 30 DIAS">Dias alternados</button>
-                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA, APÓS O ALMOÇO, POR 60 DIAS">1 cp/dia por 60 dias</button>
-                                </div>
-                                <button type="button" class="btn btn-primary w-100 mt-2 rx-add-med">
-                                    <i class="fas fa-plus me-1"></i> Adicionar Medicamento
-                                </button>
-                            </div>
-
-                            <div class="mb-3">
-                                <label class="form-label">Medicamentos da Receita</label>
-                                <ul class="list-group rx-med-list">
-                                    <li class="list-group-item text-muted rx-empty">Nenhum medicamento adicionado</li>
-                                </ul>
-                            </div>
-
-                            <button type="button" class="btn btn-success w-100 rx-save-print">
-                                <i class="fas fa-print me-2"></i>Salvar e Imprimir (2 vias)
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="tab-pane fade" id="analytics-tab-content" role="tabpanel">
                     <div class="card shadow-sm">
                         <div class="card-header bg-info text-white">
@@ -438,31 +242,25 @@
                 </div>
                 <div class="card-body">
                     <div class="prescription-preview" id="prescriptionPreview">
-                        <div class="rx-preview-name">Nome: <span id="previewPatientName">______________________</span></div>
-
-                        <div id="previewOralMedications">
-                            <div class="rx-section-title">Uso Oral</div>
-                            <div class="rx-empty-msg">1. Nenhum medicamento oral adicionado</div>
+                        <div class="prescription-header">
+                            <h4>RECEITUÁRIO</h4>
+                            <p class="mb-0">Paciente: <strong id="previewPatientName">______________________</strong></p>
                         </div>
 
-                        <div id="previewTopicalMedications" style="margin-top:16px;">
-                            <div class="rx-section-title">Uso Tópico</div>
-                            <div class="rx-empty-msg">1. Nenhum medicamento tópico adicionado</div>
+                        <div id="previewOralMedications" class="medication-section d-none">
+                            <h5><i class="fas fa-pills me-2"></i>USO ORAL</h5>
+                            <ol class="medication-list"></ol>
                         </div>
 
-                        <div class="rx-preview-footer">
-                            <div style="display:flex; align-items:flex-start; gap:8px;">
-                                <img src="{{ url_for('static', filename='img/logo-sbd.png') }}" class="rx-sbd-logo" alt="SBD" onerror="this.style.display='none'">
-                                <div class="rx-doctor-info">
-                                    <div class="rx-signature-line"></div>
-                                    <strong>Dr. Arthur Basile</strong><br>
-                                    CRM 125.217<br>
-                                    Dermatologista
-                                </div>
-                            </div>
-                            <div class="rx-preview-date">
-                                Data: <span id="previewDate"></span>
-                            </div>
+                        <div id="previewTopicalMedications" class="medication-section d-none">
+                            <h5><i class="fas fa-prescription-bottle me-2"></i></h5>
+                            <ol class="medication-list"></ol>
+                        </div>
+
+                        <div class="prescription-footer mt-4 pt-3 border-top">
+                            <p class="text-center text-muted mb-0">
+                                <small>Data: <span id="previewDate"></span></small>
+                            </p>
                         </div>
                     </div>
                 </div>
