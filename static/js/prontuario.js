@@ -370,7 +370,17 @@ async function copyPatientFullName() {
   }
 }
 
-async function savePatientData() {
+function formatDuplicateWarningLine(dup) {
+  const parts = [];
+  if (dup.patient_code) parts.push(`código ${dup.patient_code}`);
+  if (dup.phone) parts.push(`tel ${dup.phone}`);
+  if (dup.cpf) parts.push(`CPF ${dup.cpf}`);
+  const reason = dup.reason === "mesmo_cpf" ? "mesmo CPF" : "nome semelhante";
+  const details = parts.length ? ` (${parts.join(", ")})` : "";
+  return `- ${dup.name}${details} [${reason}]`;
+}
+
+async function savePatientData(force = false) {
   const patientId = getPatientId();
   const data = {
     name: document.getElementById("editPatientName")?.value || "",
@@ -388,20 +398,40 @@ async function savePatientData() {
     patient_type: document.getElementById("editPatientType")?.value || "particular"
   };
 
+  if (force) {
+    data.force = true;
+  }
+
   if (!data.name.trim()) {
     showAlert("Nome do paciente é obrigatório", "warning");
     return;
   }
 
   try {
-    const result = await core.fetchJson(`/api/patient/${patientId}/update`, {
+    // fetch direto (e não core.fetchJson) porque o 409 de duplicidade
+    // precisa ter o corpo lido para exibir a lista de conflitos.
+    const response = await fetch(`/api/patient/${patientId}/update`, {
       method: "POST",
+      credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
         "X-CSRFToken": getCSRFToken()
       },
       body: JSON.stringify(data)
     });
+    const result = await response.json();
+
+    if (result.warning === "duplicates_found") {
+      const lines = (result.warnings || []).map(formatDuplicateWarningLine).join("\n");
+      const confirmed = confirm(
+        `Possíveis cadastros duplicados encontrados:\n${lines}\n\n` +
+        "Salvar mesmo assim?"
+      );
+      if (confirmed) {
+        await savePatientData(true);
+      }
+      return;
+    }
 
     if (result.success) {
       bootstrap.Modal.getInstance(document.getElementById("editPatientModal"))?.hide();

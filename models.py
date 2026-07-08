@@ -1,10 +1,24 @@
+import re
+
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
+from sqlalchemy.orm import validates
 from werkzeug.security import generate_password_hash, check_password_hash
 from services.access_control import is_admin_user
 from services.clinic_time import clinic_now
 
 db = SQLAlchemy()
+
+
+def normalize_identity_digits(value):
+    """Reduz CPF/telefone a apenas dígitos ('123.456.789-00' -> '12345678900').
+
+    Retorna None para valores vazios/None, mantendo o campo NULL no banco.
+    """
+    if value is None:
+        return None
+    digits = re.sub(r'\D', '', str(value))
+    return digits or None
 
 def get_brazil_time():
     return clinic_now()
@@ -41,6 +55,19 @@ class User(UserMixin, db.Model):
 
 class Patient(db.Model):
     __tablename__ = 'patient'
+    # Unicidade de CPF (ignora NULL). Em produção o índice é criado pela
+    # migration a1f2e3d4c5b6; aqui garante o mesmo comportamento em bancos
+    # criados via create_all (dev/testes). Telefone NÃO é único: familiares
+    # compartilham número.
+    __table_args__ = (
+        db.Index(
+            'uq_patient_cpf',
+            'cpf',
+            unique=True,
+            postgresql_where=db.text('cpf IS NOT NULL'),
+            sqlite_where=db.text('cpf IS NOT NULL'),
+        ),
+    )
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(20))
@@ -87,6 +114,12 @@ class Patient(db.Model):
     @property
     def is_provisorio(self):
         return self.status_cadastral == 'provisorio'
+
+    @validates('cpf', 'phone')
+    def _normalize_identity(self, key, value):
+        # Apenas normaliza para dígitos; validação de tamanho fica nos
+        # endpoints para não quebrar fluxos legados com dados parciais.
+        return normalize_identity_digits(value)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
