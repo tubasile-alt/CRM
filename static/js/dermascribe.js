@@ -285,6 +285,8 @@ document.addEventListener('DOMContentLoaded', function() {
     patientNameInput.addEventListener('input', function() { updatePreview(); });
 
     window._dermascribeUpdatePreview = updatePreview;
+    window._addMedication = addMedication;
+    window._saveMedicationToDatabase = saveMedicationToDatabase;
 
     function saveMedicationToDatabase(medication, onCategorized) {
         fetch('/dermascribe/api/save-medication', {
@@ -1079,11 +1081,13 @@ function initSpecialtyTab(tabType) {
                         item.innerHTML = '<div class="d-flex justify-content-between"><strong>' + med.name + '</strong><small class="text-muted">' + (med.brand || '') + '</small></div>' +
                             '<small class="text-muted">' + inds + '</small>';
                         item.addEventListener('click', function() {
-                            addMedication({
-                                medication: med.name,
-                                type: med.type,
-                                instructions: med.instructions || ''
-                            });
+                            if (typeof window._addMedication === 'function') {
+                                window._addMedication({
+                                    medication: med.name,
+                                    type: med.type,
+                                    instructions: med.instructions || ''
+                                });
+                            }
                         });
                         container.appendChild(item);
                     });
