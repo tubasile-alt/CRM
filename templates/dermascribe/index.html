@@ -17,19 +17,102 @@
     .medication-actions i:hover { color: #dc3545; }
     .medication-actions .fa-edit:hover { color: #0d6efd; }
     .prescription-preview {
-        font-family: 'Times New Roman', Times, serif;
+        font-family: Arial, Helvetica, sans-serif;
         background: #fff;
-        padding: 30px;
+        padding: 20px;
         border: 1px solid #ddd;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        color: #111;
     }
-    .prescription-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px; }
-    .prescription-header h4 { margin-bottom: 5px; }
-    .medication-section { margin: 20px 0; }
-    .medication-section h5 { border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
-    .medication-list { list-style-type: none; padding-left: 0; }
-    .medication-list li { margin-bottom: 10px; padding-left: 20px; position: relative; }
-    .medication-list li::before { content: "•"; position: absolute; left: 0; color: #333; }
+    .rx-preview-logo {
+        text-align: center;
+        margin-bottom: 15px;
+    }
+    .rx-preview-logo img {
+        height: 50px;
+        width: auto;
+    }
+    .rx-preview-logo-text {
+        font-size: 14px;
+        letter-spacing: 3px;
+        color: #00bcd4;
+        font-weight: 700;
+    }
+    .rx-preview-logo-sub {
+        font-size: 11px;
+        color: #666;
+        letter-spacing: 2px;
+    }
+    .rx-preview-name {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 18px;
+    }
+    .rx-preview-name span {
+        border-bottom: 1px solid #000;
+        display: inline-block;
+        min-width: 220px;
+        padding-left: 5px;
+        font-weight: 400;
+    }
+    .rx-section-title {
+        font-size: 15px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .rx-med-item {
+        font-size: 14px;
+        margin-bottom: 8px;
+        line-height: 1.4;
+    }
+    .rx-med-item .rx-num {
+        font-weight: 700;
+        margin-right: 4px;
+    }
+    .rx-med-item .rx-name {
+        font-weight: 700;
+    }
+    .rx-med-item .rx-inst {
+        font-size: 13px;
+        color: #333;
+    }
+    .rx-empty-msg {
+        font-size: 14px;
+        font-weight: 700;
+        color: #555;
+    }
+    .rx-preview-footer {
+        margin-top: 40px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }
+    .rx-signature-line {
+        border-top: 1px solid #000;
+        width: 200px;
+        margin-bottom: 6px;
+    }
+    .rx-doctor-info {
+        font-size: 12px;
+        line-height: 1.5;
+    }
+    .rx-doctor-info strong {
+        font-size: 13px;
+    }
+    .rx-preview-date {
+        font-size: 13px;
+    }
+    .rx-preview-date span {
+        border-bottom: 1px solid #000;
+        display: inline-block;
+        min-width: 80px;
+        text-align: center;
+    }
+    .rx-sbd-logo {
+        width: 35px;
+        height: auto;
+        margin-right: 8px;
+    }
     @media print {
         .no-print { display: none !important; }
         .prescription-preview { border: none; box-shadow: none; }
@@ -355,25 +438,37 @@
                 </div>
                 <div class="card-body">
                     <div class="prescription-preview" id="prescriptionPreview">
-                        <div class="prescription-header">
-                            <h4>RECEITUÁRIO</h4>
-                            <p class="mb-0">Paciente: <strong id="previewPatientName">______________________</strong></p>
+                        <div class="rx-preview-logo">
+                            <img src="{{ url_for('static', filename='img/logo_3d_final.png') }}" alt="Basile" onerror="this.style.display='none'">
+                            <div class="rx-preview-logo-text">BASILE</div>
+                            <div class="rx-preview-logo-sub">DERMATOLOGIA</div>
                         </div>
 
-                        <div id="previewOralMedications" class="medication-section d-none">
-                            <h5><i class="fas fa-pills me-2"></i>USO ORAL</h5>
-                            <ol class="medication-list"></ol>
+                        <div class="rx-preview-name">Nome: <span id="previewPatientName">______________________</span></div>
+
+                        <div id="previewOralMedications">
+                            <div class="rx-section-title">Uso Oral</div>
+                            <div class="rx-empty-msg">1. Nenhum medicamento oral adicionado</div>
                         </div>
 
-                        <div id="previewTopicalMedications" class="medication-section d-none">
-                            <h5><i class="fas fa-prescription-bottle me-2"></i></h5>
-                            <ol class="medication-list"></ol>
+                        <div id="previewTopicalMedications" style="margin-top:16px;">
+                            <div class="rx-section-title">Uso Tópico</div>
+                            <div class="rx-empty-msg">1. Nenhum medicamento tópico adicionado</div>
                         </div>
 
-                        <div class="prescription-footer mt-4 pt-3 border-top">
-                            <p class="text-center text-muted mb-0">
-                                <small>Data: <span id="previewDate"></span></small>
-                            </p>
+                        <div class="rx-preview-footer">
+                            <div style="display:flex; align-items:flex-start; gap:8px;">
+                                <img src="{{ url_for('static', filename='img/logo-sbd.png') }}" class="rx-sbd-logo" alt="SBD" onerror="this.style.display='none'">
+                                <div class="rx-doctor-info">
+                                    <div class="rx-signature-line"></div>
+                                    <strong>Dr. Arthur Basile</strong><br>
+                                    CRM 125.217<br>
+                                    Dermatologista
+                                </div>
+                            </div>
+                            <div class="rx-preview-date">
+                                Data: <span id="previewDate"></span>
+                            </div>
                         </div>
                     </div>
                 </div>

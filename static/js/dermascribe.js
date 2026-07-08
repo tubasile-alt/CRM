@@ -251,30 +251,38 @@ document.addEventListener('DOMContentLoaded', function() {
         const patientName = patientNameInput.value.trim() || '______________________';
         previewPatientName.textContent = patientName;
 
+        // Uso Oral
         if (medications.oral.length === 0) {
-            previewOralMedications.classList.add('d-none');
+            previewOralMedications.innerHTML = `
+                <div class="rx-section-title">Uso Oral</div>
+                <div class="rx-empty-msg">1. Nenhum medicamento oral adicionado</div>`;
         } else {
-            previewOralMedications.classList.remove('d-none');
-            const list = previewOralMedications.querySelector('.medication-list');
-            list.innerHTML = '';
-            medications.oral.forEach(med => {
-                const item = document.createElement('li');
-                item.innerHTML = `<strong>${med.medication}</strong>${med.instructions ? `<br><span>${med.instructions}</span>` : ''}`;
-                list.appendChild(item);
+            let html = '<div class="rx-section-title">Uso Oral</div>';
+            medications.oral.forEach((med, idx) => {
+                html += `<div class="rx-med-item">
+                    <span class="rx-num">${idx + 1}.</span>
+                    <span class="rx-name">${med.medication}</span>
+                    ${med.instructions ? `<div class="rx-inst">${med.instructions}</div>` : ''}
+                </div>`;
             });
+            previewOralMedications.innerHTML = html;
         }
 
+        // Uso Tópico
         if (medications.topical.length === 0) {
-            previewTopicalMedications.classList.add('d-none');
+            previewTopicalMedications.innerHTML = `
+                <div class="rx-section-title">Uso Tópico</div>
+                <div class="rx-empty-msg">1. Nenhum medicamento tópico adicionado</div>`;
         } else {
-            previewTopicalMedications.classList.remove('d-none');
-            const list = previewTopicalMedications.querySelector('.medication-list');
-            list.innerHTML = '';
-            medications.topical.forEach(med => {
-                const item = document.createElement('li');
-                item.innerHTML = `<strong>${med.medication}</strong>${med.instructions ? `<br><span>${med.instructions}</span>` : ''}`;
-                list.appendChild(item);
+            let html = '<div class="rx-section-title">Uso Tópico</div>';
+            medications.topical.forEach((med, idx) => {
+                html += `<div class="rx-med-item">
+                    <span class="rx-num">${idx + 1}.</span>
+                    <span class="rx-name">${med.medication}</span>
+                    ${med.instructions ? `<div class="rx-inst">${med.instructions}</div>` : ''}
+                </div>`;
             });
+            previewTopicalMedications.innerHTML = html;
         }
     }
     // Expõe no window para sincronização com abas Antibiótico/Isotretinoína
