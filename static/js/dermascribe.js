@@ -25,6 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
     previewDate.textContent = new Date().toLocaleDateString('pt-BR');
 
     let medications = { oral: [], topical: [] };
+    // Expõe no window para sincronização com abas Antibiótico/Isotretinoína
+    window.medications = medications;
 
     function updateMedicationCount() {
         const totalCount = medications.oral.length + medications.topical.length;
@@ -275,6 +277,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+    // Expõe no window para sincronização com abas Antibiótico/Isotretinoína
+    window.updatePreview = updatePreview;
 
     patientNameInput.addEventListener('input', updatePreview);
 
