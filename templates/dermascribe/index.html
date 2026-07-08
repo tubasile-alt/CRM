@@ -60,6 +60,12 @@
                     <button class="nav-link" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates-tab-content" type="button">Modelos</button>
                 </li>
                 <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="antibiotico-tab" data-bs-toggle="tab" data-bs-target="#antibiotico-tab-content" type="button">Antibiótico</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="isotretinoina-tab" data-bs-toggle="tab" data-bs-target="#isotretinoina-tab-content" type="button">Isotretinoína</button>
+                </li>
+                <li class="nav-item" role="presentation">
                     <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics-tab-content" type="button">
                         <i class="fas fa-chart-bar me-1"></i>Estatísticas
                     </button>
@@ -205,6 +211,54 @@
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="antibiotico-tab-content" role="tabpanel">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-body">
+                            <input type="hidden" id="antibioticoPatientId" value="{{ patient_id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Paciente</label>
+                                <input type="text" class="form-control" id="antibioticoPatientName" placeholder="Nome do paciente" value="{{ patient_name }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Medicamento</label>
+                                <input type="text" class="form-control mb-2" id="antibioticoMedName" placeholder="Nome do medicamento">
+                                <textarea class="form-control mb-2" id="antibioticoMedInstr" rows="2" placeholder="Instruções / posologia"></textarea>
+                                <button type="button" class="btn btn-primary w-100" id="antibioticoAddMed">
+                                    <i class="fas fa-plus me-1"></i>Adicionar
+                                </button>
+                            </div>
+                            <ul id="antibioticoMedList" class="list-group list-group-flush mb-3"></ul>
+                            <button type="button" class="btn btn-success w-100" id="antibioticoSave">
+                                <i class="fas fa-save me-2"></i>Salvar e Imprimir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade" id="isotretinoina-tab-content" role="tabpanel">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-body">
+                            <input type="hidden" id="isotretinoinaPatientId" value="{{ patient_id }}">
+                            <div class="mb-3">
+                                <label class="form-label">Paciente</label>
+                                <input type="text" class="form-control" id="isotretinoinaPatientName" placeholder="Nome do paciente" value="{{ patient_name }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Medicamento</label>
+                                <input type="text" class="form-control mb-2" id="isotretinoinaMedName" placeholder="Nome do medicamento">
+                                <textarea class="form-control mb-2" id="isotretinoinaMedInstr" rows="2" placeholder="Instruções / posologia"></textarea>
+                                <button type="button" class="btn btn-primary w-100" id="isotretinoinaAddMed">
+                                    <i class="fas fa-plus me-1"></i>Adicionar
+                                </button>
+                            </div>
+                            <ul id="isotretinoinaMedList" class="list-group list-group-flush mb-3"></ul>
+                            <button type="button" class="btn btn-success w-100" id="isotretinoinaSave">
+                                <i class="fas fa-save me-2"></i>Salvar e Imprimir
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>Prescrição Médica</title>
+<style>
+@page { size: A4; margin: 0; }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  color: #111;
+  font-size: 12px;
+}
+
+.via {
+  width: 100%;
+  height: 50%;
+  position: relative;
+  padding: 18mm 20mm 14mm;
+}
+
+.via-top { border-bottom: 1px dashed #999; }
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8mm;
+}
+
+.header img {
+  width: 55px;
+  height: auto;
+}
+
+.header-info {
+  line-height: 1.35;
+}
+
+.header-info strong {
+  font-size: 13px;
+}
+
+.patient-line {
+  margin-bottom: 6mm;
+  font-size: 12.5px;
+}
+
+.medications {
+  margin-top: 4mm;
+}
+
+.med-item {
+  margin-bottom: 4mm;
+}
+
+.med-name {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.med-inst {
+  font-size: 11.5px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+.footer {
+  position: absolute;
+  left: 20mm;
+  right: 20mm;
+  bottom: 8mm;
+  font-size: 10.5px;
+}
+
+.signature-block {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 3mm;
+}
+
+.sig-left {
+  line-height: 1.3;
+}
+
+.sig-line {
+  border-top: 1px solid #000;
+  width: 220px;
+  margin-bottom: 2mm;
+}
+
+.sig-right {
+  text-align: right;
+}
+
+.rodape {
+  text-align: center;
+  font-size: 10px;
+  color: #555;
+}
+</style>
+</head>
+<body>
+
+<!-- VIA 1 -->
+<div class="via via-top">
+
+  <div class="header">
+    <img src="{{ url_for('static', filename='img/logo_3d.png') }}" onerror="this.style.display='none'" alt="Basile">
+    <div class="header-info">
+      <strong>Basile Dermatologia</strong><br>
+      Dr. Arthur Basile – CRM 125.217 | RQE 125.217
+    </div>
+  </div>
+
+  <div class="patient-line">
+    <strong>Paciente:</strong> {{ patient.name }}
+  </div>
+
+  <div class="medications">
+    {% for med in medications %}
+    <div class="med-item">
+      <div class="med-name">{{ med.medication }}</div>
+      <div class="med-inst">{{ med.instructions }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="footer">
+    <div class="signature-block">
+      <div class="sig-left">
+        <div class="sig-line"></div>
+        <div><strong>Dr. Arthur Basile</strong></div>
+        <div>CRM 125.217</div>
+      </div>
+      <div class="sig-right">
+        Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
+      </div>
+    </div>
+    <div class="rodape">
+      Av. Prof. João Fiúsa, 2300 – Ribeirão Preto, SP<br>
+      www.clinicabasile.com.br | Instagram: @clinicabasilemed
+    </div>
+  </div>
+
+</div>
+
+<!-- VIA 2 -->
+<div class="via">
+
+  <div class="header">
+    <img src="{{ url_for('static', filename='img/logo_3d.png') }}" onerror="this.style.display='none'" alt="Basile">
+    <div class="header-info">
+      <strong>Basile Dermatologia</strong><br>
+      Dr. Arthur Basile – CRM 125.217 | RQE 125.217
+    </div>
+  </div>
+
+  <div class="patient-line">
+    <strong>Paciente:</strong> {{ patient.name }}
+  </div>
+
+  <div class="medications">
+    {% for med in medications %}
+    <div class="med-item">
+      <div class="med-name">{{ med.medication }}</div>
+      <div class="med-inst">{{ med.instructions }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="footer">
+    <div class="signature-block">
+      <div class="sig-left">
+        <div class="sig-line"></div>
+        <div><strong>Dr. Arthur Basile</strong></div>
+        <div>CRM 125.217</div>
+      </div>
+      <div class="sig-right">
+        Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '' }}
+      </div>
+    </div>
+    <div class="rodape">
+      Av. Prof. João Fiúsa, 2300 – Ribeirão Preto, SP<br>
+      www.clinicabasile.com.br | Instagram: @clinicabasilemed
+    </div>
+  </div>
+
+</div>
+
+<script>
+  window.onload = function() { setTimeout(function(){ window.print(); }, 300); };
+  window.onafterprint = function() { window.close(); };
+</script>
+</body>
+</html>

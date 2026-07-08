@@ -497,3 +497,120 @@ document.addEventListener('DOMContentLoaded', function() {
         printPrescription.addEventListener('click', handleSaveAndPrint);
     }
 });
+
+// ==========================================================
+// Controlador isolado: Antibiótico e Isotretinoína
+// ==========================================================
+function initSpecialtyTab(tabType) {
+    const pidInput = document.getElementById(tabType + 'PatientId');
+    const pnameInput = document.getElementById(tabType + 'PatientName');
+    const medNameInput = document.getElementById(tabType + 'MedName');
+    const medInstrInput = document.getElementById(tabType + 'MedInstr');
+    const addBtn = document.getElementById(tabType + 'AddMed');
+    const saveBtn = document.getElementById(tabType + 'Save');
+    const listEl = document.getElementById(tabType + 'MedList');
+
+    if (!addBtn || !saveBtn || !listEl) return;
+
+    let meds = [];
+
+    function renderList() {
+        listEl.innerHTML = '';
+        if (meds.length === 0) {
+            listEl.innerHTML = '<li class="list-group-item text-muted">Nenhum medicamento adicionado</li>';
+            return;
+        }
+        meds.forEach(function(med, idx) {
+            const li = document.createElement('li');
+            li.className = 'list-group-item medication-item';
+            li.innerHTML = '<div><strong>' + med.medication + '</strong><br><small>' + med.instructions + '</small></div>' +
+                '<div class="medication-actions"><i class="fas fa-trash-alt" title="Remover" data-idx="' + idx + '"></i></div>';
+            listEl.appendChild(li);
+        });
+        listEl.querySelectorAll('.fa-trash-alt').forEach(function(icon) {
+            icon.addEventListener('click', function() {
+                meds.splice(parseInt(this.dataset.idx), 1);
+                renderList();
+            });
+        });
+    }
+
+    renderList();
+
+    addBtn.addEventListener('click', function() {
+        const name = (medNameInput.value || '').trim();
+        const instr = (medInstrInput.value || '').trim();
+        if (!name) {
+            alert('Digite o nome do medicamento.');
+            return;
+        }
+        meds.push({ medication: name, instructions: instr, type: 'oral' });
+        medNameInput.value = '';
+        medInstrInput.value = '';
+        medNameInput.focus();
+        renderList();
+    });
+
+    async function saveAndPrint(e) {
+        if (e) e.preventDefault();
+
+        const printWin = window.open('', '_blank');
+
+        const patient_id = pidInput?.value?.trim();
+        const patient_name = pnameInput?.value?.trim() || '';
+
+        if (!patient_id) {
+            alert('ID do paciente é obrigatório. Abra esta página a partir do prontuário.');
+            printWin.close();
+            return;
+        }
+
+        if (meds.length === 0) {
+            alert('Adicione pelo menos um medicamento.');
+            printWin.close();
+            return;
+        }
+
+        try {
+            const res = await fetch('/dermascribe/api/save-prescription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    patient_id: Number(patient_id),
+                    patient_name: patient_name,
+                    oral: meds,
+                    topical: [],
+                    prescription_type: tabType
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.status === 'success') {
+                const prescriptionId = data.prescription_id;
+                if (prescriptionId && printWin) {
+                    printWin.location = '/dermascribe/prescription/' + prescriptionId + '/print';
+                } else if (printWin) {
+                    printWin.close();
+                }
+                meds = [];
+                renderList();
+            } else {
+                alert('Erro ao salvar: ' + (data.message || 'Erro desconhecido'));
+                printWin.close();
+            }
+        } catch (err) {
+            console.error('Erro ao salvar receita ' + tabType + ':', err);
+            alert('Falha ao salvar: ' + err.message);
+            printWin.close();
+        }
+    }
+
+    saveBtn.addEventListener('click', saveAndPrint);
+}
+
+// Inicializar ambas as abas especializadas
+document.addEventListener('DOMContentLoaded', function() {
+    initSpecialtyTab('antibiotico');
+    initSpecialtyTab('isotretinoina');
+});

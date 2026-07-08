@@ -13,6 +13,20 @@ dermascribe_bp = Blueprint('dermascribe', __name__, url_prefix='/dermascribe')
 
 CITE_RE = re.compile(r"\[cite:\s*\d+\]", re.IGNORECASE)
 
+DEFAULT_PRINT_TEMPLATE = "dermascribe/print.html"
+PRINT_TEMPLATE_MAP = {
+    "dermascribe": "dermascribe/print.html",
+    "standard": "dermascribe/print.html",
+    "antibiotico": "dermascribe/print_basile_vias.html",
+    "isotretinoina": "dermascribe/print_basile_vias.html",
+}
+
+
+def _resolve_print_template(prescription):
+    ptype = getattr(prescription, 'prescription_type', None) or 'standard'
+    return PRINT_TEMPLATE_MAP.get(ptype, DEFAULT_PRINT_TEMPLATE)
+
+
 def strip_citations(value: str) -> str:
     if not value:
         return value
@@ -167,12 +181,17 @@ def api_save_prescription():
     if not patient:
         return jsonify({'status': 'error', 'message': 'Paciente não encontrado'})
     
+    VALID_PRESCRIPTION_TYPES = {'dermascribe', 'standard', 'antibiotico', 'isotretinoina'}
+    ptype = data.get('prescription_type', 'dermascribe') or 'dermascribe'
+    if ptype not in VALID_PRESCRIPTION_TYPES:
+        ptype = 'dermascribe'
+
     prescription = Prescription(
         patient_id=patient_id,
         doctor_id=current_user.id,
         medications_oral=oral_medications,
         medications_topical=topical_medications,
-        prescription_type='dermascribe'
+        prescription_type=ptype
     )
     
     db.session.add(prescription)
@@ -253,13 +272,17 @@ def print_prescription(prescription_id):
             "instructions": strip_citations(med.get("instructions", "")),
         })
 
+    template = _resolve_print_template(prescription)
+    medications = oral_clean + topical_clean
+
     return render_template(
-        'dermascribe/print.html',
+        template,
         prescription=prescription,
         patient=patient,
         doctor=prescription.doctor,
         oral_medications=oral_clean,
         topical_medications=topical_clean,
+        medications=medications,
     )
 
 @dermascribe_bp.route('/prescription/<int:prescription_id>/pdf')
@@ -292,13 +315,17 @@ def prescription_pdf(prescription_id):
             "instructions": strip_citations(med.get("instructions", "")),
         })
 
+    template = _resolve_print_template(prescription)
+    medications = oral_clean + topical_clean
+
     html_str = render_template(
-        'dermascribe/print.html',
+        template,
         prescription=prescription,
         patient=patient,
         doctor=prescription.doctor,
         oral_medications=oral_clean,
         topical_medications=topical_clean,
+        medications=medications,
     )
 
     pdf = HTML(string=html_str, base_url=request.host_url).write_pdf()

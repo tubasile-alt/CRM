@@ -1,0 +1,236 @@
+Tarefa
+
+Implemente apenas dois novos modos de receita no DermaScribe:
+
+* Antibiótico
+* Isotretinoína
+
+O objetivo é reaproveitar toda a estrutura existente do DermaScribe, alterando o mínimo possível do projeto.
+
+⸻
+
+IMPORTANTE
+
+Faça somente as alterações descritas abaixo.
+
+Não refatore código.
+
+Não reorganize arquivos.
+
+Não altere funcionalidades existentes.
+
+Não substitua componentes.
+
+Não melhore código fora do escopo.
+
+Se alguma alteração não for indispensável para os dois novos modelos, não faça.
+
+⸻
+
+O que deve continuar exatamente igual
+
+Não alterar:
+
+* fluxo de impressão
+* geração de PDF (WeasyPrint)
+* endpoints existentes
+* banco de dados
+* print.html
+* funcionamento das abas já existentes
+* Modelos
+* Personalizada
+* Estatísticas
+
+Todo o restante deve permanecer idêntico.
+
+⸻
+
+1. Criar um novo template
+
+Criar apenas:
+
+templates/dermascribe/print_basile_vias.html
+
+Este template será usado exclusivamente pelos tipos:
+
+* antibiotico
+* isotretinoina
+
+O layout deve ser o BASILE DERMATOLOGIA com:
+
+* logo BASILE
+* duas vias iguais na folha A4
+* linha de corte
+* assinatura
+* CRM
+* data
+* rodapé institucional
+
+O template padrão
+
+templates/dermascribe/print.html
+
+NÃO deve ser modificado.
+
+⸻
+
+2. Alterar routes/dermascribe.py
+
+Adicionar apenas um dispatcher de template.
+
+Criar:
+
+DEFAULT_PRINT_TEMPLATE = "dermascribe/print.html"
+PRINT_TEMPLATE_MAP = {
+    "dermascribe": "dermascribe/print.html",
+    "standard": "dermascribe/print.html",
+    "antibiotico": "dermascribe/print_basile_vias.html",
+    "isotretinoina": "dermascribe/print_basile_vias.html",
+}
+
+e uma função:
+
+_resolve_print_template()
+
+Depois alterar somente os dois render_template das rotas:
+
+* print
+* pdf
+
+para usar:
+
+render_template(_resolve_print_template(...))
+
+Nenhuma outra lógica dessas rotas deve ser alterada.
+
+⸻
+
+3. api_save_prescription
+
+Modificar apenas para aceitar:
+
+prescription_type
+
+Whitelist:
+
+dermascribe
+antibiotico
+isotretinoina
+
+Caso venha outro valor:
+
+usar
+
+dermascribe
+
+Não alterar nenhuma outra regra da API.
+
+⸻
+
+4. Interface
+
+Em
+
+templates/dermascribe/index.html
+
+Adicionar somente duas novas abas:
+
+* Antibiótico
+* Isotretinoína
+
+Sem alterar as abas existentes.
+
+⸻
+
+5. JavaScript
+
+No FINAL de
+
+static/js/dermascribe.js
+
+Adicionar um controlador isolado para essas duas novas abas.
+
+Não modificar o código existente.
+
+Não mover funções.
+
+Não refatorar.
+
+O controlador deve apenas:
+
+* selecionar medicamentos
+* adicionar medicamento
+* remover medicamento
+* salvar
+* imprimir
+
+utilizando os endpoints já existentes.
+
+Enviar:
+
+prescription_type
+
+como
+
+antibiotico
+
+ou
+
+isotretinoina
+
+⸻
+
+NÃO FAZER
+
+Não criar endpoints.
+
+Não criar APIs.
+
+Não alterar models.
+
+Não alterar migrations.
+
+Não alterar CSS global.
+
+Não alterar Bootstrap.
+
+Não alterar WeasyPrint.
+
+Não alterar print.html.
+
+Não alterar o fluxo atual.
+
+Não alterar funcionalidades existentes.
+
+⸻
+
+Verificação
+
+Antes de finalizar:
+
+* confirmar que o projeto continua compilando
+* verificar que o DermaScribe continua funcionando
+* verificar que Personalizada continua funcionando
+* verificar que Modelos continua funcionando
+* verificar que Estatísticas continua funcionando
+
+⸻
+
+Git
+
+Criar uma branch:
+
+feature/dermascribe-antibiotico-isotretinoina
+
+Fazer commit apenas dos arquivos realmente alterados.
+
+Abrir Pull Request.
+
+Ao terminar, informar:
+
+* arquivos modificados
+* arquivos criados
+* resumo das alterações
+* link do Pull Request
+
+Objetivo principal: implementar apenas os dois novos modelos com o menor número possível de alterações no código existente. Se houver dúvida entre reutilizar uma estrutura existente ou criar uma nova, sempre reutilize a existente.
