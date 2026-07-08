@@ -872,12 +872,10 @@ document.addEventListener('DOMContentLoaded', function() {
             var input = document.getElementById(targetId);
             if (input) {
                 input.value = text;
-                // Destacar visualmente o botão clicado por 200ms
-                this.classList.remove('btn-outline-secondary');
-                this.classList.add('btn-secondary');
+                // Destacar visualmente o botão clicado por 200ms (efeito 3D pressionado)
+                this.classList.add('pos-btn-pressed');
                 setTimeout(function() {
-                    btn.classList.remove('btn-secondary');
-                    btn.classList.add('btn-outline-secondary');
+                    btn.classList.remove('pos-btn-pressed');
                 }, 200);
             }
         });

@@ -30,6 +30,36 @@
     .medication-list { list-style-type: none; padding-left: 0; }
     .medication-list li { margin-bottom: 10px; padding-left: 20px; position: relative; }
     .medication-list li::before { content: "•"; position: absolute; left: 0; color: #333; }
+    /* Botões de posologia 3D prateados */
+    .pos-btn {
+        background: linear-gradient(180deg, #e8e8e8 0%, #b8b8b8 100%) !important;
+        border: 1px solid #999 !important;
+        color: #333 !important;
+        font-weight: 500;
+        border-radius: 6px;
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.6),
+            0 2px 4px rgba(0,0,0,0.15),
+            0 1px 1px rgba(0,0,0,0.1);
+        transition: all 0.1s ease;
+        text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+    }
+    .pos-btn:hover {
+        background: linear-gradient(180deg, #f0f0f0 0%, #c0c0c0 100%) !important;
+        box-shadow:
+            inset 0 1px 0 rgba(255,255,255,0.7),
+            0 3px 6px rgba(0,0,0,0.2),
+            0 2px 2px rgba(0,0,0,0.15);
+        transform: translateY(-1px);
+    }
+    .pos-btn:active,
+    .pos-btn.pos-btn-pressed {
+        background: linear-gradient(180deg, #a8a8a8 0%, #888888 100%) !important;
+        box-shadow:
+            inset 0 2px 4px rgba(0,0,0,0.25),
+            0 1px 1px rgba(0,0,0,0.1);
+        transform: translateY(2px);
+    }
     @media print {
         .no-print { display: none !important; }
         .prescription-preview { border: none; box-shadow: none; }
@@ -229,10 +259,10 @@
                                 <input type="text" class="form-control mb-2" id="antibioticoOralMedName" placeholder="Nome do medicamento">
                                 <label class="form-label small text-muted">Posologia (clique no botão ou digite manualmente)</label>
                                 <div class="d-flex flex-wrap gap-1 mb-2">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido por dia por 7 dias.">1 cp / 7 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">1 cp 12/12h / 7 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">1 cp 12/12h / 30 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido por dia por 30 dias.">1 cp / 30 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido por dia por 7 dias.">1 cp / 7 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">1 cp 12/12h / 7 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">1 cp 12/12h / 30 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido por dia por 30 dias.">1 cp / 30 dias</button>
                                 </div>
                                 <input type="text" class="form-control mb-2" id="antibioticoOralMedInstr" placeholder="Digite a posologia manualmente...">
                                 <button type="button" class="btn btn-primary w-100" id="antibioticoAddOral">
@@ -246,11 +276,11 @@
                                 <input type="text" class="form-control mb-2" id="antibioticoTopMedName" placeholder="Nome do medicamento">
                                 <label class="form-label small text-muted">Posologia (clique no botão ou digite manualmente)</label>
                                 <div class="d-flex flex-wrap gap-1 mb-2">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 2 vezes ao dia por 7 dias.">2x ao dia / 7 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 2 vezes ao dia por 15 dias.">2x ao dia / 15 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 3 vezes ao dia por 7 dias.">3x ao dia / 7 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar à noite por 30 dias.">à noite / 30 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar na área afetada 2x ao dia.">área afetada 2x</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 2 vezes ao dia por 7 dias.">2x ao dia / 7 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 2 vezes ao dia por 15 dias.">2x ao dia / 15 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 3 vezes ao dia por 7 dias.">3x ao dia / 7 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar à noite por 30 dias.">à noite / 30 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar na área afetada 2x ao dia.">área afetada 2x</button>
                                 </div>
                                 <input type="text" class="form-control mb-2" id="antibioticoTopMedInstr" placeholder="Digite a posologia manualmente...">
                                 <button type="button" class="btn btn-success w-100" id="antibioticoAddTop">
@@ -283,8 +313,8 @@
                                 <input type="text" class="form-control mb-2" id="isotretinoinaMedName" placeholder="Nome do medicamento">
                                 <label class="form-label small text-muted">Posologia (clique no botão ou digite manualmente)</label>
                                 <div class="d-flex flex-wrap gap-1 mb-2">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="isotretinoinaMedInstr" data-text="1 comprimido VO após o almoço por 30 dias.">1 cp VO p.c. / 30 dias</button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="isotretinoinaMedInstr" data-text="2 comprimidos VO após o almoço por 30 dias.">2 cp VO p.c. / 30 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="isotretinoinaMedInstr" data-text="1 comprimido VO após o almoço por 30 dias.">1 cp VO p.c. / 30 dias</button>
+                                    <button type="button" class="btn btn-sm pos-btn" data-target="isotretinoinaMedInstr" data-text="2 comprimidos VO após o almoço por 30 dias.">2 cp VO p.c. / 30 dias</button>
                                 </div>
                                 <input type="text" class="form-control mb-2" id="isotretinoinaMedInstr" placeholder="Digite a posologia manualmente...">
                                 <button type="button" class="btn btn-primary w-100" id="isotretinoinaAddMed">
