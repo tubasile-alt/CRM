@@ -509,31 +509,14 @@ function initSpecialtyTab(tabType) {
     const addBtn = document.getElementById(tabType + 'AddMed');
     const saveBtn = document.getElementById(tabType + 'Save');
     const listEl = document.getElementById(tabType + 'MedList');
-    const previewEl = document.getElementById(tabType + 'Preview');
-
     if (!addBtn || !saveBtn || !listEl) return;
 
     let meds = [];
-
-    function updatePreview() {
-        if (!previewEl) return;
-        if (meds.length === 0) {
-            previewEl.innerHTML = '<span class="text-muted fst-italic">Nenhum medicamento na pré-visualização.</span>';
-            return;
-        }
-        let html = '';
-        meds.forEach(function(med) {
-            html += '<div class="mb-1"><strong>' + med.medication + '</strong>' +
-                (med.instructions ? '<br><span class="text-muted">' + med.instructions + '</span>' : '') + '</div>';
-        });
-        previewEl.innerHTML = html;
-    }
 
     function renderList() {
         listEl.innerHTML = '';
         if (meds.length === 0) {
             listEl.innerHTML = '<li class="list-group-item text-muted">Nenhum medicamento adicionado</li>';
-            updatePreview();
             return;
         }
         meds.forEach(function(med, idx) {
@@ -549,7 +532,6 @@ function initSpecialtyTab(tabType) {
                 renderList();
             });
         });
-        updatePreview();
     }
 
     renderList();
