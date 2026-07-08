@@ -518,12 +518,44 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let meds = [];
 
+        // Sincroniza nome do paciente com a pré-visualização principal
+        if (patientNameInput) {
+            patientNameInput.addEventListener('input', function() {
+                const mainPatientInput = document.getElementById('patientName');
+                const previewNameEl = document.getElementById('previewPatientName');
+                if (mainPatientInput) mainPatientInput.value = patientNameInput.value;
+                if (previewNameEl) previewNameEl.textContent = patientNameInput.value.trim() || '______________________';
+            });
+        }
+
+        // Quando esta aba é mostrada, sincroniza medicamentos no preview
+        const tabTrigger = document.querySelector('[data-bs-target="#' + pane.id + '"]');
+        if (tabTrigger) {
+            tabTrigger.addEventListener('shown.bs.tab', function() {
+                syncToPreview();
+                // Também sincroniza o nome do paciente ao trocar de aba
+                const mainPatientInput = document.getElementById('patientName');
+                const previewNameEl = document.getElementById('previewPatientName');
+                if (patientNameInput && mainPatientInput) mainPatientInput.value = patientNameInput.value;
+                if (patientNameInput && previewNameEl) previewNameEl.textContent = patientNameInput.value.trim() || '______________________';
+            });
+        }
+
         pane.querySelectorAll('.rx-chip').forEach(function(chip) {
             chip.addEventListener('click', function() {
                 medInstructionsInput.value = this.dataset.instructions || '';
                 medInstructionsInput.focus();
             });
         });
+
+        function syncToPreview() {
+            // Sincroniza medicamentos do modo rx-mode com a pré-visualização principal
+            if (typeof medications !== 'undefined' && typeof updatePreview === 'function') {
+                medications.oral = meds.filter(m => m.type === 'oral');
+                medications.topical = meds.filter(m => m.type === 'topical');
+                updatePreview();
+            }
+        }
 
         function renderMeds() {
             medList.innerHTML = '';
@@ -533,6 +565,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 empty.className = 'list-group-item text-muted rx-empty';
                 empty.textContent = 'Nenhum medicamento adicionado';
                 medList.appendChild(empty);
+                syncToPreview();
                 return;
             }
 
@@ -562,6 +595,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 item.appendChild(removeBtn);
                 medList.appendChild(item);
             });
+            syncToPreview();
         }
 
         addMedBtn.addEventListener('click', function() {
