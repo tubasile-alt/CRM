@@ -223,21 +223,39 @@
                                 <label class="form-label">Paciente</label>
                                 <input type="text" class="form-control" id="antibioticoPatientName" placeholder="Nome do paciente" value="{{ patient_name }}">
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">Medicamento</label>
-                                <input type="text" class="form-control mb-2" id="antibioticoMedName" placeholder="Nome do medicamento">
-                                <select class="form-select mb-2" id="antibioticoMedInstr">
+                            <!-- Oral -->
+                            <div class="mb-3 border-start border-3 border-primary ps-3">
+                                <label class="form-label fw-bold text-primary"><i class="fas fa-pills me-1"></i>Uso Oral</label>
+                                <input type="text" class="form-control mb-2" id="antibioticoOralMedName" placeholder="Nome do medicamento">
+                                <select class="form-select mb-2" id="antibioticoOralMedInstr">
                                     <option value="">Selecione a posologia...</option>
                                     <option value="Tomar 1 comprimido por dia por 7 dias.">Tomar 1 comprimido por dia por 7 dias.</option>
                                     <option value="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">Tomar 1 comprimido de 12 em 12 horas por 7 dias.</option>
                                     <option value="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">Tomar 1 comprimido de 12 em 12 horas por 30 dias.</option>
                                     <option value="Tomar 1 comprimido por dia por 30 dias.">Tomar 1 comprimido por dia por 30 dias.</option>
                                 </select>
-                                <button type="button" class="btn btn-primary w-100" id="antibioticoAddMed">
-                                    <i class="fas fa-plus me-1"></i>Adicionar
+                                <button type="button" class="btn btn-primary w-100" id="antibioticoAddOral">
+                                    <i class="fas fa-plus me-1"></i>Adicionar Oral
                                 </button>
                             </div>
-                            <ul id="antibioticoMedList" class="list-group list-group-flush mb-3"></ul>
+                            <ul id="antibioticoOralList" class="list-group list-group-flush mb-3"></ul>
+                            <!-- Tópico -->
+                            <div class="mb-3 border-start border-3 border-success ps-3">
+                                <label class="form-label fw-bold text-success"><i class="fas fa-hand-holding-medical me-1"></i>Uso Tópico</label>
+                                <input type="text" class="form-control mb-2" id="antibioticoTopMedName" placeholder="Nome do medicamento">
+                                <select class="form-select mb-2" id="antibioticoTopMedInstr">
+                                    <option value="">Selecione a posologia...</option>
+                                    <option value="Aplicar 2 vezes ao dia por 7 dias.">Aplicar 2 vezes ao dia por 7 dias.</option>
+                                    <option value="Aplicar 2 vezes ao dia por 15 dias.">Aplicar 2 vezes ao dia por 15 dias.</option>
+                                    <option value="Aplicar 3 vezes ao dia por 7 dias.">Aplicar 3 vezes ao dia por 7 dias.</option>
+                                    <option value="Aplicar à noite por 30 dias.">Aplicar à noite por 30 dias.</option>
+                                    <option value="Aplicar na área afetada 2x ao dia.">Aplicar na área afetada 2x ao dia.</option>
+                                </select>
+                                <button type="button" class="btn btn-success w-100" id="antibioticoAddTop">
+                                    <i class="fas fa-plus me-1"></i>Adicionar Tópico
+                                </button>
+                            </div>
+                            <ul id="antibioticoTopList" class="list-group list-group-flush mb-3"></ul>
                             <div class="d-flex gap-2">
                                 <button type="button" class="btn btn-success flex-fill" id="antibioticoSave">
                                     <i class="fas fa-save me-2"></i>Salvar e Imprimir

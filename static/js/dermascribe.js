@@ -568,13 +568,180 @@ document.addEventListener('DOMContentLoaded', function() {
 function initSpecialtyTab(tabType) {
     const pidInput = document.getElementById(tabType + 'PatientId');
     const pnameInput = document.getElementById(tabType + 'PatientName');
+    const saveBtn = document.getElementById(tabType + 'Save');
+    const printBtn = document.getElementById(tabType + 'Print');
+    if (!saveBtn) return;
+
+    // Detecta modo dual (Antibiótico = Oral + Tópico)
+    const isDual = tabType === 'antibiotico' && document.getElementById(tabType + 'OralMedName');
+
+    if (isDual) {
+        // ======== MODO DUAL: Oral + Tópico ========
+        const oralName  = document.getElementById(tabType + 'OralMedName');
+        const oralInstr = document.getElementById(tabType + 'OralMedInstr');
+        const oralAdd   = document.getElementById(tabType + 'AddOral');
+        const oralList  = document.getElementById(tabType + 'OralList');
+
+        const topName  = document.getElementById(tabType + 'TopMedName');
+        const topInstr = document.getElementById(tabType + 'TopMedInstr');
+        const topAdd   = document.getElementById(tabType + 'AddTop');
+        const topList  = document.getElementById(tabType + 'TopList');
+
+        let oralMeds = [];
+        let topMeds  = [];
+
+        function renderOral() {
+            oralList.innerHTML = '';
+            if (oralMeds.length === 0) {
+                oralList.innerHTML = '<li class="list-group-item text-muted">Nenhum medicamento oral adicionado</li>';
+                return;
+            }
+            oralMeds.forEach(function(med, idx) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item medication-item';
+                li.innerHTML = '<div><strong class="text-primary">' + med.medication + '</strong><br><small>' + med.instructions + '</small></div>' +
+                    '<div class="medication-actions"><i class="fas fa-trash-alt" title="Remover" data-type="oral" data-idx="' + idx + '"></i></div>';
+                oralList.appendChild(li);
+            });
+            bindTrash(oralList, 'oral');
+        }
+        function renderTop() {
+            topList.innerHTML = '';
+            if (topMeds.length === 0) {
+                topList.innerHTML = '<li class="list-group-item text-muted">Nenhum medicamento tópico adicionado</li>';
+                return;
+            }
+            topMeds.forEach(function(med, idx) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item medication-item';
+                li.innerHTML = '<div><strong class="text-success">' + med.medication + '</strong><br><small>' + med.instructions + '</small></div>' +
+                    '<div class="medication-actions"><i class="fas fa-trash-alt" title="Remover" data-type="topical" data-idx="' + idx + '"></i></div>';
+                topList.appendChild(li);
+            });
+            bindTrash(topList, 'topical');
+        }
+        function bindTrash(container, t) {
+            container.querySelectorAll('.fa-trash-alt').forEach(function(icon) {
+                icon.addEventListener('click', function() {
+                    const arr = t === 'oral' ? oralMeds : topMeds;
+                    arr.splice(parseInt(this.dataset.idx), 1);
+                    if (t === 'oral') renderOral(); else renderTop();
+                    updatePreviewDual();
+                });
+            });
+        }
+        function updatePreviewDual() {
+            if (typeof window._dermascribeUpdatePreview === 'function') {
+                const pname = (pnameInput.value || '').trim();
+                window._dermascribeUpdatePreview(oralMeds, topMeds, pname || undefined);
+            }
+        }
+
+        renderOral();
+        renderTop();
+
+        oralAdd.addEventListener('click', function() {
+            const name = (oralName.value || '').trim();
+            const instr = (oralInstr.value || '').trim();
+            if (!name) { alert('Digite o nome do medicamento oral.'); return; }
+            if (!instr) { alert('Selecione a posologia oral.'); return; }
+            oralMeds.push({ medication: name, instructions: instr, type: 'oral' });
+            oralName.value = ''; oralInstr.value = ''; oralName.focus();
+            renderOral(); updatePreviewDual();
+        });
+        topAdd.addEventListener('click', function() {
+            const name = (topName.value || '').trim();
+            const instr = (topInstr.value || '').trim();
+            if (!name) { alert('Digite o nome do medicamento tópico.'); return; }
+            if (!instr) { alert('Selecione a posologia tópica.'); return; }
+            topMeds.push({ medication: name, instructions: instr, type: 'topical' });
+            topName.value = ''; topInstr.value = ''; topName.focus();
+            renderTop(); updatePreviewDual();
+        });
+
+        function allMeds() { return oralMeds.concat(topMeds); }
+
+        async function saveAndPrintDual(e) {
+            if (e) e.preventDefault();
+            const patient_id = pidInput?.value?.trim();
+            const patient_name = pnameInput?.value?.trim() || '';
+            if (!patient_id) { alert('ID do paciente é obrigatório.'); return; }
+            if (allMeds().length === 0) { alert('Adicione pelo menos um medicamento.'); return; }
+
+            let printWin;
+            try { printWin = window.open('about:blank', '_blank'); } catch (err) {}
+            if (!printWin) { alert('Permita popups para este site.'); return; }
+
+            try {
+                const res = await fetch('/dermascribe/api/save-prescription', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        patient_id: Number(patient_id),
+                        patient_name: patient_name,
+                        oral: oralMeds,
+                        topical: topMeds,
+                        prescription_type: tabType
+                    })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    const prescriptionId = data.prescription_id;
+                    if (prescriptionId && printWin && !printWin.closed) {
+                        try { printWin.location.href = '/dermascribe/prescription/' + prescriptionId + '/print'; }
+                        catch (err) { printWin.close(); }
+                    } else { printWin.close(); }
+                    oralMeds = []; topMeds = [];
+                    renderOral(); renderTop();
+                } else {
+                    alert('Erro ao salvar: ' + (data.message || 'Erro desconhecido'));
+                    printWin.close();
+                }
+            } catch (err) {
+                alert('Falha ao salvar: ' + err.message);
+                printWin.close();
+            }
+        }
+        saveBtn.addEventListener('click', saveAndPrintDual);
+
+        if (printBtn) {
+            printBtn.addEventListener('click', async function(e) {
+                if (e) e.preventDefault();
+                if (allMeds().length === 0) { alert('Adicione pelo menos um medicamento antes de imprimir.'); return; }
+                const patient_name = pnameInput?.value?.trim() || '';
+                let printWin;
+                try { printWin = window.open('about:blank', '_blank'); } catch (err) {}
+                if (!printWin) { alert('Permita popups para este site.'); return; }
+                try {
+                    const res = await fetch('/dermascribe/preview-print', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            patient_name: patient_name,
+                            oral: oralMeds,
+                            topical: topMeds,
+                            prescription_type: tabType
+                        })
+                    });
+                    const html = await res.text();
+                    printWin.document.open();
+                    printWin.document.write(html);
+                    printWin.document.close();
+                } catch (err) {
+                    alert('Falha ao gerar impressão.');
+                    printWin.close();
+                }
+            });
+        }
+        return; // fim do modo dual
+    }
+
+    // ======== MODO SINGLE (Isotretinoína etc) ========
     const medNameInput = document.getElementById(tabType + 'MedName');
     const medInstrInput = document.getElementById(tabType + 'MedInstr');
     const addBtn = document.getElementById(tabType + 'AddMed');
-    const saveBtn = document.getElementById(tabType + 'Save');
-    const printBtn = document.getElementById(tabType + 'Print');
     const listEl = document.getElementById(tabType + 'MedList');
-    if (!addBtn || !saveBtn || !listEl) return;
+    if (!addBtn || !listEl) return;
 
     let meds = [];
 
@@ -608,21 +775,11 @@ function initSpecialtyTab(tabType) {
     addBtn.addEventListener('click', function() {
         const name = (medNameInput.value || '').trim();
         const instr = (medInstrInput.value || '').trim();
-        if (!name) {
-            alert('Digite o nome do medicamento.');
-            return;
-        }
-        if (!instr) {
-            alert('Selecione a posologia.');
-            return;
-        }
+        if (!name) { alert('Digite o nome do medicamento.'); return; }
+        if (!instr) { alert('Selecione a posologia.'); return; }
         meds.push({ medication: name, instructions: instr, type: 'oral' });
-        medNameInput.value = '';
-        medInstrInput.value = '';
-        medNameInput.focus();
+        medNameInput.value = ''; medInstrInput.value = ''; medNameInput.focus();
         renderList();
-
-        // Atualizar pré-visualização principal com os dados desta aba
         if (typeof window._dermascribeUpdatePreview === 'function') {
             const pname = (pnameInput.value || '').trim();
             window._dermascribeUpdatePreview(meds, [], pname || undefined);
@@ -631,32 +788,14 @@ function initSpecialtyTab(tabType) {
 
     async function saveAndPrint(e) {
         if (e) e.preventDefault();
-
-        let printWin;
-        try {
-            printWin = window.open('about:blank', '_blank');
-        } catch (err) {
-            console.error('Falha ao abrir janela de impressão:', err);
-        }
-        if (!printWin) {
-            alert('O navegador bloqueou a janela de impressão. Permita popups para este site.');
-            return;
-        }
-
         const patient_id = pidInput?.value?.trim();
         const patient_name = pnameInput?.value?.trim() || '';
+        if (!patient_id) { alert('ID do paciente é obrigatório.'); return; }
+        if (meds.length === 0) { alert('Adicione pelo menos um medicamento.'); return; }
 
-        if (!patient_id) {
-            alert('ID do paciente é obrigatório. Abra esta página a partir do prontuário.');
-            printWin.close();
-            return;
-        }
-
-        if (meds.length === 0) {
-            alert('Adicione pelo menos um medicamento.');
-            printWin.close();
-            return;
-        }
+        let printWin;
+        try { printWin = window.open('about:blank', '_blank'); } catch (err) {}
+        if (!printWin) { alert('Permita popups para este site.'); return; }
 
         try {
             const res = await fetch('/dermascribe/api/save-prescription', {
@@ -670,59 +809,33 @@ function initSpecialtyTab(tabType) {
                     prescription_type: tabType
                 })
             });
-
             const data = await res.json();
-
             if (data.status === 'success') {
                 const prescriptionId = data.prescription_id;
                 if (prescriptionId && printWin && !printWin.closed) {
-                    try {
-                        printWin.location.href = '/dermascribe/prescription/' + prescriptionId + '/print';
-                    } catch (err) {
-                        console.error('Erro ao navegar janela:', err);
-                        printWin.close();
-                    }
-                } else if (printWin && !printWin.closed) {
-                    printWin.close();
-                }
-                meds = [];
-                renderList();
+                    try { printWin.location.href = '/dermascribe/prescription/' + prescriptionId + '/print'; }
+                    catch (err) { printWin.close(); }
+                } else { printWin.close(); }
+                meds = []; renderList();
             } else {
                 alert('Erro ao salvar: ' + (data.message || 'Erro desconhecido'));
                 printWin.close();
             }
         } catch (err) {
-            console.error('Erro ao salvar receita ' + tabType + ':', err);
             alert('Falha ao salvar: ' + err.message);
             printWin.close();
         }
     }
-
     saveBtn.addEventListener('click', saveAndPrint);
 
-    // Botão Imprimir sem salvar (funciona sem patient_id)
     if (printBtn) {
         printBtn.addEventListener('click', async function(e) {
             if (e) e.preventDefault();
-
-            if (meds.length === 0) {
-                alert('Adicione pelo menos um medicamento antes de imprimir.');
-                return;
-            }
-
+            if (meds.length === 0) { alert('Adicione pelo menos um medicamento antes de imprimir.'); return; }
             const patient_name = pnameInput?.value?.trim() || '';
-
             let printWin;
-            try {
-                printWin = window.open('about:blank', '_blank');
-            } catch (err) {
-                console.error('Falha ao abrir janela:', err);
-            }
-            if (!printWin) {
-                alert('O navegador bloqueou a janela de impressão. Permita popups para este site.');
-                return;
-            }
-
+            try { printWin = window.open('about:blank', '_blank'); } catch (err) {}
+            if (!printWin) { alert('Permita popups para este site.'); return; }
             try {
                 const res = await fetch('/dermascribe/preview-print', {
                     method: 'POST',
@@ -739,7 +852,6 @@ function initSpecialtyTab(tabType) {
                 printWin.document.write(html);
                 printWin.document.close();
             } catch (err) {
-                console.error('Erro ao gerar preview:', err);
                 alert('Falha ao gerar impressão.');
                 printWin.close();
             }

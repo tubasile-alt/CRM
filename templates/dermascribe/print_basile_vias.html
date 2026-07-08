@@ -162,11 +162,12 @@ ol.meds li {
     <strong>Nome:</strong> <span class="nome-underline">{{ patient.name }}</span>
   </div>
 
+  {% set oral = medications | selectattr('type', 'equalto', 'oral') | list if medications else [] %}
+  {% set topical = medications | selectattr('type', 'equalto', 'topical') | list if medications else [] %}
+
+  {% if oral %}
   <div class="secao">
     <div class="secao-titulo">Uso Oral</div>
-    {% set oral = medications | selectattr('type', 'equalto', 'oral') | list if medications else [] %}
-    {% if not oral and medications %}{% set oral = medications %}{% endif %}
-    {% if oral %}
     <ol class="meds">
       {% for med in oral %}
       <li>
@@ -175,15 +176,12 @@ ol.meds li {
       </li>
       {% endfor %}
     </ol>
-    {% else %}
-    <ol class="meds"><li><span class="med-nome">Nenhum medicamento oral adicionado</span></li></ol>
-    {% endif %}
   </div>
+  {% endif %}
 
+  {% if topical %}
   <div class="secao">
     <div class="secao-titulo">Uso Tópico</div>
-    {% set topical = medications | selectattr('type', 'equalto', 'topical') | list if medications else [] %}
-    {% if topical %}
     <ol class="meds">
       {% for med in topical %}
       <li>
@@ -192,10 +190,8 @@ ol.meds li {
       </li>
       {% endfor %}
     </ol>
-    {% else %}
-    <ol class="meds"><li><span class="med-nome">Nenhum medicamento tópico adicionado</span></li></ol>
-    {% endif %}
   </div>
+  {% endif %}
 
   <div class="via-footer">
     <div class="sig-block">
@@ -226,9 +222,9 @@ ol.meds li {
     <strong>Nome:</strong> <span class="nome-underline">{{ patient.name }}</span>
   </div>
 
+  {% if oral %}
   <div class="secao">
     <div class="secao-titulo">Uso Oral</div>
-    {% if oral %}
     <ol class="meds">
       {% for med in oral %}
       <li>
@@ -237,14 +233,12 @@ ol.meds li {
       </li>
       {% endfor %}
     </ol>
-    {% else %}
-    <ol class="meds"><li><span class="med-nome">Nenhum medicamento oral adicionado</span></li></ol>
-    {% endif %}
   </div>
+  {% endif %}
 
+  {% if topical %}
   <div class="secao">
     <div class="secao-titulo">Uso Tópico</div>
-    {% if topical %}
     <ol class="meds">
       {% for med in topical %}
       <li>
@@ -253,10 +247,8 @@ ol.meds li {
       </li>
       {% endfor %}
     </ol>
-    {% else %}
-    <ol class="meds"><li><span class="med-nome">Nenhum medicamento tópico adicionado</span></li></ol>
-    {% endif %}
   </div>
+  {% endif %}
 
   <div class="via-footer">
     <div class="sig-block">
