@@ -118,12 +118,34 @@ def normalize_patient_name(name):
     """Normaliza um nome de paciente para comparação:
     - remove espaços nas extremidades
     - colapsa espaços internos múltiplos em um único espaço
+    - remove acentos (NFKD, descartando marcas de combinação)
     - ignora maiúsculas/minúsculas (retorna em minúsculas)
+
+    O retorno é usado apenas para COMPARAR nomes — nunca para gravar
+    o nome no banco.
     """
     import re
+    import unicodedata
     if not name:
         return ''
-    return re.sub(r'\s+', ' ', str(name).strip()).lower()
+    decomposed = unicodedata.normalize('NFKD', str(name))
+    without_accents = ''.join(
+        ch for ch in decomposed if not unicodedata.combining(ch)
+    )
+    return re.sub(r'\s+', ' ', without_accents.strip()).lower()
+
+
+def normalize_digits(value):
+    """Extrai apenas os dígitos de um valor (telefone/CPF).
+
+    Retorna '' para valores vazios/None. Diferente de
+    models.normalize_identity_digits, nunca retorna None — facilita
+    usar o resultado como chave de agrupamento.
+    """
+    import re
+    if not value:
+        return ''
+    return re.sub(r'\D', '', str(value))
 
 
 def _invalid_cpf_response(value):
@@ -3496,10 +3518,13 @@ def api_audit_patients():
             token = nn.split(' ')[0]
             if token:
                 by_first_token[token].append(p)
-        ph = (p['phone'] or '').strip()
-        if ph:
+        # Agrupar por dígitos: '(11) 98888-7777' e '11988887777' caem na
+        # mesma chave. Telefones com menos de 8 dígitos são ignorados
+        # (valores truncados/lixo geram falsos agrupamentos).
+        ph = normalize_digits(p['phone'])
+        if len(ph) >= 8:
             by_phone[ph].append(p)
-        cp = (p['cpf'] or '').strip()
+        cp = normalize_digits(p['cpf'])
         if cp:
             by_cpf[cp].append(p)
         seen_code_keys = set()
