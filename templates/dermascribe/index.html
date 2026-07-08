@@ -227,13 +227,14 @@
                             <div class="mb-3 border-start border-3 border-primary ps-3">
                                 <label class="form-label fw-bold text-primary"><i class="fas fa-pills me-1"></i>Uso Oral</label>
                                 <input type="text" class="form-control mb-2" id="antibioticoOralMedName" placeholder="Nome do medicamento">
-                                <select class="form-select mb-2" id="antibioticoOralMedInstr">
-                                    <option value="">Selecione a posologia...</option>
-                                    <option value="Tomar 1 comprimido por dia por 7 dias.">Tomar 1 comprimido por dia por 7 dias.</option>
-                                    <option value="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">Tomar 1 comprimido de 12 em 12 horas por 7 dias.</option>
-                                    <option value="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">Tomar 1 comprimido de 12 em 12 horas por 30 dias.</option>
-                                    <option value="Tomar 1 comprimido por dia por 30 dias.">Tomar 1 comprimido por dia por 30 dias.</option>
-                                </select>
+                                <label class="form-label small text-muted">Posologia (clique no botão ou digite manualmente)</label>
+                                <div class="d-flex flex-wrap gap-1 mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido por dia por 7 dias.">1 cp / 7 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">1 cp 12/12h / 7 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">1 cp 12/12h / 30 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoOralMedInstr" data-text="Tomar 1 comprimido por dia por 30 dias.">1 cp / 30 dias</button>
+                                </div>
+                                <input type="text" class="form-control mb-2" id="antibioticoOralMedInstr" placeholder="Digite a posologia manualmente...">
                                 <button type="button" class="btn btn-primary w-100" id="antibioticoAddOral">
                                     <i class="fas fa-plus me-1"></i>Adicionar Oral
                                 </button>
@@ -243,14 +244,15 @@
                             <div class="mb-3 border-start border-3 border-success ps-3">
                                 <label class="form-label fw-bold text-success"><i class="fas fa-hand-holding-medical me-1"></i>Uso Tópico</label>
                                 <input type="text" class="form-control mb-2" id="antibioticoTopMedName" placeholder="Nome do medicamento">
-                                <select class="form-select mb-2" id="antibioticoTopMedInstr">
-                                    <option value="">Selecione a posologia...</option>
-                                    <option value="Aplicar 2 vezes ao dia por 7 dias.">Aplicar 2 vezes ao dia por 7 dias.</option>
-                                    <option value="Aplicar 2 vezes ao dia por 15 dias.">Aplicar 2 vezes ao dia por 15 dias.</option>
-                                    <option value="Aplicar 3 vezes ao dia por 7 dias.">Aplicar 3 vezes ao dia por 7 dias.</option>
-                                    <option value="Aplicar à noite por 30 dias.">Aplicar à noite por 30 dias.</option>
-                                    <option value="Aplicar na área afetada 2x ao dia.">Aplicar na área afetada 2x ao dia.</option>
-                                </select>
+                                <label class="form-label small text-muted">Posologia (clique no botão ou digite manualmente)</label>
+                                <div class="d-flex flex-wrap gap-1 mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 2 vezes ao dia por 7 dias.">2x ao dia / 7 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 2 vezes ao dia por 15 dias.">2x ao dia / 15 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar 3 vezes ao dia por 7 dias.">3x ao dia / 7 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar à noite por 30 dias.">à noite / 30 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="antibioticoTopMedInstr" data-text="Aplicar na área afetada 2x ao dia.">área afetada 2x</button>
+                                </div>
+                                <input type="text" class="form-control mb-2" id="antibioticoTopMedInstr" placeholder="Digite a posologia manualmente...">
                                 <button type="button" class="btn btn-success w-100" id="antibioticoAddTop">
                                     <i class="fas fa-plus me-1"></i>Adicionar Tópico
                                 </button>
@@ -279,13 +281,14 @@
                             <div class="mb-3">
                                 <label class="form-label">Medicamento</label>
                                 <input type="text" class="form-control mb-2" id="isotretinoinaMedName" placeholder="Nome do medicamento">
-                                <select class="form-select mb-2" id="isotretinoinaMedInstr">
-                                    <option value="">Selecione a posologia...</option>
-                                    <option value="Tomar 1 comprimido por dia por 7 dias.">Tomar 1 comprimido por dia por 7 dias.</option>
-                                    <option value="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">Tomar 1 comprimido de 12 em 12 horas por 7 dias.</option>
-                                    <option value="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">Tomar 1 comprimido de 12 em 12 horas por 30 dias.</option>
-                                    <option value="Tomar 1 comprimido por dia por 30 dias.">Tomar 1 comprimido por dia por 30 dias.</option>
-                                </select>
+                                <label class="form-label small text-muted">Posologia (clique no botão ou digite manualmente)</label>
+                                <div class="d-flex flex-wrap gap-1 mb-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="isotretinoinaMedInstr" data-text="Tomar 1 comprimido por dia por 7 dias.">1 cp / 7 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="isotretinoinaMedInstr" data-text="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">1 cp 12/12h / 7 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="isotretinoinaMedInstr" data-text="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">1 cp 12/12h / 30 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary pos-btn" data-target="isotretinoinaMedInstr" data-text="Tomar 1 comprimido por dia por 30 dias.">1 cp / 30 dias</button>
+                                </div>
+                                <input type="text" class="form-control mb-2" id="isotretinoinaMedInstr" placeholder="Digite a posologia manualmente...">
                                 <button type="button" class="btn btn-primary w-100" id="isotretinoinaAddMed">
                                     <i class="fas fa-plus me-1"></i>Adicionar
                                 </button>

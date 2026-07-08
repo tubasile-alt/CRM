@@ -863,4 +863,23 @@ function initSpecialtyTab(tabType) {
 document.addEventListener('DOMContentLoaded', function() {
     initSpecialtyTab('antibiotico');
     initSpecialtyTab('isotretinoina');
+
+    // Botões de atalho de posologia (classe .pos-btn)
+    document.querySelectorAll('.pos-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var targetId = this.dataset.target;
+            var text = this.dataset.text;
+            var input = document.getElementById(targetId);
+            if (input) {
+                input.value = text;
+                // Destacar visualmente o botão clicado por 200ms
+                this.classList.remove('btn-outline-secondary');
+                this.classList.add('btn-secondary');
+                setTimeout(function() {
+                    btn.classList.remove('btn-secondary');
+                    btn.classList.add('btn-outline-secondary');
+                }, 200);
+            }
+        });
+    });
 });
