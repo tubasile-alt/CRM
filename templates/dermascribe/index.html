@@ -60,6 +60,16 @@
                     <button class="nav-link" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates-tab-content" type="button">Modelos</button>
                 </li>
                 <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="antibiotico-tab" data-bs-toggle="tab" data-bs-target="#antibiotico-tab-content" type="button">
+                        <i class="fas fa-capsules me-1"></i>Antibiótico
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="isotretinoina-tab" data-bs-toggle="tab" data-bs-target="#isotretinoina-tab-content" type="button">
+                        <i class="fas fa-tablets me-1"></i>Isotretinoína
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
                     <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics-tab-content" type="button">
                         <i class="fas fa-chart-bar me-1"></i>Estatísticas
                     </button>
@@ -205,6 +215,109 @@
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade rx-mode-pane" id="antibiotico-tab-content" role="tabpanel" data-rx-type="antibiotico">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-warning">
+                            <h5 class="mb-0"><i class="fas fa-capsules me-2"></i>Receita de Antibiótico (layout BASILE, 2 vias)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Nome do Paciente</label>
+                                <input type="text" class="form-control rx-patient-name" placeholder="Nome completo do paciente" value="{{ patient_name }}">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Medicamento</label>
+                                <input type="text" class="form-control mb-2 rx-med-name" placeholder="Nome do antibiótico (ex.: DOXICICLINA 100MG)">
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <select class="form-select rx-med-type">
+                                            <option value="oral" selected>Uso oral</option>
+                                            <option value="topical">Uso tópico</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <input type="text" class="form-control rx-med-instructions" placeholder="Posologia">
+                                    </div>
+                                </div>
+                                <div class="mt-2 rx-chips">
+                                    <small class="text-muted d-block mb-1">Posologia rápida:</small>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO DE 12/12H POR 7 DIAS">12/12h por 7 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO DE 12/12H POR 10 DIAS">12/12h por 10 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA POR 30 DIAS">1x/dia por 30 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA POR 60 DIAS">1x/dia por 60 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA POR 90 DIAS">1x/dia por 90 dias</button>
+                                </div>
+                                <button type="button" class="btn btn-primary w-100 mt-2 rx-add-med">
+                                    <i class="fas fa-plus me-1"></i> Adicionar Medicamento
+                                </button>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Medicamentos da Receita</label>
+                                <ul class="list-group rx-med-list">
+                                    <li class="list-group-item text-muted rx-empty">Nenhum medicamento adicionado</li>
+                                </ul>
+                            </div>
+
+                            <button type="button" class="btn btn-success w-100 rx-save-print">
+                                <i class="fas fa-print me-2"></i>Salvar e Imprimir (2 vias)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-pane fade rx-mode-pane" id="isotretinoina-tab-content" role="tabpanel" data-rx-type="isotretinoina">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0"><i class="fas fa-tablets me-2"></i>Receita de Isotretinoína (layout BASILE, 2 vias)</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">Nome do Paciente</label>
+                                <input type="text" class="form-control rx-patient-name" placeholder="Nome completo do paciente" value="{{ patient_name }}">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Medicamento</label>
+                                <input type="text" class="form-control mb-2 rx-med-name" placeholder="Nome do medicamento (ex.: ISOTRETINOÍNA 20MG)" value="ISOTRETINOÍNA 20MG">
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <select class="form-select rx-med-type">
+                                            <option value="oral" selected>Uso oral</option>
+                                            <option value="topical">Uso tópico</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <input type="text" class="form-control rx-med-instructions" placeholder="Posologia">
+                                    </div>
+                                </div>
+                                <div class="mt-2 rx-chips">
+                                    <small class="text-muted d-block mb-1">Posologia rápida:</small>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA, APÓS O ALMOÇO, POR 30 DIAS">1 cp/dia por 30 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 02 CP VO 1X/DIA, APÓS O ALMOÇO, POR 30 DIAS">2 cp/dia por 30 dias</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO EM DIAS ALTERNADOS, APÓS O ALMOÇO, POR 30 DIAS">Dias alternados</button>
+                                    <button type="button" class="btn btn-sm btn-outline-primary me-1 mb-1 rx-chip" data-instructions="TOMAR 01 CP VO 1X/DIA, APÓS O ALMOÇO, POR 60 DIAS">1 cp/dia por 60 dias</button>
+                                </div>
+                                <button type="button" class="btn btn-primary w-100 mt-2 rx-add-med">
+                                    <i class="fas fa-plus me-1"></i> Adicionar Medicamento
+                                </button>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Medicamentos da Receita</label>
+                                <ul class="list-group rx-med-list">
+                                    <li class="list-group-item text-muted rx-empty">Nenhum medicamento adicionado</li>
+                                </ul>
+                            </div>
+
+                            <button type="button" class="btn btn-success w-100 rx-save-print">
+                                <i class="fas fa-print me-2"></i>Salvar e Imprimir (2 vias)
+                            </button>
                         </div>
                     </div>
                 </div>

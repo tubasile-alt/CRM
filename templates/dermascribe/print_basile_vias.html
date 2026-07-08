@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>Receituário — Basile Dermatologia</title>
+<style>
+@page { size: A4; margin: 0; }
+
+body{
+  margin:0;
+  font-family: Arial, Helvetica, sans-serif;
+  color:#111;
+}
+
+.sheet{
+  box-sizing: border-box;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 8mm 16mm 20mm;
+  position: relative;
+}
+
+/* VIA (duas idênticas por folha) */
+.via{
+  box-sizing: border-box;
+  height: 112mm;
+  position: relative;
+  padding: 2mm 2mm 0;
+  overflow: hidden;
+}
+
+.via-header{
+  text-align: center;
+  margin-bottom: 3mm;
+}
+
+.via-header .logo{
+  height: 15mm;
+  width: auto;
+}
+
+.patient-line{
+  font-size: 12px;
+  border-bottom: 1px solid #000;
+  padding-bottom: 2mm;
+  margin-bottom: 3mm;
+}
+
+/* SEÇÕES DE MEDICAMENTOS */
+.section{
+  margin-bottom: 3mm;
+}
+
+.section-title{
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  margin-bottom: 1.5mm;
+}
+
+.med-list{
+  margin: 0;
+  padding-left: 6mm;
+  font-size: 11.5px;
+}
+
+.med-list li{
+  margin-bottom: 2.5mm;
+}
+
+.med-name{
+  font-weight: 700;
+}
+
+.med-inst{
+  line-height: 1.35;
+  white-space: pre-wrap;
+}
+
+/* ASSINATURA E DATA (por via) */
+.via-footer{
+  position: absolute;
+  left: 2mm;
+  right: 2mm;
+  bottom: 2mm;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-size: 11px;
+}
+
+.sign-block{
+  line-height: 1.35;
+}
+
+.signature-line{
+  border-top: 1px solid #000;
+  width: 220px;
+  margin-bottom: 1.5mm;
+}
+
+.sign-name{
+  font-weight: 700;
+  font-size: 12.5px;
+}
+
+.date-field{
+  font-size: 11.5px;
+}
+
+/* LINHA DE CORTE ENTRE AS VIAS */
+.cut-line{
+  border-top: 1px dashed #555;
+  margin: 4mm 0;
+  position: relative;
+  text-align: left;
+}
+
+.cut-line .scissors{
+  position: absolute;
+  top: -3.2mm;
+  left: 4mm;
+  background: #fff;
+  padding: 0 1.5mm;
+  font-size: 11px;
+  color: #555;
+}
+
+/* RODAPÉ INSTITUCIONAL (uma vez por folha) */
+.sheet-footer{
+  position: absolute;
+  left: 16mm;
+  right: 16mm;
+  bottom: 8mm;
+  text-align: center;
+  font-size: 10.5px;
+  color: #333;
+  border-top: 1px solid #999;
+  padding-top: 2mm;
+}
+</style>
+</head>
+
+<body>
+<div class="sheet">
+
+{% macro via() %}
+<div class="via">
+
+  <div class="via-header">
+    <img class="logo" src="{{ url_for('static', filename='images/logo-basile.jpg') }}" alt="BASILE DERMATOLOGIA">
+  </div>
+
+  <div class="patient-line">
+    <strong>Paciente:</strong> {{ patient.name }}
+  </div>
+
+  {% if oral_medications %}
+  <div class="section">
+    <div class="section-title">Uso Oral</div>
+    <ol class="med-list">
+      {% for med in oral_medications %}
+      <li>
+        <span class="med-name">{{ med.medication }}</span><br>
+        <span class="med-inst">{{ med.instructions }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+
+  {% if topical_medications %}
+  <div class="section">
+    <div class="section-title">Uso Tópico</div>
+    <ol class="med-list">
+      {% for med in topical_medications %}
+      <li>
+        <span class="med-name">{{ med.medication }}</span><br>
+        <span class="med-inst">{{ med.instructions }}</span>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+
+  <div class="via-footer">
+    <div class="sign-block">
+      <div class="signature-line"></div>
+      <div class="sign-name">Dr. Arthur Basile</div>
+      <div>CRM 125.217</div>
+      <div>Dermatologista</div>
+    </div>
+    <div class="date-field">
+      Data: {{ prescription.created_at.strftime('%d/%m/%Y') if prescription.created_at else '____/____/______' }}
+    </div>
+  </div>
+
+</div>
+{% endmacro %}
+
+{{ via() }}
+
+<div class="cut-line"><span class="scissors">&#9986;</span></div>
+
+{{ via() }}
+
+<div class="sheet-footer">
+  Especialista em Dermatologia SBD | Av. Prof. João Fiúsa, 2300, Ribeirão Preto, SP<br>
+  www.clinicabasile.com.br | Instagram: @clinicabasilemed
+</div>
+
+</div>
+<script>
+  window.onload = function() { setTimeout(function(){ window.print(); }, 300); };
+  window.onafterprint = function() { window.close(); };
+</script>
+</body>
+</html>

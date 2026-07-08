@@ -11,6 +11,15 @@ from datetime import datetime
 
 dermascribe_bp = Blueprint('dermascribe', __name__, url_prefix='/dermascribe')
 
+PRINT_TEMPLATE_MAP = {
+    'antibiotico': 'dermascribe/print_basile_vias.html',
+    'isotretinoina': 'dermascribe/print_basile_vias.html',
+}
+DEFAULT_PRINT_TEMPLATE = 'dermascribe/print.html'
+
+def _resolve_print_template(prescription):
+    return PRINT_TEMPLATE_MAP.get(prescription.prescription_type, DEFAULT_PRINT_TEMPLATE)
+
 CITE_RE = re.compile(r"\[cite:\s*\d+\]", re.IGNORECASE)
 
 def strip_citations(value: str) -> str:
@@ -150,7 +159,11 @@ def api_save_prescription():
     patient_name = data.get('patient_name', '')
     oral_medications = data.get('oral', [])
     topical_medications = data.get('topical', [])
-    
+
+    prescription_type = data.get('prescription_type', 'dermascribe')
+    if prescription_type not in {'dermascribe', 'antibiotico', 'isotretinoina'}:
+        prescription_type = 'dermascribe'
+
     if not patient_id:
         return jsonify({'status': 'error', 'message': 'ID do paciente é obrigatório'})
     
@@ -172,7 +185,7 @@ def api_save_prescription():
         doctor_id=current_user.id,
         medications_oral=oral_medications,
         medications_topical=topical_medications,
-        prescription_type='dermascribe'
+        prescription_type=prescription_type
     )
     
     db.session.add(prescription)
@@ -254,7 +267,7 @@ def print_prescription(prescription_id):
         })
 
     return render_template(
-        'dermascribe/print.html',
+        _resolve_print_template(prescription),
         prescription=prescription,
         patient=patient,
         doctor=prescription.doctor,
@@ -293,7 +306,7 @@ def prescription_pdf(prescription_id):
         })
 
     html_str = render_template(
-        'dermascribe/print.html',
+        _resolve_print_template(prescription),
         prescription=prescription,
         patient=patient,
         doctor=prescription.doctor,
