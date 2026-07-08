@@ -174,6 +174,7 @@ def api_descobrir():
             'name': med.name,
             'brand': med.brand,
             'type': med.type,
+            'instructions': med.instructions or '',
             'categoria': med.categoria,
             'indicacoes': inds,
             'use_count': count
