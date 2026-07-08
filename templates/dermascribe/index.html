@@ -226,12 +226,24 @@
                             <div class="mb-3">
                                 <label class="form-label">Medicamento</label>
                                 <input type="text" class="form-control mb-2" id="antibioticoMedName" placeholder="Nome do medicamento">
-                                <textarea class="form-control mb-2" id="antibioticoMedInstr" rows="2" placeholder="Instruções / posologia"></textarea>
+                                <select class="form-select mb-2" id="antibioticoMedInstr">
+                                    <option value="">Selecione a posologia...</option>
+                                    <option value="Tomar 1 comprimido por dia por 7 dias.">Tomar 1 comprimido por dia por 7 dias.</option>
+                                    <option value="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">Tomar 1 comprimido de 12 em 12 horas por 7 dias.</option>
+                                    <option value="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">Tomar 1 comprimido de 12 em 12 horas por 30 dias.</option>
+                                    <option value="Tomar 1 comprimido por dia por 30 dias.">Tomar 1 comprimido por dia por 30 dias.</option>
+                                </select>
                                 <button type="button" class="btn btn-primary w-100" id="antibioticoAddMed">
                                     <i class="fas fa-plus me-1"></i>Adicionar
                                 </button>
                             </div>
                             <ul id="antibioticoMedList" class="list-group list-group-flush mb-3"></ul>
+                            <div class="card mb-3 bg-light border-0">
+                                <div class="card-body p-2">
+                                    <h6 class="card-title mb-2 text-muted" style="font-size:12px;"><i class="fas fa-eye me-1"></i>Pré-visualização</h6>
+                                    <div id="antibioticoPreview" class="small text-dark"></div>
+                                </div>
+                            </div>
                             <button type="button" class="btn btn-success w-100" id="antibioticoSave">
                                 <i class="fas fa-save me-2"></i>Salvar e Imprimir
                             </button>
@@ -250,12 +262,24 @@
                             <div class="mb-3">
                                 <label class="form-label">Medicamento</label>
                                 <input type="text" class="form-control mb-2" id="isotretinoinaMedName" placeholder="Nome do medicamento">
-                                <textarea class="form-control mb-2" id="isotretinoinaMedInstr" rows="2" placeholder="Instruções / posologia"></textarea>
+                                <select class="form-select mb-2" id="isotretinoinaMedInstr">
+                                    <option value="">Selecione a posologia...</option>
+                                    <option value="Tomar 1 comprimido por dia por 7 dias.">Tomar 1 comprimido por dia por 7 dias.</option>
+                                    <option value="Tomar 1 comprimido de 12 em 12 horas por 7 dias.">Tomar 1 comprimido de 12 em 12 horas por 7 dias.</option>
+                                    <option value="Tomar 1 comprimido de 12 em 12 horas por 30 dias.">Tomar 1 comprimido de 12 em 12 horas por 30 dias.</option>
+                                    <option value="Tomar 1 comprimido por dia por 30 dias.">Tomar 1 comprimido por dia por 30 dias.</option>
+                                </select>
                                 <button type="button" class="btn btn-primary w-100" id="isotretinoinaAddMed">
                                     <i class="fas fa-plus me-1"></i>Adicionar
                                 </button>
                             </div>
                             <ul id="isotretinoinaMedList" class="list-group list-group-flush mb-3"></ul>
+                            <div class="card mb-3 bg-light border-0">
+                                <div class="card-body p-2">
+                                    <h6 class="card-title mb-2 text-muted" style="font-size:12px;"><i class="fas fa-eye me-1"></i>Pré-visualização</h6>
+                                    <div id="isotretinoinaPreview" class="small text-dark"></div>
+                                </div>
+                            </div>
                             <button type="button" class="btn btn-success w-100" id="isotretinoinaSave">
                                 <i class="fas fa-save me-2"></i>Salvar e Imprimir
                             </button>
