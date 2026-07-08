@@ -31,46 +31,12 @@ body {
 /* Logo BASILE DERMATOLOGIA */
 .logo-topo {
   text-align: center;
-  margin-bottom: 6mm;
+  margin-bottom: 5mm;
 }
 
-.logo-texto {
-  font-size: 22px;
-  font-weight: 400;
-  letter-spacing: 3px;
-  color: #333;
-  line-height: 1;
-}
-
-.logo-mais {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  position: relative;
-  margin-left: 4px;
-  vertical-align: middle;
-}
-
-.logo-mais::before,
-.logo-mais::after {
-  content: '';
-  position: absolute;
-  background: #333;
-  border-radius: 1px;
-}
-
-.logo-mais::before {
-  width: 2px;
-  height: 14px;
-  left: 6px;
-  top: 0;
-}
-
-.logo-mais::after {
-  width: 14px;
-  height: 2px;
-  left: 0;
-  top: 6px;
+.logo-topo img {
+  height: 32px;
+  width: auto;
 }
 
 .logo-sub {
@@ -188,7 +154,7 @@ ol.meds li {
 <div class="via via-top">
 
   <div class="logo-topo">
-    <div class="logo-texto">BASILE<span class="logo-mais"></span></div>
+    <img src="{{ url_for('static', filename='img/logo_basile_azul.jpg') }}" onerror="this.style.display='none'" alt="Basile">
     <div class="logo-sub">DERMATOLOGIA</div>
   </div>
 
@@ -252,7 +218,7 @@ ol.meds li {
 <div class="via">
 
   <div class="logo-topo">
-    <div class="logo-texto">BASILE<span class="logo-mais"></span></div>
+    <img src="{{ url_for('static', filename='img/logo_basile_azul.jpg') }}" onerror="this.style.display='none'" alt="Basile">
     <div class="logo-sub">DERMATOLOGIA</div>
   </div>
 
