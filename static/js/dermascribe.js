@@ -882,13 +882,18 @@ function initSpecialtyTab(tabType) {
 
     function loadTaxonomia() {
         fetch('/dermascribe/api/taxonomia')
-            .then(r => r.json())
-            .then(data => {
+            .then(function(r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
+            })
+            .then(function(data) {
                 taxonomia = data;
                 renderDescobrirCategorias();
                 renderDescobrirIndicacoes();
             })
-            .catch(e => console.error('Erro taxonomia:', e));
+            .catch(function(e) {
+                console.error('Erro taxonomia:', e);
+            });
     }
 
     // -------- Modal de Categorização --------
@@ -997,12 +1002,15 @@ function initSpecialtyTab(tabType) {
         const container = document.getElementById('descobrirCategorias');
         if (!container) return;
         const cats = taxonomia.categorias || [];
+        if (!cats.length) return;
         const mostrar = descobrirMostrarMais.cat ? cats : cats.slice(0, 10);
         container.innerHTML = '';
         mostrar.forEach(function(c) {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn btn-sm ' + (descobrirCatAtiva === c ? 'btn-primary' : 'btn-outline-primary');
+            btn.style.marginRight = '4px';
+            btn.style.marginBottom = '4px';
             btn.textContent = c;
             btn.addEventListener('click', function() {
                 descobrirCatAtiva = descobrirCatAtiva === c ? null : c;
@@ -1029,12 +1037,15 @@ function initSpecialtyTab(tabType) {
         const container = document.getElementById('descobrirIndicacoes');
         if (!container) return;
         const inds = taxonomia.indicacoes || [];
+        if (!inds.length) return;
         const mostrar = descobrirMostrarMais.ind ? inds : inds.slice(0, 10);
         container.innerHTML = '';
         mostrar.forEach(function(ind) {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'btn btn-sm ' + (descobrirIndAtiva === ind ? 'btn-success' : 'btn-outline-success');
+            btn.style.marginRight = '4px';
+            btn.style.marginBottom = '4px';
             btn.textContent = ind;
             btn.addEventListener('click', function() {
                 descobrirIndAtiva = descobrirIndAtiva === ind ? null : ind;
@@ -1105,7 +1116,7 @@ function initSpecialtyTab(tabType) {
     }
 
     // -------- Bindings DOM --------
-    document.addEventListener('DOMContentLoaded', function() {
+    function _initBindings() {
         loadTaxonomia();
 
         // Toggle descobrir panel
@@ -1173,7 +1184,13 @@ function initSpecialtyTab(tabType) {
                 pendingCategorizeCallback(false);
             });
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _initBindings);
+    } else {
+        _initBindings();
+    }
 
     // Expor funções globais para o código existente
     window._openCategorizarModal = openCategorizarModal;
