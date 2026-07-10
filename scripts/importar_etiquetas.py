@@ -5,7 +5,7 @@ from app import app
 from models import db, Medication
 import pandas as pd
 
-XLSX_PATH = 'attached_assets/BASE_DE_DADOS_REVISADA_PRESCRICAO_CRM_1783538134415.xlsx'
+XLSX_PATH = 'attached_assets/BASE_DE_DADOS_REVISADA_PRESCRICAO_CRM_1783695262020.xlsx'
 
 def normalize(text):
     if pd.isna(text) or text is None:
@@ -31,11 +31,14 @@ def main():
             med_id = int(row['ID'])
             cat = normalize(row.get('Categoria sugerida'))
             inds = parse_indicacoes(row.get('Indicações sugeridas'))
+            posologia = str(row.get('Propósito (base atual)')).strip() if pd.notna(row.get('Propósito (base atual)')) else None
 
             med = Medication.query.get(med_id)
             if med:
                 med.categoria = cat
                 med.indicacoes = inds
+                if posologia:
+                    med.instructions = posologia
                 med.etiqueta_revisada = True
                 atualizados += 1
             else:
