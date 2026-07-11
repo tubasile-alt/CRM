@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/home/runner/work/CRM/CRM/.github/scripts/fase1_run.py", line 30, in <module>
+    main()
+  File "/home/runner/work/CRM/CRM/.github/scripts/fase1_extract_services.py", line 218, in main
+    write_service(
+  File "/home/runner/work/CRM/CRM/.github/scripts/fase1_extract_services.py", line 133, in write_service
+    imports = imports_for(nodes, {getattr(node, "name") for node in nodes}, extra_locals)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/CRM/CRM/.github/scripts/fase1_extract_services.py", line 116, in imports_for
+    raise RuntimeError(
+RuntimeError: Dependências globais não mapeadas ao extrair helpers: r
