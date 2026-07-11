@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import subprocess
 import sys
 
@@ -22,10 +23,13 @@ if old_block in test_source:
 elif new_block not in test_source:
     raise SystemExit("Baseline conhecido de duplicidades não encontrado no formato esperado")
 
+env = os.environ.copy()
+env["PYTHONPATH"] = "." + os.pathsep + env.get("PYTHONPATH", "")
 result = subprocess.run(
     [sys.executable, "scripts/audit_routes.py", "--output", "route-inventory.json"],
     text=True,
     capture_output=True,
+    env=env,
 )
 output = (result.stdout or "") + (result.stderr or "")
 print(output, end="")
