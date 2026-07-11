@@ -43,7 +43,7 @@ jobs:
           fi
 
       - name: Refresh URL contract snapshot
-        run: python -m tests.generate_url_snapshot
+        run: python .github/scripts/fase1_refresh_snapshot.py
 
       - name: Report exact URL contract count
         run: |
@@ -119,13 +119,13 @@ jobs:
           git commit -m "refactor(fase-1): extract shared helpers to services + refresh URL snapshot (no renames, no behavior change)"
           git push origin HEAD:refactor/fase-1-extract-services
 
-      - name: Persist dependency diagnostics
-        if: failure() && hashFiles('.github/phase1_dependency_error.txt') != ''
+      - name: Persist diagnostics
+        if: failure()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/phase1_dependency_error.txt
+          git add .github/phase1_dependency_error.txt .github/phase1_snapshot_error.txt 2>/dev/null || true
           if ! git diff --cached --quiet; then
-            git commit -m "chore: record phase 1 dependency diagnostic"
+            git commit -m "chore: record phase 1 diagnostic"
             git push origin HEAD:refactor/fase-1-extract-services
           fi
