@@ -1,0 +1,62 @@
+name: Route audit
+
+on:
+  pull_request:
+    paths:
+      - "app.py"
+      - "routes/**"
+      - "tests/**"
+      - "scripts/audit_routes.py"
+      - "requirements*.txt"
+      - ".github/workflows/route-audit.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "app.py"
+      - "routes/**"
+      - "tests/**"
+      - "scripts/audit_routes.py"
+      - "requirements*.txt"
+      - ".github/workflows/route-audit.yml"
+
+jobs:
+  route-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install development dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run route contract tests
+        env:
+          DISABLE_SCHEDULER: "1"
+          DATABASE_URL: "sqlite:///:memory:"
+          SECRET_KEY: "route-audit-ci"
+        run: pytest -q tests/test_route_contract.py
+
+      - name: Export route inventory
+        if: always()
+        env:
+          DISABLE_SCHEDULER: "1"
+          DATABASE_URL: "sqlite:///:memory:"
+          SECRET_KEY: "route-audit-ci"
+        run: python scripts/audit_routes.py --output route-inventory.json
+
+      - name: Upload route inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: route-inventory
+          path: route-inventory.json
+          if-no-files-found: warn
