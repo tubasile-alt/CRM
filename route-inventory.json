@@ -1,0 +1,1376 @@
+{
+  "route_count": 169,
+  "routes": [
+    {
+      "path": "/",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "index",
+      "blueprint": null
+    },
+    {
+      "path": "/admin/audit-patients",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "audit_patients_page",
+      "blueprint": null
+    },
+    {
+      "path": "/agenda",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "agenda",
+      "blueprint": null
+    },
+    {
+      "path": "/agenda/export/excel",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "export_agenda_excel",
+      "blueprint": null
+    },
+    {
+      "path": "/agenda/export/pdf",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "export_agenda_pdf",
+      "blueprint": null
+    },
+    {
+      "path": "/agenda/importar-fisica",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "physical_agenda.import_page",
+      "blueprint": "physical_agenda"
+    },
+    {
+      "path": "/agenda/send-email",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "send_agenda_email",
+      "blueprint": null
+    },
+    {
+      "path": "/api/admin/audit-patients",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "api_audit_patients",
+      "blueprint": null
+    },
+    {
+      "path": "/api/admin/recalculate-evolution/<int:appointment_id>",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "admin_recalculate_evolution",
+      "blueprint": null
+    },
+    {
+      "path": "/api/agenda-fisica/analisar",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "physical_agenda.analyze",
+      "blueprint": "physical_agenda"
+    },
+    {
+      "path": "/api/agenda-fisica/importar",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "physical_agenda.confirm_import",
+      "blueprint": "physical_agenda"
+    },
+    {
+      "path": "/api/agenda-fisica/pacientes-provisorios",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "physical_agenda.create_provisional_patient",
+      "blueprint": "physical_agenda"
+    },
+    {
+      "path": "/api/agenda-fisica/previsualizar-importacao",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "physical_agenda.preview_import",
+      "blueprint": "physical_agenda"
+    },
+    {
+      "path": "/api/agenda-fisica/sugerir-pacientes",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "physical_agenda.suggest_patients",
+      "blueprint": "physical_agenda"
+    },
+    {
+      "path": "/api/appointments",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_appointments",
+      "blueprint": null
+    },
+    {
+      "path": "/api/appointments",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "create_appointment",
+      "blueprint": null
+    },
+    {
+      "path": "/api/appointments/<int:appointment_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "delete_appointment_api",
+      "blueprint": null
+    },
+    {
+      "path": "/api/appointments/<int:id>",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "update_appointment",
+      "blueprint": null
+    },
+    {
+      "path": "/api/appointments/<int:id>/notes",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_appointment_notes",
+      "blueprint": null
+    },
+    {
+      "path": "/api/chat/contacts",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_chat_contacts",
+      "blueprint": null
+    },
+    {
+      "path": "/api/chat/latest_unread",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_latest_unread",
+      "blueprint": null
+    },
+    {
+      "path": "/api/chat/mark_read",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "mark_messages_read",
+      "blueprint": null
+    },
+    {
+      "path": "/api/chat/messages",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_messages",
+      "blueprint": null
+    },
+    {
+      "path": "/api/chat/send",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "send_message",
+      "blueprint": null
+    },
+    {
+      "path": "/api/chat/unread_count",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_unread_count",
+      "blueprint": null
+    },
+    {
+      "path": "/api/checkout/<int:payment_id>/pay",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "process_payment",
+      "blueprint": null
+    },
+    {
+      "path": "/api/checkout/<int:payment_id>/toggle-consultation",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "toggle_consultation_charge",
+      "blueprint": null
+    },
+    {
+      "path": "/api/checkout/create",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "create_checkout",
+      "blueprint": null
+    },
+    {
+      "path": "/api/checkout/pending",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_pending_checkouts",
+      "blueprint": null
+    },
+    {
+      "path": "/api/checkout/pending/count",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_pending_checkout_count",
+      "blueprint": null
+    },
+    {
+      "path": "/api/cosmetic-plans/<int:plan_id>/executions",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "list_plan_executions",
+      "blueprint": null
+    },
+    {
+      "path": "/api/cosmetic-plans/<int:plan_id>/executions",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "create_plan_execution",
+      "blueprint": null
+    },
+    {
+      "path": "/api/cosmetic-plans/<int:plan_id>/perform",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "perform_cosmetic_plan",
+      "blueprint": null
+    },
+    {
+      "path": "/api/cp/encounter/<int:encounter_id>",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "cp.get_encounter",
+      "blueprint": "cp"
+    },
+    {
+      "path": "/api/cp/encounter/<int:encounter_id>/finalize",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "cp.finalize_encounter",
+      "blueprint": "cp"
+    },
+    {
+      "path": "/api/cp/encounter/<int:encounter_id>/save",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "cp.save_encounter",
+      "blueprint": "cp"
+    },
+    {
+      "path": "/api/cp/encounter/start",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "cp.start_encounter",
+      "blueprint": "cp"
+    },
+    {
+      "path": "/api/cp/exam-request/<int:encounter_id>",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "cp.exam_request_stub",
+      "blueprint": "cp"
+    },
+    {
+      "path": "/api/cp/patient/<int:dp_id>/history",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "cp.get_patient_history",
+      "blueprint": "cp"
+    },
+    {
+      "path": "/api/cp/tcle/<int:encounter_id>",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "cp.tcle_stub",
+      "blueprint": "cp"
+    },
+    {
+      "path": "/api/crm/botox-follow-ups",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_botox_follow_ups",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/export-excel",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.export_excel",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/followups",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_followups",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/marcella-sales-funnel",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_marcella_sales_funnel",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/patient-funnel-status/<int:patient_id>",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "crm.save_patient_funnel_status",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/pending-surgeries",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_pending_surgeries",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/performed",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_performed_procedures",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/planned",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_planned_procedures",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/plans/<int:plan_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "crm.delete_cosmetic_plan",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/populate-google-sheets",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "crm.populate_google_sheets",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/records/<int:plan_id>",
+      "methods": [
+        "PATCH"
+      ],
+      "endpoint": "crm.update_cosmetic_plan",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/stats",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_crm_stats",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/surgery-evolutions-second-surgery",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_surgery_evolutions_second_surgery",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/sync-performed-to-google-sheets",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "crm.sync_performed_to_google_sheets",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/sync-to-google-sheets",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "crm.sync_to_google_sheets",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/crm/transplant-stats",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.get_transplant_stats",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/api/dashboard/one-year-second-surgery-patients",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dashboard_one_year_second_surgery_patients",
+      "blueprint": null
+    },
+    {
+      "path": "/api/dashboard/surgery-stats",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_surgery_stats",
+      "blueprint": null
+    },
+    {
+      "path": "/api/doctor-patients/link",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "link_doctor_patient",
+      "blueprint": null
+    },
+    {
+      "path": "/api/doctor-patients/search",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "search_doctor_patients",
+      "blueprint": null
+    },
+    {
+      "path": "/api/evolution/<int:evo_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "delete_evolution",
+      "blueprint": null
+    },
+    {
+      "path": "/api/evolution/<int:evo_id>",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "update_evolution",
+      "blueprint": null
+    },
+    {
+      "path": "/api/executions",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "list_executions",
+      "blueprint": null
+    },
+    {
+      "path": "/api/executions/<int:execution_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "delete_execution",
+      "blueprint": null
+    },
+    {
+      "path": "/api/executions/<int:execution_id>",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "update_execution",
+      "blueprint": null
+    },
+    {
+      "path": "/api/notes/<int:note_id>",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "update_note",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:id>/history",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_patient_history",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:id>/photo",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "update_patient_photo",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/attention-note",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "save_attention_note",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/consultations",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_patient_consultations",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/evolution",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "create_evolution",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/evolutions",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_evolutions",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/photo",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "delete_patient_photo",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/photo/file",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_patient_photo",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/prescription",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "save_prescription",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/prescriptions",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_prescriptions",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/surgeries",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_patient_surgeries",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/surgeries",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "patient.get_patient_surgeries",
+      "blueprint": "patient"
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/surgery",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "create_patient_surgery",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/surgery",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "patient.create_patient_surgery",
+      "blueprint": "patient"
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/surgery/<int:surgery_id>/evolution",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "patient.create_surgery_evolution",
+      "blueprint": "patient"
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/surgery/<int:surgery_id>/evolutions",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "patient.get_surgery_evolutions",
+      "blueprint": "patient"
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/tags",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "update_patient_tags",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/today-appointment",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_patient_today_appointment",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/transplant-indication",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "save_transplant_indication",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/transplant/planning-summary",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "patient.get_transplant_planning_summary",
+      "blueprint": "patient"
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/transplant/schedule-surgery",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "patient.schedule_transplant_surgery",
+      "blueprint": "patient"
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/update",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "update_patient",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patient/delete/<int:surgery_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "patient.delete_patient_surgery",
+      "blueprint": "patient"
+    },
+    {
+      "path": "/api/patient/surgery-evolution/<int:evolution_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "patient.delete_surgery_evolution",
+      "blueprint": "patient"
+    },
+    {
+      "path": "/api/patients/<int:id>/ivp",
+      "methods": [
+        "PATCH"
+      ],
+      "endpoint": "update_patient_ivp",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patients/<int:patient_id>/activation-preview",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "preview_ativacao_paciente",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patients/<int:patient_id>/ativar",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "ativar_paciente",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patients/search",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "search_patients",
+      "blueprint": null
+    },
+    {
+      "path": "/api/patients/search_detailed",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "search_detailed_patients",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/<int:patient_id>",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "save_prontuario",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/<int:patient_id>/cosmetic-plan",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "save_cosmetic_plan",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/<int:patient_id>/cosmetic-plans",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_cosmetic_plans",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/<int:patient_id>/cosmetic-plans-grouped",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_cosmetic_plans_grouped",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/<int:patient_id>/finalizar",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "finalizar_atendimento",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/<int:patient_id>/generate-budget",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "generate_budget_pdf",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/<int:patient_id>/hair-transplant",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "save_hair_transplant",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/cosmetic-plan/<int:plan_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "delete_cosmetic_plan",
+      "blueprint": null
+    },
+    {
+      "path": "/api/prontuario/cosmetic-plan/<int:plan_id>",
+      "methods": [
+        "PATCH"
+      ],
+      "endpoint": "update_cosmetic_plan",
+      "blueprint": null
+    },
+    {
+      "path": "/api/push/status",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "push.status",
+      "blueprint": "push"
+    },
+    {
+      "path": "/api/push/subscribe",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "push.subscribe",
+      "blueprint": "push"
+    },
+    {
+      "path": "/api/push/test",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "push.test_push",
+      "blueprint": "push"
+    },
+    {
+      "path": "/api/push/unsubscribe",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "push.unsubscribe",
+      "blueprint": "push"
+    },
+    {
+      "path": "/api/push/vapid-public-key",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "push.vapid_public_key",
+      "blueprint": "push"
+    },
+    {
+      "path": "/api/reports/patient-growth",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "report_patient_growth",
+      "blueprint": null
+    },
+    {
+      "path": "/api/surgery/<int:surgery_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "delete_patient_surgery",
+      "blueprint": null
+    },
+    {
+      "path": "/api/surgery/<int:surgery_id>/evolution",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "create_surgery_evolution",
+      "blueprint": null
+    },
+    {
+      "path": "/api/surgery/<int:surgery_id>/evolutions",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "get_surgery_evolutions",
+      "blueprint": null
+    },
+    {
+      "path": "/api/surgery/evolution/<int:evolution_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "delete_surgery_evolution",
+      "blueprint": null
+    },
+    {
+      "path": "/apple-touch-icon-precomposed.png",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "apple_touch_icon",
+      "blueprint": null
+    },
+    {
+      "path": "/apple-touch-icon.png",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "apple_touch_icon",
+      "blueprint": null
+    },
+    {
+      "path": "/chat",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "chat",
+      "blueprint": null
+    },
+    {
+      "path": "/configuracoes/",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "settings.index",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/backup/create",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "settings.create_backup",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/backup/list",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "settings.list_backups",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/doctor-preferences",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "settings.get_doctor_preferences",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/doctor-preferences",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "settings.update_doctor_preferences",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/google-calendar/list",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "settings.get_google_calendars",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/google-calendar/select",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "settings.set_google_calendar",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/rooms",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "settings.get_rooms",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/rooms",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "settings.create_room",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/rooms/<int:room_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "settings.delete_room",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/configuracoes/api/rooms/<int:room_id>",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "settings.update_room",
+      "blueprint": "settings"
+    },
+    {
+      "path": "/crm",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.crm_page",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dashboard",
+      "blueprint": null
+    },
+    {
+      "path": "/dermascribe/",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dermascribe.index",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/analytics/top-medications",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dermascribe.api_top_medications",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/descobrir",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dermascribe.api_descobrir",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/export-medications-excel",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dermascribe.api_export_excel",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/patient/<int:patient_id>/prescriptions",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dermascribe.api_patient_prescriptions",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/save-medication",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "dermascribe.api_save_medication",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/save-prescription",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "dermascribe.api_save_prescription",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/suggest-medications",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "dermascribe.api_suggest_medications",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/taxonomia",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dermascribe.api_taxonomia",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/api/track-prescription",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "dermascribe.api_track_prescription",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/prescription/<int:prescription_id>/pdf",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dermascribe.prescription_pdf",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/prescription/<int:prescription_id>/print",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "dermascribe.print_prescription",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/dermascribe/preview-print",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "dermascribe.preview_print",
+      "blueprint": "dermascribe"
+    },
+    {
+      "path": "/espera/api/assign-room/<int:appointment_id>",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "waiting_room.assign_room",
+      "blueprint": "waiting_room"
+    },
+    {
+      "path": "/espera/api/average-wait",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "waiting_room.get_average_wait",
+      "blueprint": "waiting_room"
+    },
+    {
+      "path": "/espera/api/checkin/<int:appointment_id>",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "waiting_room.check_in",
+      "blueprint": "waiting_room"
+    },
+    {
+      "path": "/espera/api/checkout/<int:appointment_id>",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "waiting_room.check_out",
+      "blueprint": "waiting_room"
+    },
+    {
+      "path": "/espera/api/list",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "waiting_room.get_waiting_list",
+      "blueprint": "waiting_room"
+    },
+    {
+      "path": "/espera/api/remove/<int:appointment_id>",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "waiting_room.remove_from_waiting",
+      "blueprint": "waiting_room"
+    },
+    {
+      "path": "/espera/api/stats",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "waiting_room.get_stats",
+      "blueprint": "waiting_room"
+    },
+    {
+      "path": "/health",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "health",
+      "blueprint": null
+    },
+    {
+      "path": "/icon-1024.png",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "icon_1024",
+      "blueprint": null
+    },
+    {
+      "path": "/icon-192.png",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "icon_192",
+      "blueprint": null
+    },
+    {
+      "path": "/icon-512.png",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "icon_512",
+      "blueprint": null
+    },
+    {
+      "path": "/login",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "endpoint": "login",
+      "blueprint": null
+    },
+    {
+      "path": "/logout",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "logout",
+      "blueprint": null
+    },
+    {
+      "path": "/manifest.json",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "manifest",
+      "blueprint": null
+    },
+    {
+      "path": "/mapa-cirurgico/",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "surgical_map.index",
+      "blueprint": "surgical_map"
+    },
+    {
+      "path": "/mapa-cirurgico/api/surgery",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "surgical_map.create_surgery",
+      "blueprint": "surgical_map"
+    },
+    {
+      "path": "/mapa-cirurgico/api/surgery/<int:surgery_id>",
+      "methods": [
+        "DELETE"
+      ],
+      "endpoint": "surgical_map.delete_surgery",
+      "blueprint": "surgical_map"
+    },
+    {
+      "path": "/mapa-cirurgico/api/surgery/<int:surgery_id>",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "surgical_map.update_surgery",
+      "blueprint": "surgical_map"
+    },
+    {
+      "path": "/mapa-cirurgico/api/weekly",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "surgical_map.get_weekly_map",
+      "blueprint": "surgical_map"
+    },
+    {
+      "path": "/mapa-cirurgico/export/excel",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "surgical_map.export_excel",
+      "blueprint": "surgical_map"
+    },
+    {
+      "path": "/mapa-cirurgico/export/pdf",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "surgical_map.export_pdf",
+      "blueprint": "surgical_map"
+    },
+    {
+      "path": "/prontuario/<int:patient_id>",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "prontuario",
+      "blueprint": null
+    },
+    {
+      "path": "/prontuario/dp/<int:dp_id>",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "prontuario_dp",
+      "blueprint": null
+    },
+    {
+      "path": "/sale",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "crm.sales_funnel",
+      "blueprint": "crm"
+    },
+    {
+      "path": "/service-worker.js",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "service_worker",
+      "blueprint": null
+    },
+    {
+      "path": "/static/<path:filename>",
+      "methods": [
+        "GET"
+      ],
+      "endpoint": "static",
+      "blueprint": null
+    }
+  ],
+  "duplicate_route_method_pairs": [
+    {
+      "path": "/api/patient/<int:patient_id>/surgeries",
+      "method": "GET",
+      "endpoints": [
+        "get_patient_surgeries",
+        "patient.get_patient_surgeries"
+      ]
+    },
+    {
+      "path": "/api/patient/<int:patient_id>/surgery",
+      "method": "POST",
+      "endpoints": [
+        "create_patient_surgery",
+        "patient.create_patient_surgery"
+      ]
+    }
+  ]
+}
