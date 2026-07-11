@@ -1,0 +1,16 @@
+name: Fase 1 dependency diagnostics
+
+on:
+  push:
+    branches:
+      - refactor/fase-1-extract-services
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/fase-1-extract-services
+      - name: Run extraction dependency check
+        run: python .github/scripts/fase1_run.py
