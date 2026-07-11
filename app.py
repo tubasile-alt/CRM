@@ -1840,7 +1840,7 @@ def get_patient_today_appointment(patient_id):
     ).order_by(Appointment.start_time.desc()).first()
     
     if appointment:
-        print(f"DEBUG today-appointment: Encontrado appointment_id={appointment.id} para patient_id={patient_id}")
+        app.logger.debug(f"today-appointment: Encontrado appointment_id={appointment.id} para patient_id={patient_id}")
         return jsonify({'appointment_id': appointment.id})
     
     # Se nao encontrar pendente, buscar qualquer um de hoje
@@ -1850,10 +1850,10 @@ def get_patient_today_appointment(patient_id):
     ).order_by(Appointment.start_time.desc()).first()
     
     if appointment:
-        print(f"DEBUG today-appointment: Encontrado (qualquer) appointment_id={appointment.id} para patient_id={patient_id}")
+        app.logger.debug(f"today-appointment: Encontrado (qualquer) appointment_id={appointment.id} para patient_id={patient_id}")
         return jsonify({'appointment_id': appointment.id})
     
-    print(f"DEBUG today-appointment: Nenhum agendamento encontrado para patient_id={patient_id} em {today}")
+    app.logger.debug(f"today-appointment: Nenhum agendamento encontrado para patient_id={patient_id} em {today}")
     return jsonify({'appointment_id': None})
 
 @app.route('/api/appointments/<int:id>/notes', methods=['GET'])
@@ -2173,78 +2173,6 @@ def get_prescriptions(patient_id):
         })
     
     return jsonify({'prescriptions': result})
-
-@app.route('/debug/prontuario/<int:pid>')
-@login_required
-def debug_prontuario(pid):
-    patient = db.session.get(Patient, pid)
-    if not patient:
-        return jsonify({'error': 'Paciente não encontrado'}), 404
-        
-    appts = Appointment.query.filter_by(patient_id=pid)\
-        .order_by(Appointment.start_time.desc())\
-        .limit(10).all()
-        
-    result = {
-        'patient_id': pid,
-        'patient_name': patient.name,
-        'appointments': []
-    }
-    
-    for a in appts:
-        notes_count = Note.query.filter_by(appointment_id=a.id).count()
-        evos_consultation = Evolution.query.filter_by(consultation_id=a.id).count()
-        
-        # Tentar pegar um texto de exemplo
-        sample_text = ""
-        first_note = Note.query.filter_by(appointment_id=a.id).first()
-        if first_note and first_note.content:
-            sample_text = first_note.content[:80]
-        else:
-            first_evo = Evolution.query.filter_by(consultation_id=a.id).first()
-            if first_evo and first_evo.content:
-                sample_text = first_evo.content[:80]
-                
-        result['appointments'].append({
-            'appointment_id': a.id,
-            'date': a.start_time.isoformat(),
-            'status': a.status,
-            'procedure': a.appointment_type,
-            'notes_count': notes_count,
-            'evolutions_count_consultation_id': evos_consultation,
-            'sample_text': sample_text
-        })
-        
-    return jsonify(result)
-
-@app.route('/debug/appointment/<int:appointment_id>')
-@login_required
-def debug_appointment(appointment_id):
-    appt = db.session.get(Appointment, appointment_id)
-    if not appt:
-        return jsonify({'error': 'Agendamento não encontrado'}), 404
-        
-    notes_count = Note.query.filter_by(appointment_id=appointment_id).count()
-    evos_consultation = Evolution.query.filter_by(consultation_id=appointment_id).count()
-    
-    sample_text = ""
-    first_note = Note.query.filter_by(appointment_id=appointment_id).first()
-    if first_note and first_note.content:
-        sample_text = first_note.content[:80]
-    else:
-        first_evo = Evolution.query.filter_by(consultation_id=appointment_id).first()
-        if first_evo and first_evo.content:
-            sample_text = first_evo.content[:80]
-            
-    return jsonify({
-        'appointment_id': appt.id,
-        'patient_id': appt.patient_id,
-        'date': appt.start_time.isoformat(),
-        'status': appt.status,
-        'notes_count': notes_count,
-        'evolutions_count_consultation_id': evos_consultation,
-        'sample_text': sample_text
-    })
 
 def build_patient_timeline(p_id):
     from collections import defaultdict
@@ -3547,62 +3475,6 @@ def api_audit_patients():
     })
 
 
-@app.route('/debug/timeline/<int:patient_id>')
-@login_required
-def debug_timeline(patient_id):
-    from datetime import datetime, date
-    events = build_patient_timeline(patient_id)
-    def serialize(obj):
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        return str(obj)
-    safe_events = []
-    for ev in events:
-        safe_ev = {k: serialize(v) if isinstance(v, (datetime, date)) else v for k, v in ev.items() if k != 'events'}
-        safe_ev['events'] = []
-        for sub in ev.get('events', []):
-            safe_sub = {k: serialize(v) if isinstance(v, (datetime, date)) else v for k, v in sub.items()}
-            safe_ev['events'].append(safe_sub)
-        safe_events.append(safe_ev)
-    return jsonify({
-        "patient_id": patient_id,
-        "count": len(safe_events),
-        "events": safe_events
-    })
-
-@app.route('/debug/procedures/<int:patient_id>')
-@login_required
-def debug_procedures(patient_id):
-    from models import CosmeticProcedurePlan, Note
-    plans = CosmeticProcedurePlan.query.join(Note).filter(Note.patient_id == patient_id, CosmeticProcedurePlan.was_performed == True).all()
-    results = []
-    for p in plans:
-        results.append({
-            "id": p.id,
-            "title": p.procedure_name,
-            "was_performed": p.was_performed,
-            "performed_date": str(p.performed_date),
-            "created_at": str(p.created_at),
-            "appointment_id": p.note.appointment_id if p.note else None
-        })
-    return jsonify(results)
-
-@app.route('/debug/evolutions/<int:patient_id>')
-@login_required
-def debug_evolutions(patient_id):
-    from models import Evolution
-    evos = Evolution.query.filter_by(patient_id=patient_id).all()
-    results = []
-    for e in evos:
-        results.append({
-            "id": e.id,
-            "created_at": str(e.created_at),
-            "evolution_date": str(e.evolution_date),
-            "appointment_id": e.consultation_id,
-            "preview": (e.content[:100] + '...') if e.content else ""
-        })
-    return jsonify(results)
-
 @app.route('/api/prontuario/<int:patient_id>', methods=['POST'])
 @login_required
 def save_prontuario(patient_id):
@@ -3707,9 +3579,9 @@ def finalizar_atendimento(patient_id):
                         appt_to_update.checked_in_time = get_brazil_time()
                     db.session.add(appt_to_update)
                     db.session.flush() # Força a ida para o DB dentro da transação
-                    print(f"DEBUG CRÍTICO: Appointment {appointment_id} forçado para atendido")
+                    app.logger.debug(f"Appointment {appointment_id} forçado para atendido")
                 else:
-                    print(f"DEBUG: Appointment {appointment_id} não encontrado ou paciente não confere. Anulando ID para evitar erro de FK.")
+                    app.logger.debug(f"Appointment {appointment_id} não encontrado ou paciente não confere. Anulando ID para evitar erro de FK.")
                     appointment_id = None # Anular para evitar erro de FK se o agendamento sumiu
             except Exception as appt_err:
                 print(f"Erro ao atualizar status do agendamento inicial: {appt_err}")
@@ -3997,13 +3869,13 @@ def finalizar_atendimento(patient_id):
             db.session.add(patient)
         
         # Atualizar status do agendamento para "atendido"
-        print(f"DEBUG finalizar: appointment_id={appointment_id}, patient_id={patient_id}, doctor_id={current_user.id}")
+        app.logger.debug(f"finalizar: appointment_id={appointment_id}, patient_id={patient_id}, doctor_id={current_user.id}")
         
         if appointment_id:
             # Primeiro buscar sem filtro de doctor para debug
             appointment_check_val = Appointment.query.filter_by(id=appointment_id).first()
             if appointment_check_val:
-                print(f"DEBUG: Appointment encontrado - doctor_id no DB: {appointment_check_val.doctor_id}, current_user.id: {current_user.id}")
+                app.logger.debug(f"Appointment encontrado - doctor_id no DB: {appointment_check_val.doctor_id}, current_user.id: {current_user.id}")
             
             # Buscar o appointment (sem filtro de doctor_id para permitir atualizar)
             appointment_final = Appointment.query.filter_by(
@@ -4021,7 +3893,7 @@ def finalizar_atendimento(patient_id):
                 if not appointment_final.checked_in_time:
                     appointment_final.checked_in_time = get_brazil_time()
                 db.session.add(appointment_final)
-                print(f"DEBUG: Appointment {appointment_id} updated to atendido, status={appointment_final.status}")
+                app.logger.debug(f"Appointment {appointment_id} updated to atendido, status={appointment_final.status}")
             else:
                 print(f"Warning: Appointment {appointment_id} not found for patient {patient_id}")
         
@@ -4068,7 +3940,7 @@ def finalizar_atendimento(patient_id):
                 
                 if gs_rows:
                     append_procedures_batch(gs_rows)
-                    print(f"DEBUG: {len(gs_rows)} procedimentos enviados para Google Sheets")
+                    app.logger.debug(f"{len(gs_rows)} procedimentos enviados para Google Sheets")
 
                 # Aba Botox: envia cada Botox realizado também para a aba dedicada
                 try:
@@ -4813,7 +4685,7 @@ def get_pending_checkouts():
         db.func.date(Payment.created_at) == today
     ).all()
     
-    print(f"DEBUG: Found {len(payments)} payments for today")
+    app.logger.debug(f"Found {len(payments)} payments for today")
     
     data = []
     for payment in payments:
@@ -4973,7 +4845,7 @@ def toggle_consultation_charge(payment_id):
     
     db.session.commit()
     
-    print(f"DEBUG toggle: Payment {payment_id} - new_total={new_total}, procedures={procedures}")
+    app.logger.debug(f"toggle: Payment {payment_id} - new_total={new_total}, procedures={procedures}")
     
     return jsonify({
         'success': True, 
