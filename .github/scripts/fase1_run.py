@@ -30,20 +30,27 @@ extractor.IMPORT_MAP.update({
 _original_local_names = extractor.local_names
 
 
-def local_names_with_lambdas(node):
+def _add_arguments(names, arguments):
+    for arg in (*arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs):
+        names.add(arg.arg)
+    if arguments.vararg:
+        names.add(arguments.vararg.arg)
+    if arguments.kwarg:
+        names.add(arguments.kwarg.arg)
+
+
+def local_names_with_nested_scopes(node):
     names = _original_local_names(node)
     for child in ast.walk(node):
-        if isinstance(child, ast.Lambda):
-            for arg in (*child.args.posonlyargs, *child.args.args, *child.args.kwonlyargs):
-                names.add(arg.arg)
-            if child.args.vararg:
-                names.add(child.args.vararg.arg)
-            if child.args.kwarg:
-                names.add(child.args.kwarg.arg)
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            names.add(child.name)
+            _add_arguments(names, child.args)
+        elif isinstance(child, ast.Lambda):
+            _add_arguments(names, child.args)
     return names
 
 
-extractor.local_names = local_names_with_lambdas
+extractor.local_names = local_names_with_nested_scopes
 
 try:
     extractor.main()
