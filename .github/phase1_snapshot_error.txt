@@ -1,1 +1,12 @@
 /opt/hostedtoolcache/Python/3.11.15/x64/bin/python: No module named tests.generate_url_snapshot
+
+
+FILES_IN_TESTS:
+tests/__init__.py
+tests/__pycache__/__init__.cpython-311.pyc
+tests/conftest.py
+tests/route_audit.py
+tests/test_chat_hub_contract.py
+tests/test_physical_agenda_import.py
+tests/test_route_contract.py
+tests/test_safety_primitives.py
