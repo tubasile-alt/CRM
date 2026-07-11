@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - refactor/fase-1-extract-services
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   extract-and-validate:
-    if: ${{ !startsWith(github.event.head_commit.message, 'refactor(fase-1):') }}
+    if: ${{ github.event_name == 'pull_request' || !startsWith(github.event.head_commit.message, 'refactor(fase-1):') }}
     runs-on: ubuntu-latest
     env:
       DISABLE_SCHEDULER: "1"
