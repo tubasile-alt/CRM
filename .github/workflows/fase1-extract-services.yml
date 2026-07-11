@@ -39,7 +39,7 @@ jobs:
           fi
 
       - name: Apply name-based extraction
-        run: python .github/scripts/fase1_extract_services.py
+        run: python .github/scripts/fase1_run.py
 
       - name: Refresh URL contract snapshot
         run: python -m tests.generate_url_snapshot
