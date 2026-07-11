@@ -1,11 +1,12 @@
+import ast
 from pathlib import Path
 import traceback
 
-from fase1_extract_services import IMPORT_MAP, main
+import fase1_extract_services as extractor
 
 # Candidate mappings are only emitted when the extracted AST actually loads the name.
 # This keeps every service import limited to dependencies used by its copied bodies.
-IMPORT_MAP.update({
+extractor.IMPORT_MAP.update({
     "current_user": "from flask_login import current_user",
     "jsonify": "from flask import jsonify",
     "request": "from flask import request",
@@ -26,8 +27,26 @@ IMPORT_MAP.update({
     "os": "import os",
 })
 
+_original_local_names = extractor.local_names
+
+
+def local_names_with_lambdas(node):
+    names = _original_local_names(node)
+    for child in ast.walk(node):
+        if isinstance(child, ast.Lambda):
+            for arg in (*child.args.posonlyargs, *child.args.args, *child.args.kwonlyargs):
+                names.add(arg.arg)
+            if child.args.vararg:
+                names.add(child.args.vararg.arg)
+            if child.args.kwarg:
+                names.add(child.args.kwarg.arg)
+    return names
+
+
+extractor.local_names = local_names_with_lambdas
+
 try:
-    main()
+    extractor.main()
 except Exception:
     diagnostic = traceback.format_exc()
     Path(".github/phase1_dependency_error.txt").write_text(diagnostic, encoding="utf-8")
