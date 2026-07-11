@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "5d1DZGb71xd0e-8DwzLlO"
+uri = "file://route-inventory.json"
+type = "unspecified"
+title = "Inventário Completo de Rotas (JSON)"
