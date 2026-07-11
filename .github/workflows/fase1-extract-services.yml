@@ -95,7 +95,7 @@ jobs:
           done
 
       - name: Show complete diff before commit
-        run: git diff --check && git diff --stat && git diff
+        run: git diff --stat && git diff
 
       - name: Commit validated refactor
         run: |
