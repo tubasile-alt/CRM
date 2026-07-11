@@ -1,3 +1,6 @@
+from pathlib import Path
+import traceback
+
 from fase1_extract_services import IMPORT_MAP, main
 
 # Candidate mappings are only emitted when the extracted AST actually loads the name.
@@ -23,4 +26,10 @@ IMPORT_MAP.update({
     "os": "import os",
 })
 
-main()
+try:
+    main()
+except Exception:
+    diagnostic = traceback.format_exc()
+    Path(".github/phase1_dependency_error.txt").write_text(diagnostic, encoding="utf-8")
+    print(diagnostic)
+    raise
