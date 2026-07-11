@@ -15,7 +15,12 @@ from services.patient_photo_service import delete_patient_photo as delete_stored
 from services.patient_photo_service import save_patient_photo, save_patient_photo_data_url
 from utils.database_backup import backup_manager
 from services.access_control import can_manage_owned_record
-from services.clinic_time import clinic_now, clinic_today, clinic_wall_time_iso, utc_instant_to_clinic_iso
+from services.clinic_time import clinic_now, clinic_today, clinic_wall_time_iso, utc_instant_to_clinic_iso, get_brazil_time, parse_datetime_with_tz, format_brazil_datetime
+from services.patient_identity import NEW_PATIENT_CODE_START, generate_next_patient_code, normalize_patient_name, find_possible_duplicate_patients
+from services.execution_service import _parse_date_or_datetime, _serialize_execution, _build_execution_from_payload
+from services.finalization_service import _note_counts_as_finalized, _find_finalized_note, _resolve_consultation_finalization
+from services.timeline_service import build_patient_timeline
+from services.doctor_service import get_doctor_id, get_all_doctors
 from services.statuses import normalize_appointment_status
 
 app = Flask(__name__)
@@ -88,93 +93,7 @@ def _ensure_index_on_startup():
 # Faixa inicial da nova política de códigos de paciente (FASE 1).
 # Novos pacientes recebem códigos a partir de 1001. Códigos históricos
 # (< 1001) são preservados integralmente e nunca alterados aqui.
-NEW_PATIENT_CODE_START = 1001
 
-
-def generate_next_patient_code(doctor_id):
-    """Gera o próximo patient_code de forma segura contra concorrência.
-
-    Regra de transição (FASE 1):
-      - Se NÃO existir nenhum código >= 1001 para o médico => próximo = 1001.
-      - Se já existir algum código >= 1001 => próximo = MAIOR_CODIGO + 1.
-
-    A geração é protegida por LOCK de tabela no PostgreSQL para impedir que
-    dois usuários simultâneos recebam o mesmo código (race condition). O lock
-    é liberado automaticamente no commit/rollback da transação corrente.
-
-    Deve ser chamada dentro de uma transação que será commitada pelo chamador.
-    """
-    if db.engine.dialect.name == 'postgresql':
-        db.session.execute(
-            db.text('LOCK TABLE patient_doctor IN SHARE ROW EXCLUSIVE MODE')
-        )
-    max_code = db.session.query(db.func.max(PatientDoctor.patient_code))\
-        .filter(PatientDoctor.doctor_id == doctor_id).scalar() or 0
-    return max(max_code + 1, NEW_PATIENT_CODE_START)
-
-
-def normalize_patient_name(name):
-    """Normaliza um nome de paciente para comparação:
-    - remove espaços nas extremidades
-    - colapsa espaços internos múltiplos em um único espaço
-    - ignora maiúsculas/minúsculas (retorna em minúsculas)
-    """
-    import re
-    if not name:
-        return ''
-    return re.sub(r'\s+', ' ', str(name).strip()).lower()
-
-
-def find_possible_duplicate_patients(name, doctor_id=None, limit=8):
-    """Procura pacientes com nome igual ou muito parecido ao informado.
-
-    Retorna uma lista de dicts com dados básicos do paciente (incluindo o
-    patient_code do médico, quando houver vínculo) para exibir no alerta de
-    possível duplicidade. NÃO mescla nem altera nada — apenas detecta.
-    """
-    from difflib import SequenceMatcher
-
-    target = normalize_patient_name(name)
-    if not target:
-        return []
-
-    first_token = target.split(' ')[0]
-
-    # Candidatos: nomes que contenham o primeiro token (reduz o conjunto),
-    # comparação final feita em Python sobre o nome normalizado.
-    candidates = Patient.query.filter(
-        Patient.name.ilike(f'%{first_token}%')
-    ).limit(200).all()
-
-    results = []
-    for cand in candidates:
-        cand_norm = normalize_patient_name(cand.name)
-        if not cand_norm:
-            continue
-        ratio = SequenceMatcher(None, target, cand_norm).ratio()
-        if cand_norm == target or ratio >= 0.85:
-            code = None
-            if doctor_id:
-                pd = PatientDoctor.query.filter_by(
-                    patient_id=cand.id, doctor_id=doctor_id
-                ).first()
-                if pd:
-                    code = pd.patient_code
-            results.append({
-                'id': cand.id,
-                'name': cand.name,
-                'patient_code': code,
-                'phone': cand.phone,
-                'birth_date': cand.birth_date,
-                'cpf': cand.cpf,
-                'city': cand.city,
-                'exact': cand_norm == target,
-                'similarity': round(ratio, 3),
-            })
-
-    # Mais parecidos primeiro
-    results.sort(key=lambda r: (not r['exact'], -r['similarity']))
-    return results[:limit]
 
 from flask_wtf.csrf import CSRFError
 
@@ -242,85 +161,6 @@ def service_worker():
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return response
 
-def get_brazil_time():
-    return clinic_now()
-
-def parse_datetime_with_tz(iso_string):
-    """Parse ISO datetime string - retorna naive datetime para São Paulo.
-    NÃO usamos timezone para evitar conversões automáticas do SQLAlchemy."""
-    # Remove 'Z' suffix if present and parse
-    iso_string = iso_string.replace('Z', '')
-    dt = datetime.fromisoformat(iso_string)
-    
-    # Sempre retorna naive (sem timezone) - representa horário de São Paulo
-    if dt.tzinfo is not None:
-        # Se veio com timezone, converter para São Paulo e remover tzinfo
-        tz = pytz.timezone('America/Sao_Paulo')
-        dt = dt.astimezone(tz).replace(tzinfo=None)
-    
-    return dt
-
-def format_brazil_datetime(dt):
-    """Converte datetime para timezone de São Paulo e formata"""
-    if not dt:
-        return None
-    tz = pytz.timezone('America/Sao_Paulo')
-    
-    # Se o datetime é naive (sem timezone), assume que já está em São Paulo
-    if dt.tzinfo is None:
-        dt = tz.localize(dt)
-    else:
-        # Se tem timezone, converte para São Paulo
-        dt = dt.astimezone(tz)
-    
-    return dt.strftime('%d/%m/%Y %H:%M')
-
-
-def _note_counts_as_finalized(note):
-    if not note:
-        return False
-
-    if getattr(note, 'is_finalized', False):
-        return True
-
-    if getattr(note, 'finalized_at', None):
-        return True
-
-    duration = getattr(note, 'consultation_duration', None)
-    if duration is not None:
-        return True
-
-    return False
-
-
-def _find_finalized_note(notes):
-    if not notes:
-        return None
-
-    explicit_note = next((n for n in notes if _note_counts_as_finalized(n)), None)
-    if explicit_note:
-        return explicit_note
-
-    return next((
-        n for n in notes
-        if n.note_type == 'conduta' and (
-            (n.content or '').strip() == '[Conduta registrada via procedimentos]'
-            or len(getattr(n, 'indications', []) or []) > 0
-            or len(getattr(n, 'cosmetic_plans', []) or []) > 0
-            or len(getattr(n, 'hair_transplants', []) or []) > 0
-        )
-    ), None)
-
-
-def _resolve_consultation_finalization(appointment, grouped_notes):
-    finalized_note = _find_finalized_note(grouped_notes)
-    appointment_finalized = bool(
-        appointment and (
-            getattr(appointment, 'is_finalized', False)
-            or getattr(appointment, 'finalized_at', None)
-        )
-    )
-    return appointment_finalized or finalized_note is not None, finalized_note
 
 @app.route('/api/cosmetic-plans/<int:plan_id>/perform', methods=['POST'])
 @login_required
@@ -347,91 +187,6 @@ def perform_cosmetic_plan(plan_id):
     db.session.add(execution)
     db.session.commit()
     return jsonify({'success': True, 'execution': _serialize_execution(execution)})
-
-
-def _parse_date_or_datetime(value):
-    if not value:
-        return None
-    if isinstance(value, datetime):
-        return value
-    try:
-        value_str = str(value).strip()
-        if len(value_str) == 10:
-            return datetime.strptime(value_str, '%Y-%m-%d')
-        return datetime.fromisoformat(value_str.replace('Z', ''))
-    except Exception:
-        return None
-
-
-def _serialize_execution(execution):
-    execution_status = (execution.execution_status or ('realizada' if execution.was_performed else 'agendada')).lower()
-    return {
-        'id': execution.id,
-        'plan_id': execution.plan_id,
-        'scheduled_date': execution.scheduled_date.isoformat() if execution.scheduled_date else None,
-        'performed_date': execution.performed_date.isoformat() if execution.performed_date else None,
-        'execution_status': execution_status,
-        'was_performed': execution_status == 'realizada',
-        'charged_value': float(execution.charged_value) if execution.charged_value is not None else None,
-        'notes': execution.notes,
-        'followup_date': execution.followup_date.isoformat() if execution.followup_date else None,
-        'followup_status': execution.followup_status,
-        'created_at': execution.created_at.isoformat() if execution.created_at else None,
-    }
-
-
-def _build_execution_from_payload(plan, data, force_performed=False):
-    allowed_statuses = {'agendada', 'realizada', 'cancelada', 'faltou'}
-    allowed_followup = {'pendente', 'contatado', 'agendado', 'sem_resposta'}
-
-    scheduled_date = _parse_date_or_datetime(data.get('scheduled_date'))
-    performed_date = _parse_date_or_datetime(data.get('performed_date'))
-
-    if force_performed:
-        execution_status = 'realizada'
-    else:
-        raw_status = (data.get('execution_status') or '').strip().lower()
-        if raw_status in allowed_statuses:
-            execution_status = raw_status
-        else:
-            execution_status = 'realizada' if bool(data.get('was_performed', bool(performed_date))) else 'agendada'
-
-    if execution_status == 'realizada' and not performed_date:
-        raise ValueError('performed_date é obrigatório quando execution_status=realizada')
-    if execution_status == 'agendada' and not scheduled_date:
-        raise ValueError('scheduled_date é obrigatório quando execution_status=agendada')
-
-    was_performed = execution_status == 'realizada'
-
-    charged_raw = data.get('charged_value', data.get('planned_value', plan.final_budget or plan.planned_value))
-    charged_value = None
-    if charged_raw not in (None, ''):
-        try:
-            charged_value = float(charged_raw)
-        except (TypeError, ValueError):
-            raise ValueError('charged_value inválido')
-        if charged_value < 0:
-            raise ValueError('charged_value não pode ser negativo')
-
-    followup_date = _parse_date_or_datetime(data.get('followup_date'))
-    followup_status = (data.get('followup_status') or 'pendente').strip().lower()
-    if followup_status not in allowed_followup:
-        raise ValueError('followup_status inválido')
-
-    return ProcedureExecution(
-        plan_id=plan.id,
-        scheduled_date=scheduled_date,
-        performed_date=performed_date,
-        execution_status=execution_status,
-        was_performed=was_performed,
-        charged_value=charged_value,
-        notes=data.get('notes') or data.get('observations'),
-        followup_date=followup_date,
-        followup_status=followup_status,
-        created_by=current_user.id,
-        updated_by=current_user.id,
-        idempotency_key=(data.get('idempotency_key') or request.headers.get('X-Idempotency-Key') or '').strip() or None,
-    )
 
 
 @app.route('/api/cosmetic-plans/<int:plan_id>/executions', methods=['POST'])
@@ -889,28 +644,7 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-def get_doctor_id():
-    """Retorna o ID do médico - se o usuário atual é médico, retorna seu ID"""
-    if current_user.is_doctor():
-        return current_user.id
-    else:
-        # Secretária: retorna None para permitir seleção de médico no frontend
-        return None
         
-def get_all_doctors():
-    """Retorna todos os médicos com suas preferências de cor"""
-    from models import DoctorPreference
-    doctors = User.query.filter_by(role='medico').all()
-    result = []
-    for doctor in doctors:
-        pref = DoctorPreference.query.filter_by(user_id=doctor.id).first()
-        result.append({
-            'id': doctor.id,
-            'name': doctor.name,
-            'color': pref.color if pref else '#0d6efd',
-            'layer_enabled': pref.layer_enabled if pref else True
-        })
-    return result
 
 @app.route('/dashboard')
 @login_required
@@ -2173,153 +1907,6 @@ def get_prescriptions(patient_id):
         })
     
     return jsonify({'prescriptions': result})
-
-def build_patient_timeline(p_id):
-    from collections import defaultdict
-    from datetime import date, datetime
-    from models import Evolution, CosmeticProcedurePlan, Surgery, TransplantSurgeryRecord
-    events_by_day = defaultdict(list)
-
-    def safe_parse_date(s):
-        if not s:
-            return None
-        if isinstance(s, datetime):
-            return s.date()
-        if isinstance(s, date):
-            return s
-        try:
-            return datetime.strptime(s, '%Y-%m-%d').date()
-        except Exception:
-            try:
-                return datetime.fromisoformat(s.replace('Z', '')).date()
-            except Exception:
-                return None
-
-    def to_dt(val, default_hour=12):
-        if isinstance(val, datetime):
-            return val
-        if isinstance(val, date):
-            return datetime.combine(val, datetime.min.time().replace(hour=default_hour))
-        return None
-
-    appts = Appointment.query.filter(
-        Appointment.patient_id == p_id,
-        Appointment.status != 'faltou'
-    ).all()
-    for apt in appts:
-        raw = apt.consultation_date or apt.start_time
-        if not raw:
-            continue
-        dt = to_dt(raw)
-        d = dt.date()
-        events_by_day[d].append({
-            "type": "consulta",
-            "dt": dt,
-            "title": f"Consulta: {apt.appointment_type or 'Geral'}",
-            "label": apt.appointment_type or 'Consulta',
-            "body": apt.notes or "",
-            "id": apt.id,
-            "reference_id": apt.id,
-            "status": apt.status,
-            "doctor": apt.doctor.name if apt.doctor else 'Médico'
-        })
-
-    from models import Note as _Note, CosmeticProcedurePlan as _CPP
-    cosmetic_plans = _CPP.query.join(_Note).filter(
-        _Note.patient_id == p_id,
-        db.exists().where(ProcedureExecution.plan_id == _CPP.id).where(ProcedureExecution.execution_status == 'realizada')
-    ).all()
-    for plan in cosmetic_plans:
-        d = safe_parse_date(plan.performed_date)
-        if not d:
-            if plan.note and plan.note.created_at:
-                d = plan.note.created_at.date()
-            else:
-                continue
-        dt = datetime.combine(d, datetime.min.time().replace(hour=12))
-        events_by_day[d].append({
-            "type": "procedimento",
-            "dt": dt,
-            "title": f"Procedimento: {plan.procedure_name}",
-            "label": plan.procedure_name,
-            "body": f"Realizado em {d.strftime('%d/%m/%Y')}. {getattr(plan, 'observations', '') or ''}",
-            "id": plan.id,
-            "reference_id": plan.id,
-            "appointment_id": plan.note.appointment_id if plan.note else None,
-            "doctor": plan.note.doctor.name if plan.note and plan.note.doctor else 'Médico'
-        })
-
-    surgeries = Surgery.query.filter_by(patient_id=p_id).all()
-    for surg in surgeries:
-        d = surg.date if isinstance(surg.date, date) else safe_parse_date(str(surg.date))
-        if not d:
-            continue
-        start = getattr(surg, 'start_time', None)
-        dt = datetime.combine(d, start) if start else datetime.combine(d, datetime.min.time().replace(hour=8))
-        events_by_day[d].append({
-            "type": "cirurgia",
-            "dt": dt,
-            "title": f"Cirurgia: {surg.procedure_name}",
-            "label": surg.procedure_name,
-            "body": surg.notes or "",
-            "id": surg.id,
-            "reference_id": surg.id,
-            "status": getattr(surg, 'status', ''),
-            "doctor": surg.doctor.name if surg.doctor else 'Médico'
-        })
-
-    ts_records = TransplantSurgeryRecord.query.filter_by(patient_id=p_id).all()
-    for ts in ts_records:
-        d = ts.surgery_date if isinstance(ts.surgery_date, date) else safe_parse_date(str(ts.surgery_date))
-        if not d:
-            continue
-        dt = datetime.combine(d, datetime.min.time().replace(hour=8))
-        events_by_day[d].append({
-            "type": "cirurgia",
-            "dt": dt,
-            "title": f"Transplante Capilar: {ts.surgery_type or ''}",
-            "label": "Transplante Capilar",
-            "body": ts.observations or "",
-            "id": ts.id,
-            "reference_id": ts.id,
-            "doctor": ts.doctor.name if ts.doctor else 'Médico'
-        })
-
-    evos = Evolution.query.filter_by(patient_id=p_id).all()
-    for evo in evos:
-        raw = getattr(evo, 'evolution_date', None) or evo.created_at
-        if not raw:
-            continue
-        dt = to_dt(raw)
-        if not dt:
-            continue
-        d = dt.date()
-        events_by_day[d].append({
-            "type": "evolution",
-            "dt": dt,
-            "title": "Evolução clínica",
-            "label": "Evolução",
-            "body": evo.content or "(Sem conteúdo)",
-            "id": evo.id,
-            "reference_id": evo.id,
-            "doctor": evo.doctor.name if evo.doctor else 'Médico'
-        })
-
-    type_order = {"cirurgia": 0, "procedimento": 1, "consulta": 2, "evolution": 3}
-    timeline = []
-    for d in sorted(events_by_day.keys()):
-        day_events = sorted(
-            events_by_day[d],
-            key=lambda x: (type_order.get(x["type"], 99), x["dt"])
-        )
-        timeline.append({
-            "date": d.strftime('%Y-%m-%d'),
-            "label": d.strftime('%d/%m/%Y'),
-            "dt": day_events[0]["dt"],
-            "type": day_events[0]["type"],
-            "events": day_events
-        })
-    return timeline
 
 
 @app.route('/prontuario/<int:patient_id>')

@@ -1,5 +1,5 @@
 {
-  "route_count": 169,
+  "route_count": 163,
   "routes": [
     {
       "path": "/",
@@ -614,24 +614,8 @@
       "methods": [
         "GET"
       ],
-      "endpoint": "get_patient_surgeries",
-      "blueprint": null
-    },
-    {
-      "path": "/api/patient/<int:patient_id>/surgeries",
-      "methods": [
-        "GET"
-      ],
       "endpoint": "patient.get_patient_surgeries",
       "blueprint": "patient"
-    },
-    {
-      "path": "/api/patient/<int:patient_id>/surgery",
-      "methods": [
-        "POST"
-      ],
-      "endpoint": "create_patient_surgery",
-      "blueprint": null
     },
     {
       "path": "/api/patient/<int:patient_id>/surgery",
@@ -879,38 +863,6 @@
         "GET"
       ],
       "endpoint": "report_patient_growth",
-      "blueprint": null
-    },
-    {
-      "path": "/api/surgery/<int:surgery_id>",
-      "methods": [
-        "DELETE"
-      ],
-      "endpoint": "delete_patient_surgery",
-      "blueprint": null
-    },
-    {
-      "path": "/api/surgery/<int:surgery_id>/evolution",
-      "methods": [
-        "POST"
-      ],
-      "endpoint": "create_surgery_evolution",
-      "blueprint": null
-    },
-    {
-      "path": "/api/surgery/<int:surgery_id>/evolutions",
-      "methods": [
-        "GET"
-      ],
-      "endpoint": "get_surgery_evolutions",
-      "blueprint": null
-    },
-    {
-      "path": "/api/surgery/evolution/<int:evolution_id>",
-      "methods": [
-        "DELETE"
-      ],
-      "endpoint": "delete_surgery_evolution",
       "blueprint": null
     },
     {
@@ -1355,22 +1307,5 @@
       "blueprint": null
     }
   ],
-  "duplicate_route_method_pairs": [
-    {
-      "path": "/api/patient/<int:patient_id>/surgeries",
-      "method": "GET",
-      "endpoints": [
-        "get_patient_surgeries",
-        "patient.get_patient_surgeries"
-      ]
-    },
-    {
-      "path": "/api/patient/<int:patient_id>/surgery",
-      "method": "POST",
-      "endpoints": [
-        "create_patient_surgery",
-        "patient.create_patient_surgery"
-      ]
-    }
-  ]
+  "duplicate_route_method_pairs": []
 }
