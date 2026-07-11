@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     onCategorized(false);
                 }
             } else if (data.status === 'exists') {
-                // Medicamento já existe — modal NÃO abre
+                // Medicamento já existe - modal NÃO abre
                 if (onCategorized) onCategorized(false);
             }
         })
@@ -869,7 +869,7 @@ function initSpecialtyTab(tabType) {
 }
 
 // ==========================================================
-// BLOCO 3 — Modal de Categorização + BLOCO 4 — Descoberta
+// BLOCO 3 - Modal de Categorização + BLOCO 4 - Descoberta
 // ==========================================================
 (function() {
     let taxonomia = { categorias: [], indicacoes: [] };
