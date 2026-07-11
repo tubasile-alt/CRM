@@ -22,7 +22,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          show-progress: false
           ref: refactor/fase-1-extract-services
 
       - name: Apply name-based extraction
