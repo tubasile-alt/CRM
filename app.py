@@ -1632,6 +1632,44 @@ def update_note(note_id):
         print(f"Erro ao atualizar nota: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/notes', methods=['POST'])
+@login_required
+def create_note():
+    try:
+        if not (current_user.is_doctor() or current_user.is_secretary()):
+            return jsonify({'success': False, 'error': 'Sem permissão'}), 403
+
+        data = request.get_json() or {}
+        patient_id = data.get('patient_id')
+        appointment_id = data.get('appointment_id')
+        note_type = data.get('note_type')
+        content = data.get('content', '')
+
+        if not patient_id or not note_type:
+            return jsonify({'success': False, 'error': 'patient_id e note_type são obrigatórios'}), 400
+
+        if current_user.is_doctor():
+            from models import PatientDoctor
+            pd = PatientDoctor.query.filter_by(patient_id=patient_id, doctor_id=current_user.id).first()
+            if not pd and not getattr(current_user, 'is_admin', lambda: False)():
+                return jsonify({'success': False, 'error': 'Sem acesso a este paciente'}), 403
+
+        note = Note(
+            patient_id=patient_id,
+            doctor_id=current_user.id,
+            appointment_id=appointment_id,
+            note_type=note_type,
+            content=content
+        )
+        db.session.add(note)
+        db.session.commit()
+
+        return jsonify({'success': True, 'id': note.id})
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erro ao criar nota: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/agenda/export/pdf', methods=['GET'])
 @login_required
 def export_agenda_pdf():

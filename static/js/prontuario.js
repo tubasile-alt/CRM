@@ -1,4 +1,4 @@
-console.log("prontuario.js carregado v=20260311-right-panel-stable");
+console.log("prontuario.js carregado v=20260713-create-notes-fix");
 
 let timerInterval = null;
 let timerStartTime = null;
@@ -2851,6 +2851,7 @@ async function saveConsultationEdit() {
   );
 
   const fields = ["Queixa", "Anamnese", "Diagnostico", "Conduta"];
+  const patientId = getPatientId();
   fields.forEach((field) => {
     const noteId = document.getElementById(`edit${field}Id`).value;
     const content = document.getElementById(`edit${field}`).value;
@@ -2864,6 +2865,23 @@ async function saveConsultationEdit() {
             "X-CSRFToken": getCSRFToken()
           },
           body: JSON.stringify({ content })
+        })
+      );
+    } else if (content.trim()) {
+      const noteType = field.toLowerCase();
+      updatePromises.push(
+        core.fetchJson(`/api/notes`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+          },
+          body: JSON.stringify({
+            patient_id: patientId,
+            appointment_id: consultationId,
+            note_type: noteType,
+            content: content
+          })
         })
       );
     }

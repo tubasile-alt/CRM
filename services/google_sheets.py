@@ -194,6 +194,12 @@ def _do_append_batch(procedures_data):
         return False
 
 
+def append_procedures_batch(procedures_data):
+    """Dispara em background a inserção de múltiplos procedimentos na planilha."""
+    t = threading.Thread(target=_do_append_batch, args=(procedures_data,), daemon=True)
+    t.start()
+
+
 def _do_append_transplant(data):
     try:
         spreadsheet_id = get_or_create_spreadsheet()
