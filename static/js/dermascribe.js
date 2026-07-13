@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewTopicalMedications = document.getElementById('previewTopicalMedications');
     const previewDate = document.getElementById('previewDate');
     const copyPrescription = document.getElementById('copyPrescription');
-    const printPrescription = document.getElementById('printPrescription');
     const copyToast = document.getElementById('copyToast');
     const addManualMedicationBtn = document.getElementById('addManualMedication');
     const clearFormBtn = document.getElementById('clearForm');
@@ -524,51 +523,6 @@ document.addEventListener('DOMContentLoaded', function() {
         savePrescriptionBtn.addEventListener('click', handleSaveAndPrint);
     }
 
-    // Botão Imprimir = imprime sem salvar (funciona sem patient_id)
-    if (printPrescription) {
-        printPrescription.addEventListener('click', async function(e) {
-            if (e) e.preventDefault();
-
-            if (medications.oral.length === 0 && medications.topical.length === 0) {
-                alert('Adicione pelo menos um medicamento antes de imprimir.');
-                return;
-            }
-
-            const patient_name = patientNameInput?.value?.trim() || '';
-
-            let printWin;
-            try {
-                printWin = window.open('about:blank', '_blank');
-            } catch (err) {
-                console.error('Falha ao abrir janela:', err);
-            }
-            if (!printWin) {
-                alert('O navegador bloqueou a janela de impressão. Permita popups para este site.');
-                return;
-            }
-
-            try {
-                const res = await fetch('/dermascribe/preview-print', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        patient_name: patient_name,
-                        oral: medications.oral,
-                        topical: medications.topical,
-                        prescription_type: 'standard'
-                    })
-                });
-                const html = await res.text();
-                printWin.document.open();
-                printWin.document.write(html);
-                printWin.document.close();
-            } catch (err) {
-                console.error('Erro ao gerar preview de impressão:', err);
-                alert('Falha ao gerar impressão.');
-                printWin.close();
-            }
-        });
-    }
 });
 
 // ==========================================================
