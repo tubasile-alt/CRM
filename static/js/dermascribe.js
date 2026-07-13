@@ -347,6 +347,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
             medications = { oral: [], topical: [] };
 
+            // USO TÓPICO
+            medications.topical.push({
+                medication: 'PIELLUS MX',
+                type: 'topical',
+                instructions: 'APLICAR NO COURO CABELUDO 1X/DIA'
+            });
+
+            // USO INTERNO
+            medications.oral.push({
+                medication: 'NOUVE SILÍCIO D',
+                type: 'oral',
+                instructions: 'TOMAR 01 CP VO POR DIA POR 3 MESES'
+            });
             medications.oral.push({
                 medication: 'MINOXIDIL 2,5MG',
                 type: 'oral',
