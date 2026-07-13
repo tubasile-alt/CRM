@@ -11,6 +11,7 @@ nenhum valor existente no banco é reescrito.
 
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+import pytz
 
 
 CLINIC_TIMEZONE_NAME = 'America/Sao_Paulo'
