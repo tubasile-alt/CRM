@@ -1,5 +1,5 @@
 {
-  "route_count": 164,
+  "route_count": 165,
   "routes": [
     {
       "path": "/",
@@ -135,6 +135,14 @@
         "DELETE"
       ],
       "endpoint": "delete_appointment_api",
+      "blueprint": null
+    },
+    {
+      "path": "/api/appointments/<int:appointment_id>/timeline-label",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "update_timeline_label",
       "blueprint": null
     },
     {

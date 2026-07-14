@@ -8,6 +8,7 @@ import pytz
 import click
 import os
 from io import BytesIO
+from sqlalchemy import inspect as sqlalchemy_inspect
 
 from config import Config
 from models import db, User, Patient, PatientPhoto, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
@@ -76,6 +77,26 @@ def _ensure_physical_agenda_import_log_schema():
         app.logger.warning(f"Não foi possível garantir physical_agenda_import_log: {e}")
 
 
+def _ensure_appointment_timeline_label_schema():
+    try:
+        if db.engine.dialect.name == 'postgresql':
+            with db.engine.begin() as conn:
+                conn.execute(db.text("""
+                    ALTER TABLE appointment
+                    ADD COLUMN IF NOT EXISTS timeline_label VARCHAR(200);
+                """))
+        else:
+            inspector = sqlalchemy_inspect(db.engine)
+            columns = [column['name'] for column in inspector.get_columns('appointment')]
+            if 'timeline_label' not in columns:
+                with db.engine.begin() as conn:
+                    conn.execute(db.text(
+                        "ALTER TABLE appointment ADD COLUMN timeline_label VARCHAR(200);"
+                    ))
+    except Exception as e:
+        app.logger.warning(f"Não foi possível garantir appointment.timeline_label: {e}")
+
+
 # Executar a verificação do índice uma vez no startup (idempotente)
 # Adiado para evitar que falhas de conexão no import do módulo
 # quebrem o startup em produção. Rodará no primeiro request.
@@ -83,6 +104,7 @@ def _ensure_physical_agenda_import_log_schema():
 def _ensure_index_on_startup():
     _ensure_patient_doctor_partial_index()
     _ensure_physical_agenda_import_log_schema()
+    _ensure_appointment_timeline_label_schema()
     # Remove o handler após a primeira execução (safe para workers concorrentes)
     try:
         app.before_request_funcs[None].remove(_ensure_index_on_startup)
@@ -1155,6 +1177,47 @@ def update_appointment(id):
     db.session.commit()
     
     return jsonify({'success': True})
+
+@app.route('/api/appointments/<int:appointment_id>/timeline-label', methods=['PUT'])
+@login_required
+def update_timeline_label(appointment_id):
+    appointment = Appointment.query.get_or_404(appointment_id)
+
+    if current_user.is_doctor() and appointment.doctor_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+
+    raw_label = data.get('timeline_label')
+    timeline_label = None if raw_label is None else str(raw_label).strip()
+    if not timeline_label:
+        timeline_label = None
+    elif len(timeline_label) > 200:
+        return jsonify({
+            'success': False,
+            'error': 'O rótulo da timeline deve ter no máximo 200 caracteres'
+        }), 400
+
+    try:
+        appointment.timeline_label = timeline_label
+        db.session.commit()
+        title = appointment.timeline_label or f"Consulta: {appointment.appointment_type or 'Geral'}"
+        return jsonify({
+            'success': True,
+            'timeline_label': appointment.timeline_label,
+            'title': title
+        })
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception(
+            f"Erro ao atualizar rótulo da timeline do agendamento {appointment_id}: {e}"
+        )
+        return jsonify({
+            'success': False,
+            'error': 'Não foi possível atualizar o rótulo da timeline'
+        }), 500
 
 @app.route('/api/patient/<int:id>/photo', methods=['POST'])
 @login_required

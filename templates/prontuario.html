@@ -260,7 +260,20 @@
                     <div class="mb-3 p-2 rounded bg-light border-start border-3
                       {% if sub_event.type == 'consulta' %}border-primary{% elif sub_event.type == 'procedimento' %}border-success{% elif sub_event.type == 'cirurgia' %}border-danger{% elif sub_event.type == 'evolution' %}border-warning{% endif %}">
                       <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="fw-bold small">{{ sub_event.label }}</span>
+                        {% if sub_event.editable and sub_event.appointment_id %}
+                        <span
+                          class="fw-bold small timeline-title-editable"
+                          data-appointment-id="{{ sub_event.appointment_id }}"
+                          role="button"
+                          tabindex="0"
+                          title="Editar rótulo"
+                        >
+                          <span class="timeline-title-text">{{ sub_event.title }}</span>
+                          <i class="bi bi-pencil-square timeline-edit-icon ms-1" aria-hidden="true"></i>
+                        </span>
+                        {% else %}
+                        <span class="fw-bold small">{{ sub_event.title or sub_event.label }}</span>
+                        {% endif %}
                         <span class="badge
                           {% if sub_event.type == 'consulta' %}bg-primary{% elif sub_event.type == 'procedimento' %}bg-success{% elif sub_event.type == 'cirurgia' %}bg-danger{% elif sub_event.type == 'evolution' %}bg-warning{% else %}bg-secondary{% endif %}"
                           style="font-size: 0.7rem;"
@@ -355,6 +368,29 @@
     overflow: hidden;
     text-overflow: ellipsis;
     box-shadow: 0 2px 8px rgba(13, 110, 253, 0.12);
+  }
+
+  .timeline-title-editable {
+    cursor: text;
+    display: inline-flex;
+    align-items: center;
+    max-width: 210px;
+    text-align: left;
+  }
+
+  .timeline-title-text {
+    overflow-wrap: anywhere;
+  }
+
+  .timeline-edit-icon {
+    font-size: 0.75rem;
+    opacity: 0.55;
+  }
+
+  .timeline-label-input {
+    max-width: 210px;
+    font-size: 0.8rem;
+    padding: 0.1rem 0.35rem;
   }
 
   .norwood-card.selected {
@@ -1530,5 +1566,5 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/prontuario-core.js') }}?v=20260318-protected"></script>
 <script src="{{ url_for('static', filename='js/surgeries.js') }}?v=20260507-foliculite"></script>
-<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260713-create-notes-fix"></script>
+<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260713-timeline-label"></script>
 {% endblock %}

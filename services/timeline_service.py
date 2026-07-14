@@ -46,12 +46,14 @@ def build_patient_timeline(p_id):
         events_by_day[d].append({
             "type": "consulta",
             "dt": dt,
-            "title": f"Consulta: {apt.appointment_type or 'Geral'}",
+            "title": apt.timeline_label or f"Consulta: {apt.appointment_type or 'Geral'}",
             "label": apt.appointment_type or 'Consulta',
             "body": apt.notes or "",
             "id": apt.id,
+            "appointment_id": apt.id,
             "reference_id": apt.id,
             "status": apt.status,
+            "editable": True,
             "doctor": apt.doctor.name if apt.doctor else 'Médico'
         })
 
