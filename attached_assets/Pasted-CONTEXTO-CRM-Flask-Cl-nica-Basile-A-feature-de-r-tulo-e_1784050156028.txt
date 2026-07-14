@@ -1,0 +1,75 @@
+CONTEXTO: CRM Flask (Clínica Basile). A feature de rótulo editável da
+timeline (PR #63) já funciona: existe a coluna appointment.timeline_label,
+o endpoint PUT /api/appointments/<id>/timeline-label, e a edição do título
+DENTRO do popover (elemento .timeline-title-editable em prontuario.html,
+handler startTimelineLabelEdit em static/js/prontuario.js). O problema: o
+texto SEMPRE VISÍVEL na timeline — a bolha .timeline-keyword-bubble — ainda
+mostra o appointment_type cru, não é clicável e não reflete o rótulo
+editado. Ajuste de EXIBIÇÃO apenas. RESTRIÇÃO ABSOLUTA: não tocar em
+appointment_type nem em nada de cobrança (CONSULTATION_PRICES). Reaproveitar
+o endpoint e a função de edição que já existem — NÃO criar rota nova nem
+duplicar lógica.
+
+TAREFA 1 — services/timeline_service.py (item de consulta apenas):
+Trocar
+    "label": apt.appointment_type or 'Consulta'
+por
+    "label": apt.timeline_label or apt.appointment_type or 'Consulta'
+Os demais tipos de evento (procedimento, cirurgia, evolução) ficam
+inalterados.
+
+TAREFA 2 — templates/prontuario.html (a bolha visível):
+Hoje a bolha é montada em Jinja (~linha 244-247) a partir de event.events[0].label.
+Para o PRIMEIRO evento do dot quando ele for uma consulta editável, tornar a
+bolha clicável reutilizando o MESMO mecanismo do título do popover:
+- adicionar no elemento da bolha (ou num span interno com o texto) as mesmas
+  marcações que .timeline-title-editable já usa: class que o handler
+  reconhece, data-appointment-id="{{ event.events[0].appointment_id }}",
+  role="button", tabindex="0".
+- só aplicar isso quando event.events[0].editable e
+  event.events[0].appointment_id existirem; caso contrário, bolha normal.
+- não quebrar o sufixo " +N" de eventos extras: ele deve continuar aparecendo
+  fora do trecho clicável (ex.: texto editável num <span> e o "+N" em outro).
+IMPORTANTE: a bolha fica DENTRO de .timeline-dot-wrapper, junto do
+.js-timeline-dot que abre o popover. Garantir que clicar na bolha para editar
+NÃO dispare a abertura/fechamento do popover — o handler de edição em
+prontuario.js já faz e.preventDefault()/e.stopPropagation() para
+.timeline-title-editable; se a bolha usar uma classe diferente, replicar o
+stopPropagation para ela também.
+
+TAREFA 3 — static/js/prontuario.js (refletir após salvar):
+Na função startTimelineLabelEdit, no bloco de sucesso do saveEdit (após
+renderTimelineTitle com result.title): localizar, a partir do elemento
+editado, o .timeline-dot-wrapper mais próximo (.closest) e, dentro dele, o
+.timeline-keyword-bubble; atualizar o texto da bolha para o novo rótulo,
+PRESERVANDO um eventual sufixo " +N" (use regex / \+\d+$/ para detectar e
+reanexar). Assim a bolha reflete a edição sem exigir reload, venha o clique
+do popover ou da própria bolha.
+Se a Tarefa 2 fez a bolha usar a MESMA classe .timeline-title-editable e a
+mesma estrutura de <span class="timeline-title-text">, então o handler de
+clique e o startTimelineLabelEdit já funcionam nela sem código extra —
+prefira essa abordagem (menos código, sem duplicação). Nesse caso a Tarefa 3
+serve só para sincronizar a OUTRA bolha/título do mesmo dot que não foi o
+elemento clicado.
+
+TAREFA 4 — cache-busting:
+Em templates/prontuario.html, incrementar o parâmetro de versão do script
+prontuario.js (?v=20260713-timeline-label → ?v=20260714-timeline-bubble)
+para forçar os navegadores a baixarem a versão nova.
+
+VALIDAÇÃO:
+1. python -m pytest tests/ -v → tudo verde
+2. node --check static/js/prontuario.js → sintaxe OK
+3. python scripts/audit_routes.py --output route-inventory.json → route_count
+   INALTERADO (nenhuma rota nova) e commitar o JSON só se ele mudar
+4. Preview (paciente de teste):
+   a. clicar direto na bolha visível de uma consulta → vira input editável
+   b. digitar "Botox", Enter → salva, bolha mostra "Botox" na hora, sem reload
+   c. recarregar a página → "Botox" persiste na bolha E no título do popover
+   d. editar pelo popover → a bolha do mesmo dot também atualiza
+   e. limpar o rótulo (texto vazio + Enter) → volta a exibir o appointment_type
+   f. abrir o checkout dessa consulta → valor cobrado IDÊNTICO ao de antes
+   g. logado como outro médico, tentar editar consulta de paciente alheio → 403
+5. Diff completo antes de commitar
+COMMIT: "fix: timeline bubble reflects and edits label (display-only, billing untouched)"
+PR sem merge.
