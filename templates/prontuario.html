@@ -360,13 +360,14 @@
 
   .timeline-dot-wrapper {
     position: relative;
+    min-height: 70px;
   }
 
   .timeline-keyword-bubble {
     position: absolute;
-    top: 34px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 50%;
+    left: calc(50% + 18px);
+    transform: translateY(-50%);
     max-width: 130px;
     padding: 3px 10px;
     border-radius: 999px;
@@ -389,6 +390,18 @@
     align-items: center;
     max-width: 210px;
     text-align: left;
+  }
+
+  .timeline-keyword-bubble .timeline-title-editable {
+    display: inline;
+    max-width: none;
+    cursor: pointer;
+  }
+
+  .timeline-keyword-bubble .timeline-label-input {
+    max-width: 110px;
+    font-size: 0.68rem;
+    padding: 0.1rem 0.25rem;
   }
 
   .timeline-title-text {
