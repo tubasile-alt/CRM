@@ -244,7 +244,20 @@
                 {% set keyword = event.events[0].label if event.events and event.events[0].label else 'Registro' %}
                 {% set extra_events = (event.events|length) - 1 %}
                 <div class="timeline-keyword-bubble">
+                  {% if event.events and event.events[0].editable and event.events[0].appointment_id %}
+                  <span
+                    class="timeline-title-editable"
+                    data-appointment-id="{{ event.events[0].appointment_id }}"
+                    role="button"
+                    tabindex="0"
+                    title="Editar rótulo"
+                  >
+                    <span class="timeline-title-text">{{ keyword }}</span>
+                    <i class="bi bi-pencil-square timeline-edit-icon ms-1" aria-hidden="true"></i>
+                  </span>{% if extra_events > 0 %}<span> +{{ extra_events }}</span>{% endif %}
+                  {% else %}
                   {{ keyword }}{% if extra_events > 0 %} +{{ extra_events }}{% endif %}
+                  {% endif %}
                 </div>
 
                 <div
@@ -1566,5 +1579,5 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/prontuario-core.js') }}?v=20260318-protected"></script>
 <script src="{{ url_for('static', filename='js/surgeries.js') }}?v=20260507-foliculite"></script>
-<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260713-timeline-label"></script>
+<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260714-timeline-bubble"></script>
 {% endblock %}

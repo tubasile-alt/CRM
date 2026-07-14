@@ -47,7 +47,7 @@ def build_patient_timeline(p_id):
             "type": "consulta",
             "dt": dt,
             "title": apt.timeline_label or f"Consulta: {apt.appointment_type or 'Geral'}",
-            "label": apt.appointment_type or 'Consulta',
+            "label": apt.timeline_label or apt.appointment_type or 'Consulta',
             "body": apt.notes or "",
             "id": apt.id,
             "appointment_id": apt.id,

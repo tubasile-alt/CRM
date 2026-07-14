@@ -594,6 +594,22 @@ function startTimelineLabelEdit(titleEl) {
 
       renderTimelineTitle(titleEl, result.title || originalTitle);
       showAlert("Rótulo da timeline atualizado.", "success");
+
+      const wrapper = titleEl.closest(".timeline-dot-wrapper");
+      if (wrapper) {
+        const bubble = wrapper.querySelector(".timeline-keyword-bubble");
+        if (bubble) {
+          const suffixMatch = bubble.textContent.match(/ \+\d+$/);
+          const suffix = suffixMatch ? suffixMatch[0] : "";
+          const newText = (result.title || originalTitle) + suffix;
+          const textSpan = bubble.querySelector(".timeline-title-text");
+          if (textSpan) {
+            textSpan.textContent = newText;
+          } else {
+            bubble.textContent = newText;
+          }
+        }
+      }
     } catch (err) {
       console.error(err);
       renderTimelineTitle(titleEl, originalTitle);
