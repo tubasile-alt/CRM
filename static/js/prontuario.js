@@ -1,4 +1,4 @@
-console.log("prontuario.js carregado v=20260713-create-notes-fix");
+console.log("prontuario.js carregado v=20260713-timeline-label");
 
 let timerInterval = null;
 let timerStartTime = null;
@@ -523,6 +523,100 @@ function handleTimelineDotClick(dot) {
   const isVisible = popover.style.display === "block";
   closeAllTimelinePopovers();
   popover.style.display = isVisible ? "none" : "block";
+}
+
+function renderTimelineTitle(titleEl, title) {
+  titleEl.classList.remove("is-editing");
+  titleEl.replaceChildren();
+
+  const textEl = document.createElement("span");
+  textEl.className = "timeline-title-text";
+  textEl.textContent = title || "";
+
+  const iconEl = document.createElement("i");
+  iconEl.className = "bi bi-pencil-square timeline-edit-icon ms-1";
+  iconEl.setAttribute("aria-hidden", "true");
+
+  titleEl.append(textEl, iconEl);
+}
+
+function getTimelineTitleText(titleEl) {
+  return titleEl.querySelector(".timeline-title-text")?.textContent?.trim() || "";
+}
+
+function startTimelineLabelEdit(titleEl) {
+  if (!titleEl || titleEl.classList.contains("is-editing")) return;
+
+  const appointmentId = titleEl.getAttribute("data-appointment-id");
+  if (!appointmentId) return;
+
+  const originalTitle = getTimelineTitleText(titleEl);
+  titleEl.classList.add("is-editing");
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.maxLength = 200;
+  input.className = "form-control form-control-sm timeline-label-input";
+  input.value = originalTitle;
+  input.setAttribute("aria-label", "Rótulo da consulta na timeline");
+
+  titleEl.replaceChildren(input);
+
+  let finished = false;
+
+  function cancelEdit() {
+    if (finished) return;
+    finished = true;
+    renderTimelineTitle(titleEl, originalTitle);
+  }
+
+  async function saveEdit() {
+    if (finished) return;
+
+    const nextTitle = input.value.trim();
+    if (nextTitle === originalTitle) {
+      cancelEdit();
+      return;
+    }
+
+    finished = true;
+    input.disabled = true;
+
+    try {
+      const result = await core.fetchJson(`/api/appointments/${appointmentId}/timeline-label`, {
+        method: "PUT",
+        body: JSON.stringify({ timeline_label: nextTitle })
+      });
+
+      if (!result || result.success === false) {
+        throw new Error(result?.error || "Erro ao atualizar rótulo da timeline");
+      }
+
+      renderTimelineTitle(titleEl, result.title || originalTitle);
+      showAlert("Rótulo da timeline atualizado.", "success");
+    } catch (err) {
+      console.error(err);
+      renderTimelineTitle(titleEl, originalTitle);
+      showAlert(err.message || "Erro ao atualizar rótulo da timeline", "danger");
+    }
+  }
+
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+  });
+
+  input.addEventListener("blur", saveEdit);
+
+  requestAnimationFrame(() => {
+    input.focus();
+    input.select();
+  });
 }
 
 function scrollToConsultation(id) {
@@ -3837,6 +3931,18 @@ window.addEventListener("message", function (event) {
 ========================= */
 
 document.addEventListener("click", function (e) {
+  if (e.target.closest(".timeline-label-input")) {
+    return;
+  }
+
+  const timelineTitle = e.target.closest(".timeline-title-editable");
+  if (timelineTitle) {
+    e.preventDefault();
+    e.stopPropagation();
+    startTimelineLabelEdit(timelineTitle);
+    return;
+  }
+
   const dot = e.target.closest(".js-timeline-dot");
   if (dot) {
     e.preventDefault();
@@ -3864,6 +3970,18 @@ document.addEventListener("click", function (e) {
 
   if (!e.target.closest(".timeline-dot-wrapper")) {
     closeAllTimelinePopovers();
+  }
+});
+
+document.addEventListener("keydown", function (e) {
+  const timelineTitle = e.target.closest(".timeline-title-editable");
+  if (
+    timelineTitle &&
+    !timelineTitle.classList.contains("is-editing") &&
+    (e.key === "Enter" || e.key === " ")
+  ) {
+    e.preventDefault();
+    startTimelineLabelEdit(timelineTitle);
   }
 });
 
