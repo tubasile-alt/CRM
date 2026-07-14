@@ -769,9 +769,9 @@ def dashboard():
     month_start = datetime.combine(first_day, datetime.min.time())
     month_end = datetime.combine(last_day, datetime.max.time())
 
-    payments_today = paid_payments.filter(Payment.created_at >= day_start, Payment.created_at <= day_end).all()
-    payments_week = paid_payments.filter(Payment.created_at >= week_start, Payment.created_at <= week_end).all()
-    payments_month = paid_payments.filter(Payment.created_at >= month_start, Payment.created_at <= month_end).all()
+    payments_today = paid_payments.filter(Payment.paid_at >= day_start, Payment.paid_at <= day_end).all()
+    payments_week = paid_payments.filter(Payment.paid_at >= week_start, Payment.paid_at <= week_end).all()
+    payments_month = paid_payments.filter(Payment.paid_at >= month_start, Payment.paid_at <= month_end).all()
 
     receita_hoje = float(sum(float(p.total_amount or 0) for p in payments_today))
     receita_semana = float(sum(float(p.total_amount or 0) for p in payments_week))
