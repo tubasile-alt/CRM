@@ -222,7 +222,7 @@
                 <div class="text-xs opacity-75">{{ event.dt.strftime('%H:%M') }}</div>
               </div>
 
-              <div class="timeline-dot-wrapper d-flex justify-content-center align-items-center">
+              <div class="timeline-dot-wrapper">
                 <div
                   class="timeline-dot js-timeline-dot rounded-circle shadow-sm
                   {% if event.type == 'consulta' %}
@@ -254,7 +254,7 @@
                     <i class="bi bi-pencil-square timeline-edit-icon ms-1" aria-hidden="true"></i>
                   </span>{% if extra_events > 0 %}<span> +{{ extra_events }}</span>{% endif %}
                   {% else %}
-                  {{ keyword }}{% if extra_events > 0 %} +{{ extra_events }}{% endif %}
+                  {{ keyword }}{% if extra_events > 0 %} +{{ extra_events }}</span>{% endif %}
                   {% endif %}
                 </div>
 
@@ -357,32 +357,35 @@
   }
 
   .timeline-dot-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     position: relative;
-    min-height: 90px;
+    min-height: 80px;
   }
 
   .timeline-dot-wrapper::before {
     content: '';
     position: absolute;
-    top: 50%;
+    top: calc(50% - 12px);
     left: -50vw;
     right: -50vw;
     height: 4px;
     background: #e9ecef;
-    transform: translateY(-50%);
     z-index: 0;
   }
 
   .timeline-dot {
     position: relative;
     z-index: 1;
+    flex-shrink: 0;
   }
 
   .timeline-keyword-bubble {
-    position: absolute;
-    top: calc(50% + 20px);
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
+    z-index: 2;
     max-width: 130px;
     padding: 3px 10px;
     border-radius: 999px;
@@ -397,7 +400,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     box-shadow: 0 2px 8px rgba(13, 110, 253, 0.12);
-    z-index: 2;
   }
 
   .timeline-title-editable {
