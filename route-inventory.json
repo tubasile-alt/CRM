@@ -1,5 +1,5 @@
 {
-  "route_count": 163,
+  "route_count": 164,
   "routes": [
     {
       "path": "/",
@@ -158,112 +158,112 @@
       "methods": [
         "GET"
       ],
-      "endpoint": "get_chat_contacts",
-      "blueprint": null
+      "endpoint": "chat_api.get_chat_contacts",
+      "blueprint": "chat_api"
     },
     {
       "path": "/api/chat/latest_unread",
       "methods": [
         "GET"
       ],
-      "endpoint": "get_latest_unread",
-      "blueprint": null
+      "endpoint": "chat_api.get_latest_unread",
+      "blueprint": "chat_api"
     },
     {
       "path": "/api/chat/mark_read",
       "methods": [
         "POST"
       ],
-      "endpoint": "mark_messages_read",
-      "blueprint": null
+      "endpoint": "chat_api.mark_messages_read",
+      "blueprint": "chat_api"
     },
     {
       "path": "/api/chat/messages",
       "methods": [
         "GET"
       ],
-      "endpoint": "get_messages",
-      "blueprint": null
+      "endpoint": "chat_api.get_messages",
+      "blueprint": "chat_api"
     },
     {
       "path": "/api/chat/send",
       "methods": [
         "POST"
       ],
-      "endpoint": "send_message",
-      "blueprint": null
+      "endpoint": "chat_api.send_message",
+      "blueprint": "chat_api"
     },
     {
       "path": "/api/chat/unread_count",
       "methods": [
         "GET"
       ],
-      "endpoint": "get_unread_count",
-      "blueprint": null
+      "endpoint": "chat_api.get_unread_count",
+      "blueprint": "chat_api"
     },
     {
       "path": "/api/checkout/<int:payment_id>/pay",
       "methods": [
         "POST"
       ],
-      "endpoint": "process_payment",
-      "blueprint": null
+      "endpoint": "checkout_api.process_payment",
+      "blueprint": "checkout_api"
     },
     {
       "path": "/api/checkout/<int:payment_id>/toggle-consultation",
       "methods": [
         "POST"
       ],
-      "endpoint": "toggle_consultation_charge",
-      "blueprint": null
+      "endpoint": "checkout_api.toggle_consultation_charge",
+      "blueprint": "checkout_api"
     },
     {
       "path": "/api/checkout/create",
       "methods": [
         "POST"
       ],
-      "endpoint": "create_checkout",
-      "blueprint": null
+      "endpoint": "checkout_api.create_checkout",
+      "blueprint": "checkout_api"
     },
     {
       "path": "/api/checkout/pending",
       "methods": [
         "GET"
       ],
-      "endpoint": "get_pending_checkouts",
-      "blueprint": null
+      "endpoint": "checkout_api.get_pending_checkouts",
+      "blueprint": "checkout_api"
     },
     {
       "path": "/api/checkout/pending/count",
       "methods": [
         "GET"
       ],
-      "endpoint": "get_pending_checkout_count",
-      "blueprint": null
+      "endpoint": "checkout_api.get_pending_checkout_count",
+      "blueprint": "checkout_api"
     },
     {
       "path": "/api/cosmetic-plans/<int:plan_id>/executions",
       "methods": [
         "GET"
       ],
-      "endpoint": "list_plan_executions",
-      "blueprint": null
+      "endpoint": "cosmetic_api.list_plan_executions",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/cosmetic-plans/<int:plan_id>/executions",
       "methods": [
         "POST"
       ],
-      "endpoint": "create_plan_execution",
-      "blueprint": null
+      "endpoint": "cosmetic_api.create_plan_execution",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/cosmetic-plans/<int:plan_id>/perform",
       "methods": [
         "POST"
       ],
-      "endpoint": "perform_cosmetic_plan",
-      "blueprint": null
+      "endpoint": "cosmetic_api.perform_cosmetic_plan",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/cp/encounter/<int:encounter_id>",
@@ -486,39 +486,47 @@
       "methods": [
         "DELETE"
       ],
-      "endpoint": "delete_evolution",
-      "blueprint": null
+      "endpoint": "evolutions_api.delete_evolution",
+      "blueprint": "evolutions_api"
     },
     {
       "path": "/api/evolution/<int:evo_id>",
       "methods": [
         "PUT"
       ],
-      "endpoint": "update_evolution",
-      "blueprint": null
+      "endpoint": "evolutions_api.update_evolution",
+      "blueprint": "evolutions_api"
     },
     {
       "path": "/api/executions",
       "methods": [
         "GET"
       ],
-      "endpoint": "list_executions",
-      "blueprint": null
+      "endpoint": "cosmetic_api.list_executions",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/executions/<int:execution_id>",
       "methods": [
         "DELETE"
       ],
-      "endpoint": "delete_execution",
-      "blueprint": null
+      "endpoint": "cosmetic_api.delete_execution",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/executions/<int:execution_id>",
       "methods": [
         "PUT"
       ],
-      "endpoint": "update_execution",
+      "endpoint": "cosmetic_api.update_execution",
+      "blueprint": "cosmetic_api"
+    },
+    {
+      "path": "/api/notes",
+      "methods": [
+        "POST"
+      ],
+      "endpoint": "create_note",
       "blueprint": null
     },
     {
@@ -566,16 +574,16 @@
       "methods": [
         "POST"
       ],
-      "endpoint": "create_evolution",
-      "blueprint": null
+      "endpoint": "evolutions_api.create_evolution",
+      "blueprint": "evolutions_api"
     },
     {
       "path": "/api/patient/<int:patient_id>/evolutions",
       "methods": [
         "GET"
       ],
-      "endpoint": "get_evolutions",
-      "blueprint": null
+      "endpoint": "evolutions_api.get_evolutions",
+      "blueprint": "evolutions_api"
     },
     {
       "path": "/api/patient/<int:patient_id>/photo",
@@ -766,16 +774,16 @@
       "methods": [
         "GET"
       ],
-      "endpoint": "get_cosmetic_plans",
-      "blueprint": null
+      "endpoint": "cosmetic_api.get_cosmetic_plans",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/prontuario/<int:patient_id>/cosmetic-plans-grouped",
       "methods": [
         "GET"
       ],
-      "endpoint": "get_cosmetic_plans_grouped",
-      "blueprint": null
+      "endpoint": "cosmetic_api.get_cosmetic_plans_grouped",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/prontuario/<int:patient_id>/finalizar",
@@ -806,16 +814,16 @@
       "methods": [
         "DELETE"
       ],
-      "endpoint": "delete_cosmetic_plan",
-      "blueprint": null
+      "endpoint": "cosmetic_api.delete_cosmetic_plan",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/prontuario/cosmetic-plan/<int:plan_id>",
       "methods": [
         "PATCH"
       ],
-      "endpoint": "update_cosmetic_plan",
-      "blueprint": null
+      "endpoint": "cosmetic_api.update_cosmetic_plan",
+      "blueprint": "cosmetic_api"
     },
     {
       "path": "/api/push/status",
