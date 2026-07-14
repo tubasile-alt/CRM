@@ -214,8 +214,6 @@
         {% endif %}
 
         <div class="consultation-timeline-container position-relative px-5">
-          <div class="timeline-line position-absolute w-100" style="height: 4px; background: #e9ecef; top: 50%; left: 0; transform: translateY(-50%); z-index: 1;"></div>
-
           <div class="d-flex align-items-center justify-content-start gap-4 position-relative py-5 overflow-auto" style="z-index: 2; scrollbar-width: thin;">
             {% for event in timeline_events %}
             <div class="timeline-item text-center position-relative" style="min-width: 140px;">
@@ -224,7 +222,7 @@
                 <div class="text-xs opacity-75">{{ event.dt.strftime('%H:%M') }}</div>
               </div>
 
-              <div class="timeline-dot-wrapper d-flex justify-content-center">
+              <div class="timeline-dot-wrapper d-flex justify-content-center align-items-center">
                 <div
                   class="timeline-dot js-timeline-dot rounded-circle shadow-sm
                   {% if event.type == 'consulta' %}
@@ -360,14 +358,31 @@
 
   .timeline-dot-wrapper {
     position: relative;
-    min-height: 70px;
+    min-height: 90px;
+  }
+
+  .timeline-dot-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -50vw;
+    right: -50vw;
+    height: 4px;
+    background: #e9ecef;
+    transform: translateY(-50%);
+    z-index: 0;
+  }
+
+  .timeline-dot {
+    position: relative;
+    z-index: 1;
   }
 
   .timeline-keyword-bubble {
     position: absolute;
-    top: 50%;
-    left: calc(50% + 18px);
-    transform: translateY(-50%);
+    top: calc(50% + 20px);
+    left: 50%;
+    transform: translateX(-50%);
     max-width: 130px;
     padding: 3px 10px;
     border-radius: 999px;
@@ -382,6 +397,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     box-shadow: 0 2px 8px rgba(13, 110, 253, 0.12);
+    z-index: 2;
   }
 
   .timeline-title-editable {
@@ -1592,5 +1608,5 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/prontuario-core.js') }}?v=20260318-protected"></script>
 <script src="{{ url_for('static', filename='js/surgeries.js') }}?v=20260507-foliculite"></script>
-<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260714-timeline-bubble"></script>
+<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260714-timeline-below-dot"></script>
 {% endblock %}
