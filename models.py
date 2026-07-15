@@ -617,7 +617,10 @@ class Medication(db.Model):
             'purpose': self.purpose,
             'type': self.type.lower() if self.type else 'topical',
             'brand': self.brand,
-            'instructions': self.instructions if self.instructions else self.get_default_instructions()
+            'instructions': self.instructions if self.instructions else self.get_default_instructions(),
+            'categoria': self.categoria,
+            'indicacoes': self.indicacoes,
+            'etiqueta_revisada': self.etiqueta_revisada
         }
     
     def get_default_instructions(self):

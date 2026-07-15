@@ -1,3 +1,15 @@
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+    function fetchHeaders(contentType) {
+        const h = {};
+        if (contentType) h['Content-Type'] = contentType;
+        const csrf = getCsrfToken();
+        if (csrf) h['X-CSRFToken'] = csrf;
+        return h;
+    }
+
 document.addEventListener('DOMContentLoaded', function() {
     const medicationInput = document.getElementById('medicationInput');
     const clearMedicationInput = document.getElementById('clearMedicationInput');
@@ -64,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function fetchMedicationSuggestions(partialInput) {
         fetch('/dermascribe/api/suggest-medications', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: fetchHeaders('application/json'),
             body: JSON.stringify({ partial_input: partialInput })
         })
         .then(response => response.json())
@@ -94,10 +106,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const typeClass = suggestion.type === 'topical' ? 'bg-success' : 'bg-primary';
             const typeIcon = suggestion.type === 'topical' ? 'fa-prescription-bottle' : 'fa-pills';
 
+            const catBadge = suggestion.categoria ? `<span class="badge bg-light text-dark border ms-1" style="font-size:0.65em;">${suggestion.categoria}</span>` : '';
             item.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div><strong>${suggestion.medication}</strong></div>
+                        <div><strong>${suggestion.medication}</strong>${catBadge}</div>
                         <small class="text-muted">${suggestion.instructions || ''}</small>
                     </div>
                     <span class="badge ${typeClass}">
@@ -291,7 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function saveMedicationToDatabase(medication, onCategorized) {
         fetch('/dermascribe/api/save-medication', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: fetchHeaders('application/json'),
             body: JSON.stringify(medication)
         })
         .then(response => response.json())
@@ -385,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadTopMedications() {
         const container = document.getElementById('topMedicationsContainer');
 
-        fetch('/dermascribe/api/analytics/top-medications')
+        fetch('/dermascribe/api/analytics/top-medications', { credentials: 'same-origin' })
         .then(response => response.json())
         .then(data => {
             if (data.medications.length === 0) {
@@ -477,7 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const res = await fetch('/dermascribe/api/save-prescription', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: fetchHeaders('application/json'),
                 body: JSON.stringify({
                     patient_id: Number(patient_id),
                     patient_name: patient_name,
@@ -563,7 +576,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
                 const res = await fetch('/dermascribe/preview-print', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: fetchHeaders('application/json'),
                     body: JSON.stringify({
                         patient_name: patient_name,
                         oral: medications.oral,
@@ -697,7 +710,7 @@ function initSpecialtyTab(tabType) {
             try {
                 const res = await fetch('/dermascribe/api/save-prescription', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: fetchHeaders('application/json'),
                     body: JSON.stringify({
                         patient_id: Number(patient_id),
                         patient_name: patient_name,
@@ -737,7 +750,7 @@ function initSpecialtyTab(tabType) {
                 try {
                     const res = await fetch('/dermascribe/preview-print', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: fetchHeaders('application/json'),
                         body: JSON.stringify({
                             patient_name: patient_name,
                             oral: oralMeds,
@@ -822,7 +835,7 @@ function initSpecialtyTab(tabType) {
         try {
             const res = await fetch('/dermascribe/api/save-prescription', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: fetchHeaders('application/json'),
                 body: JSON.stringify({
                     patient_id: Number(patient_id),
                     patient_name: patient_name,
@@ -861,7 +874,7 @@ function initSpecialtyTab(tabType) {
             try {
                 const res = await fetch('/dermascribe/preview-print', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: fetchHeaders('application/json'),
                     body: JSON.stringify({
                         patient_name: patient_name,
                         oral: meds,
@@ -894,7 +907,7 @@ function initSpecialtyTab(tabType) {
     let pendingCategorizeCallback = null;
 
     function loadTaxonomia() {
-        fetch('/dermascribe/api/taxonomia')
+        fetch('/dermascribe/api/taxonomia', { credentials: 'same-origin' })
             .then(function(r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();
@@ -985,7 +998,7 @@ function initSpecialtyTab(tabType) {
         }
         fetch('/dermascribe/api/save-medication', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: fetchHeaders('application/json'),
             body: JSON.stringify({
                 medication: catMedNomeAtual,
                 type: catMedTypeAtual || 'topical',
@@ -1091,7 +1104,7 @@ function initSpecialtyTab(tabType) {
         let url = '/dermascribe/api/descobrir?';
         if (descobrirCatAtiva) url += 'categoria=' + encodeURIComponent(descobrirCatAtiva) + '&';
         if (descobrirIndAtiva) url += 'indicacao=' + encodeURIComponent(descobrirIndAtiva);
-        fetch(url)
+        fetch(url, { credentials: 'same-origin' })
             .then(r => r.json())
             .then(function(data) {
                 container.innerHTML = '';
