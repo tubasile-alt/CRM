@@ -13,10 +13,10 @@
         'Retorno Ulthera',
         'Morpheus',
         'Retorno Morpheus',
-        'IC',
-        '1º IC',
-        'ret IC',
-        'ut IC',
+        'Implante Capilar',
+        '1º Implante Capilar',
+        'Retorno Implante Capilar',
+        'UT Implante Capilar',
         'Infiltração Capilar',
         'Soroterapia',
         'Pequena Cirurgia',
@@ -492,7 +492,7 @@
         if (normalizedType.includes('retirada de ponto')) return 'appointment-retirada-de-ponto';
         if (normalizedType.includes('nitrogenio liquido')) return 'appointment-nitrogenio-liquido';
         if (normalizedType.includes('patologia')) return 'appointment-patologia';
-        if (normalizedType === 'ic' || normalizedType.includes('infiltracao capilar')) return 'appointment-ic';
+        if (normalizedType.includes('implante capilar')) return 'appointment-implante-capilar';
         if (normalizedType.includes('retorno')) return 'appointment-retorno';
         return 'appointment-particular';
     }

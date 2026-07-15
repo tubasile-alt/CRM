@@ -148,7 +148,7 @@ class Appointment(db.Model):
     end_time = db.Column(db.DateTime, nullable=False)
     consultation_date = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default='agendado')
-    appointment_type = db.Column(db.String(20), default='Particular')
+    appointment_type = db.Column(db.String(40), default='Particular')
     timeline_label = db.Column(db.String(200), nullable=True)
     notes = db.Column(db.Text)
     waiting = db.Column(db.Boolean, default=False)
