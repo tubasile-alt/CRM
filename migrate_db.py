@@ -36,15 +36,38 @@ def create_partial_unique_index():
         db.session.commit()
         print('✓ Índice único parcial (patient_code >= 1001) criado/verificado')
 
+def ensure_medication_columns():
+    """Garante que as colunas de etiquetagem existam na tabela medications."""
+    with app.app_context():
+        if not db.engine.dialect.name == 'postgresql':
+            return
+        cols = db.session.execute(db.text(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'medications'"
+        )).fetchall()
+        col_names = {c[0] for c in cols}
+        if 'categoria' not in col_names:
+            db.session.execute(db.text("ALTER TABLE medications ADD COLUMN categoria VARCHAR(100)"))
+            print('  + Coluna categoria adicionada')
+        if 'indicacoes' not in col_names:
+            db.session.execute(db.text("ALTER TABLE medications ADD COLUMN indicacoes JSONB"))
+            print('  + Coluna indicacoes adicionada')
+        if 'etiqueta_revisada' not in col_names:
+            db.session.execute(db.text("ALTER TABLE medications ADD COLUMN etiqueta_revisada BOOLEAN DEFAULT FALSE"))
+            print('  + Coluna etiqueta_revisada adicionada')
+        db.session.commit()
+
 def migrate_database():
     """Migra o banco de dados adicionando novas tabelas e colunas"""
     with app.app_context():
         print('Iniciando migração segura do banco de dados...')
-        
+
         # Criar backup primeiro
         backup_file = backup_database()
-        
+
         try:
+            # Garantir colunas de etiquetagem em medications
+            ensure_medication_columns()
+
             # Criar novas tabelas (se não existirem)
             db.create_all()
             print('✓ Novas tabelas criadas com sucesso')
