@@ -37,7 +37,8 @@ ABBREVIATION_MAP = {
     'ic': 'Implante Capilar',
     '1\u00ba ic': '1\u00ba Implante Capilar',
     'ret ic': 'Retorno Implante Capilar',
-    'ut ic': 'UT Implante Capilar',
+    'ut ic': 'Retorno Implante Capilar',
+    'ut uc': 'Retorno Implante Capilar',
 }
 
 

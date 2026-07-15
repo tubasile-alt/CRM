@@ -16,7 +16,6 @@
         'Implante Capilar',
         '1º Implante Capilar',
         'Retorno Implante Capilar',
-        'UT Implante Capilar',
         'Infiltração Capilar',
         'Soroterapia',
         'Pequena Cirurgia',
