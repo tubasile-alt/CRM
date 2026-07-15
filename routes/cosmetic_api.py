@@ -8,6 +8,7 @@ from services.execution_service import (
     _parse_date_or_datetime,
     _serialize_execution,
 )
+from services.checkout_service import ensure_checkout_for_execution
 
 
 cosmetic_api_bp = Blueprint('cosmetic_api', __name__)
@@ -36,8 +37,14 @@ def perform_cosmetic_plan(plan_id):
         return jsonify({'success': False, 'error': str(exc)}), 400
 
     db.session.add(execution)
+    db.session.flush()
+    payment = ensure_checkout_for_execution(plan, execution)
     db.session.commit()
-    return jsonify({'success': True, 'execution': _serialize_execution(execution)})
+    return jsonify({
+        'success': True,
+        'execution': _serialize_execution(execution),
+        'payment_id': payment.id if payment else None,
+    })
 
 
 @cosmetic_api_bp.route('/api/cosmetic-plans/<int:plan_id>/executions', methods=['POST'])
@@ -62,8 +69,16 @@ def create_plan_execution(plan_id):
         return jsonify({'success': False, 'error': str(exc)}), 400
 
     db.session.add(execution)
+    db.session.flush()
+    payment = ensure_checkout_for_execution(plan, execution)
     db.session.commit()
-    app.logger.info('execution_created id=%s plan_id=%s user_id=%s', execution.id, plan.id, current_user.id)
+    app.logger.info(
+        'execution_created id=%s plan_id=%s user_id=%s payment_id=%s',
+        execution.id,
+        plan.id,
+        current_user.id,
+        payment.id if payment else None,
+    )
     
     # Sincronizar com Google Sheets se foi marcado como realizado
     if execution.execution_status == 'realizada':
@@ -136,7 +151,11 @@ def create_plan_execution(plan_id):
         except Exception as e:
             app.logger.error(f'Erro ao iniciar sincronização Google Sheets: {e}')
     
-    return jsonify({'success': True, 'execution': _serialize_execution(execution)}), 201
+    return jsonify({
+        'success': True,
+        'execution': _serialize_execution(execution),
+        'payment_id': payment.id if payment else None,
+    }), 201
 
 
 @cosmetic_api_bp.route('/api/cosmetic-plans/<int:plan_id>/executions', methods=['GET'])

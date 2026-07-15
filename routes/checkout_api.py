@@ -2,6 +2,7 @@ from flask import Blueprint, current_app as app, jsonify, request
 from flask_login import current_user, login_required
 
 from models import Appointment, Payment, db
+from services.checkout_service import can_manage_checkout_payment, can_use_checkout
 from services.clinic_time import format_brazil_datetime, get_brazil_time
 from services.pricing import CONSULTATION_PRICES
 
@@ -12,18 +13,25 @@ checkout_api_bp = Blueprint('checkout_api', __name__)
 @checkout_api_bp.route('/api/checkout/pending', methods=['GET'])
 @login_required
 def get_pending_checkouts():
-    if not current_user.is_secretary() and not current_user.is_doctor():
+    if not can_use_checkout(current_user):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     today = get_brazil_time().date()
     
     payments = Payment.query.filter(
-        db.func.date(Payment.created_at) == today
-    ).all()
+        db.or_(
+            Payment.status == 'pendente',
+            db.func.date(Payment.created_at) == today,
+            db.func.date(Payment.paid_at) == today,
+        )
+    ).order_by(Payment.status.desc(), Payment.created_at.asc()).all()
     
     app.logger.debug(f"Found {len(payments)} payments for today")
     
     data = []
+    today_pending = []
+    old_pending = []
+    today_paid = []
     for payment in payments:
         patient = payment.patient
         apt_id = payment.appointment_id if payment.appointment_id else 'N/A'
@@ -44,7 +52,9 @@ def get_pending_checkouts():
             payment.total_amount = computed_total
             db.session.commit()
         
-        data.append({
+        created_date = payment.created_at.date() if payment.created_at else None
+        paid_date = payment.paid_at.date() if payment.paid_at else None
+        checkout_data = {
             'id': payment.id,
             'appointment_id': apt_id,
             'patient_name': patient.name if patient else 'Desconhecido',
@@ -52,20 +62,36 @@ def get_pending_checkouts():
             'total_amount': computed_total,
             'procedures': procedures,
             'created_at': format_brazil_datetime(payment.created_at),
+            'created_date': created_date.isoformat() if created_date else None,
             'status': payment.status,
             'paid_at': format_brazil_datetime(payment.paid_at),
             'payment_method': payment.payment_method,
             'consultation_included': has_consultation_item
-        })
+        }
+        data.append(checkout_data)
+        if payment.status == 'pendente' and created_date == today:
+            today_pending.append(checkout_data)
+        elif payment.status == 'pendente':
+            old_pending.append(checkout_data)
+        elif payment.status == 'pago' and (paid_date == today or created_date == today):
+            today_paid.append(checkout_data)
         print(f"  - Payment {payment.id}: {patient.name if patient else '?'} R${computed_total} - {payment.status}")
     
-    return jsonify({'success': True, 'checkouts': data})
+    return jsonify({
+        'success': True,
+        'checkouts': data,
+        'groups': {
+            'today_pending': today_pending,
+            'old_pending': old_pending,
+            'today_paid': today_paid,
+        },
+    })
 
 
 @checkout_api_bp.route('/api/checkout/create', methods=['POST'])
 @login_required
 def create_checkout():
-    if not current_user.is_doctor() and not current_user.is_secretary():
+    if not can_use_checkout(current_user):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     data = request.get_json(silent=True)
@@ -97,7 +123,7 @@ def create_checkout():
 @checkout_api_bp.route('/api/checkout/<int:payment_id>/pay', methods=['POST'])
 @login_required
 def process_payment(payment_id):
-    if not current_user.is_secretary():
+    if not can_manage_checkout_payment(current_user):
         return jsonify({'success': False, 'error': 'Apenas secretárias'}), 403
     
     data = request.get_json(silent=True)
@@ -122,12 +148,7 @@ def process_payment(payment_id):
 @login_required
 def get_pending_checkout_count():
     """Retorna a contagem de checkouts pendentes do dia"""
-    today = get_brazil_time().date()
-    
-    count = Payment.query.filter(
-        db.func.date(Payment.created_at) == today,
-        Payment.status == 'pendente'
-    ).count()
+    count = Payment.query.filter(Payment.status == 'pendente').count()
     
     return jsonify({'success': True, 'count': count})
 
@@ -138,7 +159,7 @@ def toggle_consultation_charge(payment_id):
     """Ativa ou desativa a cobrança da consulta no checkout"""
     from sqlalchemy.orm.attributes import flag_modified
     
-    if not current_user.is_secretary():
+    if not can_manage_checkout_payment(current_user):
         return jsonify({'success': False, 'error': 'Apenas secretárias'}), 403
     
     data = request.get_json(silent=True)

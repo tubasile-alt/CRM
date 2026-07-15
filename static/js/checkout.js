@@ -35,7 +35,7 @@ function loadCheckouts() {
         .then(r => r.json())
         .then(result => {
             if (result.success) {
-                displayCheckouts(result.checkouts);
+                displayCheckouts(result.groups || result.checkouts);
                 updatePendingCheckoutBadge();
             } else {
                 showAlert(result.error || 'Erro ao carregar checkouts', 'danger');
@@ -44,35 +44,49 @@ function loadCheckouts() {
         .catch(err => console.error('Erro:', err));
 }
 
-function displayCheckouts(checkouts) {
+function displayCheckouts(checkoutPayload) {
     const container = document.getElementById('checkoutList');
+    const groups = Array.isArray(checkoutPayload)
+        ? {
+            today_pending: checkoutPayload.filter(c => c.status === 'pendente'),
+            old_pending: [],
+            today_paid: checkoutPayload.filter(c => c.status === 'pago')
+        }
+        : (checkoutPayload || {});
+    const todayPending = groups.today_pending || [];
+    const oldPending = groups.old_pending || [];
+    const todayPaid = groups.today_paid || [];
     
-    if (!checkouts || checkouts.length === 0) {
+    if (todayPending.length === 0 && oldPending.length === 0 && todayPaid.length === 0) {
         container.innerHTML = `
             <div class="col-12">
                 <div class="alert alert-success text-center">
-                    <i class="bi bi-check-circle"></i> Nenhum checkout para hoje
+                    <i class="bi bi-check-circle"></i> Nenhum checkout pendente
                 </div>
             </div>
         `;
         return;
     }
-    
-    const pending = checkouts.filter(c => c.status === 'pendente');
-    const paid = checkouts.filter(c => c.status === 'pago');
-    
+
     let html = '';
-    
-    if (pending.length > 0) {
-        html += '<div class="row mb-3"><div class="col-12"><h5 class="text-warning"><i class="bi bi-hourglass-split"></i> Pendentes</h5></div></div>';
-        pending.forEach(checkout => {
+
+    if (todayPending.length > 0) {
+        html += '<div class="row mb-3"><div class="col-12"><h5 class="text-warning"><i class="bi bi-hourglass-split"></i> Pendentes de hoje</h5></div></div>';
+        todayPending.forEach(checkout => {
             html += createCheckoutCard(checkout);
         });
     }
-    
-    if (paid.length > 0) {
-        html += '<div class="row mb-3"><div class="col-12"><h5 class="text-success"><i class="bi bi-check-circle"></i> Realizados</h5></div></div>';
-        paid.forEach(checkout => {
+
+    if (oldPending.length > 0) {
+        html += '<div class="row mb-3"><div class="col-12"><h5 class="text-danger"><i class="bi bi-exclamation-triangle"></i> Pendentes antigos</h5></div></div>';
+        oldPending.forEach(checkout => {
+            html += createCheckoutCard(checkout, { oldPending: true });
+        });
+    }
+
+    if (todayPaid.length > 0) {
+        html += '<div class="row mb-3"><div class="col-12"><h5 class="text-success"><i class="bi bi-check-circle"></i> Realizados hoje</h5></div></div>';
+        todayPaid.forEach(checkout => {
             html += createCheckoutCard(checkout);
         });
     }
@@ -80,12 +94,15 @@ function displayCheckouts(checkouts) {
     container.innerHTML = html;
 }
 
-function createCheckoutCard(checkout) {
+function createCheckoutCard(checkout, options = {}) {
     const isPaid = checkout.status === 'pago';
-    const badgeClass = isPaid ? 'bg-success' : 'bg-warning';
-    const badgeText = isPaid ? 'Realizado' : 'Pendente';
+    const badgeClass = isPaid ? 'bg-success' : (options.oldPending ? 'bg-danger' : 'bg-warning');
+    const badgeText = isPaid ? 'Realizado' : (options.oldPending ? 'Pendente antigo' : 'Pendente');
     const paymentMethodText = isPaid ? `<small class="text-muted ms-2">${checkout.payment_method}</small>` : '';
     const paidAtText = isPaid ? `<p class="text-muted mb-2"><small><i class="bi bi-check-lg"></i> Pago às ${checkout.paid_at}</small></p>` : '';
+    const oldPendingText = options.oldPending
+        ? `<p class="text-danger mb-2"><small><i class="bi bi-exclamation-triangle"></i> Criado em ${checkout.created_at}</small></p>`
+        : '';
     
     const procedures = checkout.procedures || [];
     const consultationItem = procedures.find(p => (p.name || '').startsWith('Consulta'));
@@ -183,6 +200,7 @@ function createCheckoutCard(checkout) {
                     <hr class="my-2">
                     <strong class="d-block mb-2">Itens:</strong>
                     ${itemsHtml}
+                    ${oldPendingText}
                     ${paidAtText}
                 </div>
                 <div class="card-footer bg-light">
@@ -201,7 +219,10 @@ function getConsultationPrice(consultationType) {
     const prices = {
         'Particular': 400.0,
         'Transplante Capilar': 400.0,
+        'Implante Capilar': 400.0,
+        '1º Implante Capilar': 400.0,
         'Retorno': 0.0,
+        'Retorno Implante Capilar': 0.0,
         'UNIMED': 0.0,
         'Cortesia': 0.0,
         'Consulta Cortesia': 0.0
