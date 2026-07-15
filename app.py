@@ -23,6 +23,7 @@ from services.timeline_service import build_patient_timeline
 from services.doctor_service import get_doctor_id, get_all_doctors
 from services.pricing import CONSULTATION_PRICES
 from services.statuses import normalize_appointment_status
+from services.appointment_types import normalize_appointment_type
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -965,7 +966,7 @@ def create_appointment():
         start_time=parse_datetime_with_tz(start_time),
         end_time=parse_datetime_with_tz(end_time),
         status=normalize_appointment_status(data.get('status')),
-        appointment_type=data.get('appointmentType', 'Particular'),
+        appointment_type=normalize_appointment_type(data.get('appointmentType', 'Particular')),
         notes=data.get('notes', '')
     )
 
@@ -1088,9 +1089,9 @@ def update_appointment(id):
     if 'notes' in data:
         appointment.notes = data['notes']
     if 'appointment_type' in data:
-        appointment.appointment_type = data['appointment_type']
+        appointment.appointment_type = normalize_appointment_type(data['appointment_type'])
     if 'appointmentType' in data:
-        appointment.appointment_type = data['appointmentType']
+        appointment.appointment_type = normalize_appointment_type(data['appointmentType'])
     
     # === GOOGLE SHEETS: Atualização de Status/Data (Transplante Capilar) ===
     if appointment.appointment_type == 'Transplante Capilar' and appointment.status == 'agendado':
@@ -2479,6 +2480,12 @@ def ativar_paciente(patient_id):
             PatientDoctor.query.filter_by(patient_id=provisional.id).delete()
             db.session.delete(provisional)
 
+            # Normalizar tipos de consulta das abreviações do provisório
+            for apt in Appointment.query.filter_by(patient_id=target.id).all():
+                normalized = normalize_appointment_type(apt.appointment_type)
+                if normalized != apt.appointment_type:
+                    apt.appointment_type = normalized
+
             # Garantir que o ativo tenha PatientDoctor com código
             pd = PatientDoctor.query.filter_by(patient_id=target.id, doctor_id=doctor_id).first()
             if not pd:
@@ -2510,6 +2517,12 @@ def ativar_paciente(patient_id):
         else:
             # --- ATIVAR: promover o próprio provisório a ativo ---
             provisional.status_cadastral = 'ativo'
+
+            # Normalizar tipos de consulta das abreviações do provisório
+            for apt in Appointment.query.filter_by(patient_id=provisional.id).all():
+                normalized = normalize_appointment_type(apt.appointment_type)
+                if normalized != apt.appointment_type:
+                    apt.appointment_type = normalized
 
             pd = PatientDoctor.query.filter_by(
                 patient_id=provisional.id, doctor_id=doctor_id
