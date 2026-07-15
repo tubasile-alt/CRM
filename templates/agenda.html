@@ -394,6 +394,12 @@
     color: #842029;
 }
 
+.appointment-ic {
+    background: #e8f4f8;
+    border-left-color: #17a2b8;
+    color: #0c5460;
+}
+
 .appointment-provisorio {
     border-left: 5px solid #e67e00 !important;
     background: #fff8e6 !important;
@@ -930,6 +936,10 @@
                                 <option value="Retorno Ulthera">Retorno Ulthera</option>
                                 <option value="Morpheus">Morpheus</option>
                                 <option value="Retorno Morpheus">Retorno Morpheus</option>
+                                <option value="IC">IC</option>
+                                <option value="1º IC">1º IC</option>
+                                <option value="ret IC">ret IC</option>
+                                <option value="ut IC">ut IC</option>
                                 <option value="Infiltração Capilar">Infiltração Capilar</option>
                                 <option value="Soroterapia">Soroterapia</option>
                                 <option value="Pequena Cirurgia">Pequena Cirurgia</option>
@@ -1175,6 +1185,10 @@
                             <option value="Retorno Ulthera">Retorno Ulthera</option>
                             <option value="Morpheus">Morpheus</option>
                             <option value="Retorno Morpheus">Retorno Morpheus</option>
+                            <option value="IC">IC</option>
+                            <option value="1º IC">1º IC</option>
+                            <option value="ret IC">ret IC</option>
+                            <option value="ut IC">ut IC</option>
                             <option value="Infiltração Capilar">Infiltração Capilar</option>
                             <option value="Soroterapia">Soroterapia</option>
                             <option value="Pequena Cirurgia">Pequena Cirurgia</option>
@@ -1306,6 +1320,6 @@ let currentView = 'day';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/locales/pt-br.global.min.js"></script>
-<script src="{{ url_for('static', filename='js/agenda.js') }}"></script>
+<script src="{{ url_for('static', filename='js/agenda.js') }}?v=20260715-ic-fix"></script>
 <script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
 {% endblock %}

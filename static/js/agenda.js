@@ -13,6 +13,10 @@
         'Retorno Ulthera',
         'Morpheus',
         'Retorno Morpheus',
+        'IC',
+        '1º IC',
+        'ret IC',
+        'ut IC',
         'Infiltração Capilar',
         'Soroterapia',
         'Pequena Cirurgia',
@@ -488,6 +492,7 @@
         if (normalizedType.includes('retirada de ponto')) return 'appointment-retirada-de-ponto';
         if (normalizedType.includes('nitrogenio liquido')) return 'appointment-nitrogenio-liquido';
         if (normalizedType.includes('patologia')) return 'appointment-patologia';
+        if (normalizedType === 'ic' || normalizedType.includes('infiltracao capilar')) return 'appointment-ic';
         if (normalizedType.includes('retorno')) return 'appointment-retorno';
         return 'appointment-particular';
     }
@@ -1831,24 +1836,24 @@ window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, ph
         body: JSON.stringify(payload)
     })
     .then(r => r.json())
-	    .then(data => {
-	        if (data.success) {
-	            const action = data.action === 'merge' ? 'vinculado ao cadastro existente' : 'ativado';
-	            showAlert(`Cadastro ${action} com sucesso! Código: ${data.patient_code}`, 'success');
-	            const modal = bootstrap.Modal.getInstance(document.getElementById('ativarProvisiorioModal'));
-	            if (modal) modal.hide();
-	            loadAppointments();
-	        } else if (data.warning === 'duplicates_found') {
-	            renderActivationWarnings(data, patientId, doctorId);
-	        } else if (data.error === 'required_fields') {
-	            (data.required || []).forEach(item => {
-	                if (item.field === 'phone') document.getElementById('ativarTelefoneErro').classList.remove('d-none');
-	                if (item.field === 'cpf') document.getElementById('ativarCpfErro').classList.remove('d-none');
-	            });
-	            showAlert(data.message || 'Informe telefone e CPF antes de ativar.', 'danger');
-	        } else {
-	            showAlert(data.error || 'Erro ao ativar cadastro', 'danger');
-	        }
+            .then(data => {
+                if (data.success) {
+                    const action = data.action === 'merge' ? 'vinculado ao cadastro existente' : 'ativado';
+                    showAlert(`Cadastro ${action} com sucesso! Código: ${data.patient_code}`, 'success');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('ativarProvisiorioModal'));
+                    if (modal) modal.hide();
+                    loadAppointments();
+                } else if (data.warning === 'duplicates_found') {
+                    renderActivationWarnings(data, patientId, doctorId);
+                } else if (data.error === 'required_fields') {
+                    (data.required || []).forEach(item => {
+                        if (item.field === 'phone') document.getElementById('ativarTelefoneErro').classList.remove('d-none');
+                        if (item.field === 'cpf') document.getElementById('ativarCpfErro').classList.remove('d-none');
+                    });
+                    showAlert(data.message || 'Informe telefone e CPF antes de ativar.', 'danger');
+                } else {
+                    showAlert(data.error || 'Erro ao ativar cadastro', 'danger');
+                }
     })
     .catch(() => showAlert('Erro ao ativar cadastro', 'danger'));
 };
