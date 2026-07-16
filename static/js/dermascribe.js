@@ -601,6 +601,11 @@ document.addEventListener('DOMContentLoaded', function() {
 // Controlador isolado: Antibiótico e Isotretinoína
 // ==========================================================
 function initSpecialtyTab(tabType) {
+    // Guarda contra inicialização duplicada (listeners duplicados causam arrays vazios)
+    if (!window._specialtyTabInitialized) window._specialtyTabInitialized = {};
+    if (window._specialtyTabInitialized[tabType]) return;
+    window._specialtyTabInitialized[tabType] = true;
+
     const pidInput = document.getElementById(tabType + 'PatientId');
     const pnameInput = document.getElementById(tabType + 'PatientName');
     const saveBtn = document.getElementById(tabType + 'Save');
@@ -698,6 +703,8 @@ function initSpecialtyTab(tabType) {
 
         async function saveAndPrintDual(e) {
             if (e) e.preventDefault();
+            if (saveBtn.dataset.loading === '1') return;
+
             const patient_id = pidInput?.value?.trim();
             const patient_name = pnameInput?.value?.trim() || '';
             if (!patient_id) { alert('ID do paciente é obrigatório.'); return; }
@@ -706,6 +713,11 @@ function initSpecialtyTab(tabType) {
             let printWin;
             try { printWin = window.open('about:blank', '_blank'); } catch (err) {}
             if (!printWin) { alert('Permita popups para este site.'); return; }
+
+            saveBtn.disabled = true;
+            saveBtn.dataset.loading = '1';
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Salvando...';
 
             try {
                 const res = await fetch('/dermascribe/api/save-prescription', {
@@ -719,8 +731,16 @@ function initSpecialtyTab(tabType) {
                         prescription_type: tabType
                     })
                 });
-                const data = await res.json();
-                if (data.status === 'success') {
+                let data;
+                try {
+                    data = await res.json();
+                } catch (jsonErr) {
+                    // Sessão expirada ou erro do servidor retornou HTML
+                    alert('Sua sessão expirou ou houve um erro no servidor. Faça login novamente.');
+                    printWin.close();
+                    return;
+                }
+                if (data && data.status === 'success') {
                     const prescriptionId = data.prescription_id;
                     if (prescriptionId && printWin && !printWin.closed) {
                         try { printWin.location.href = '/dermascribe/prescription/' + prescriptionId + '/print'; }
@@ -729,12 +749,16 @@ function initSpecialtyTab(tabType) {
                     oralMeds = []; topMeds = [];
                     renderOral(); renderTop();
                 } else {
-                    alert('Erro ao salvar: ' + (data.message || 'Erro desconhecido'));
+                    alert('Erro ao salvar: ' + (data && data.message ? data.message : 'Erro desconhecido'));
                     printWin.close();
                 }
             } catch (err) {
                 alert('Falha ao salvar: ' + err.message);
                 printWin.close();
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.dataset.loading = '0';
+                saveBtn.innerHTML = originalText;
             }
         }
         saveBtn.addEventListener('click', saveAndPrintDual);
