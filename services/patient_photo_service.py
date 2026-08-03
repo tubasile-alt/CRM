@@ -5,11 +5,22 @@ from io import BytesIO
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from models import PatientPhoto, db
+from services.clinic_time import get_brazil_time
 
 
 MAX_SOURCE_SIZE = 5 * 1024 * 1024
 PHOTO_SIZE = (300, 400)
 PHOTO_MIME_TYPE = 'image/jpeg'
+
+
+def _versioned_photo_url(patient, updated_at=None):
+    base_url = f'/api/patient/{patient.id}/photo/file'
+    stamp_dt = updated_at or get_brazil_time()
+    try:
+        stamp = int(stamp_dt.timestamp())
+    except Exception:
+        stamp = int(get_brazil_time().timestamp())
+    return f'{base_url}?v={stamp}'
 
 
 def _normalize_image(source_bytes):
@@ -53,8 +64,9 @@ def save_patient_photo(patient, source_bytes):
 
     photo.data = photo_bytes
     photo.mime_type = PHOTO_MIME_TYPE
+    photo.updated_at = get_brazil_time()
     patient.photo_url = f'/api/patient/{patient.id}/photo/file'
-    return patient.photo_url
+    return _versioned_photo_url(patient, photo.updated_at)
 
 
 def save_patient_photo_data_url(patient, photo_data):

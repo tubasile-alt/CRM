@@ -2,14 +2,27 @@
 
 from models import Appointment
 from models import ProcedureExecution
+from models import TimelineEventLabel
 from models import db
 
 
 def build_patient_timeline(p_id):
     from collections import defaultdict
     from datetime import date, datetime
-    from models import Evolution, CosmeticProcedurePlan, Surgery, TransplantSurgeryRecord
+    from models import Evolution, Surgery, TransplantSurgeryRecord
     events_by_day = defaultdict(list)
+    label_rows = TimelineEventLabel.query.filter_by(patient_id=p_id).all()
+    custom_labels = {
+        (row.event_type, row.reference_id): row.label
+        for row in label_rows
+        if row.label
+    }
+
+    def display_label(event_type, reference_id, default_label):
+        return custom_labels.get((event_type, reference_id)) or default_label
+
+    def display_title(event_type, reference_id, default_title):
+        return custom_labels.get((event_type, reference_id)) or default_title
 
     def safe_parse_date(s):
         if not s:
@@ -43,15 +56,18 @@ def build_patient_timeline(p_id):
             continue
         dt = to_dt(raw)
         d = dt.date()
+        apt_label = apt.timeline_label or display_label('consulta', apt.id, apt.appointment_type or 'Consulta')
+        apt_title = apt.timeline_label or display_title('consulta', apt.id, f"Consulta: {apt.appointment_type or 'Geral'}")
         events_by_day[d].append({
             "type": "consulta",
             "dt": dt,
-            "title": apt.timeline_label or f"Consulta: {apt.appointment_type or 'Geral'}",
-            "label": apt.timeline_label or apt.appointment_type or 'Consulta',
+            "title": apt_title,
+            "label": apt_label,
             "body": apt.notes or "",
             "id": apt.id,
             "appointment_id": apt.id,
             "reference_id": apt.id,
+            "label_event_type": "consulta",
             "status": apt.status,
             "editable": True,
             "doctor": apt.doctor.name if apt.doctor else 'Médico'
@@ -70,15 +86,18 @@ def build_patient_timeline(p_id):
             else:
                 continue
         dt = datetime.combine(d, datetime.min.time().replace(hour=12))
+        default_label = plan.procedure_name or 'Procedimento'
         events_by_day[d].append({
             "type": "procedimento",
             "dt": dt,
-            "title": f"Procedimento: {plan.procedure_name}",
-            "label": plan.procedure_name,
+            "title": display_title('procedimento', plan.id, f"Procedimento: {default_label}"),
+            "label": display_label('procedimento', plan.id, default_label),
             "body": f"Realizado em {d.strftime('%d/%m/%Y')}. {getattr(plan, 'observations', '') or ''}",
             "id": plan.id,
             "reference_id": plan.id,
+            "label_event_type": "procedimento",
             "appointment_id": plan.note.appointment_id if plan.note else None,
+            "editable": True,
             "doctor": plan.note.doctor.name if plan.note and plan.note.doctor else 'Médico'
         })
 
@@ -89,15 +108,18 @@ def build_patient_timeline(p_id):
             continue
         start = getattr(surg, 'start_time', None)
         dt = datetime.combine(d, start) if start else datetime.combine(d, datetime.min.time().replace(hour=8))
+        default_label = surg.procedure_name or 'Cirurgia'
         events_by_day[d].append({
             "type": "cirurgia",
             "dt": dt,
-            "title": f"Cirurgia: {surg.procedure_name}",
-            "label": surg.procedure_name,
+            "title": display_title('cirurgia', surg.id, f"Cirurgia: {default_label}"),
+            "label": display_label('cirurgia', surg.id, default_label),
             "body": surg.notes or "",
             "id": surg.id,
             "reference_id": surg.id,
+            "label_event_type": "cirurgia",
             "status": getattr(surg, 'status', ''),
+            "editable": True,
             "doctor": surg.doctor.name if surg.doctor else 'Médico'
         })
 
@@ -107,14 +129,18 @@ def build_patient_timeline(p_id):
         if not d:
             continue
         dt = datetime.combine(d, datetime.min.time().replace(hour=8))
+        default_label = "Transplante Capilar"
+        default_title = f"Transplante Capilar: {ts.surgery_type or ''}".rstrip()
         events_by_day[d].append({
             "type": "cirurgia",
             "dt": dt,
-            "title": f"Transplante Capilar: {ts.surgery_type or ''}",
-            "label": "Transplante Capilar",
+            "title": display_title('transplante', ts.id, default_title),
+            "label": display_label('transplante', ts.id, default_label),
             "body": ts.observations or "",
             "id": ts.id,
             "reference_id": ts.id,
+            "label_event_type": "transplante",
+            "editable": True,
             "doctor": ts.doctor.name if ts.doctor else 'Médico'
         })
 
@@ -130,11 +156,13 @@ def build_patient_timeline(p_id):
         events_by_day[d].append({
             "type": "evolution",
             "dt": dt,
-            "title": "Evolução clínica",
-            "label": "Evolução",
+            "title": display_title('evolution', evo.id, "Evolução clínica"),
+            "label": display_label('evolution', evo.id, "Evolução"),
             "body": evo.content or "(Sem conteúdo)",
             "id": evo.id,
             "reference_id": evo.id,
+            "label_event_type": "evolution",
+            "editable": True,
             "doctor": evo.doctor.name if evo.doctor else 'Médico'
         })
 

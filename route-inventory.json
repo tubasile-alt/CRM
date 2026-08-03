@@ -1,5 +1,5 @@
 {
-  "route_count": 165,
+  "route_count": 166,
   "routes": [
     {
       "path": "/",
@@ -879,6 +879,14 @@
         "GET"
       ],
       "endpoint": "report_patient_growth",
+      "blueprint": null
+    },
+    {
+      "path": "/api/timeline-events/label",
+      "methods": [
+        "PUT"
+      ],
+      "endpoint": "update_timeline_event_label",
       "blueprint": null
     },
     {

@@ -23,6 +23,8 @@
   window.__patientId = {{ patient.id }};
 </script>
 
+{% set can_edit_patient_photo = current_user.is_doctor() or current_user.is_secretary() or current_user.is_admin() %}
+
 <div class="row">
   <div class="col-12">
     <div class="card mb-4 border-0 shadow-sm">
@@ -33,11 +35,12 @@
               id="patientPhotoWrapper"
               class="patient-photo shadow-sm"
               style="width: 100px; height: 125px; border: 2px dashed #dee2e6; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #ffffff; cursor: pointer; transition: all 0.3s ease;"
-              onclick="{% if current_user.is_doctor() %}document.getElementById('photoInput').click(){% endif %}"
+              onclick="{% if can_edit_patient_photo %}document.getElementById('photoInput').click(){% endif %}"
             >
               {% if patient.photo_url %}
+              {% set photo_stamp = patient.photo_file.updated_at.timestamp()|int if patient.photo_file else none %}
               <img
-                src="{{ patient.photo_url }}"
+                src="{{ patient.photo_url }}{% if photo_stamp %}{% if '?' in patient.photo_url %}&{% else %}?{% endif %}v={{ photo_stamp }}{% endif %}"
                 alt="Foto do paciente"
                 style="width: 100%; height: 100%; object-fit: cover;"
                 id="patientPhoto"
@@ -50,7 +53,7 @@
               {% endif %}
             </div>
 
-            {% if current_user.is_doctor() %}
+            {% if can_edit_patient_photo %}
             <input
               type="file"
               id="photoInput"
@@ -60,7 +63,7 @@
             >
             {% endif %}
 
-            {% if patient.photo_url and current_user.is_doctor() %}
+            {% if patient.photo_url and can_edit_patient_photo %}
             <button
               class="btn btn-sm btn-danger shadow-sm"
               style="position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center;"
@@ -239,13 +242,17 @@
                   style="width: 24px; height: 24px; border: 4px solid #fff; cursor: pointer; transition: all 0.2s;"
                 ></div>
 
-                {% set keyword = event.events[0].label if event.events and event.events[0].label else 'Registro' %}
+                {% set first_event = event.events[0] if event.events else none %}
+                {% set keyword = first_event.label if first_event and first_event.label else 'Registro' %}
                 {% set extra_events = (event.events|length) - 1 %}
                 <div class="timeline-keyword-bubble">
-                  {% if event.events and event.events[0].editable and event.events[0].appointment_id %}
+                  {% if first_event and first_event.editable and first_event.reference_id %}
                   <span
                     class="timeline-title-editable"
-                    data-appointment-id="{{ event.events[0].appointment_id }}"
+                    data-event-type="{{ first_event.label_event_type or first_event.type }}"
+                    data-reference-id="{{ first_event.reference_id }}"
+                    data-appointment-id="{{ first_event.appointment_id or '' }}"
+                    data-label-role="bubble"
                     role="button"
                     tabindex="0"
                     title="Editar rótulo"
@@ -271,10 +278,13 @@
                     <div class="mb-3 p-2 rounded bg-light border-start border-3
                       {% if sub_event.type == 'consulta' %}border-primary{% elif sub_event.type == 'procedimento' %}border-success{% elif sub_event.type == 'cirurgia' %}border-danger{% elif sub_event.type == 'evolution' %}border-warning{% endif %}">
                       <div class="d-flex justify-content-between align-items-center mb-1">
-                        {% if sub_event.editable and sub_event.appointment_id %}
+                        {% if sub_event.editable and sub_event.reference_id %}
                         <span
                           class="fw-bold small timeline-title-editable"
-                          data-appointment-id="{{ sub_event.appointment_id }}"
+                          data-event-type="{{ sub_event.label_event_type or sub_event.type }}"
+                          data-reference-id="{{ sub_event.reference_id }}"
+                          data-appointment-id="{{ sub_event.appointment_id or '' }}"
+                          data-label-role="title"
                           role="button"
                           tabindex="0"
                           title="Editar rótulo"
