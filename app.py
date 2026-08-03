@@ -11,7 +11,7 @@ from io import BytesIO
 from sqlalchemy import inspect as sqlalchemy_inspect
 
 from config import Config
-from models import db, User, Patient, PatientPhoto, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
+from models import db, User, Patient, PatientPhoto, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, TransplantSurgeryRecord, TimelineEventLabel, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
 from services.patient_photo_service import delete_patient_photo as delete_stored_patient_photo
 from services.patient_photo_service import save_patient_photo, save_patient_photo_data_url
 from utils.database_backup import backup_manager
@@ -98,6 +98,153 @@ def _ensure_appointment_timeline_label_schema():
         app.logger.warning(f"Não foi possível garantir appointment.timeline_label: {e}")
 
 
+def _ensure_patient_photo_schema():
+    try:
+        if db.engine.dialect.name == 'postgresql':
+            with db.engine.begin() as conn:
+                conn.execute(db.text("""
+                    ALTER TABLE patient
+                    ADD COLUMN IF NOT EXISTS photo_url VARCHAR(255);
+                """))
+                conn.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS patient_photo (
+                        id SERIAL PRIMARY KEY,
+                        patient_id INTEGER NOT NULL REFERENCES patient(id) ON DELETE CASCADE,
+                        data BYTEA NOT NULL,
+                        mime_type VARCHAR(50) NOT NULL DEFAULT 'image/jpeg',
+                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                """))
+                conn.execute(db.text("""
+                    ALTER TABLE patient_photo
+                    ADD COLUMN IF NOT EXISTS mime_type VARCHAR(50) NOT NULL DEFAULT 'image/jpeg';
+                """))
+                conn.execute(db.text("""
+                    ALTER TABLE patient_photo
+                    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+                """))
+                conn.execute(db.text("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_photo_patient_id
+                    ON patient_photo (patient_id);
+                """))
+        else:
+            inspector = sqlalchemy_inspect(db.engine)
+            patient_columns = [column['name'] for column in inspector.get_columns('patient')]
+            photo_exists = 'patient_photo' in inspector.get_table_names()
+            photo_columns = (
+                [column['name'] for column in inspector.get_columns('patient_photo')]
+                if photo_exists
+                else []
+            )
+            with db.engine.begin() as conn:
+                if 'photo_url' not in patient_columns:
+                    conn.execute(db.text(
+                        "ALTER TABLE patient ADD COLUMN photo_url VARCHAR(255);"
+                    ))
+                if not photo_exists:
+                    conn.execute(db.text("""
+                        CREATE TABLE patient_photo (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            patient_id INTEGER NOT NULL UNIQUE,
+                            data BLOB NOT NULL,
+                            mime_type VARCHAR(50) NOT NULL DEFAULT 'image/jpeg',
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """))
+                else:
+                    if 'mime_type' not in photo_columns:
+                        conn.execute(db.text(
+                            "ALTER TABLE patient_photo ADD COLUMN mime_type VARCHAR(50) NOT NULL DEFAULT 'image/jpeg';"
+                        ))
+                    if 'updated_at' not in photo_columns:
+                        conn.execute(db.text(
+                            "ALTER TABLE patient_photo ADD COLUMN updated_at DATETIME;"
+                        ))
+                conn.execute(db.text("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_photo_patient_id
+                    ON patient_photo (patient_id);
+                """))
+    except Exception as e:
+        app.logger.warning(f"Não foi possível garantir patient_photo: {e}")
+
+
+def _ensure_timeline_event_label_schema():
+    try:
+        if db.engine.dialect.name == 'postgresql':
+            with db.engine.begin() as conn:
+                conn.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS timeline_event_label (
+                        id SERIAL PRIMARY KEY,
+                        patient_id INTEGER NOT NULL REFERENCES patient(id) ON DELETE CASCADE,
+                        event_type VARCHAR(40) NOT NULL,
+                        reference_id INTEGER NOT NULL,
+                        label VARCHAR(200),
+                        doctor_id INTEGER,
+                        updated_by_id INTEGER,
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                """))
+                conn.execute(db.text("""
+                    ALTER TABLE timeline_event_label
+                    ADD COLUMN IF NOT EXISTS updated_by_id INTEGER;
+                """))
+                conn.execute(db.text("""
+                    ALTER TABLE timeline_event_label
+                    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+                """))
+                conn.execute(db.text("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_timeline_event_label_ref
+                    ON timeline_event_label (patient_id, event_type, reference_id);
+                """))
+                conn.execute(db.text("""
+                    CREATE INDEX IF NOT EXISTS idx_timeline_event_label_lookup
+                    ON timeline_event_label (event_type, reference_id);
+                """))
+        else:
+            inspector = sqlalchemy_inspect(db.engine)
+            label_exists = 'timeline_event_label' in inspector.get_table_names()
+            label_columns = (
+                [column['name'] for column in inspector.get_columns('timeline_event_label')]
+                if label_exists
+                else []
+            )
+            with db.engine.begin() as conn:
+                if not label_exists:
+                    conn.execute(db.text("""
+                        CREATE TABLE timeline_event_label (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            patient_id INTEGER NOT NULL,
+                            event_type VARCHAR(40) NOT NULL,
+                            reference_id INTEGER NOT NULL,
+                            label VARCHAR(200),
+                            doctor_id INTEGER,
+                            updated_by_id INTEGER,
+                            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """))
+                else:
+                    if 'updated_by_id' not in label_columns:
+                        conn.execute(db.text(
+                            "ALTER TABLE timeline_event_label ADD COLUMN updated_by_id INTEGER;"
+                        ))
+                    if 'updated_at' not in label_columns:
+                        conn.execute(db.text(
+                            "ALTER TABLE timeline_event_label ADD COLUMN updated_at DATETIME;"
+                        ))
+                conn.execute(db.text("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_timeline_event_label_ref
+                    ON timeline_event_label (patient_id, event_type, reference_id);
+                """))
+                conn.execute(db.text("""
+                    CREATE INDEX IF NOT EXISTS idx_timeline_event_label_lookup
+                    ON timeline_event_label (event_type, reference_id);
+                """))
+    except Exception as e:
+        app.logger.warning(f"Não foi possível garantir timeline_event_label: {e}")
+
+
 # Executar a verificação do índice uma vez no startup (idempotente)
 # Adiado para evitar que falhas de conexão no import do módulo
 # quebrem o startup em produção. Rodará no primeiro request.
@@ -106,6 +253,8 @@ def _ensure_index_on_startup():
     _ensure_patient_doctor_partial_index()
     _ensure_physical_agenda_import_log_schema()
     _ensure_appointment_timeline_label_schema()
+    _ensure_patient_photo_schema()
+    _ensure_timeline_event_label_schema()
     # Remove o handler após a primeira execução (safe para workers concorrentes)
     try:
         app.before_request_funcs[None].remove(_ensure_index_on_startup)
@@ -1179,51 +1328,184 @@ def update_appointment(id):
     
     return jsonify({'success': True})
 
-@app.route('/api/appointments/<int:appointment_id>/timeline-label', methods=['PUT'])
-@login_required
-def update_timeline_label(appointment_id):
-    appointment = Appointment.query.get_or_404(appointment_id)
+def _can_edit_patient_context(patient_id, owner_doctor_id=None):
+    if current_user.is_admin() or current_user.is_secretary():
+        return True
+    if not current_user.is_doctor():
+        return False
+    if owner_doctor_id and owner_doctor_id == current_user.id:
+        return True
+    return PatientDoctor.query.filter_by(
+        patient_id=patient_id,
+        doctor_id=current_user.id
+    ).first() is not None
 
-    if current_user.is_doctor() and appointment.doctor_id != current_user.id:
-        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
 
-    data = request.get_json(silent=True)
-    if data is None:
-        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+def _resolve_timeline_label_target(event_type, reference_id):
+    if event_type == 'consulta':
+        appointment = Appointment.query.get_or_404(reference_id)
+        default_label = appointment.appointment_type or 'Consulta'
+        return {
+            'patient_id': appointment.patient_id,
+            'doctor_id': appointment.doctor_id,
+            'default_label': default_label,
+            'default_title': f"Consulta: {appointment.appointment_type or 'Geral'}",
+            'appointment': appointment,
+        }
 
-    raw_label = data.get('timeline_label')
+    if event_type == 'procedimento':
+        plan = CosmeticProcedurePlan.query.get_or_404(reference_id)
+        note = db.session.get(Note, plan.note_id)
+        default_label = plan.procedure_name or 'Procedimento'
+        return {
+            'patient_id': note.patient_id if note else None,
+            'doctor_id': note.doctor_id if note else None,
+            'default_label': default_label,
+            'default_title': f"Procedimento: {default_label}",
+        }
+
+    if event_type == 'cirurgia':
+        surgery = Surgery.query.get_or_404(reference_id)
+        default_label = surgery.procedure_name or 'Cirurgia'
+        return {
+            'patient_id': surgery.patient_id,
+            'doctor_id': surgery.doctor_id,
+            'default_label': default_label,
+            'default_title': f"Cirurgia: {default_label}",
+        }
+
+    if event_type == 'transplante':
+        surgery = TransplantSurgeryRecord.query.get_or_404(reference_id)
+        default_label = 'Transplante Capilar'
+        default_title = (
+            f"Transplante Capilar: {surgery.surgery_type}"
+            if surgery.surgery_type
+            else 'Transplante Capilar'
+        )
+        return {
+            'patient_id': surgery.patient_id,
+            'doctor_id': surgery.doctor_id,
+            'default_label': default_label,
+            'default_title': default_title,
+        }
+
+    if event_type == 'evolution':
+        evolution = Evolution.query.get_or_404(reference_id)
+        return {
+            'patient_id': evolution.patient_id,
+            'doctor_id': evolution.doctor_id,
+            'default_label': 'Evolução',
+            'default_title': 'Evolução clínica',
+        }
+
+    return None
+
+
+def _set_timeline_event_label(event_type, reference_id, raw_label):
+    target = _resolve_timeline_label_target(event_type, reference_id)
+    if not target or not target.get('patient_id'):
+        return {'success': False, 'error': 'Evento da timeline inválido'}, 400
+
+    if not _can_edit_patient_context(target['patient_id'], target.get('doctor_id')):
+        return {'success': False, 'error': 'Não autorizado'}, 403
+
     timeline_label = None if raw_label is None else str(raw_label).strip()
     if not timeline_label:
         timeline_label = None
     elif len(timeline_label) > 200:
-        return jsonify({
+        return {
             'success': False,
             'error': 'O rótulo da timeline deve ter no máximo 200 caracteres'
-        }), 400
+        }, 400
 
     try:
-        appointment.timeline_label = timeline_label
+        if event_type == 'consulta':
+            appointment = target['appointment']
+            appointment.timeline_label = timeline_label
+        else:
+            label_row = TimelineEventLabel.query.filter_by(
+                patient_id=target['patient_id'],
+                event_type=event_type,
+                reference_id=reference_id,
+            ).first()
+            if timeline_label:
+                if label_row is None:
+                    label_row = TimelineEventLabel(
+                        patient_id=target['patient_id'],
+                        event_type=event_type,
+                        reference_id=reference_id,
+                        doctor_id=target.get('doctor_id'),
+                    )
+                    db.session.add(label_row)
+                label_row.label = timeline_label
+                label_row.updated_by_id = current_user.id
+                label_row.updated_at = get_brazil_time()
+            elif label_row is not None:
+                db.session.delete(label_row)
+
         db.session.commit()
-        title = appointment.timeline_label or f"Consulta: {appointment.appointment_type or 'Geral'}"
-        return jsonify({
+        visible_title = timeline_label or target['default_title']
+        visible_label = timeline_label or target['default_label']
+        return {
             'success': True,
-            'timeline_label': appointment.timeline_label,
-            'title': title
-        })
+            'timeline_label': timeline_label,
+            'title': visible_title,
+            'label': visible_label,
+            'event_type': event_type,
+            'reference_id': reference_id,
+        }, 200
     except Exception as e:
         db.session.rollback()
         app.logger.exception(
-            f"Erro ao atualizar rótulo da timeline do agendamento {appointment_id}: {e}"
+            f"Erro ao atualizar rótulo da timeline {event_type}/{reference_id}: {e}"
         )
-        return jsonify({
+        return {
             'success': False,
             'error': 'Não foi possível atualizar o rótulo da timeline'
-        }), 500
+        }, 500
+
+
+@app.route('/api/timeline-events/label', methods=['PUT'])
+@login_required
+def update_timeline_event_label():
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+
+    event_type = (data.get('event_type') or '').strip()
+    try:
+        reference_id = int(data.get('reference_id'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Evento da timeline inválido'}), 400
+
+    result, status = _set_timeline_event_label(
+        event_type,
+        reference_id,
+        data.get('timeline_label', data.get('label')),
+    )
+    return jsonify(result), status
+
+
+@app.route('/api/appointments/<int:appointment_id>/timeline-label', methods=['PUT'])
+@login_required
+def update_timeline_label(appointment_id):
+    data = request.get_json(silent=True)
+    if data is None:
+        return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+
+    result, status = _set_timeline_event_label(
+        'consulta',
+        appointment_id,
+        data.get('timeline_label'),
+    )
+    return jsonify(result), status
 
 @app.route('/api/patient/<int:id>/photo', methods=['POST'])
 @login_required
 def update_patient_photo(id):
     patient = Patient.query.get_or_404(id)
+    if not _can_edit_patient_context(patient.id):
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     
     if 'photo' in request.files:
         # Upload via form-data
@@ -1266,11 +1548,13 @@ def get_patient_photo(patient_id):
     response = send_file(
         BytesIO(photo.data),
         mimetype=photo.mime_type,
-        conditional=True,
-        etag=True,
-        max_age=3600,
+        conditional=False,
+        etag=False,
+        max_age=0,
     )
-    response.headers['Cache-Control'] = 'private, max-age=3600'
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
 
@@ -3703,6 +3987,8 @@ def chat():
 def delete_patient_photo(patient_id):
     """Remover foto do paciente"""
     patient = Patient.query.get_or_404(patient_id)
+    if not _can_edit_patient_context(patient.id):
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
     delete_stored_patient_photo(patient)
     db.session.commit()
     return jsonify({'success': True})

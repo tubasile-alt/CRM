@@ -163,6 +163,29 @@ class Appointment(db.Model):
     doctor = db.relationship('User', backref='appointments')
 
 
+class TimelineEventLabel(db.Model):
+    __tablename__ = 'timeline_event_label'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('patient.id', ondelete='CASCADE'), nullable=False, index=True)
+    event_type = db.Column(db.String(40), nullable=False)
+    reference_id = db.Column(db.Integer, nullable=False)
+    label = db.Column(db.String(200), nullable=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    updated_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time, nullable=False)
+    updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time, nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint('patient_id', 'event_type', 'reference_id', name='uq_timeline_event_label_ref'),
+        db.Index('idx_timeline_event_label_lookup', 'event_type', 'reference_id'),
+    )
+
+    patient = db.relationship('Patient')
+    doctor = db.relationship('User', foreign_keys=[doctor_id])
+    updated_by = db.relationship('User', foreign_keys=[updated_by_id])
+
+
 class PhysicalAgendaImportLog(db.Model):
     """Trilha técnica de agendamentos criados pela importação física."""
     __tablename__ = 'physical_agenda_import_log'

@@ -544,11 +544,56 @@ function getTimelineTitleText(titleEl) {
   return titleEl.querySelector(".timeline-title-text")?.textContent?.trim() || "";
 }
 
+function getTimelineLabelTarget(titleEl) {
+  const eventType = titleEl.getAttribute("data-event-type") || "";
+  const referenceId = titleEl.getAttribute("data-reference-id") || "";
+  const appointmentId = titleEl.getAttribute("data-appointment-id") || "";
+
+  if (eventType && referenceId) {
+    return {
+      eventType,
+      referenceId,
+      url: "/api/timeline-events/label",
+      payload: {
+        event_type: eventType,
+        reference_id: Number(referenceId)
+      }
+    };
+  }
+
+  if (appointmentId) {
+    return {
+      eventType: "consulta",
+      referenceId: appointmentId,
+      url: `/api/appointments/${appointmentId}/timeline-label`,
+      payload: {}
+    };
+  }
+
+  return null;
+}
+
+function timelineTextForRole(titleEl, result, fallback) {
+  if (titleEl.getAttribute("data-label-role") === "bubble") {
+    return result?.label || result?.title || fallback;
+  }
+  return result?.title || result?.label || fallback;
+}
+
+function syncTimelineTitleInstances(sourceEl, target, result, fallback) {
+  document.querySelectorAll(".timeline-title-editable").forEach((candidate) => {
+    if (candidate === sourceEl) return;
+    if (candidate.getAttribute("data-event-type") !== target.eventType) return;
+    if (candidate.getAttribute("data-reference-id") !== String(target.referenceId)) return;
+    renderTimelineTitle(candidate, timelineTextForRole(candidate, result, fallback));
+  });
+}
+
 function startTimelineLabelEdit(titleEl) {
   if (!titleEl || titleEl.classList.contains("is-editing")) return;
 
-  const appointmentId = titleEl.getAttribute("data-appointment-id");
-  if (!appointmentId) return;
+  const target = getTimelineLabelTarget(titleEl);
+  if (!target) return;
 
   const originalTitle = getTimelineTitleText(titleEl);
   titleEl.classList.add("is-editing");
@@ -558,7 +603,7 @@ function startTimelineLabelEdit(titleEl) {
   input.maxLength = 200;
   input.className = "form-control form-control-sm timeline-label-input";
   input.value = originalTitle;
-  input.setAttribute("aria-label", "Rótulo da consulta na timeline");
+  input.setAttribute("aria-label", "Rótulo do evento na timeline");
 
   titleEl.replaceChildren(input);
 
@@ -583,33 +628,21 @@ function startTimelineLabelEdit(titleEl) {
     input.disabled = true;
 
     try {
-      const result = await core.fetchJson(`/api/appointments/${appointmentId}/timeline-label`, {
+      const result = await core.fetchJson(target.url, {
         method: "PUT",
-        body: JSON.stringify({ timeline_label: nextTitle })
+        body: JSON.stringify({
+          ...target.payload,
+          timeline_label: nextTitle
+        })
       });
 
       if (!result || result.success === false) {
         throw new Error(result?.error || "Erro ao atualizar rótulo da timeline");
       }
 
-      renderTimelineTitle(titleEl, result.title || originalTitle);
+      renderTimelineTitle(titleEl, timelineTextForRole(titleEl, result, originalTitle));
+      syncTimelineTitleInstances(titleEl, target, result, originalTitle);
       showAlert("Rótulo da timeline atualizado.", "success");
-
-      const wrapper = titleEl.closest(".timeline-dot-wrapper");
-      if (wrapper) {
-        const bubble = wrapper.querySelector(".timeline-keyword-bubble");
-        if (bubble) {
-          const suffixMatch = bubble.textContent.match(/ \+\d+$/);
-          const suffix = suffixMatch ? suffixMatch[0] : "";
-          const newText = (result.title || originalTitle) + suffix;
-          const textSpan = bubble.querySelector(".timeline-title-text");
-          if (textSpan) {
-            textSpan.textContent = newText;
-          } else {
-            bubble.textContent = newText;
-          }
-        }
-      }
     } catch (err) {
       console.error(err);
       renderTimelineTitle(titleEl, originalTitle);
