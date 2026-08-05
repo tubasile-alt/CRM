@@ -245,23 +245,6 @@ def _ensure_timeline_event_label_schema():
         app.logger.warning(f"Não foi possível garantir timeline_event_label: {e}")
 
 
-# Executar a verificação do índice uma vez no startup (idempotente)
-# Adiado para evitar que falhas de conexão no import do módulo
-# quebrem o startup em produção. Rodará no primeiro request.
-@app.before_request
-def _ensure_index_on_startup():
-    _ensure_patient_doctor_partial_index()
-    _ensure_physical_agenda_import_log_schema()
-    _ensure_appointment_timeline_label_schema()
-    _ensure_patient_photo_schema()
-    _ensure_timeline_event_label_schema()
-    # Remove o handler após a primeira execução (safe para workers concorrentes)
-    try:
-        app.before_request_funcs[None].remove(_ensure_index_on_startup)
-    except ValueError:
-        pass
-
-
 # Faixa inicial da nova política de códigos de paciente (FASE 1).
 # Novos pacientes recebem códigos a partir de 1001. Códigos históricos
 # (< 1001) são preservados integralmente e nunca alterados aqui.
