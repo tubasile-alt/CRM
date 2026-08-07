@@ -48,7 +48,7 @@
 
   .main-navbar{ z-index:1030; }
   body.has-fixed-navbar .container-fluid.py-4{
-    padding-top: 92px !important;
+    padding-top: calc(var(--main-navbar-height, 92px) + 16px) !important;
   }
   #chat-badge.has-unread{
     animation: chatBadgePulse 1.2s infinite;
@@ -265,6 +265,30 @@
     {% endif %}
     {% endif %}
     {% block extra_js %}{% endblock %}
+    <script>
+      (function () {
+        function syncMainNavbarHeight() {
+          var navbar = document.querySelector('.main-navbar');
+          if (!navbar) return;
+          document.documentElement.style.setProperty(
+            '--main-navbar-height',
+            navbar.getBoundingClientRect().height + 'px'
+          );
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', syncMainNavbarHeight, { once: true });
+        } else {
+          syncMainNavbarHeight();
+        }
+
+        window.addEventListener('resize', syncMainNavbarHeight, { passive: true });
+        if (window.ResizeObserver) {
+          var navbar = document.querySelector('.main-navbar');
+          if (navbar) new ResizeObserver(syncMainNavbarHeight).observe(navbar);
+        }
+      })();
+    </script>
 <div id="chat-toast-root"></div>
 </body>
 </html>

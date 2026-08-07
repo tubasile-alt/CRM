@@ -25,10 +25,8 @@
 
 {% set can_edit_patient_photo = current_user.is_doctor() or current_user.is_secretary() or current_user.is_admin() %}
 
-<div class="row">
-  <div class="col-12">
-    <div class="card mb-4 border-0 shadow-sm">
-      <div class="card-body">
+<div class="card mb-4 border-0 shadow-sm prontuario-patient-summary" id="patientSummary">
+      <div class="card-body prontuario-patient-summary-body">
         <div class="d-flex align-items-center gap-4">
           <div class="patient-photo-container" style="position: relative;">
             <div
@@ -74,22 +72,25 @@
             {% endif %}
           </div>
 
-          <div class="flex-grow-1">
-            <div class="d-flex align-items-center justify-content-between">
-              <div>
-                <h2 class="mb-1 fw-bold" style="color: #2c3e50;">
-                  Prontuário: {{ patient.name|upper }}
+          <div class="flex-grow-1 min-w-0">
+            <div class="d-flex align-items-start justify-content-between gap-3 prontuario-patient-header-main">
+              <div class="flex-grow-1 min-w-0">
+                <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+                  <h1 class="prontuario-patient-name mb-0">
+                    <span class="prontuario-patient-kicker">Prontuário</span>
+                    <span class="prontuario-patient-name-text">{{ patient.name|upper }}</span>
+                    {% if age %}
+                    <span class="prontuario-patient-age">({{ age }} anos)</span>
+                    {% endif %}
+                  </h1>
                   <button
-                    class="btn btn-sm btn-link text-secondary p-0 ms-2 align-baseline"
+                    class="btn btn-sm btn-link text-secondary p-0 prontuario-copy-name"
                     type="button"
                     title="Copiar nome completo"
                     onclick="copyPatientFullName()"
                   >
                     <i class="bi bi-copy"></i>
                   </button>
-                  {% if age %}
-                  <span class="text-muted fw-normal fs-4">({{ age }} anos)</span>
-                  {% endif %}
 
                   <span id="patientStarsContainer" class="ms-2">
                     {% if patient.ivp_stars %}
@@ -114,11 +115,11 @@
                   {% endif %}
 
                   {% if current_user.is_doctor() or current_user.is_secretary() %}
-                  <button class="btn btn-sm btn-outline-secondary border-0 ms-2" onclick="openEditPatientModal()" title="Editar Cadastro">
+                  <button class="btn btn-sm btn-outline-secondary border-0 prontuario-edit-patient" onclick="openEditPatientModal()" title="Editar Cadastro">
                     <i class="bi bi-pencil-square"></i> Editar Cadastro
                   </button>
                   {% endif %}
-                </h2>
+                </div>
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                   <span class="badge rounded-pill text-bg-light border">
                     <i class="bi bi-person-badge me-1"></i>Tipo paciente: {{ patient_type_label }}
@@ -154,15 +155,13 @@
                 </div>
               </div>
 
-              <button class="btn btn-light border shadow-sm px-4 rounded-pill" onclick="history.back()">
+              <button class="btn btn-light border shadow-sm px-4 rounded-pill prontuario-back-button" onclick="history.back()">
                 <i class="bi bi-arrow-left me-2"></i> Voltar
               </button>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
 </div>
 
 {% if current_user.is_doctor() %}
@@ -497,6 +496,123 @@
 
   #clinicalRightPanel {
     min-height: 120px;
+  }
+
+  .prontuario-patient-summary {
+    position: sticky;
+    top: var(--main-navbar-height, 92px);
+    z-index: 1020;
+    background: #fff;
+    border: 1px solid rgba(13, 110, 253, 0.12) !important;
+    border-top: 4px solid #0d6efd !important;
+    border-radius: 0 0 16px 16px;
+    box-shadow: 0 8px 24px rgba(31, 63, 143, 0.12) !important;
+  }
+
+  .prontuario-patient-summary-body {
+    padding: 1rem 1.25rem !important;
+  }
+
+  .prontuario-patient-name {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    min-width: 0;
+    color: #1f2d3d;
+    line-height: 1.1;
+  }
+
+  .prontuario-patient-kicker {
+    color: #0d6efd;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .prontuario-patient-name-text {
+    font-size: clamp(1.25rem, 2.2vw, 1.9rem);
+    font-weight: 800;
+    overflow-wrap: anywhere;
+  }
+
+  .prontuario-patient-age {
+    color: #6c757d;
+    font-size: clamp(0.95rem, 1.5vw, 1.2rem);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .prontuario-copy-name {
+    color: #52606d !important;
+    border-radius: 8px;
+  }
+
+  .prontuario-copy-name:hover,
+  .prontuario-edit-patient:hover {
+    background: #eef5ff;
+    color: #0d6efd !important;
+  }
+
+  .prontuario-patient-header-main .badge {
+    color: #344054 !important;
+    background: #f7f9fc !important;
+    font-weight: 600;
+  }
+
+  .prontuario-back-button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 768px) {
+    .prontuario-patient-summary {
+      top: var(--main-navbar-height, 92px);
+      border-radius: 0 0 12px 12px;
+    }
+
+    .prontuario-patient-summary-body {
+      padding: 0.75rem !important;
+    }
+
+    .prontuario-patient-summary .d-flex.align-items-center.gap-4 {
+      align-items: flex-start !important;
+      gap: 0.75rem !important;
+    }
+
+    .prontuario-patient-summary .patient-photo {
+      width: 64px !important;
+      height: 80px !important;
+      flex: 0 0 64px;
+    }
+
+    .prontuario-patient-header-main {
+      display: block !important;
+    }
+
+    .prontuario-back-button {
+      margin-top: 0.65rem;
+      width: 100%;
+    }
+
+    .prontuario-patient-name {
+      gap: 0.3rem;
+    }
+
+    .prontuario-patient-kicker {
+      width: 100%;
+      font-size: 0.7rem;
+    }
+
+    .prontuario-patient-name-text {
+      font-size: 1.15rem;
+    }
+
+    .prontuario-patient-age {
+      font-size: 0.85rem;
+    }
   }
 </style>
 
