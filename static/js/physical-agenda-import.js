@@ -568,6 +568,32 @@
             .filter((row) => row.querySelector('.agenda-include-row')?.checked && row.dataset.imported !== 'true');
     }
 
+    async function validateImport(items) {
+        const response = await fetch('/api/agenda-fisica/previsualizar-importacao', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.getCSRFToken?.() || '',
+            },
+            body: JSON.stringify({
+                doctor_id: doctorSelect.value,
+                items,
+            }),
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.success) {
+            throw new Error(data?.error || 'Não foi possível validar as linhas selecionadas.');
+        }
+        if (!data.ready) {
+            const issues = (data.rows || [])
+                .filter((row) => !row.ready)
+                .flatMap((row) => (row.issues || []).map((issue) => `Linha ${Number(row.row_index) + 1}: ${issue}`));
+            throw new Error(issues.join(' ') || 'Revise as linhas selecionadas antes de importar.');
+        }
+        return data;
+    }
+
     async function confirmAppointmentImport() {
         console.log('[PAI] confirmAppointmentImport() clicked');
         clearError();
@@ -578,13 +604,15 @@
             showError('Selecione ao menos uma linha para importar.');
             return;
         }
-        if (!window.confirm(`Criar ${items.length} agendamento(s) na agenda do médico selecionado? Pacientes sem match serão criados como provisórios automaticamente.`)) {
-            console.log('[PAI] user cancelled');
-            return;
-        }
 
         confirmImportButton.disabled = true;
         try {
+            await validateImport(items);
+            if (!window.confirm(`Criar ${items.length} agendamento(s) na agenda do médico selecionado? Pacientes sem match serão criados como provisórios automaticamente.`)) {
+                console.log('[PAI] user cancelled');
+                return;
+            }
+
             const response = await fetch('/api/agenda-fisica/importar', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -688,6 +716,7 @@
     });
 
     refreshMatchesButton.addEventListener('click', loadPatientSuggestions);
+    confirmImportButton.addEventListener('click', confirmAppointmentImport);
     console.log('[PAI] refreshMatchesButton listener registered');
     window.confirmPhysicalAgendaImport = confirmAppointmentImport;
     tableBody.addEventListener('input', (event) => {

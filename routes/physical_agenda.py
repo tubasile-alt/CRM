@@ -354,6 +354,17 @@ def confirm_import():
         return _error('Confirme explicitamente a criação dos agendamentos.')
 
     try:
+        preview = build_import_preview(data.get('items'), doctor_id)
+        if not preview['ready']:
+            issues = []
+            for row in preview['rows']:
+                if not row['ready']:
+                    issues.extend(
+                        f'Linha {row["row_index"] + 1}: {issue}'
+                        for issue in row['issues']
+                    )
+            return _error(' '.join(issues) or 'Revise as linhas antes de importar.')
+
         created = import_appointments(
             data.get('items'),
             doctor_id,
