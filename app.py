@@ -28,6 +28,32 @@ from services.appointment_types import normalize_appointment_type
 app = Flask(__name__)
 app.config.from_object(Config)
 
+
+def _safe_birth_date_iso(value):
+    """Serializa datas de nascimento sem deixar um registro legado quebrar a API."""
+    if not value:
+        return ''
+    try:
+        year = int(value.year)
+        if not 1 <= year <= 9999:
+            raise ValueError('ano fora do intervalo suportado')
+        return value.isoformat()
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        return ''
+
+
+def _parse_birth_date_input(value):
+    """Aceita somente o formato ISO usado pelos campos HTML de data."""
+    if value in (None, ''):
+        return None
+    if not isinstance(value, str):
+        raise ValueError('Data de nascimento inválida.')
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except ValueError as exc:
+        raise ValueError('Data de nascimento inválida.') from exc
+
+
 # Fazer backup automático ao iniciar a aplicação (DESABILITADO EM PRODUÇÃO)
 # Este backup é executado apenas manualmente via init_backup.py
 # @app.before_request
@@ -834,7 +860,7 @@ def get_appointments():
                 patient_type = apt.patient.patient_type or 'Particular'
                 patient_phone = apt.patient.phone or ''
                 patient_cpf = apt.patient.cpf or ''
-                patient_birth_date = apt.patient.birth_date.isoformat() if apt.patient.birth_date else ''
+                patient_birth_date = _safe_birth_date_iso(apt.patient.birth_date)
                 patient_address = apt.patient.address or ''
                 patient_city = apt.patient.city or ''
                 patient_mother_name = apt.patient.mother_name or ''
@@ -940,7 +966,7 @@ def get_patient_history(id):
             'name': patient.name,
             'phone': patient.phone,
             'cpf': patient.cpf,
-            'birth_date': patient.birth_date,
+            'birth_date': _safe_birth_date_iso(patient.birth_date),
             'address': patient.address,
             'city': patient.city,
             'patient_type': patient.patient_type
@@ -1031,7 +1057,10 @@ def create_appointment():
     is_new_patient = False
     if not patient:
         # Converter strings vazias para None para campos opcionais
-        birth_date_val = data.get('birth_date') or None
+        try:
+            birth_date_val = _parse_birth_date_input(data.get('birth_date'))
+        except ValueError as exc:
+            return jsonify({'success': False, 'error': str(exc)}), 400
         phone_val = data.get('phone') or None
         cpf_val = data.get('cpf') or None
         address_val = data.get('address') or None
@@ -1074,8 +1103,13 @@ def create_appointment():
             patient.phone = data['phone']
         if 'cpf' in data:
             patient.cpf = data['cpf']
-        if 'birth_date' in data and data['birth_date']:
-            patient.birth_date = data['birth_date']
+        if 'birth_date' in data:
+            try:
+                birth_date_val = _parse_birth_date_input(data.get('birth_date'))
+            except ValueError as exc:
+                return jsonify({'success': False, 'error': str(exc)}), 400
+            if birth_date_val is not None:
+                patient.birth_date = birth_date_val
         if 'address' in data:
             patient.address = data['address']
         if 'city' in data:
@@ -1209,6 +1243,13 @@ def update_appointment(id):
     data = request.get_json(silent=True)
     if data is None:
         return jsonify({'success': False, 'error': 'Dados inválidos'}), 400
+
+    birth_date_val = None
+    if 'birth_date' in data:
+        try:
+            birth_date_val = _parse_birth_date_input(data.get('birth_date'))
+        except ValueError as exc:
+            return jsonify({'success': False, 'error': str(exc)}), 400
     
     if 'start' in data:
         appointment.start_time = parse_datetime_with_tz(data['start'])
@@ -1266,11 +1307,7 @@ def update_appointment(id):
         if 'cpf' in data:
             appointment.patient.cpf = data.get('cpf') or None
         if 'birth_date' in data:
-            if data.get('birth_date'):
-                from datetime import datetime
-                appointment.patient.birth_date = datetime.strptime(data['birth_date'], '%Y-%m-%d').date()
-            else:
-                appointment.patient.birth_date = None
+            appointment.patient.birth_date = birth_date_val
         if 'address' in data:
             appointment.patient.address = data.get('address') or None
         if 'city' in data:
@@ -1568,7 +1605,7 @@ def search_patients():
             'id': patient.id,
             'name': patient.name,
             'cpf': patient.cpf or '',
-            'birth_date': patient.birth_date.isoformat() if patient.birth_date else '',
+            'birth_date': _safe_birth_date_iso(patient.birth_date),
             'phone': patient.phone or '',
             'address': patient.address or '',
             'city': patient.city or '',
@@ -2221,7 +2258,7 @@ def prontuario(patient_id):
             consultation_type_label = 'Não informado'
 
         age = None
-        if patient.birth_date:
+        if _safe_birth_date_iso(patient.birth_date):
             today = clinic_today()
             age = today.year - patient.birth_date.year - ((today.month, today.day) < (patient.birth_date.month, patient.birth_date.day))
         
@@ -2273,7 +2310,7 @@ def prontuario_dp(dp_id):
         use_cp = True
 
     age = None
-    if patient.birth_date:
+    if _safe_birth_date_iso(patient.birth_date):
         today = clinic_today()
         age = today.year - patient.birth_date.year - (
             (today.month, today.day) < (patient.birth_date.month, patient.birth_date.day)

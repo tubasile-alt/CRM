@@ -3,3 +3,4 @@
 - [Deployment static asset cache](deployment-static-cache.md) — reuse of a fixed asset version can leave production serving JavaScript older than the current source.
 - [Production schema drift](schema-drift-publish.md) — missing development tables can make Publish propose destructive drops against data-bearing production tables.
 - [Patient header sticky layout](patient-header-sticky-layout.md) — the fixed patient summary must follow the measured navbar height across wrapped desktop and mobile layouts.
+- [Invalid database dates](invalid-date-guard.md) — validate incoming dates and serialize legacy out-of-range dates defensively so one patient cannot break agenda responses.
