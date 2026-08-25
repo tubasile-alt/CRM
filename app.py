@@ -4086,13 +4086,6 @@ def admin_recalculate_evolution(appointment_id):
     else:
         return jsonify({'success': False, 'error': message})
 
-if __name__ == '__main__':
-    import os
-    # Development server - runs when executed as script
-    # Production uses Gunicorn (see deploy_config_tool settings)
-    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
-
 # APIs de Cirurgias de Transplante Capilar
 @login_required
 def get_surgeries(ht_id):
@@ -4161,3 +4154,10 @@ def inject_environment_flags():
         'IS_PRODUCTION': IS_PRODUCTION,
         'IS_PREVIEW': not IS_PRODUCTION,
     }
+
+
+if __name__ == '__main__':
+    # Keep server startup after every route and template context processor
+    # has been registered. This file is also the workflow entry point.
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    app.run(host='0.0.0.0', port=5000, debug=debug_mode)
