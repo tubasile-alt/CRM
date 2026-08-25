@@ -517,6 +517,13 @@ function closeAllTimelinePopovers() {
 }
 
 function handleTimelineDotClick(dot) {
+  const scrollTarget = dot.getAttribute("data-scroll-target");
+  if (scrollTarget) {
+    closeAllTimelinePopovers();
+    scrollToConsultation(scrollTarget);
+    return;
+  }
+
   const popover = dot.parentElement?.querySelector(".timeline-popover");
   if (!popover) return;
 

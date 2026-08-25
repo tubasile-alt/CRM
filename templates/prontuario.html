@@ -225,6 +225,8 @@
                 <div class="text-xs opacity-75">{{ event.dt.strftime('%H:%M') }}</div>
               </div>
 
+              {% set first_event = event.events[0] if event.events else none %}
+              {% set scroll_consultation_id = first_event.appointment_id if first_event and first_event.appointment_id else (first_event.id if first_event and first_event.type == 'consulta' else none) %}
               <div class="timeline-dot-wrapper">
                 <div
                   class="timeline-dot js-timeline-dot rounded-circle shadow-sm
@@ -239,10 +241,11 @@
                   {% else %}
                     bg-secondary
                   {% endif %}"
+                  {% if scroll_consultation_id %}data-scroll-target="consultation-{{ scroll_consultation_id }}"{% endif %}
+                  title="{% if scroll_consultation_id %}Ir para esta consulta no histórico{% else %}Ver detalhes do evento{% endif %}"
                   style="width: 24px; height: 24px; border: 4px solid #fff; cursor: pointer; transition: all 0.2s;"
                 ></div>
 
-                {% set first_event = event.events[0] if event.events else none %}
                 {% set keyword = first_event.label if first_event and first_event.label else 'Registro' %}
                 {% set extra_events = (event.events|length) - 1 %}
                 <div class="timeline-keyword-bubble">
@@ -352,6 +355,188 @@
 </div>
 
 <style>
+  #consultationsAccordion {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  #consultationsAccordion .accordion-item.consultation-card {
+    border: 1px solid #dfe5ec;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  }
+
+  #consultationsAccordion .accordion-item.consultation-card + .consultation-card {
+    margin-top: 0;
+  }
+
+  .consultation-summary-toggle {
+    padding: 0;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .consultation-summary-toggle:not(.collapsed) {
+    background: #f8fbff;
+    color: inherit;
+    box-shadow: inset 0 -1px 0 rgba(13, 110, 253, 0.08);
+  }
+
+  .consultation-summary-toggle:focus {
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+  }
+
+  .consultation-summary-toggle::after {
+    margin-right: 1rem;
+    margin-left: 0.75rem;
+  }
+
+  .consultation-summary-inner {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 1rem;
+    padding: 0.95rem 1rem;
+  }
+
+  .consultation-summary-main {
+    min-width: 0;
+    display: grid;
+    gap: 0.35rem;
+    text-align: left;
+  }
+
+  .consultation-summary-topline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .history-date-text {
+    color: #1f2933;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .history-category-pill,
+  .history-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 1.6rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .history-category-pill {
+    color: #0f3f96;
+    background: #edf4ff;
+    border: 1px solid #cfe1ff;
+  }
+
+  .history-status-pill {
+    color: #7a4b00;
+    background: #fff6db;
+    border: 1px solid #ffe3a3;
+  }
+
+  .history-meta-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.85rem;
+    color: #667085;
+    font-size: 0.86rem;
+    font-weight: 500;
+  }
+
+  .history-preview-strip {
+    display: grid;
+    gap: 0.25rem;
+    margin-top: 0.1rem;
+  }
+
+  .history-preview-line,
+  .history-preview-empty {
+    max-width: 100%;
+    color: #344054;
+    font-size: 0.84rem;
+    font-weight: 450;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .history-preview-empty {
+    color: #98a2b3;
+    font-style: italic;
+  }
+
+  .history-preview-label {
+    color: #475467;
+    font-weight: 700;
+    margin-right: 0.35rem;
+  }
+
+  .history-action-area {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    padding-top: 0.05rem;
+  }
+
+  .history-action-btn {
+    width: 2rem;
+    height: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    border: 1px solid transparent;
+    background: #fff;
+    font-size: 0.95rem;
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  }
+
+  .history-action-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .history-action-success {
+    color: #087443;
+    border-color: #abefc6;
+    background: #f6fef9;
+  }
+
+  .history-action-warning {
+    color: #b54708;
+    border-color: #fedf89;
+    background: #fffcf5;
+  }
+
+  .history-action-primary {
+    color: #175cd3;
+    border-color: #b2ccff;
+    background: #f5f8ff;
+  }
+
+  .history-action-danger {
+    color: #b42318;
+    border-color: #fecdca;
+    background: #fffbfa;
+  }
+
   .highlight-consult,
   .timeline-highlight {
     animation: highlight 2s ease-out;
@@ -446,6 +631,25 @@
     max-width: 210px;
     font-size: 0.8rem;
     padding: 0.1rem 0.35rem;
+  }
+
+  @media (max-width: 991.98px) {
+    .consultation-summary-inner {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+
+    .history-action-area {
+      justify-content: flex-start;
+    }
+
+    .history-preview-line,
+    .history-preview-empty {
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
   }
 
   .norwood-card.selected {
@@ -1141,7 +1345,7 @@
           <div class="accordion-item mb-2 consultation-card" id="consultation-{{ consultation.id }}">
             <h2 class="accordion-header" id="heading{{ consultation.id }}">
               <button
-                class="accordion-button collapsed"
+                class="accordion-button collapsed consultation-summary-toggle"
                 type="button"
                 data-bs-toggle="collapse"
                 data-bs-target="#collapse{{ consultation.id }}"
@@ -1150,69 +1354,118 @@
                 data-consultation-key="{{ consultation.id }}"
                 onclick="highlightConsultationGroup('{{ consultation.id }}')"
               >
-                <div class="w-100">
-                  <div class="d-flex justify-content-between align-items-center">
-                    <strong>
-                      <i class="bi bi-calendar3"></i>
-                      {{ consultation.date.strftime('%d/%m/%Y %H:%M') }}
-                      {% if not consultation.all_notes %}
-                      <span class="badge bg-warning text-dark ms-1" style="font-size: 0.7em;"><i class="bi bi-exclamation-triangle-fill me-1"></i>Sem notas</span>
-                      {% endif %}
-                    </strong>
+                <div class="consultation-summary-inner">
+                  <div class="consultation-summary-main">
+                    <div class="consultation-summary-topline">
+                      <span class="history-date-text">
+                        <i class="bi bi-calendar3"></i>
+                        {{ consultation.date.strftime('%d/%m/%Y %H:%M') }}
+                      </span>
 
-                    <div class="d-flex align-items-center gap-2">
-                      <span class="badge bg-primary">
+                      <span class="history-category-pill">
                         {{ consultation.category|replace('_', ' ')|title if consultation.category else 'Consulta' }}
                       </span>
 
-                      {% if current_user.is_doctor() %}
-                        <span
-                          class="btn btn-sm btn-outline-success" role="button" tabindex="0"
-                          onclick="event.stopPropagation(); openEvolutionFromConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y %H:%M') }}')"
-                          title="Adicionar evolução para esta consulta"
-                        >
-                          <i class="bi bi-plus-circle"></i> Evolução
-                        </span>
+                      {% if not consultation.all_notes %}
+                      <span class="history-status-pill">
+                        <i class="bi bi-exclamation-triangle-fill"></i> Sem notas
+                      </span>
                       {% endif %}
+                    </div>
 
-                      {% if current_user.is_doctor() or current_user.is_secretary() %}
-                        <span
-                          class="btn btn-sm btn-outline-warning" role="button" tabindex="0"
-                          onclick="event.stopPropagation(); editConsultationDate({{ consultation.id }}, '{{ consultation.date.strftime('%Y-%m-%dT%H:%M') }}')"
-                          title="Editar data e informações"
-                        >
-                          <i class="bi bi-pencil"></i>
-                        </span>
+                    <div class="history-meta-line">
+                      <span><i class="bi bi-person-circle"></i> {{ consultation.doctor.name }}</span>
+                      {% if consultation.duration %}
+                      <span><i class="bi bi-clock"></i> {{ consultation.duration }}min</span>
+                      {% endif %}
+                    </div>
 
-                        {% if consultation.appointment_id %}
-                        <span
-                          class="btn btn-sm btn-outline-primary" role="button" tabindex="0"
-                          onclick="event.stopPropagation(); window.location.href='/prontuario/{{ patient.id }}?appointment_id={{ consultation.appointment_id }}'"
-                          title="Editar consulta completa"
-                        >
-                          <i class="bi bi-pencil-square"></i>
-                        </span>
+                    <div class="history-preview-strip">
+                      {% set preview_fields = [
+                        ('Queixa', 'queixa', 'bi-chat-left-text'),
+                        ('Diagnóstico', 'diagnostico', 'bi-clipboard-check'),
+                        ('Conduta', 'conduta', 'bi-prescription2')
+                      ] %}
+                      {% set preview = namespace(found=false) %}
+                      {% for preview_label, note_key, preview_icon in preview_fields %}
+                        {% if note_key in consultation.notes_by_type %}
+                          {% set preview_text = (consultation.notes_by_type[note_key].content or '')|trim %}
+                          {% if preview_text and preview_text != '[Conduta registrada via procedimentos]' %}
+                            {% set preview.found = true %}
+                            <span class="history-preview-line">
+                              <span class="history-preview-label"><i class="bi {{ preview_icon }}"></i> {{ preview_label }}</span>
+                              {{ preview_text|striptags|truncate(130, true) }}
+                            </span>
+                          {% endif %}
                         {% endif %}
+                      {% endfor %}
+
+                      {% if consultation.cosmetic_plans %}
+                        {% set preview.found = true %}
+                        <span class="history-preview-line">
+                          <span class="history-preview-label"><i class="bi bi-stars"></i> Plano</span>
+                          {% for plan in consultation.cosmetic_plans[:2] %}
+                            {{ plan.procedure_name }}{% if not loop.last %}, {% endif %}
+                          {% endfor %}
+                          {% if consultation.cosmetic_plans|length > 2 %}+{{ consultation.cosmetic_plans|length - 2 }}{% endif %}
+                        </span>
                       {% endif %}
 
-                      {% if current_user.is_doctor() %}
-                        <span
-                          class="btn btn-sm btn-outline-danger" role="button" tabindex="0"
-                          onclick="event.stopPropagation(); deleteConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y') }}')"
-                          title="Deletar consulta"
-                        >
-                          <i class="bi bi-trash"></i>
+                      {% if consultation.evolutions %}
+                        {% set preview.found = true %}
+                        <span class="history-preview-line">
+                          <span class="history-preview-label"><i class="bi bi-journal-text"></i> Evolução</span>
+                          {{ consultation.evolutions[0].content|striptags|truncate(130, true) }}
                         </span>
+                      {% endif %}
+
+                      {% if not preview.found %}
+                      <span class="history-preview-empty">Nenhum conteúdo clínico salvo nesta consulta.</span>
                       {% endif %}
                     </div>
                   </div>
 
-                  <small class="text-muted d-block mt-1">
-                    <i class="bi bi-person-circle"></i> {{ consultation.doctor.name }}
-                    {% if consultation.duration %}
-                    | <i class="bi bi-clock"></i> {{ consultation.duration }}min
+                  <div class="history-action-area">
+                    {% if current_user.is_doctor() %}
+                      <span
+                        class="history-action-btn history-action-success" role="button" tabindex="0"
+                        onclick="event.stopPropagation(); openEvolutionFromConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y %H:%M') }}')"
+                        title="Adicionar evolução"
+                      >
+                        <i class="bi bi-plus-circle"></i>
+                      </span>
                     {% endif %}
-                  </small>
+
+                    {% if current_user.is_doctor() or current_user.is_secretary() %}
+                      <span
+                        class="history-action-btn history-action-warning" role="button" tabindex="0"
+                        onclick="event.stopPropagation(); editConsultationDate({{ consultation.id }}, '{{ consultation.date.strftime('%Y-%m-%dT%H:%M') }}')"
+                        title="Editar data e informações"
+                      >
+                        <i class="bi bi-calendar2-week"></i>
+                      </span>
+
+                      {% if consultation.appointment_id %}
+                      <span
+                        class="history-action-btn history-action-primary" role="button" tabindex="0"
+                        onclick="event.stopPropagation(); window.location.href='/prontuario/{{ patient.id }}?appointment_id={{ consultation.appointment_id }}'"
+                        title="Editar consulta completa"
+                      >
+                        <i class="bi bi-pencil-square"></i>
+                      </span>
+                      {% endif %}
+                    {% endif %}
+
+                    {% if current_user.is_doctor() %}
+                      <span
+                        class="history-action-btn history-action-danger" role="button" tabindex="0"
+                        onclick="event.stopPropagation(); deleteConsultation({{ consultation.id }}, '{{ consultation.date.strftime('%d/%m/%Y') }}')"
+                        title="Excluir consulta"
+                      >
+                        <i class="bi bi-trash"></i>
+                      </span>
+                    {% endif %}
+                  </div>
                 </div>
               </button>
             </h2>
@@ -1621,5 +1874,5 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/prontuario-core.js') }}?v=20260318-protected"></script>
 <script src="{{ url_for('static', filename='js/surgeries.js') }}?v=20260507-foliculite"></script>
-<script src="{{ url_for('static', filename='js/prontuario.js') }}?v=20260714-timeline-below-dot"></script>
+<script src="{{ url_for('static', filename='js/prontuario.js') }}?v={{ asset_version('js/prontuario.js') }}"></script>
 {% endblock %}
