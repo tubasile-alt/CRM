@@ -11,7 +11,7 @@ from io import BytesIO
 from sqlalchemy import inspect as sqlalchemy_inspect
 
 from config import Config
-from models import db, User, Patient, PatientPhoto, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, TransplantSurgeryRecord, TimelineEventLabel, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
+from models import db, User, Patient, PatientPhoto, PatientAISummary, Appointment, Note, Procedure, Indication, Tag, PatientTag, ChatMessage, MessageRead, CosmeticProcedurePlan, ProcedureExecution, HairTransplant, TransplantImage, FollowUpReminder, Payment, PatientDoctor, Evolution, Surgery, TransplantSurgeryRecord, TimelineEventLabel, OperatingRoom, Prescription, CommercialTask, PushSubscription, PatientActivationLog
 from services.patient_photo_service import delete_patient_photo as delete_stored_patient_photo
 from services.patient_photo_service import save_patient_photo, save_patient_photo_data_url
 from utils.database_backup import backup_manager
@@ -22,6 +22,11 @@ from services.finalization_service import _note_counts_as_finalized, _find_final
 from services.timeline_service import build_patient_timeline
 from services.doctor_service import get_doctor_id, get_all_doctors
 from services.pricing import CONSULTATION_PRICES
+from services.prontuario_summary_ai import (
+    ProntuarioSummaryAIError,
+    build_prontuario_summary_source,
+    generate_prontuario_summary,
+)
 from services.statuses import normalize_appointment_status
 from services.appointment_types import normalize_appointment_type
 
@@ -192,6 +197,76 @@ def _ensure_patient_photo_schema():
                 """))
     except Exception as e:
         app.logger.warning(f"Não foi possível garantir patient_photo: {e}")
+
+
+def _ensure_patient_ai_summary_schema():
+    if app.config.get('_PATIENT_AI_SUMMARY_SCHEMA_READY'):
+        return
+    try:
+        if db.engine.dialect.name == 'postgresql':
+            with db.engine.begin() as conn:
+                conn.execute(db.text("""
+                    CREATE TABLE IF NOT EXISTS patient_ai_summary (
+                        id SERIAL PRIMARY KEY,
+                        patient_id INTEGER NOT NULL REFERENCES patient(id) ON DELETE CASCADE,
+                        summary_text TEXT NOT NULL,
+                        source_hash VARCHAR(64) NOT NULL,
+                        model VARCHAR(100),
+                        generated_by_id INTEGER REFERENCES "user"(id) ON DELETE SET NULL,
+                        generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                """))
+                conn.execute(db.text("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_ai_summary_patient_id
+                    ON patient_ai_summary (patient_id);
+                """))
+                conn.execute(db.text("""
+                    CREATE INDEX IF NOT EXISTS idx_patient_ai_summary_source_hash
+                    ON patient_ai_summary (source_hash);
+                """))
+        else:
+            inspector = sqlalchemy_inspect(db.engine)
+            summary_exists = 'patient_ai_summary' in inspector.get_table_names()
+            summary_columns = (
+                [column['name'] for column in inspector.get_columns('patient_ai_summary')]
+                if summary_exists
+                else []
+            )
+            with db.engine.begin() as conn:
+                if not summary_exists:
+                    conn.execute(db.text("""
+                        CREATE TABLE patient_ai_summary (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            patient_id INTEGER NOT NULL UNIQUE,
+                            summary_text TEXT NOT NULL,
+                            source_hash VARCHAR(64) NOT NULL,
+                            model VARCHAR(100),
+                            generated_by_id INTEGER,
+                            generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """))
+                else:
+                    if 'summary_text' not in summary_columns:
+                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN summary_text TEXT;"))
+                    if 'source_hash' not in summary_columns:
+                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN source_hash VARCHAR(64);"))
+                    if 'model' not in summary_columns:
+                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN model VARCHAR(100);"))
+                    if 'generated_by_id' not in summary_columns:
+                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN generated_by_id INTEGER;"))
+                    if 'generated_at' not in summary_columns:
+                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN generated_at DATETIME;"))
+                conn.execute(db.text("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_ai_summary_patient_id
+                    ON patient_ai_summary (patient_id);
+                """))
+                conn.execute(db.text("""
+                    CREATE INDEX IF NOT EXISTS idx_patient_ai_summary_source_hash
+                    ON patient_ai_summary (source_hash);
+                """))
+        app.config['_PATIENT_AI_SUMMARY_SCHEMA_READY'] = True
+    except Exception as e:
+        app.logger.warning(f"Não foi possível garantir patient_ai_summary: {e}")
 
 
 def _ensure_timeline_event_label_schema():
@@ -1519,6 +1594,113 @@ def update_timeline_label(appointment_id):
         data.get('timeline_label'),
     )
     return jsonify(result), status
+
+
+def _compose_ai_summary_text(ai_result):
+    lines = [(ai_result.get('summary') or '').strip()]
+    alerts = [item.strip() for item in (ai_result.get('alerts') or []) if item and item.strip()]
+    pending = [item.strip() for item in (ai_result.get('pending') or []) if item and item.strip()]
+    if alerts:
+        lines.append('Alertas: ' + '; '.join(alerts[:4]))
+    if pending:
+        lines.append('Pendências: ' + '; '.join(pending[:4]))
+    return '\n'.join(line for line in lines if line).strip()[:2000]
+
+
+def _serialize_patient_ai_summary(summary, stale, has_source_content):
+    generated_at = summary.generated_at if summary else None
+    return {
+        'success': True,
+        'summary': summary.summary_text if summary else None,
+        'stale': bool(stale),
+        'has_source_content': bool(has_source_content),
+        'generated_at': generated_at.isoformat() if generated_at else None,
+        'generated_at_label': format_brazil_datetime(generated_at) if generated_at else None,
+        'model': summary.model if summary else None,
+    }
+
+
+@app.route('/api/patient/<int:patient_id>/ai-summary', methods=['GET'])
+@login_required
+def get_patient_ai_summary(patient_id):
+    patient = Patient.query.get_or_404(patient_id)
+    if not _can_edit_patient_context(patient.id):
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    _ensure_patient_ai_summary_schema()
+
+    try:
+        _, source_hash, has_source_content = build_prontuario_summary_source(patient.id)
+        summary = PatientAISummary.query.filter_by(patient_id=patient.id).first()
+        response = jsonify(_serialize_patient_ai_summary(
+            summary,
+            stale=summary is None or summary.source_hash != source_hash,
+            has_source_content=has_source_content,
+        ))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except Exception as exc:
+        app.logger.error('Erro técnico ao consultar resumo IA do prontuário %s: %s', patient_id, type(exc).__name__)
+        return jsonify({
+            'success': False,
+            'error': 'Não foi possível carregar o resumo IA.'
+        }), 500
+
+
+@app.route('/api/patient/<int:patient_id>/ai-summary/generate', methods=['POST'])
+@login_required
+def generate_patient_ai_summary(patient_id):
+    patient = Patient.query.get_or_404(patient_id)
+    if not _can_edit_patient_context(patient.id):
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    _ensure_patient_ai_summary_schema()
+
+    try:
+        source_payload, source_hash, has_source_content = build_prontuario_summary_source(patient.id)
+        if not has_source_content:
+            return jsonify({
+                'success': False,
+                'error': 'Ainda não há conteúdo clínico suficiente para resumir.'
+            }), 400
+
+        ai_result, model = generate_prontuario_summary(source_payload)
+        summary_text = _compose_ai_summary_text(ai_result)
+        if not summary_text:
+            return jsonify({
+                'success': False,
+                'error': 'A IA não conseguiu gerar um resumo útil.'
+            }), 502
+
+        summary = PatientAISummary.query.filter_by(patient_id=patient.id).first()
+        if summary is None:
+            summary = PatientAISummary(patient_id=patient.id)
+            db.session.add(summary)
+        summary.summary_text = summary_text
+        summary.source_hash = source_hash
+        summary.model = model
+        summary.generated_by_id = current_user.id
+        summary.generated_at = get_brazil_time()
+        db.session.commit()
+
+        response = jsonify(_serialize_patient_ai_summary(
+            summary,
+            stale=False,
+            has_source_content=has_source_content,
+        ))
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except ProntuarioSummaryAIError as exc:
+        db.session.rollback()
+        status = 503 if 'OPENAI_API_KEY' in str(exc) else 502
+        return jsonify({'success': False, 'error': str(exc)}), status
+    except Exception as exc:
+        db.session.rollback()
+        app.logger.error('Erro técnico ao gerar resumo IA do prontuário %s: %s', patient_id, type(exc).__name__)
+        return jsonify({
+            'success': False,
+            'error': 'Não foi possível gerar o resumo IA.'
+        }), 500
 
 @app.route('/api/patient/<int:id>/photo', methods=['POST'])
 @login_required
