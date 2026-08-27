@@ -7,4 +7,6 @@ When a publish diff proposes dropping production tables that are still part of t
 
 **Why:** Development lacked the photo and timeline-label tables while production still held data, causing a misleading destructive publish warning. Request-time DDL later blocked the Autoscale health check and caused a failed publish.
 
-**How to apply:** Compare both schemas read-only, recreate only missing development structures from the model/production shape, then recalculate the publish diff and inspect every remaining statement. Keep `/health` and `/` free of migrations; apply schema changes through the development post-merge flow and Publish.
+**Environment constraint:** The runtime database can be separate from the managed development database compared by Publish. Runtime or external-database migrations do not automatically change the schema that Publish diffs.
+
+**How to apply:** Compare the managed development and production schemas read-only, recreate only missing development structures from the model/production shape, then recalculate the publish diff and inspect every remaining statement. Keep `/health` and `/` free of migrations; apply schema changes through the development post-merge flow and Publish.
