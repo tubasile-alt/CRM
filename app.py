@@ -199,76 +199,6 @@ def _ensure_patient_photo_schema():
         app.logger.warning(f"Não foi possível garantir patient_photo: {e}")
 
 
-def _ensure_patient_ai_summary_schema():
-    if app.config.get('_PATIENT_AI_SUMMARY_SCHEMA_READY'):
-        return
-    try:
-        if db.engine.dialect.name == 'postgresql':
-            with db.engine.begin() as conn:
-                conn.execute(db.text("""
-                    CREATE TABLE IF NOT EXISTS patient_ai_summary (
-                        id SERIAL PRIMARY KEY,
-                        patient_id INTEGER NOT NULL REFERENCES patient(id) ON DELETE CASCADE,
-                        summary_text TEXT NOT NULL,
-                        source_hash VARCHAR(64) NOT NULL,
-                        model VARCHAR(100),
-                        generated_by_id INTEGER REFERENCES "user"(id) ON DELETE SET NULL,
-                        generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                    );
-                """))
-                conn.execute(db.text("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_ai_summary_patient_id
-                    ON patient_ai_summary (patient_id);
-                """))
-                conn.execute(db.text("""
-                    CREATE INDEX IF NOT EXISTS idx_patient_ai_summary_source_hash
-                    ON patient_ai_summary (source_hash);
-                """))
-        else:
-            inspector = sqlalchemy_inspect(db.engine)
-            summary_exists = 'patient_ai_summary' in inspector.get_table_names()
-            summary_columns = (
-                [column['name'] for column in inspector.get_columns('patient_ai_summary')]
-                if summary_exists
-                else []
-            )
-            with db.engine.begin() as conn:
-                if not summary_exists:
-                    conn.execute(db.text("""
-                        CREATE TABLE patient_ai_summary (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            patient_id INTEGER NOT NULL UNIQUE,
-                            summary_text TEXT NOT NULL,
-                            source_hash VARCHAR(64) NOT NULL,
-                            model VARCHAR(100),
-                            generated_by_id INTEGER,
-                            generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-                        );
-                    """))
-                else:
-                    if 'summary_text' not in summary_columns:
-                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN summary_text TEXT;"))
-                    if 'source_hash' not in summary_columns:
-                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN source_hash VARCHAR(64);"))
-                    if 'model' not in summary_columns:
-                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN model VARCHAR(100);"))
-                    if 'generated_by_id' not in summary_columns:
-                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN generated_by_id INTEGER;"))
-                    if 'generated_at' not in summary_columns:
-                        conn.execute(db.text("ALTER TABLE patient_ai_summary ADD COLUMN generated_at DATETIME;"))
-                conn.execute(db.text("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS idx_patient_ai_summary_patient_id
-                    ON patient_ai_summary (patient_id);
-                """))
-                conn.execute(db.text("""
-                    CREATE INDEX IF NOT EXISTS idx_patient_ai_summary_source_hash
-                    ON patient_ai_summary (source_hash);
-                """))
-        app.config['_PATIENT_AI_SUMMARY_SCHEMA_READY'] = True
-    except Exception as e:
-        app.logger.warning(f"Não foi possível garantir patient_ai_summary: {e}")
-
-
 def _ensure_timeline_event_label_schema():
     try:
         if db.engine.dialect.name == 'postgresql':
@@ -1627,8 +1557,6 @@ def get_patient_ai_summary(patient_id):
     if not _can_edit_patient_context(patient.id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
 
-    _ensure_patient_ai_summary_schema()
-
     try:
         _, source_hash, has_source_content = build_prontuario_summary_source(patient.id)
         summary = PatientAISummary.query.filter_by(patient_id=patient.id).first()
@@ -1653,8 +1581,6 @@ def generate_patient_ai_summary(patient_id):
     patient = Patient.query.get_or_404(patient_id)
     if not _can_edit_patient_context(patient.id):
         return jsonify({'success': False, 'error': 'Não autorizado'}), 403
-
-    _ensure_patient_ai_summary_schema()
 
     try:
         source_payload, source_hash, has_source_content = build_prontuario_summary_source(patient.id)
