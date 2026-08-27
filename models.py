@@ -114,6 +114,29 @@ class PatientPhoto(db.Model):
 
     patient = db.relationship('Patient', back_populates='photo_file')
 
+
+class PatientAISummary(db.Model):
+    """Resumo clínico derivado por IA, separado das notas originais."""
+    __tablename__ = 'patient_ai_summary'
+
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(
+        db.Integer,
+        db.ForeignKey('patient.id', ondelete='CASCADE'),
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+    summary_text = db.Column(db.Text, nullable=False)
+    source_hash = db.Column(db.String(64), nullable=False, index=True)
+    model = db.Column(db.String(100))
+    generated_by_id = db.Column(db.Integer, db.ForeignKey('user.id', ondelete='SET NULL'))
+    generated_at = db.Column(db.DateTime, default=get_brazil_time, nullable=False)
+
+    patient = db.relationship('Patient', backref=db.backref('ai_summary', uselist=False))
+    generated_by = db.relationship('User', foreign_keys=[generated_by_id])
+
+
 class PatientDoctor(db.Model):
     __tablename__ = 'patient_doctor'
     id = db.Column(db.Integer, primary_key=True)

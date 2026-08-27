@@ -109,6 +109,96 @@ function ensureClinicalEditAllowed() {
 }
 
 /* =========================
+   RESUMO IA
+========================= */
+
+function getAISummaryElements() {
+  return {
+    card: document.getElementById("prontuarioAISummaryCard"),
+    text: document.getElementById("aiSummaryText"),
+    status: document.getElementById("aiSummaryStatus"),
+    button: document.getElementById("aiSummaryRefreshBtn")
+  };
+}
+
+function setAISummaryLoading(isLoading) {
+  const { button } = getAISummaryElements();
+  if (!button) return;
+  button.disabled = Boolean(isLoading);
+  button.classList.toggle("is-loading", Boolean(isLoading));
+}
+
+function renderAISummary(data) {
+  const { text, status } = getAISummaryElements();
+  if (!text || !status) return;
+
+  if (!data || data.success === false) {
+    text.textContent = data?.error || "Não foi possível carregar o resumo IA.";
+    status.textContent = "Resumo indisponível.";
+    return;
+  }
+
+  if (data.summary) {
+    text.textContent = data.summary;
+    if (data.stale) {
+      status.textContent = data.generated_at_label
+        ? `Desatualizado desde ${data.generated_at_label}.`
+        : "Resumo desatualizado.";
+    } else {
+      status.textContent = data.generated_at_label
+        ? `Atualizado em ${data.generated_at_label}.`
+        : "Resumo atualizado.";
+    }
+    return;
+  }
+
+  text.textContent = data.has_source_content
+    ? "Nenhum resumo gerado ainda."
+    : "Ainda não há conteúdo clínico suficiente para resumir.";
+  status.textContent = data.has_source_content
+    ? "Use o botão para gerar o primeiro resumo."
+    : "Aguardando registros clínicos.";
+}
+
+async function loadAISummary() {
+  const patientId = getPatientId();
+  if (!patientId || !core) return;
+
+  try {
+    const data = await core.fetchJson(`/api/patient/${patientId}/ai-summary`);
+    renderAISummary(data);
+  } catch (err) {
+    console.error(err);
+    renderAISummary({
+      success: false,
+      error: err.message || "Não foi possível carregar o resumo IA."
+    });
+  }
+}
+
+async function refreshAISummary() {
+  const patientId = getPatientId();
+  if (!patientId || !core) return;
+
+  setAISummaryLoading(true);
+  try {
+    const data = await core.fetchJson(`/api/patient/${patientId}/ai-summary/generate`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    renderAISummary(data);
+    showAlert("Resumo IA atualizado.", "success");
+  } catch (err) {
+    console.error(err);
+    showAlert(err.message || "Erro ao gerar resumo IA.", "danger");
+  } finally {
+    setAISummaryLoading(false);
+  }
+}
+
+window.refreshAISummary = refreshAISummary;
+
+/* =========================
    DITADO
 ========================= */
 
@@ -4044,6 +4134,7 @@ document.addEventListener("keydown", function (e) {
 document.addEventListener("DOMContentLoaded", async function () {
   window.patientId = getPatientId();
 
+  loadAISummary();
   initSpeechRecognition();
   if (canEditClinical()) {
     startConsultation();

@@ -104,6 +104,7 @@ class Config:
 
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
     OPENAI_VISION_MODEL = os.environ.get('OPENAI_VISION_MODEL', 'gpt-4.1-mini')
+    OPENAI_SUMMARY_MODEL = os.environ.get('OPENAI_SUMMARY_MODEL', OPENAI_VISION_MODEL)
     PHYSICAL_AGENDA_UPLOAD_MAX_MB = _positive_int_env('PHYSICAL_AGENDA_UPLOAD_MAX_MB', 10)
 
     DOCTOR_COLORS = ['#0d6efd', '#198754', '#dc3545', '#ffc107', '#6f42c1', '#20c997', '#fd7e14', '#0dcaf0']
