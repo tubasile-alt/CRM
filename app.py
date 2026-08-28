@@ -1527,21 +1527,24 @@ def update_timeline_label(appointment_id):
 
 
 def _compose_ai_summary_text(ai_result):
-    lines = [(ai_result.get('summary') or '').strip()]
-    alerts = [item.strip() for item in (ai_result.get('alerts') or []) if item and item.strip()]
-    pending = [item.strip() for item in (ai_result.get('pending') or []) if item and item.strip()]
-    if alerts:
-        lines.append('Alertas: ' + '; '.join(alerts[:4]))
-    if pending:
-        lines.append('Pendências: ' + '; '.join(pending[:4]))
-    return '\n'.join(line for line in lines if line).strip()[:2000]
+    return _strip_ai_summary_interpretation_sections(ai_result.get('summary'))[:2000]
+
+
+def _strip_ai_summary_interpretation_sections(text):
+    lines = []
+    for line in str(text or '').splitlines():
+        label = line.strip().lower()
+        if label.startswith(('alertas:', 'pendências:', 'pendencias:')):
+            continue
+        lines.append(line)
+    return '\n'.join(lines).strip()
 
 
 def _serialize_patient_ai_summary(summary, stale, has_source_content):
     generated_at = summary.generated_at if summary else None
     return {
         'success': True,
-        'summary': summary.summary_text if summary else None,
+        'summary': _strip_ai_summary_interpretation_sections(summary.summary_text) if summary else None,
         'stale': bool(stale),
         'has_source_content': bool(has_source_content),
         'generated_at': generated_at.isoformat() if generated_at else None,
