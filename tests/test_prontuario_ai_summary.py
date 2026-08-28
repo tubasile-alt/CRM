@@ -160,8 +160,6 @@ class ProntuarioAISummaryServiceTests(unittest.TestCase):
         client = openai_mock.return_value
         client.responses.create.return_value.output_text = json.dumps({
             'summary': 'Quadro estável com conduta recente.',
-            'alerts': ['Alergia a dipirona'],
-            'pending': ['Reavaliar em 30 dias'],
         })
 
         with self.app.app_context():
@@ -176,7 +174,13 @@ class ProntuarioAISummaryServiceTests(unittest.TestCase):
         self.assertLessEqual(request['max_output_tokens'], 700)
         self.assertTrue(request['text']['format']['strict'])
         self.assertEqual(request['text']['format']['name'], 'prontuario_ai_summary')
+        schema = request['text']['format']['schema']
+        self.assertEqual(schema['required'], ['summary'])
+        self.assertNotIn('alerts', schema['properties'])
+        self.assertNotIn('pending', schema['properties'])
         self.assertEqual(result['summary'], 'Quadro estável com conduta recente.')
+        self.assertNotIn('alerts', result)
+        self.assertNotIn('pending', result)
 
 
 def test_prontuario_ai_summary_ui_contract():
@@ -189,6 +193,7 @@ def test_prontuario_ai_summary_ui_contract():
     assert '/api/patient/${patientId}/ai-summary`' in js_source
     assert '/api/patient/${patientId}/ai-summary/generate`' in js_source
     assert 'window.refreshAISummary = refreshAISummary;' in js_source
+    assert 'Conferir no prontuário.' in template
 
 
 def test_patient_ai_summary_model_is_separate_from_notes():

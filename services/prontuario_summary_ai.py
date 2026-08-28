@@ -30,20 +30,18 @@ SUMMARY_RESPONSE_SCHEMA = {
     'additionalProperties': False,
     'properties': {
         'summary': {'type': 'string'},
-        'alerts': {'type': 'array', 'items': {'type': 'string'}},
-        'pending': {'type': 'array', 'items': {'type': 'string'}},
     },
-    'required': ['summary', 'alerts', 'pending'],
+    'required': ['summary'],
 }
 
 SYSTEM_PROMPT = """Você resume prontuários médicos para revisão clínica rápida.
 Use apenas os dados fornecidos. Não invente informações.
 Omitir campos vazios. Não mencionar dados administrativos.
 q=queixa, a=anamnese/exame, dx=diagnóstico, c=conduta.
-Responder em português do Brasil, objetivo, com no máximo 1200 caracteres no total.
-summary deve trazer o quadro atual e condutas recentes em texto corrido curto.
-alerts deve conter apenas riscos clínicos importantes.
-pending deve conter apenas pendências práticas de seguimento.
+Responder em português do Brasil, objetivo, com no máximo 900 caracteres.
+summary deve trazer apenas um resumo factual do conteúdo do prontuário em texto corrido curto.
+Não criar alertas, pendências, recomendações, orientações, riscos, julgamento clínico ou condutas novas.
+A interpretação e decisão clínica ficam exclusivamente para o médico.
 """
 
 
@@ -373,23 +371,13 @@ def _normalize_ai_result(payload):
     if not isinstance(payload, dict):
         raise ProntuarioSummaryAIError('A IA retornou uma resposta em formato inválido.')
 
-    summary = _clean_text(payload.get('summary'), 1400)
-    alerts = [
-        item for item in (_clean_text(value, 180) for value in (payload.get('alerts') or []))
-        if item
-    ][:4]
-    pending = [
-        item for item in (_clean_text(value, 180) for value in (payload.get('pending') or []))
-        if item
-    ][:4]
+    summary = _clean_text(payload.get('summary'), 1000)
 
     if not summary:
         raise ProntuarioSummaryAIError('A IA não conseguiu gerar um resumo útil.')
 
     return {
         'summary': summary,
-        'alerts': alerts,
-        'pending': pending,
     }
 
 
@@ -412,7 +400,7 @@ def generate_prontuario_summary(source_payload):
         response = client.responses.create(
             model=model,
             store=False,
-            max_output_tokens=700,
+            max_output_tokens=450,
             input=[{
                 'role': 'user',
                 'content': [{
