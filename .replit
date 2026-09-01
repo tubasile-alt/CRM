@@ -65,7 +65,7 @@ externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["gunicorn", "--bind=0.0.0.0:5000", "--workers=2", "--threads=2", "--worker-class=gthread", "--timeout=120", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
+run = ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
 
 [userenv]
 
