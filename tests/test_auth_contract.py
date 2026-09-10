@@ -19,6 +19,9 @@ PUBLIC_PATHS = {
     "/icon-1024.png",
     "/api/push/vapid-public-key",
 }
+EXTERNAL_AUTH_PREFIXES = (
+    "/api/integrations/",
+)
 
 # 400 aceito só para métodos com corpo: CSRFProtect pode rejeitar antes
 # do login_required. GET sem login jamais pode retornar 2xx/5xx.
@@ -39,7 +42,12 @@ def test_every_route_requires_auth(flask_app):
     client = flask_app.test_client()
     failures = []
     for rule in flask_app.url_map.iter_rules():
-        if rule.endpoint == "static" or str(rule.rule) in PUBLIC_PATHS:
+        rule_path = str(rule.rule)
+        if (
+            rule.endpoint == "static"
+            or rule_path in PUBLIC_PATHS
+            or rule_path.startswith(EXTERNAL_AUTH_PREFIXES)
+        ):
             continue
         for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
             resp = client.open(_concrete_path(rule), method=method)
