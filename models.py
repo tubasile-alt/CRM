@@ -44,6 +44,7 @@ class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(20))
+    accepts_marketing = db.Column(db.Boolean, default=True, nullable=False)
     email = db.Column(db.String(120))
     birth_date = db.Column(db.Date)
     cpf = db.Column(db.String(14))
@@ -496,6 +497,36 @@ class ProcedureExecution(db.Model):
     updated_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, index=True)
     updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time, index=True)
     created_at = db.Column(db.DateTime, default=get_brazil_time, index=True)
+
+
+class MessageDispatch(db.Model):
+    __tablename__ = 'message_dispatch'
+
+    id = db.Column(db.Integer, primary_key=True)
+    execution_id = db.Column(
+        db.Integer,
+        db.ForeignKey('procedure_execution.id', ondelete='CASCADE'),
+        nullable=False,
+        index=True,
+    )
+    message_type = db.Column(db.String(20), nullable=False)
+    due_at = db.Column(db.Date, nullable=False, index=True)
+    status = db.Column(db.String(20), nullable=False, default='pendente')
+    sent_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+
+    execution = db.relationship('ProcedureExecution', backref='dispatches')
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            'execution_id',
+            'message_type',
+            name='ux_dispatch_exec_type',
+        ),
+        db.Index('ix_dispatch_due', 'status', 'due_at'),
+    )
+
 
 # Modelos para Transplante Capilar
 class HairTransplant(db.Model):

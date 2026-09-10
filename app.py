@@ -29,6 +29,7 @@ from services.prontuario_summary_ai import (
 )
 from services.statuses import normalize_appointment_status
 from services.appointment_types import normalize_appointment_type
+from services.followup_service import register_followup_listeners
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -80,6 +81,7 @@ def _parse_birth_date_input(value):
 db.init_app(app)
 csrf = CSRFProtect(app)
 mail = Mail(app)
+register_followup_listeners()
 
 
 def _ensure_patient_doctor_partial_index():

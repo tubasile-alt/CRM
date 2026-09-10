@@ -2,7 +2,6 @@ import os
 import shutil
 from datetime import datetime
 from app import app, db
-from models import OperatingRoom, Surgery, DoctorPreference, User
 from services.push_schema_service import ensure_push_subscription_schema
 
 def backup_database():
@@ -56,6 +55,25 @@ def ensure_medication_columns():
             print('  + Coluna etiqueta_revisada adicionada')
         db.session.commit()
 
+
+def ensure_patient_marketing_column():
+    """Garante que a preferência de marketing exista na tabela patient."""
+    with app.app_context():
+        if db.engine.dialect.name != 'postgresql':
+            return
+        cols = db.session.execute(db.text(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'patient'"
+        )).fetchall()
+        col_names = {c[0] for c in cols}
+        if 'accepts_marketing' not in col_names:
+            db.session.execute(db.text(
+                "ALTER TABLE patient "
+                "ADD COLUMN accepts_marketing BOOLEAN DEFAULT TRUE NOT NULL"
+            ))
+            print('  + Coluna accepts_marketing adicionada')
+        db.session.commit()
+
+
 def migrate_database():
     """Migra o banco de dados adicionando novas tabelas e colunas"""
     with app.app_context():
@@ -67,6 +85,9 @@ def migrate_database():
         try:
             # Garantir colunas de etiquetagem em medications
             ensure_medication_columns()
+
+            # Garantir preferência de marketing antes de carregar o modelo completo
+            ensure_patient_marketing_column()
 
             # Criar novas tabelas (se não existirem)
             db.create_all()

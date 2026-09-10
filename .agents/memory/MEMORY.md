@@ -6,3 +6,4 @@
 - [Patient header sticky layout](patient-header-sticky-layout.md) — the fixed patient summary must follow the measured navbar height across wrapped desktop and mobile layouts.
 - [Invalid database dates](invalid-date-guard.md) — validate incoming dates and serialize legacy out-of-range dates defensively so one patient cannot break agenda responses.
 - [Physical agenda confirmation](physical-agenda-confirmation.md) — validate the final edited rows immediately before writing and avoid fixed JavaScript cache keys.
+- [Message dispatch activation](message-dispatch-activation.md) — create dispatch schema via post-merge; keep listeners off until production schema and backfill are verified.
