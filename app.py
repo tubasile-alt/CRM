@@ -3560,22 +3560,6 @@ def finalizar_atendimento(patient_id):
                         )
                         db.session.add(execution_obj)
 
-                        # Auto-sync aba Botox no Google Sheets
-                        _proc_type = (plan_obj.procedure_name or proc_name or '').lower()
-                        if 'botox' in _proc_type:
-                            try:
-                                from services.google_sheets import append_botox_row
-                                from dateutil.relativedelta import relativedelta as _rdelta
-                                _fu_date = (performed_date_value + _rdelta(months=5)).strftime('%d/%m/%Y')
-                                append_botox_row({
-                                    'patient_name':  patient.name if patient else f'Paciente #{patient_id}',
-                                    'phone':         patient.phone if patient else '',
-                                    'performed_date': performed_date_value.strftime('%d/%m/%Y'),
-                                    'followup_date':  _fu_date,
-                                })
-                            except Exception as _be:
-                                print(f'Erro ao registrar Botox (não-crítico): {_be}')
-
                     # Criar novo lembrete APENAS para não realizados
                     if not proc_item.get('performed', False):
                         follow_up_date = (get_brazil_time() + timedelta(days=30 * int(proc_item['months']))).date()
@@ -3760,23 +3744,6 @@ def finalizar_atendimento(patient_id):
                     append_procedures_batch(gs_rows)
                     app.logger.debug(f"{len(gs_rows)} procedimentos enviados para Google Sheets")
 
-                # Aba Botox: envia cada Botox realizado também para a aba dedicada
-                try:
-                    from services.google_sheets import append_botox_row
-                    from dateutil.relativedelta import relativedelta as _rdelta
-                    for _row in gs_rows:
-                        if 'botox' in _row.get('procedure_name', '').lower():
-                            _pd = datetime.strptime(_row['procedure_date'], '%d/%m/%Y').date()
-                            _fu = (_pd + _rdelta(months=5)).strftime('%d/%m/%Y')
-                            append_botox_row({
-                                'patient_name':  _row['patient_name'],
-                                'phone':         _row['phone'],
-                                'performed_date': _row['procedure_date'],
-                                'followup_date':  _fu,
-                            })
-                except Exception as _be:
-                    print(f"Erro ao registrar Botox na aba Botox (não-crítico): {_be}")
-            
             elif category == 'transplante_capilar':
                 from services.google_sheets import append_transplant_data
                 append_transplant_data([{
@@ -4147,6 +4114,21 @@ def start_smart_no_show_scheduler(app_instance):
         minutes=5,
         id="smart_no_show_30min",
         replace_existing=True
+    )
+
+    from services.botox_sheet_service import run_botox_sheet_sync
+
+    def _sync_botox_sheet():
+        with app_instance.app_context():
+            ok, msg = run_botox_sheet_sync()
+            print(f"[BOTOX-SHEET] {'✓' if ok else '✗'} {msg}")
+
+    scheduler.add_job(
+        func=_sync_botox_sheet,
+        trigger="interval",
+        hours=6,
+        id="botox_sheet_sync",
+        replace_existing=True,
     )
 
     scheduler.start()

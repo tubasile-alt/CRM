@@ -1,7 +1,6 @@
 import os
 import threading
 import requests as http_requests
-from datetime import datetime, timezone
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import re
@@ -266,11 +265,15 @@ def append_transplant_data(data):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ABA BOTOX – auto-sync por linha + sync completo histórico
+# ABA BOTOX – espelho reconciliado do banco
 # ──────────────────────────────────────────────────────────────────────────────
 BOTOX_SPREADSHEET_ID = '1IUNWhBRzt5u6_ttfzjfTKckhSMOMx1l_s7uGnIom66o'
 BOTOX_SHEET_NAME     = 'Botox'
-BOTOX_HEADERS        = ['Paciente', 'Celular', 'Data Realizado', 'Data Follow-up (5 meses)']
+BOTOX_HEADERS = [
+    'execution_id', 'Paciente', 'Celular', 'Data Realizado',
+    'Data Follow-up (5 meses)', 'Status D0', 'Enviada D0',
+    'Status 5m', 'Enviada 5m',
+]
 
 
 def _ensure_botox_sheet(headers_req, base, access_token):
@@ -292,8 +295,8 @@ def _ensure_botox_sheet(headers_req, base, access_token):
     return True
 
 
-def _do_append_botox_row(row_data):
-    """Adiciona UMA linha na aba Botox (chamado em background thread)."""
+def write_botox_sheet(values_matrix):
+    """Reescreve a aba Botox inteira, preservando o conteúdo se o PUT falhar."""
     try:
         import requests as req
         token = _get_access_token()
@@ -304,80 +307,25 @@ def _do_append_botox_row(row_data):
             def get(self, *a, **kw):  return req.get(*a, headers=h, **kw)
             def post(self, *a, **kw): return req.post(*a, headers=h, **kw)
             def put(self, *a, **kw):  return req.put(*a, headers=h, **kw)
-        s = _S()
+        if not _ensure_botox_sheet(_S(), base, token):
+            return False, 'não foi possível garantir a aba Botox'
 
-        _ensure_botox_sheet(s, base, token)
-
-        resp = req.post(
-            f'{base}/values/{BOTOX_SHEET_NAME}!A:D:append',
+        resp = req.put(
+            f'{base}/values/{BOTOX_SHEET_NAME}!A1',
             headers=h,
-            timeout=15,
-            params={'valueInputOption': 'USER_ENTERED', 'insertDataOption': 'INSERT_ROWS'},
-            json={'values': [[
-                row_data.get('patient_name', ''),
-                format_phone_for_sheets(row_data.get('phone', '')),
-                row_data.get('performed_date', ''),
-                row_data.get('followup_date', ''),
-            ]]}
+            timeout=60,
+            params={'valueInputOption': 'USER_ENTERED'},
+            json={'values': values_matrix},
         )
-        if resp.status_code in (200, 201):
-            print(f'✓ Google Sheets Botox: linha adicionada para {row_data.get("patient_name")}')
-        else:
-            print(f'✗ Erro Botox sheet append: {resp.status_code} {resp.text[:200]}')
+        if resp.status_code not in (200, 201):
+            return False, f'PUT falhou: {resp.status_code} {resp.text[:200]}'
+
+        first_stale_row = len(values_matrix) + 1
+        req.post(
+            f'{base}/values/{BOTOX_SHEET_NAME}!A{first_stale_row}:I100000:clear',
+            headers=h,
+            timeout=30,
+        )
+        return True, f'{len(values_matrix) - 1} linhas sincronizadas'
     except Exception as e:
-        print(f'✗ Erro _do_append_botox_row: {e}')
-
-
-def append_botox_row(row_data):
-    """Dispara em background a inserção de uma linha na aba Botox."""
-    t = threading.Thread(target=_do_append_botox_row, args=(row_data,), daemon=True)
-    t.start()
-
-
-def sync_all_botox_to_sheet(rows):
-    """
-    Sincroniza (sobrescreve) TODA a aba Botox com a lista fornecida.
-    rows = lista de dicts: patient_name, phone, performed_date, followup_date
-    Chamado em background thread.
-    """
-    def _do():
-        try:
-            import requests as req
-            token = _get_access_token()
-            h = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-            base = f'https://sheets.googleapis.com/v4/spreadsheets/{BOTOX_SPREADSHEET_ID}'
-
-            class _S:
-                def get(self, *a, **kw):  return req.get(*a, headers=h, **kw)
-                def post(self, *a, **kw): return req.post(*a, headers=h, **kw)
-                def put(self, *a, **kw):  return req.put(*a, headers=h, **kw)
-            s = _S()
-
-            _ensure_botox_sheet(s, base, token)
-
-            # Limpar e reescrever
-            req.post(f'{base}/values/{BOTOX_SHEET_NAME}!A1:Z5000:clear', headers=h, timeout=10)
-
-            values = [BOTOX_HEADERS] + [[
-                r.get('patient_name', ''),
-                format_phone_for_sheets(r.get('phone', '')),
-                r.get('performed_date', ''),
-                r.get('followup_date', ''),
-            ] for r in rows]
-
-            resp = req.put(
-                f'{base}/values/{BOTOX_SHEET_NAME}!A1',
-                headers=h,
-                timeout=30,
-                params={'valueInputOption': 'USER_ENTERED'},
-                json={'values': values}
-            )
-            if resp.status_code in (200, 201):
-                print(f'✓ Google Sheets Botox: {len(rows)} linhas sincronizadas')
-            else:
-                print(f'✗ Erro sync_all_botox: {resp.status_code} {resp.text[:200]}')
-        except Exception as e:
-            print(f'✗ Erro sync_all_botox_to_sheet: {e}')
-
-    t = threading.Thread(target=_do, daemon=True)
-    t.start()
+        return False, f'erro inesperado: {e}'
