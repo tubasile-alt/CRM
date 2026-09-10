@@ -1,0 +1,397 @@
+# Fase 2 — Planilha Botox como backup confiável
+
+Repositório: `tubasile-alt/CRM` · Branch: `feat/botox-sheet-sync-fase2`
+Depende de: Fase 1 mergeada (`MessageDispatch` existindo em produção)
+
+## Objetivo
+
+A aba `Botox` passa a ser um espelho fiel do banco, reconstruído por
+reconciliação. Hoje ela é alimentada por `append` disparado em dois pontos
+legados do `app.py`, dentro de uma thread daemon — o que faz linhas
+desaparecerem silenciosamente e explica a aba parar em março/2026.
+
+**Não depende de `MESSAGE_DISPATCH_ENABLED`.** A planilha funciona com a flag
+desligada; as colunas de status simplesmente aparecem vazias até a Fase 5.
+
+## Escopo
+
+- [ ] Novo cabeçalho A:I na aba Botox
+- [ ] `services/botox_sheet_service.py` — construção das linhas + escrita
+- [ ] Advisory lock contra os 2 workers do gunicorn
+- [ ] Script executável `scripts/sync_botox_sheet.py`
+- [ ] Job APScheduler de 6h (best-effort — ver aviso)
+- [ ] Remoção de `append_botox_row`, `_do_append_botox_row`,
+      `sync_all_botox_to_sheet` e das 2 chamadas em `app.py`
+- [ ] Testes
+
+## Fora de escopo
+
+- Endpoints com API key (Fase 4)
+- Qualquer envio de mensagem
+- Alterar `followup_service.py` da Fase 1
+
+---
+
+## Aviso: Autoscale escala a zero
+
+O deploy é `deploymentTarget = "autoscale"`. O container é encerrado quando não
+há tráfego. Um `BackgroundScheduler` só dispara enquanto o processo vive —
+portanto **o job de 6h é best-effort, não garantia**.
+
+Isso já vale para o scheduler de auto-faltou existente (`app.py:4152`).
+
+Por isso a lógica fica em função pura, invocável de três formas:
+
+| Gatilho | Confiabilidade | Fase |
+|---|---|---|
+| `python scripts/sync_botox_sheet.py` | manual, 100% | esta |
+| APScheduler 6h | best-effort | esta |
+| n8n → endpoint com API key | garantida | Fase 4 |
+
+Não tente resolver a confiabilidade nesta fase.
+
+---
+
+## Passo 0 — Verificação prévia
+
+```bash
+grep -n "BOTOX_HEADERS\|BOTOX_SHEET_NAME\|BOTOX_SPREADSHEET_ID" services/google_sheets.py
+grep -rn "append_botox_row\|sync_all_botox_to_sheet" --include=*.py .  | grep -v backups
+grep -n "def _get_access_token\|def _ensure_botox_sheet\|def format_phone_for_sheets" services/google_sheets.py
+grep -n "class MessageDispatch" -A 5 models.py
+```
+
+Confirmar:
+
+- `_get_access_token()`, `_ensure_botox_sheet()` e `format_phone_for_sheets()`
+  existem e serão reaproveitados
+- `append_botox_row` é chamado em exatamente 2 pontos de `app.py`
+- `sync_all_botox_to_sheet` não é chamado em lugar nenhum (código morto)
+- `MessageDispatch` existe com `message_type` e `status`
+
+Divergiu, **pare e reporte**.
+
+---
+
+## Passo 1 — `services/google_sheets.py`
+
+### 1a. Novo cabeçalho
+
+Substituir a constante:
+
+```python
+BOTOX_HEADERS = [
+    'execution_id', 'Paciente', 'Celular', 'Data Realizado',
+    'Data Follow-up (5 meses)', 'Status D0', 'Enviada D0',
+    'Status 5m', 'Enviada 5m',
+]
+```
+
+### 1b. Escrita síncrona da aba
+
+Adicionar. **Síncrona de propósito** — sem `threading.Thread`. Quem chama decide
+o contexto de execução, e o erro precisa subir.
+
+```python
+def write_botox_sheet(values_matrix):
+    """Reescreve a aba Botox inteira. values_matrix já inclui o cabeçalho.
+
+    Ordem deliberada: escreve primeiro, limpa a sobra depois. Se a escrita
+    falhar, a planilha permanece com o conteúdo anterior — nunca vazia.
+
+    Retorna (ok: bool, mensagem: str). Não levanta exceção.
+    """
+    try:
+        import requests as req
+        token = _get_access_token()
+        h = {'Authorization': f'Bearer {token}',
+             'Content-Type': 'application/json'}
+        base = f'https://sheets.googleapis.com/v4/spreadsheets/{BOTOX_SPREADSHEET_ID}'
+
+        class _S:
+            def get(self, *a, **kw):  return req.get(*a, headers=h, **kw)
+            def post(self, *a, **kw): return req.post(*a, headers=h, **kw)
+            def put(self, *a, **kw):  return req.put(*a, headers=h, **kw)
+
+        if not _ensure_botox_sheet(_S(), base, token):
+            return False, 'não foi possível garantir a aba Botox'
+
+        resp = req.put(
+            f'{base}/values/{BOTOX_SHEET_NAME}!A1',
+            headers=h,
+            timeout=60,
+            params={'valueInputOption': 'USER_ENTERED'},
+            json={'values': values_matrix},
+        )
+        if resp.status_code not in (200, 201):
+            return False, f'PUT falhou: {resp.status_code} {resp.text[:200]}'
+
+        # Limpa apenas o que sobrou abaixo do bloco recém-escrito.
+        first_stale_row = len(values_matrix) + 1
+        req.post(
+            f'{base}/values/{BOTOX_SHEET_NAME}!A{first_stale_row}:I100000:clear',
+            headers=h, timeout=30,
+        )
+
+        return True, f'{len(values_matrix) - 1} linhas sincronizadas'
+
+    except Exception as e:
+        return False, f'erro inesperado: {e}'
+```
+
+### 1c. Remoções
+
+Apagar por completo:
+
+- `_do_append_botox_row()`
+- `append_botox_row()`
+- `sync_all_botox_to_sheet()`
+
+`_ensure_botox_sheet()` e `format_phone_for_sheets()` **ficam**.
+
+---
+
+## Passo 2 — `services/botox_sheet_service.py` (arquivo novo)
+
+```python
+"""Reconciliação da aba Botox do Google Sheets a partir do banco.
+
+A planilha é um espelho de leitura: reconstruída por completo a cada execução.
+Nenhum caminho de request escreve nela.
+"""
+import os
+from sqlalchemy import text
+from sqlalchemy.orm import aliased
+
+ADVISORY_LOCK_KEY = 918273
+
+
+def build_botox_sheet_rows():
+    """Retorna a matriz de valores da aba, cabeçalho incluído."""
+    from models import (db, ProcedureExecution, CosmeticProcedurePlan,
+                        Note, Patient, MessageDispatch)
+    from services.google_sheets import BOTOX_HEADERS, format_phone_for_sheets
+
+    d0 = aliased(MessageDispatch)
+    m5 = aliased(MessageDispatch)
+
+    rows = (
+        db.session.query(ProcedureExecution, Patient, d0, m5)
+        .join(CosmeticProcedurePlan,
+              ProcedureExecution.plan_id == CosmeticProcedurePlan.id)
+        .join(Note, CosmeticProcedurePlan.note_id == Note.id)
+        .join(Patient, Note.patient_id == Patient.id)
+        .outerjoin(d0, db.and_(d0.execution_id == ProcedureExecution.id,
+                               d0.message_type == 'd0'))
+        .outerjoin(m5, db.and_(m5.execution_id == ProcedureExecution.id,
+                               m5.message_type == 'm5'))
+        .filter(
+            ProcedureExecution.execution_status == 'realizada',
+            ProcedureExecution.performed_date.isnot(None),
+            db.func.lower(CosmeticProcedurePlan.procedure_name).like('%botox%'),
+        )
+        .order_by(ProcedureExecution.performed_date.asc())
+        .all()
+    )
+
+    def _d(value):
+        return value.strftime('%d/%m/%Y') if value else ''
+
+    def _dt(value):
+        return value.strftime('%d/%m/%Y %H:%M') if value else ''
+
+    matrix = [list(BOTOX_HEADERS)]
+    for execution, patient, disp_d0, disp_m5 in rows:
+        matrix.append([
+            execution.id,
+            patient.name or '',
+            format_phone_for_sheets(patient.phone),
+            _d(execution.performed_date),
+            _d(execution.followup_date),
+            disp_d0.status if disp_d0 else '',
+            _dt(disp_d0.sent_at) if disp_d0 else '',
+            disp_m5.status if disp_m5 else '',
+            _dt(disp_m5.sent_at) if disp_m5 else '',
+        ])
+    return matrix
+
+
+def run_botox_sheet_sync():
+    """Ponto de entrada único. Seguro para chamadas concorrentes.
+
+    Retorna (ok: bool, mensagem: str).
+    """
+    from models import db
+    from services.google_sheets import write_botox_sheet
+
+    is_postgres = db.engine.dialect.name == 'postgresql'
+
+    if not is_postgres:
+        matrix = build_botox_sheet_rows()
+        return write_botox_sheet(matrix)
+
+    # Advisory lock: o gunicorn roda --workers=2 e ambos sobem o scheduler.
+    # A conexão precisa ser mantida aberta durante todo o lock.
+    with db.engine.connect() as conn:
+        acquired = conn.execute(
+            text('SELECT pg_try_advisory_lock(:k)'), {'k': ADVISORY_LOCK_KEY}
+        ).scalar()
+
+        if not acquired:
+            return True, 'ignorado: outro worker já está sincronizando'
+
+        try:
+            matrix = build_botox_sheet_rows()
+            return write_botox_sheet(matrix)
+        finally:
+            conn.execute(text('SELECT pg_advisory_unlock(:k)'),
+                         {'k': ADVISORY_LOCK_KEY})
+```
+
+Detalhe que não pode ser simplificado: o advisory lock do PostgreSQL é
+**por sessão**. Com o pool do SQLAlchemy, `db.session.execute()` pode pegar
+conexões diferentes entre o lock e o unlock, e o lock vaza. Daí o
+`db.engine.connect()` explícito segurando a mesma conexão do início ao fim.
+
+---
+
+## Passo 3 — `scripts/sync_botox_sheet.py` (arquivo novo)
+
+```python
+"""Sincroniza a aba Botox sob demanda.
+
+Uso:
+    python scripts/sync_botox_sheet.py            # sincroniza
+    python scripts/sync_botox_sheet.py --dry-run  # só mostra o que faria
+"""
+import sys
+
+from app import app
+from services.botox_sheet_service import build_botox_sheet_rows, run_botox_sheet_sync
+
+
+def main():
+    dry_run = '--dry-run' in sys.argv
+
+    with app.app_context():
+        if dry_run:
+            matrix = build_botox_sheet_rows()
+            print(f'linhas de dados: {len(matrix) - 1}')
+            print(f'cabeçalho: {matrix[0]}')
+            for row in matrix[1:4]:
+                print(f'  {row}')
+            if len(matrix) > 4:
+                print(f'  ... (+{len(matrix) - 4})')
+            print('\nDRY-RUN: nada foi escrito na planilha.')
+            return
+
+        ok, msg = run_botox_sheet_sync()
+        print(('✓ ' if ok else '✗ ') + msg)
+        sys.exit(0 if ok else 1)
+
+
+if __name__ == '__main__':
+    main()
+```
+
+---
+
+## Passo 4 — `app.py`
+
+### 4a. Remover as duas chamadas legadas
+
+Localizar **por conteúdo**, não por número de linha. São dois blocos
+`try/except` que importam `append_botox_row`:
+
+- um dentro da criação de `ProcedureExecution` com `performed_date_value`
+- outro dentro do loop `for _row in gs_rows` com o comentário
+  `# Aba Botox: envia cada Botox realizado também para a aba dedicada`
+
+Remover cada bloco inteiro, incluindo o `try/except` e o import local de
+`relativedelta`. Verificar se o `relativedelta` importado ali não é usado por
+mais nada no mesmo escopo antes de remover.
+
+O `append_procedures_batch(gs_rows)` da aba principal **permanece intocado**.
+
+### 4b. Registrar o job de 6h
+
+No `start_smart_no_show_scheduler`, junto ao job existente:
+
+```python
+    from services.botox_sheet_service import run_botox_sheet_sync
+
+    def _sync_botox_sheet():
+        with app_instance.app_context():
+            ok, msg = run_botox_sheet_sync()
+            print(f"[BOTOX-SHEET] {'✓' if ok else '✗'} {msg}")
+
+    scheduler.add_job(
+        func=_sync_botox_sheet,
+        trigger="interval",
+        hours=6,
+        id="botox_sheet_sync",
+        replace_existing=True,
+    )
+```
+
+Não criar um scheduler novo. Não adicionar nada fora dessa função.
+
+---
+
+## Passo 5 — Testes
+
+Em `tests/test_botox_sheet.py`, usando o padrão de `db.create_all()` com SQLite
+já presente nos testes existentes:
+
+1. `build_botox_sheet_rows` sem dados → só o cabeçalho, 9 colunas
+2. Execução Botox realizada sem dispatch → linha com colunas F–I vazias
+3. Execução Botox realizada com dispatch D0 `enviada` → coluna F = `enviada`
+4. Procedimento não-Botox → não aparece
+5. Execução `agendada` → não aparece
+6. Ordenação por `performed_date` crescente
+7. Telefone formatado via `format_phone_for_sheets` (`(16) 99994-1774` →
+   `5516999941774`)
+
+Não mockar a API do Google nem chamar `write_botox_sheet` nos testes.
+`build_botox_sheet_rows` é puro e é onde mora a lógica.
+
+---
+
+## Passo 6 — Verificação
+
+```bash
+python -m pyflakes services/google_sheets.py services/botox_sheet_service.py \
+       scripts/sync_botox_sheet.py app.py
+python -m pytest tests/ -q
+python scripts/audit_routes.py
+grep -rn "append_botox_row\|sync_all_botox_to_sheet" --include=*.py . | grep -v backups
+```
+
+O último grep deve retornar **vazio**.
+
+Confirmar no PR:
+
+- `pyflakes` limpo
+- Baseline de testes passando (era 79 na Fase 1)
+- 168 rotas, sem colisão
+- Nenhuma thread daemon restante no caminho da planilha
+- `/health` 200 após restart
+
+---
+
+## Ativação
+
+⚠️ Preview e Produção compartilham o mesmo banco Neon **e a mesma planilha**.
+Não existe ambiente de ensaio. O primeiro `sync` reescreve a aba real.
+
+1. **Duplicar a aba `Botox` para `Botox_backup_2026-09` na mão, antes de tudo.**
+   Ela é seu backup de pacientes; não confie no primeiro deploy.
+2. `python scripts/sync_botox_sheet.py --dry-run` — conferir a contagem
+   (esperado: 263, alinhado com o dry-run do backfill da Fase 1)
+3. `python scripts/sync_botox_sheet.py` — sincronização real
+4. Abrir a planilha e conferir: cabeçalho com 9 colunas, os meses que faltavam
+   entre março e setembro agora presentes, telefones no formato `55…`
+5. Só então mergear o PR
+
+Se a contagem do passo 2 divergir muito de 263, **pare** — significa que o
+filtro de Botox ou o join está pegando algo diferente do que o backfill pegou.
