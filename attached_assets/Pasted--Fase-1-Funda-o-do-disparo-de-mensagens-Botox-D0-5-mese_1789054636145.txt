@@ -1,0 +1,286 @@
+# Fase 1 — Fundação do disparo de mensagens (Botox D0 + 5 meses)
+
+Repositório: `tubasile-alt/CRM` · Branch: `feat/message-dispatch-fase1`
+
+## Contexto
+
+Pacientes que fazem Botox devem receber **duas** mensagens automáticas:
+
+1. **D0** — no dia da aplicação
+2. **M5** — cinco meses depois, lembrando que o efeito está terminando
+
+O disparo será feito pelo n8n em fases posteriores. Esta fase constrói **apenas
+a fundação de dados**. Nenhuma mensagem é enviada aqui.
+
+### Por que uma tabela nova
+
+`ProcedureExecution` já tem `followup_date` e `followup_status`, mas são campos
+únicos — não representam duas mensagens com estados independentes. A tabela
+`message_dispatch` resolve isso e fica genérica para lembretes futuros
+(preenchimento 12m, bioestimulador 18m) sem nova migração.
+
+## Escopo desta fase
+
+- [ ] Modelo `MessageDispatch` + coluna `Patient.accepts_marketing`
+- [ ] `services/followup_service.py` com a regra dos 5 meses e os event listeners
+- [ ] Revisão Alembic + função `_ensure_message_dispatch_schema()` no startup
+- [ ] Script de backfill das execuções históricas
+- [ ] Testes
+
+## Fora de escopo — NÃO fazer
+
+- Endpoints de integração / API key (Fase 4)
+- Qualquer alteração em `services/google_sheets.py` ou na aba Botox (Fase 2)
+- Remover as chamadas `append_botox_row` de `app.py` (Fase 3)
+- Normalização E.164 de telefone (Fase 4)
+- Qualquer envio de mensagem
+- Refatorar `finalizar_atendimento`
+
+---
+
+## Passo 0 — Verificação prévia (rodar antes de escrever código)
+
+```bash
+grep -n "class ProcedureExecution" -A 20 models.py
+grep -n "followup_date\|followup_status" models.py
+grep -n "_ensure_.*_schema" app.py
+grep -rn "append_botox_row" --include=*.py app.py
+ls migrations/versions | wc -l
+```
+
+**Confirmar e reportar antes de prosseguir:**
+
+- `ProcedureExecution` tem `followup_date`, `followup_status`, `idempotency_key`
+- `execution_status` aceita: `agendada`, `realizada`, `cancelada`, `faltou`
+- `Patient` tem `phone` e **não** tem campo de opt-out
+- Existem funções `_ensure_*_schema()` no `app.py` rodando no startup
+
+Se algo divergir, **pare e reporte**. Não adapte por conta própria.
+
+---
+
+## Passo 1 — `models.py`
+
+### 1a. Novo modelo `MessageDispatch`
+
+Inserir logo após a classe `ProcedureExecution`:
+
+```python
+class MessageDispatch(db.Model):
+    __tablename__ = 'message_dispatch'
+
+    id = db.Column(db.Integer, primary_key=True)
+    execution_id = db.Column(
+        db.Integer,
+        db.ForeignKey('procedure_execution.id', ondelete='CASCADE'),
+        nullable=False, index=True
+    )
+    message_type = db.Column(db.String(20), nullable=False)   # 'd0' | 'm5'
+    due_at = db.Column(db.Date, nullable=False, index=True)
+    status = db.Column(db.String(20), nullable=False, default='pendente')
+    # pendente | enviada | falhou | pulada
+    sent_at = db.Column(db.DateTime, nullable=True)
+    last_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+
+    execution = db.relationship('ProcedureExecution', backref='dispatches')
+
+    __table_args__ = (
+        db.UniqueConstraint('execution_id', 'message_type',
+                            name='ux_dispatch_exec_type'),
+        db.Index('ix_dispatch_due', 'status', 'due_at'),
+    )
+```
+
+O `UniqueConstraint` é a garantia física de que nenhum paciente recebe a mesma
+mensagem duas vezes, mesmo com `--workers=2` no gunicorn. **Não remover.**
+
+### 1b. Coluna em `Patient`
+
+```python
+accepts_marketing = db.Column(db.Boolean, default=True, nullable=False)
+```
+
+A mensagem D0 é orientação pós-procedimento. A M5 é retenção comercial e precisa
+de canal de descadastro. Fases posteriores vão filtrar por este campo.
+
+---
+
+## Passo 2 — `services/followup_service.py` (arquivo novo)
+
+### Regra única dos 5 meses
+
+Hoje a regra está duplicada em três lugares (`routes/crm.py` no cálculo do
+`follow_up_date`, e duas vezes em `app.py` nos blocos que chamam
+`append_botox_row`). **Não remover as três nesta fase** — só criar a fonte única
+que as fases seguintes vão consumir.
+
+```python
+FOLLOWUP_MONTHS_BOTOX = 5
+
+def is_botox(procedure_name: str) -> bool:
+    return 'botox' in (procedure_name or '').lower()
+
+def compute_m5_date(performed_date):
+    return (performed_date + relativedelta(months=FOLLOWUP_MONTHS_BOTOX)).date()
+```
+
+### Criação dos dispatches
+
+```python
+def build_dispatch_rows(execution, plan, today=None):
+    """Retorna a lista de dicts de dispatch para uma execução realizada.
+    Não escreve no banco. Testável isoladamente."""
+```
+
+Regras:
+
+| Condição | `d0` | `m5` |
+|---|---|---|
+| `performed_date.date() >= hoje` | `pendente` | `pendente` |
+| `performed_date.date() < hoje` (lançamento retroativo) | **`pulada`** | `pendente` |
+
+A D0 nunca é enviada retroativamente. Uma secretária lançando o procedimento de
+ontem não pode disparar "obrigado pela aplicação de hoje".
+
+Só gerar dispatches quando `is_botox(plan.procedure_name)` for verdadeiro e
+`execution_status == 'realizada'` e `performed_date` não for nulo.
+
+### Event listeners
+
+Três caminhos distintos criam `ProcedureExecution` hoje (`app.py`,
+`routes/cosmetic_api.py`, `static/js/prontuario.js` via API). Colocar a lógica em
+cada um garante que o próximo caminho novo esqueça. Usar eventos SQLAlchemy:
+
+```python
+@event.listens_for(ProcedureExecution, 'before_insert')
+@event.listens_for(ProcedureExecution, 'before_update')
+def _set_followup_date(mapper, connection, target):
+    # preenche target.followup_date quando realizada e ainda vazio
+```
+
+```python
+@event.listens_for(ProcedureExecution, 'after_insert')
+@event.listens_for(ProcedureExecution, 'after_update')
+def _sync_dispatches(mapper, connection, target):
+    # cria as linhas de message_dispatch faltantes
+```
+
+**Restrições técnicas obrigatórias:**
+
+- Em `after_insert`/`after_update`, usar o `connection` recebido. **Nunca**
+  `db.session` — mutar a sessão dentro desses eventos é proibido pelo SQLAlchemy
+  e causa erro intermitente sob carga.
+- Em `after_update`, detectar a transição para `realizada` com
+  `sqlalchemy.inspect(target).attrs.execution_status.history`. Isso importa
+  porque `templates/crm.html` faz `PATCH {execution_status: 'realizada'}` depois
+  da criação — a execução nasce `agendada` e vira `realizada` num segundo request.
+- Antes de inserir, fazer `SELECT` dos `message_type` já existentes para aquele
+  `execution_id` e inserir só o que falta. Não usar `ON CONFLICT` (quebra em
+  SQLite, usado nos testes).
+- Registrar os listeners com import explícito em `app.py`, senão não carregam.
+
+### Zero I/O
+
+Estes listeners rodam dentro da transação do request. **Nada de HTTP, Google
+Sheets ou envio de mensagem aqui.** Só banco.
+
+---
+
+## Passo 3 — Schema
+
+### 3a. Revisão Alembic
+
+`migrations/versions/` — criar revisão com `down_revision` apontando para a head
+atual (confirmar com `alembic heads`, não chutar).
+
+### 3b. Função idempotente no startup
+
+Seguir o padrão já existente no `app.py` (`_ensure_patient_photo_schema`,
+`_ensure_appointment_timeline_label_schema`): `CREATE TABLE IF NOT EXISTS` /
+`ADD COLUMN IF NOT EXISTS` para PostgreSQL, com branch de inspector para SQLite,
+tudo dentro de `try/except` que só loga warning.
+
+Nomear `_ensure_message_dispatch_schema()` e chamá-la junto das outras.
+
+Motivo: em produção no Replit o Alembic nem sempre é executado no deploy. As
+funções de startup são a rede de segurança real do seu ambiente.
+
+---
+
+## Passo 4 — `scripts/backfill_botox_dispatches.py`
+
+Popula as execuções históricas. **Obrigatório `--dry-run` como padrão**; só grava
+com `--commit` explícito.
+
+Regras de backfill:
+
+| Situação | `status` |
+|---|---|
+| `d0` de qualquer execução passada | **`pulada`** — sempre |
+| `m5` com `due_at < hoje - 30 dias` | **`pulada`** |
+| `m5` com `due_at` entre `hoje-30d` e hoje | `pendente` |
+| `m5` com `due_at` futuro | `pendente` |
+
+O teto de 30 dias existe para que o primeiro disparo real não atinja a base
+histórica inteira de uma vez.
+
+Saída do dry-run, por categoria:
+
+```
+d0  pulada   : N
+m5  pulada   : N
+m5  pendente : N   (destes, K vencem nos próximos 30 dias)
+total execuções botox realizadas processadas: N
+```
+
+Rodar o dry-run e **colar o resultado no PR** antes de qualquer `--commit`.
+
+---
+
+## Passo 5 — Testes (`tests/`)
+
+1. `build_dispatch_rows` com `performed_date` = hoje → `d0` e `m5` pendentes
+2. `build_dispatch_rows` com `performed_date` = 10 dias atrás → `d0` pulada
+3. Execução criada direto como `realizada` → 2 dispatches
+4. Execução criada `agendada` e depois atualizada para `realizada` → 2 dispatches
+   (cobre o fluxo real do `crm.html`)
+5. Atualizar a mesma execução duas vezes → continua com 2 dispatches, não 4
+6. Procedimento não-Botox → 0 dispatches
+7. `followup_date` preenchido automaticamente ao virar `realizada`
+
+O teste 5 é o mais importante: é o que prova que o paciente não recebe mensagem
+duplicada.
+
+---
+
+## Passo 6 — Verificação final
+
+```bash
+python -m pyflakes models.py services/followup_service.py \
+       scripts/backfill_botox_dispatches.py app.py
+python -m pytest tests/ -q
+python scripts/audit_routes.py     # nenhuma rota deve mudar nesta fase
+```
+
+Confirmar explicitamente no PR:
+
+- `pyflakes` limpo em **todos** os arquivos novos e alterados
+  (a Fase 1 anterior quebrou produção por um `import pytz` transitivo faltando
+  em `clinic_time.py` — não repetir)
+- Baseline de testes passando
+- Contagem de rotas inalterada
+- Nenhuma mensagem enviada, nenhuma chamada externa introduzida
+
+---
+
+## Entrega
+
+PR único, `feat/message-dispatch-fase1`. Na descrição:
+
+1. Resultado do dry-run do backfill (números por categoria)
+2. Confirmação dos itens do Passo 0
+3. Lista de arquivos tocados
+
+Deploy pode ser em horário comercial: esta fase não altera comportamento
+visível nem dispara nada.
