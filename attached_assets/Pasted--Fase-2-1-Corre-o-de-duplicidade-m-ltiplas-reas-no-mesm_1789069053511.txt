@@ -1,0 +1,315 @@
+# Fase 2.1 — Correção de duplicidade (múltiplas áreas no mesmo dia)
+
+Repositório: `tubasile-alt/CRM` · Branch: `fix/dispatch-dedupe-por-paciente`
+Pré-condição verificada: `message_dispatch` com **0 linhas** em produção
+
+## O problema
+
+Quando o mesmo Botox é registrado em duas execuções no mesmo dia (glabela e
+testa, por exemplo), o desenho atual cria **dois dispatches** e produz **duas
+linhas** na planilha para o mesmo paciente.
+
+Causa: a chave única é `(execution_id, message_type)`. Como são execuções
+distintas, o banco não vê duplicidade. O paciente receberia a mesma mensagem
+duas vezes.
+
+## A correção
+
+A unidade de mensagem não é a execução — é **o paciente numa data**. A chave
+única passa a ser `(patient_id, message_type, due_at)`.
+
+Como a tabela está vazia e o backfill nunca foi commitado, não há dado a migrar.
+
+---
+
+## Passo 0 — Verificação prévia
+
+```bash
+python - <<'EOF'
+from app import app
+from models import db, MessageDispatch
+with app.app_context():
+    print('linhas em message_dispatch:', MessageDispatch.query.count())
+EOF
+```
+
+**Se retornar diferente de 0, PARE e reporte.** O plano abaixo recria a tabela e
+só é seguro enquanto ela está vazia.
+
+Confirmar também:
+
+```bash
+grep -n "ux_dispatch_exec_type" models.py
+```
+
+Cadeia de relacionamento já confirmada:
+`procedure_execution.plan_id` → `cosmetic_procedure_plan.note_id` →
+`note.patient_id`
+
+---
+
+## Passo 1 — `models.py`
+
+Em `MessageDispatch`, adicionar a coluna e trocar a restrição:
+
+```python
+    patient_id = db.Column(
+        db.Integer, db.ForeignKey('patient.id'),
+        nullable=False, index=True
+    )
+```
+
+```python
+    __table_args__ = (
+        db.UniqueConstraint('patient_id', 'message_type', 'due_at',
+                            name='ux_dispatch_patient_type_due'),
+        db.Index('ix_dispatch_due', 'status', 'due_at'),
+    )
+```
+
+`execution_id` **permanece** — passa a apontar para a execução representativa,
+a primeira que gerou o dispatch. Útil para rastreio.
+
+---
+
+## Passo 2 — `migrate_db.py`
+
+`db.create_all()` não altera tabela existente. Como a tabela está vazia, o
+caminho seguro é recriar. Adicionar antes do `db.create_all()`:
+
+```python
+def ensure_message_dispatch_schema():
+    """Recria message_dispatch no formato novo (chave por paciente).
+
+    Só age se a tabela existir no formato antigo E estiver vazia.
+    Nunca descarta dados.
+    """
+    with app.app_context():
+        if db.engine.dialect.name != 'postgresql':
+            return
+
+        exists = db.session.execute(db.text(
+            "SELECT to_regclass('message_dispatch')"
+        )).scalar()
+        if not exists:
+            return  # create_all vai criar no formato novo
+
+        has_patient_id = db.session.execute(db.text("""
+            SELECT 1 FROM information_schema.columns
+             WHERE table_name = 'message_dispatch'
+               AND column_name = 'patient_id'
+        """)).scalar()
+        if has_patient_id:
+            return  # já está no formato novo
+
+        rows = db.session.execute(db.text(
+            'SELECT COUNT(*) FROM message_dispatch'
+        )).scalar()
+        if rows and rows > 0:
+            print(f'  ! message_dispatch tem {rows} linhas — NÃO recriada. '
+                  f'Migração manual necessária.')
+            return
+
+        db.session.execute(db.text('DROP TABLE message_dispatch'))
+        db.session.commit()
+        print('  + message_dispatch descartada (vazia) para recriação')
+```
+
+Chamar dentro de `migrate_database()`, junto de
+`ensure_patient_marketing_column()`, **antes** do `db.create_all()`.
+
+A guarda do `rows > 0` é o que impede este código de virar uma arma no futuro.
+Não remover.
+
+---
+
+## Passo 3 — `services/followup_service.py`
+
+### 3a. Resolver o `patient_id`
+
+Os listeners recebem `connection`, não `db.session`. Resolver por SQL:
+
+```python
+def _resolve_patient_id(connection, execution):
+    row = connection.execute(text("""
+        SELECT n.patient_id
+          FROM cosmetic_procedure_plan p
+          JOIN note n ON n.id = p.note_id
+         WHERE p.id = :plan_id
+    """), {'plan_id': execution.plan_id}).first()
+    return row[0] if row else None
+```
+
+### 3b. Dedupe na criação
+
+Substituir a checagem atual (que consulta por `execution_id`) por consulta à
+chave nova:
+
+```python
+def _dispatch_exists(connection, patient_id, message_type, due_at):
+    return connection.execute(text("""
+        SELECT 1 FROM message_dispatch
+         WHERE patient_id = :pid
+           AND message_type = :mtype
+           AND due_at = :due
+    """), {'pid': patient_id, 'mtype': message_type, 'due': due_at}).first() is not None
+```
+
+Fluxo do listener, para cada tipo (`d0`, `m5`):
+
+1. resolver `patient_id`; se `None`, não criar nada
+2. se `_dispatch_exists(...)` → **pular**, não é erro
+3. senão, inserir com `patient_id` preenchido
+
+O segundo Botox do mesmo dia cai no passo 2 e não gera linha. O paciente é
+chamado uma vez.
+
+### 3c. Sem janela de retoque
+
+Decisão do Arthur: existem **apenas dois tipos de mensagem**, `d0` e `m5`.
+Nenhuma regra de supersessão, nenhuma janela de retoque. Se o paciente aplicar
+Botox em datas diferentes, cada data gera seu próprio M5 — isso é comportamento
+desejado, não duplicidade.
+
+A duplicidade a eliminar é exclusivamente a de **mesma data**, resolvida pela
+chave única do Passo 1.
+
+---
+
+## Passo 4 — `scripts/backfill_botox_dispatches.py`
+
+Aplicar as mesmas regras:
+
+1. Ordenar as execuções por `performed_date` **crescente**, para que a
+   supersessão de retoque produza o mesmo resultado que produziria em tempo real
+2. Dedupe por `(patient_id, message_type, due_at)` — manter um dicionário em
+   memória durante o dry-run, já que as linhas ainda não estão no banco
+3. Preencher `patient_id` em todas as linhas
+4. Manter o filtro do teto de 30 dias e a regra de `d0` sempre `pulada`
+
+A saída do dry-run ganha uma linha:
+
+```
+execuções Botox processadas : 263
+dispatches após dedupe      : N     ← novo
+  d0  pulada   : N
+  m5  pulada   : N
+  m5  pendente : N
+    próximos 30 dias: N
+duplicatas suprimidas       : N     ← novo
+```
+
+O número de "duplicatas suprimidas" é a medida direta do problema que você
+encontrou. Vale registrar no PR.
+
+---
+
+## Passo 5 — `services/botox_sheet_service.py`
+
+A planilha também precisa deixar de duplicar. Uma linha por
+**paciente + data realizada**.
+
+### Cabeçalho (A:I) em `services/google_sheets.py`
+
+Muda apenas a primeira coluna, de singular para plural. Nenhuma coluna nova:
+
+```python
+BOTOX_HEADERS = [
+    'execution_ids', 'Paciente', 'Celular', 'Data Realizado',
+    'Data Follow-up (5 meses)', 'Status D0', 'Enviada D0',
+    'Status 5m', 'Enviada 5m',
+]
+```
+
+O range de limpeza em `write_botox_sheet` continua `A{n}:I100000`.
+
+Não criar coluna de áreas ou procedimentos: os nomes de procedimento não
+diferenciam região, e não haverá nomes novos por área. Quando duas aplicações
+caem no mesmo dia, a coluna `execution_ids` já registra ambas (`1234, 1237`) —
+suficiente para rastreio, sem poluir a planilha.
+
+### Agrupamento em `build_botox_sheet_rows`
+
+Manter a query como está, mas trocar o `outerjoin` dos dispatches — agora eles
+casam por `patient_id` + `due_at`, não por `execution_id`. Depois, agrupar em
+Python:
+
+```python
+from collections import OrderedDict
+
+def build_botox_sheet_rows():
+    ...  # query igual, sem os outerjoins de dispatch
+
+    grupos = OrderedDict()
+    for execution, patient in rows:
+        chave = (patient.id, execution.performed_date.date())
+        g = grupos.setdefault(chave, {
+            'patient': patient,
+            'performed_date': execution.performed_date,
+            'followup_date': execution.followup_date,
+            'execution_ids': [],
+        })
+        g['execution_ids'].append(execution.id)
+
+    # dispatches em uma consulta só, indexados por (patient_id, tipo, due_at)
+    ...
+```
+
+Montar a linha com `', '.join(str(i) for i in g['execution_ids'])` na coluna A.
+
+Resultado esperado: a contagem de linhas cai de 263 para o número de
+atendimentos distintos. A diferença é exatamente o número de dias em que você
+registrou mais de uma aplicação no mesmo paciente.
+
+---
+
+## Passo 6 — Testes
+
+Somar aos existentes:
+
+1. Duas execuções Botox, mesmo paciente, mesmo dia → **2 dispatches** no total
+   (1 `d0` + 1 `m5`), não 4
+2. Duas execuções, mesmo paciente, **dias diferentes** → 4 dispatches
+3. Planilha: duas execuções mesmo paciente/dia → **1 linha**
+4. `execution_ids` da linha agrupada contém os dois ids, separados por vírgula
+
+O teste 1 é o que prova a correção. O teste 2 garante que não se corrigiu demais:
+aplicações em datas distintas continuam gerando mensagens distintas.
+
+---
+
+## Passo 7 — Verificação
+
+```bash
+python -m pyflakes models.py migrate_db.py services/followup_service.py \
+       services/botox_sheet_service.py services/google_sheets.py \
+       scripts/backfill_botox_dispatches.py
+python -m pytest tests/ -q
+python scripts/audit_routes.py
+```
+
+Confirmar no PR:
+
+- `message_dispatch` recriada com `patient_id` e `ux_dispatch_patient_type_due`
+- Dry-run do backfill com a contagem de duplicatas suprimidas
+- Dry-run do sync da planilha com a contagem agrupada
+- Nenhuma rota alterada
+- `/health` 200
+
+---
+
+## Ativação
+
+1. Merge → `[postMerge]` recria a tabela
+2. Conferir em produção:
+   ```sql
+   SELECT column_name FROM information_schema.columns
+    WHERE table_name = 'message_dispatch' AND column_name = 'patient_id';
+   SELECT indexname FROM pg_indexes
+    WHERE tablename = 'message_dispatch';
+   ```
+3. `python scripts/backfill_botox_dispatches.py --dry-run` — revisar os números
+4. `python scripts/sync_botox_sheet.py --dry-run` — conferir a queda na contagem
+5. `python scripts/sync_botox_sheet.py` — planilha agrupada
+
+A flag `MESSAGE_DISPATCH_ENABLED` continua desligada durante tudo isso.
