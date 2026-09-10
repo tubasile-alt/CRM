@@ -310,6 +310,7 @@ from routes.chat_api import chat_api_bp
 from routes.checkout_api import checkout_api_bp
 from routes.evolutions_api import evolutions_api_bp
 from routes.cosmetic_api import cosmetic_api_bp
+from routes.integrations import integrations_bp
 
 app.register_blueprint(surgical_map_bp)
 app.register_blueprint(waiting_room_bp)
@@ -323,6 +324,8 @@ app.register_blueprint(chat_api_bp)
 app.register_blueprint(checkout_api_bp)
 app.register_blueprint(evolutions_api_bp)
 app.register_blueprint(cosmetic_api_bp)
+app.register_blueprint(integrations_bp)
+csrf.exempt(integrations_bp)
 
 @login_manager.user_loader
 def load_user(user_id):

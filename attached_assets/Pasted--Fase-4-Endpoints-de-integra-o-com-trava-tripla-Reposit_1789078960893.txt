@@ -1,0 +1,383 @@
+# Fase 4 — Endpoints de integração com trava tripla
+
+Repositório: `tubasile-alt/CRM` · Branch: `feat/integrations-api-fase4`
+Depende de: Fase 2.1 mergeada
+
+## Princípio desta fase
+
+**Nada pode ser enviado ao fim dela.** O endpoint nasce mudo por construção: são
+três travas independentes, todas desligadas por padrão, e é preciso agir nas três
+para que uma única mensagem saia.
+
+Isso não é cautela decorativa. O modo `test` permite rodar o pipeline inteiro —
+n8n, WhatsApp, marcação de status, planilha — contra **o seu próprio celular**,
+antes de qualquer paciente entrar na conta.
+
+## Dimensionamento do risco
+
+Dos 155 M5 pendentes, 25 vencem nos próximos 30 dias e o restante está
+distribuído pelos 5 meses seguintes. O regime de operação é de
+**aproximadamente uma mensagem por dia** — muito abaixo do que caracteriza
+disparo em massa.
+
+O único ponto de rajada é o dia da ativação: os dispatches já vencidos saem
+todos na primeira rodada. Medir antes:
+
+```sql
+SELECT COUNT(*) FROM message_dispatch
+ WHERE status = 'pendente' AND due_at <= CURRENT_DATE;
+```
+
+Esse número é o tamanho da rajada. A trava de cap diário existe para contê-la.
+
+## Escopo
+
+- [ ] `routes/integrations.py` — 4 rotas, autenticação por API key
+- [ ] Isenção de CSRF para o blueprint
+- [ ] Três travas: API key, modo de envio, cap diário
+- [ ] Rota de preview que nunca altera nada
+- [ ] Testes
+
+## Fora de escopo
+
+- Workflow n8n (Fase 5)
+- Textos das mensagens (Fase 5)
+- Ligar qualquer trava
+
+---
+
+## Passo 0 — Verificação prévia
+
+```bash
+grep -n "CSRFProtect\|csrf = " app.py
+grep -n "register_blueprint" app.py | tail -5
+grep -rn "X-API-Key" --include=*.py routes/
+python scripts/audit_routes.py
+```
+
+Confirmar:
+
+- `csrf = CSRFProtect(app)` em `app.py:81` — global, o blueprint novo **precisa**
+  de isenção explícita
+- Não existe padrão de autenticação por API key no projeto; este é o primeiro
+- Contagem de rotas atual (168 na Fase 1) para comparar depois
+
+---
+
+## Passo 1 — `routes/integrations.py` (arquivo novo)
+
+```python
+"""Endpoints para consumo pelo n8n. Autenticação por API key, sem sessão.
+
+TRAVAS DE SEGURANÇA (todas desligadas por padrão):
+
+  1. INTEGRATIONS_API_KEY  ausente -> toda rota responde 503
+  2. DISPATCH_SEND_MODE    'off' (padrão) | 'test' | 'live'
+                           off  -> /due sempre devolve lista vazia
+                           test -> só devolve telefones de DISPATCH_TEST_PHONES
+                           live -> operação real
+  3. DISPATCH_DAILY_CAP    teto de envios por dia (padrão 20), aplicado no
+                           servidor e não negociável pelo cliente
+
+É preciso agir nas TRÊS para que uma mensagem chegue a um paciente.
+"""
+import os
+import secrets as pysecrets
+from datetime import date, datetime
+from functools import wraps
+
+from flask import Blueprint, jsonify, request
+
+integrations_bp = Blueprint('integrations', __name__,
+                            url_prefix='/api/integrations')
+
+DEFAULT_DAILY_CAP = 20
+MAX_PAGE_SIZE = 50
+
+
+# ---------------------------------------------------------------- travas
+
+def _api_key_required(view):
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        expected = os.environ.get('INTEGRATIONS_API_KEY')
+        if not expected:
+            return jsonify({'error': 'integração não configurada'}), 503
+
+        provided = request.headers.get('X-API-Key', '')
+        if not pysecrets.compare_digest(provided, expected):
+            return jsonify({'error': 'não autorizado'}), 401
+
+        return view(*args, **kwargs)
+    return wrapper
+
+
+def _send_mode():
+    return (os.environ.get('DISPATCH_SEND_MODE') or 'off').strip().lower()
+
+
+def _test_phones():
+    raw = os.environ.get('DISPATCH_TEST_PHONES') or ''
+    return {
+        ''.join(c for c in item if c.isdigit())
+        for item in raw.split(',') if item.strip()
+    }
+
+
+def _daily_cap():
+    try:
+        return int(os.environ.get('DISPATCH_DAILY_CAP', DEFAULT_DAILY_CAP))
+    except ValueError:
+        return DEFAULT_DAILY_CAP
+
+
+def _sent_today():
+    from models import db, MessageDispatch
+    return db.session.query(db.func.count(MessageDispatch.id)).filter(
+        MessageDispatch.status == 'enviada',
+        db.func.date(MessageDispatch.sent_at) == date.today(),
+    ).scalar() or 0
+
+
+# ---------------------------------------------------------------- consulta
+
+def _pending_query():
+    """Dispatches vencidos, pendentes, de paciente com telefone e opt-in."""
+    from models import db, MessageDispatch, Patient
+
+    return (
+        db.session.query(MessageDispatch, Patient)
+        .join(Patient, Patient.id == MessageDispatch.patient_id)
+        .filter(
+            MessageDispatch.status == 'pendente',
+            MessageDispatch.due_at <= date.today(),
+            Patient.phone.isnot(None),
+            Patient.phone != '',
+            Patient.accepts_marketing.is_(True),
+        )
+        .order_by(MessageDispatch.due_at.asc(), MessageDispatch.id.asc())
+    )
+
+
+def _serialize(dispatch, patient):
+    from services.google_sheets import format_phone_for_sheets
+    return {
+        'dispatch_id': dispatch.id,
+        'message_type': dispatch.message_type,
+        'execution_id': dispatch.execution_id,
+        'patient_id': patient.id,
+        'patient_name': patient.name,
+        'phone': format_phone_for_sheets(patient.phone),
+        'due_at': dispatch.due_at.isoformat(),
+    }
+
+
+# ---------------------------------------------------------------- rotas
+
+@integrations_bp.route('/messages/due', methods=['GET'])
+@_api_key_required
+def messages_due():
+    """Fila real de envio. Sujeita às três travas."""
+    mode = _send_mode()
+
+    if mode == 'off':
+        return jsonify({
+            'mode': 'off',
+            'messages': [],
+            'note': 'DISPATCH_SEND_MODE=off — nenhuma mensagem liberada',
+        })
+
+    cap = _daily_cap()
+    used = _sent_today()
+    remaining = max(0, cap - used)
+    if remaining == 0:
+        return jsonify({
+            'mode': mode, 'messages': [],
+            'note': f'cap diário atingido ({used}/{cap})',
+        })
+
+    try:
+        requested = int(request.args.get('limit', MAX_PAGE_SIZE))
+    except ValueError:
+        requested = MAX_PAGE_SIZE
+    limit = max(0, min(requested, MAX_PAGE_SIZE, remaining))
+
+    rows = _pending_query().all()
+
+    if mode == 'test':
+        allowed = _test_phones()
+        if not allowed:
+            return jsonify({
+                'mode': 'test', 'messages': [],
+                'note': 'DISPATCH_TEST_PHONES vazio — nada liberado',
+            })
+        rows = [
+            (d, p) for (d, p) in rows
+            if ''.join(c for c in (p.phone or '') if c.isdigit())[-11:]
+            in {t[-11:] for t in allowed}
+        ]
+
+    payload = [_serialize(d, p) for (d, p) in rows[:limit]]
+    return jsonify({
+        'mode': mode,
+        'daily_cap': cap,
+        'sent_today': used,
+        'messages': payload,
+    })
+
+
+@integrations_bp.route('/messages/preview', methods=['GET'])
+@_api_key_required
+def messages_preview():
+    """Diagnóstico: o que SERIA enviado, ignorando modo e cap.
+
+    Somente leitura. Nunca altera nada. Não usar no n8n.
+    """
+    rows = _pending_query().all()
+    by_type = {}
+    for dispatch, _patient in rows:
+        by_type[dispatch.message_type] = by_type.get(dispatch.message_type, 0) + 1
+
+    return jsonify({
+        'mode_atual': _send_mode(),
+        'daily_cap': _daily_cap(),
+        'sent_today': _sent_today(),
+        'total_vencidos': len(rows),
+        'por_tipo': by_type,
+        'amostra': [_serialize(d, p) for (d, p) in rows[:10]],
+    })
+
+
+@integrations_bp.route('/messages/<int:dispatch_id>', methods=['PATCH'])
+@_api_key_required
+def messages_update(dispatch_id):
+    """Registra o resultado do envio."""
+    from models import db, MessageDispatch
+
+    data = request.get_json(silent=True) or {}
+    new_status = (data.get('status') or '').strip()
+
+    if new_status not in ('enviada', 'falhou'):
+        return jsonify({'error': "status deve ser 'enviada' ou 'falhou'"}), 400
+
+    dispatch = db.session.get(MessageDispatch, dispatch_id)
+    if not dispatch:
+        return jsonify({'error': 'dispatch não encontrado'}), 404
+
+    if dispatch.status != 'pendente':
+        # Idempotência: reprocessamento do n8n não sobrescreve resultado.
+        return jsonify({
+            'dispatch_id': dispatch.id,
+            'status': dispatch.status,
+            'note': 'já processado, sem alteração',
+        }), 200
+
+    dispatch.status = new_status
+    dispatch.sent_at = datetime.utcnow() if new_status == 'enviada' else None
+    dispatch.last_error = (data.get('error') or '')[:500] or None
+    db.session.commit()
+
+    return jsonify({'dispatch_id': dispatch.id, 'status': dispatch.status})
+
+
+@integrations_bp.route('/botox-sheet/sync', methods=['POST'])
+@_api_key_required
+def botox_sheet_sync():
+    """Gatilho confiável da planilha, já que o Autoscale escala a zero."""
+    from services.botox_sheet_service import run_botox_sheet_sync
+
+    ok, msg = run_botox_sheet_sync()
+    return jsonify({'ok': ok, 'message': msg}), (200 if ok else 500)
+```
+
+---
+
+## Passo 2 — `app.py`
+
+Registrar junto dos demais blueprints e **isentar de CSRF**:
+
+```python
+from routes.integrations import integrations_bp
+app.register_blueprint(integrations_bp)
+csrf.exempt(integrations_bp)
+```
+
+A isenção é obrigatória: `CSRFProtect` é global e bloquearia o `PATCH` do n8n.
+Sem ela, o endpoint responde 400 e o motivo não é óbvio nos logs.
+
+---
+
+## Passo 3 — Testes
+
+1. Sem `INTEGRATIONS_API_KEY` no ambiente → todas as rotas retornam **503**
+2. Com a chave configurada e header errado → **401**
+3. `DISPATCH_SEND_MODE` ausente → `/due` devolve `messages: []` mesmo havendo
+   dispatch pendente e vencido
+4. Modo `test` com `DISPATCH_TEST_PHONES` vazio → lista vazia
+5. Modo `test` com um telefone na lista → devolve só o dispatch daquele telefone
+6. Modo `live` com `DISPATCH_DAILY_CAP=2` e 5 pendentes → devolve 2
+7. Cap já consumido no dia → lista vazia com a nota do cap
+8. `PATCH` com `status='enviada'` → grava `sent_at`
+9. `PATCH` repetido no mesmo dispatch → 200 sem alterar (idempotência)
+10. `PATCH` com status inválido → 400
+11. Paciente com `accepts_marketing=False` → nunca aparece em `/due`
+12. `/preview` não altera nenhum status
+
+Os testes 3, 4 e 6 são as travas. Se algum deles passar a falhar no futuro,
+alguém removeu uma proteção.
+
+---
+
+## Passo 4 — Verificação
+
+```bash
+python -m pyflakes routes/integrations.py app.py
+python -m pytest tests/ -q
+python scripts/audit_routes.py
+```
+
+Confirmar no PR:
+
+- 4 rotas novas, sem colisão (168 → 172)
+- `pyflakes` limpo
+- Baseline de testes passando (era 90 na Fase 2.1)
+- `INTEGRATIONS_API_KEY`, `DISPATCH_SEND_MODE`, `DISPATCH_TEST_PHONES` e
+  `DISPATCH_DAILY_CAP` **ausentes** dos Secrets ao fim da fase
+- `/health` 200
+
+Verificação manual após deploy — deve retornar 503, provando que está mudo:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' \
+  https://<seu-dominio>/api/integrations/messages/due
+```
+
+---
+
+## Ativação futura — sequência de segurança
+
+Não executar nesta fase. Registrado aqui para não se perder.
+
+| Etapa | Ação | Quem recebe |
+|---|---|---|
+| 1 | `INTEGRATIONS_API_KEY` nos Secrets | ninguém |
+| 2 | `curl` em `/messages/preview` — conferir a rajada | ninguém |
+| 3 | `DISPATCH_SEND_MODE=test` + `DISPATCH_TEST_PHONES=<seu celular>` | só você |
+| 4 | Rodar o n8n ponta a ponta, conferir o texto no seu WhatsApp | só você |
+| 5 | `DISPATCH_DAILY_CAP=5` e `DISPATCH_SEND_MODE=live` | 5 pacientes/dia |
+| 6 | Subir o cap gradualmente ao longo de duas semanas | ramp |
+
+### Proteção do número no WhatsApp
+
+- Intervalo de **30 a 60 segundos** entre mensagens no n8n, não 3 segundos.
+  Cadência humana pesa mais que volume total na detecção.
+- Começar com cap 5/dia e subir devagar. O regime normal é ~1/dia; caps altos
+  só importam para drenar a rajada inicial, e drenar devagar é melhor.
+- Enviar apenas em horário comercial. Mensagem comercial às 22h gera denúncia,
+  e denúncia é o que de fato derruba número.
+- Confirmar se o número já tem histórico de conversa bidirecional com esses
+  pacientes. Número com histórico tem risco muito menor que número novo
+  disparando para quem nunca escreveu.
+- A M5 é comunicação comercial. Incluir forma de descadastro na própria
+  mensagem e refletir a recusa em `Patient.accepts_marketing` — que o `/due` já
+  respeita.
