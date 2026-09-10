@@ -4,58 +4,64 @@ A planilha é um espelho de leitura: reconstruída por completo a cada execuçã
 Nenhum caminho de request escreve nela.
 """
 
+from collections import OrderedDict
+
 from sqlalchemy import text
-from sqlalchemy.orm import aliased
 
 
 ADVISORY_LOCK_KEY = 918273
 
 
 def build_botox_sheet_rows():
-    """Retorna a matriz de valores da aba, cabeçalho incluído."""
-    from models import (
-        CosmeticProcedurePlan,
-        MessageDispatch,
-        Note,
-        Patient,
-        ProcedureExecution,
-        db,
-    )
+    """Retorna a matriz de valores, agrupada por paciente e data."""
+    from models import CosmeticProcedurePlan, Note, Patient, ProcedureExecution, db
     from services.google_sheets import BOTOX_HEADERS, format_phone_for_sheets
 
-    d0 = aliased(MessageDispatch)
-    m5 = aliased(MessageDispatch)
-
     rows = (
-        db.session.query(ProcedureExecution, Patient, d0, m5)
+        db.session.query(ProcedureExecution, Patient)
         .join(
             CosmeticProcedurePlan,
             ProcedureExecution.plan_id == CosmeticProcedurePlan.id,
         )
         .join(Note, CosmeticProcedurePlan.note_id == Note.id)
         .join(Patient, Note.patient_id == Patient.id)
-        .outerjoin(
-            d0,
-            db.and_(
-                d0.execution_id == ProcedureExecution.id,
-                d0.message_type == 'd0',
-            ),
-        )
-        .outerjoin(
-            m5,
-            db.and_(
-                m5.execution_id == ProcedureExecution.id,
-                m5.message_type == 'm5',
-            ),
-        )
         .filter(
             ProcedureExecution.execution_status == 'realizada',
             ProcedureExecution.performed_date.isnot(None),
             db.func.lower(CosmeticProcedurePlan.procedure_name).like('%botox%'),
         )
-        .order_by(ProcedureExecution.performed_date.asc())
+        .order_by(
+            ProcedureExecution.performed_date.asc(),
+            ProcedureExecution.id.asc(),
+        )
         .all()
     )
+
+    groups = OrderedDict()
+    for execution, patient in rows:
+        key = (patient.id, execution.performed_date.date())
+        group = groups.setdefault(key, {
+            'patient': patient,
+            'performed_date': execution.performed_date,
+            'followup_date': execution.followup_date,
+            'execution_ids': [],
+        })
+        group['execution_ids'].append(execution.id)
+        if not group['followup_date'] and execution.followup_date:
+            group['followup_date'] = execution.followup_date
+
+    from models import MessageDispatch
+
+    patient_ids = [group['patient'].id for group in groups.values()]
+    dispatches = []
+    if patient_ids:
+        dispatches = db.session.query(MessageDispatch).filter(
+            MessageDispatch.patient_id.in_(patient_ids)
+        ).all()
+    dispatch_by_key = {
+        (dispatch.patient_id, dispatch.message_type, dispatch.due_at): dispatch
+        for dispatch in dispatches
+    }
 
     def _d(value):
         return value.strftime('%d/%m/%Y') if value else ''
@@ -64,13 +70,26 @@ def build_botox_sheet_rows():
         return value.strftime('%d/%m/%Y %H:%M') if value else ''
 
     matrix = [list(BOTOX_HEADERS)]
-    for execution, patient, disp_d0, disp_m5 in rows:
+    for group in groups.values():
+        patient = group['patient']
+        performed_date = group['performed_date']
+        followup_date = group['followup_date']
+        disp_d0 = dispatch_by_key.get(
+            (patient.id, 'd0', performed_date.date())
+        )
+        disp_m5 = dispatch_by_key.get(
+            (
+                patient.id,
+                'm5',
+                followup_date.date() if followup_date else None,
+            )
+        )
         matrix.append([
-            execution.id,
+            ', '.join(str(execution_id) for execution_id in group['execution_ids']),
             patient.name or '',
             format_phone_for_sheets(patient.phone),
-            _d(execution.performed_date),
-            _d(execution.followup_date),
+            _d(performed_date),
+            _d(followup_date),
             disp_d0.status if disp_d0 else '',
             _dt(disp_d0.sent_at) if disp_d0 else '',
             disp_m5.status if disp_m5 else '',

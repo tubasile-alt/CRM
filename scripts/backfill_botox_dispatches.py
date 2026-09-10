@@ -20,6 +20,7 @@ from app import app  # noqa: E402
 from models import (  # noqa: E402
     CosmeticProcedurePlan,
     MessageDispatch,
+    Note,
     ProcedureExecution,
     db,
 )
@@ -34,31 +35,39 @@ def _build_backfill_rows(today):
     executions = db.session.query(ProcedureExecution).join(
         CosmeticProcedurePlan,
         ProcedureExecution.plan_id == CosmeticProcedurePlan.id,
+    ).join(
+        Note,
+        CosmeticProcedurePlan.note_id == Note.id,
     ).filter(
         ProcedureExecution.execution_status == 'realizada',
         ProcedureExecution.performed_date.isnot(None),
-    ).all()
+    ).order_by(ProcedureExecution.performed_date.asc()).all()
 
     existing = {
-        (execution_id, message_type)
-        for execution_id, message_type in db.session.query(
-            MessageDispatch.execution_id,
+        (patient_id, message_type, due_at)
+        for patient_id, message_type, due_at in db.session.query(
+            MessageDispatch.patient_id,
             MessageDispatch.message_type,
+            MessageDispatch.due_at,
         ).all()
     }
 
     output = []
     processed = 0
+    suppressed = 0
     for execution in executions:
         plan = execution.plan
         if not is_botox(plan.procedure_name):
             continue
         processed += 1
+        patient_id = plan.note.patient_id
         for row in build_dispatch_rows(execution, plan, today=today):
-            key = (execution.id, row['message_type'])
+            key = (patient_id, row['message_type'], row['due_at'])
             if key in existing:
+                suppressed += 1
                 continue
             row = dict(row)
+            row['patient_id'] = patient_id
             if row['message_type'] == 'd0':
                 row['status'] = 'pulada'
             elif row['due_at'] < today - timedelta(days=30):
@@ -67,10 +76,10 @@ def _build_backfill_rows(today):
                 row['status'] = 'pendente'
             output.append(row)
             existing.add(key)
-    return output, processed
+    return output, processed, suppressed
 
 
-def _print_summary(rows, processed, today):
+def _print_summary(rows, processed, suppressed, today):
     counts = Counter((row['message_type'], row['status']) for row in rows)
     upcoming = sum(
         1
@@ -85,6 +94,8 @@ def _print_summary(rows, processed, today):
         f"m5  pendente : {counts[('m5', 'pendente')]} "
         f"(destes, {upcoming} vencem nos próximos 30 dias)"
     )
+    print(f"dispatches após dedupe      : {len(rows)}")
+    print(f"duplicatas suprimidas       : {suppressed}")
     print(f"total execuções botox realizadas processadas: {processed}")
 
 
@@ -107,8 +118,8 @@ def main():
 
     with app.app_context():
         today = clinic_today()
-        rows, processed = _build_backfill_rows(today)
-        _print_summary(rows, processed, today)
+        rows, processed, suppressed = _build_backfill_rows(today)
+        _print_summary(rows, processed, suppressed, today)
         if not args.commit:
             print('dry-run: nenhuma alteração gravada')
             return 0

@@ -42,6 +42,7 @@ class BotoxSheetRowsTests(unittest.TestCase):
             )
             db.session.add_all([doctor, patient])
             db.session.flush()
+            self.patient_id = patient.id
             note = Note(
                 patient_id=patient.id,
                 doctor_id=doctor.id,
@@ -97,13 +98,14 @@ class BotoxSheetRowsTests(unittest.TestCase):
             db.session.commit()
             matrix = build_botox_sheet_rows()
 
-            self.assertEqual(matrix[1][0], execution.id)
+            self.assertEqual(matrix[1][0], str(execution.id))
             self.assertEqual(matrix[1][5:9], ['', '', '', ''])
 
     def test_d0_dispatch_is_rendered(self):
         with self.app.app_context():
             execution = self._execution()
             db.session.add(MessageDispatch(
+                patient_id=self.patient_id,
                 execution_id=execution.id,
                 message_type='d0',
                 due_at=datetime(2026, 3, 10).date(),
@@ -145,7 +147,10 @@ class BotoxSheetRowsTests(unittest.TestCase):
             db.session.commit()
             matrix = build_botox_sheet_rows()
 
-            self.assertEqual([matrix[1][0], matrix[2][0]], [earlier.id, later.id])
+            self.assertEqual(
+                [matrix[1][0], matrix[2][0]],
+                [str(earlier.id), str(later.id)],
+            )
 
     def test_phone_is_formatted_for_sheets(self):
         with self.app.app_context():
@@ -154,6 +159,57 @@ class BotoxSheetRowsTests(unittest.TestCase):
             row = build_botox_sheet_rows()[1]
 
         self.assertEqual(row[2], '5516999941774')
+
+    def test_same_patient_same_day_is_one_row_with_all_execution_ids(self):
+        with self.app.app_context():
+            first = self._execution(
+                procedure_name='Botox glabela',
+                performed_date=datetime(2026, 3, 10, 10, 0),
+            )
+            second = self._execution(
+                procedure_name='Botox testa',
+                performed_date=datetime(2026, 3, 10, 15, 0),
+            )
+            db.session.commit()
+
+            matrix = build_botox_sheet_rows()
+
+        self.assertEqual(len(matrix), 2)
+        self.assertEqual(matrix[1][0], f'{first.id}, {second.id}')
+
+    def test_dispatch_status_is_joined_by_patient_and_due_date(self):
+        with self.app.app_context():
+            first = self._execution(
+                performed_date=datetime(2026, 3, 10, 10, 0),
+            )
+            self._execution(
+                procedure_name='Botox testa',
+                performed_date=datetime(2026, 3, 10, 15, 0),
+            )
+            db.session.add_all([
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=first.id,
+                    message_type='d0',
+                    due_at=datetime(2026, 3, 10).date(),
+                    status='enviada',
+                    sent_at=datetime(2026, 3, 10, 15, 45),
+                ),
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=first.id,
+                    message_type='m5',
+                    due_at=datetime(2026, 8, 10).date(),
+                    status='pendente',
+                ),
+            ])
+            db.session.commit()
+
+            row = build_botox_sheet_rows()[1]
+
+        self.assertEqual(row[5], 'enviada')
+        self.assertEqual(row[6], '10/03/2026 15:45')
+        self.assertEqual(row[7], 'pendente')
 
 
 if __name__ == '__main__':

@@ -270,7 +270,7 @@ def append_transplant_data(data):
 BOTOX_SPREADSHEET_ID = '1IUNWhBRzt5u6_ttfzjfTKckhSMOMx1l_s7uGnIom66o'
 BOTOX_SHEET_NAME     = 'Botox'
 BOTOX_HEADERS = [
-    'execution_id', 'Paciente', 'Celular', 'Data Realizado',
+    'execution_ids', 'Paciente', 'Celular', 'Data Realizado',
     'Data Follow-up (5 meses)', 'Status D0', 'Enviada D0',
     'Status 5m', 'Enviada 5m',
 ]

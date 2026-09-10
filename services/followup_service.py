@@ -4,7 +4,7 @@ import os
 from types import SimpleNamespace
 
 from dateutil.relativedelta import relativedelta
-from sqlalchemy import event, inspect, select
+from sqlalchemy import event, inspect, select, text
 
 from models import CosmeticProcedurePlan, MessageDispatch, ProcedureExecution
 from services.clinic_time import clinic_today
@@ -91,24 +91,55 @@ def _load_plan(connection, target):
     return SimpleNamespace(procedure_name=procedure_name)
 
 
+def _resolve_patient_id(connection, execution):
+    row = connection.execute(text("""
+        SELECT n.patient_id
+          FROM cosmetic_procedure_plan p
+          JOIN note n ON n.id = p.note_id
+         WHERE p.id = :plan_id
+    """), {'plan_id': execution.plan_id}).first()
+    return row[0] if row else None
+
+
+def _dispatch_exists(connection, patient_id, message_type, due_at):
+    return connection.execute(text("""
+        SELECT 1
+          FROM message_dispatch
+         WHERE patient_id = :patient_id
+           AND message_type = :message_type
+           AND due_at = :due_at
+    """), {
+        'patient_id': patient_id,
+        'message_type': message_type,
+        'due_at': due_at,
+    }).first() is not None
+
+
 def _insert_missing_dispatches(connection, target):
     plan = _load_plan(connection, target)
     if plan is None:
+        return
+
+    patient_id = _resolve_patient_id(connection, target)
+    if patient_id is None:
         return
 
     rows = build_dispatch_rows(target, plan)
     if not rows:
         return
 
-    existing_types = set(connection.execute(
-        select(MessageDispatch.message_type).where(
-            MessageDispatch.execution_id == target.id
-        )
-    ).scalars())
-    missing_rows = [
-        row for row in rows
-        if row['message_type'] not in existing_types
-    ]
+    missing_rows = []
+    for row in rows:
+        if _dispatch_exists(
+            connection,
+            patient_id,
+            row['message_type'],
+            row['due_at'],
+        ):
+            continue
+        row = dict(row)
+        row['patient_id'] = patient_id
+        missing_rows.append(row)
     if missing_rows:
         connection.execute(MessageDispatch.__table__.insert(), missing_rows)
 

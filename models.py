@@ -503,6 +503,12 @@ class MessageDispatch(db.Model):
     __tablename__ = 'message_dispatch'
 
     id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(
+        db.Integer,
+        db.ForeignKey('patient.id'),
+        nullable=False,
+        index=True,
+    )
     execution_id = db.Column(
         db.Integer,
         db.ForeignKey('procedure_execution.id', ondelete='CASCADE'),
@@ -517,12 +523,14 @@ class MessageDispatch(db.Model):
     created_at = db.Column(db.DateTime, default=get_brazil_time)
 
     execution = db.relationship('ProcedureExecution', backref='dispatches')
+    patient = db.relationship('Patient', backref='message_dispatches')
 
     __table_args__ = (
         db.UniqueConstraint(
-            'execution_id',
+            'patient_id',
             'message_type',
-            name='ux_dispatch_exec_type',
+            'due_at',
+            name='ux_dispatch_patient_type_due',
         ),
         db.Index('ix_dispatch_due', 'status', 'due_at'),
     )

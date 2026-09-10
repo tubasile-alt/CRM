@@ -74,6 +74,46 @@ def ensure_patient_marketing_column():
         db.session.commit()
 
 
+def ensure_message_dispatch_schema():
+    """Recria message_dispatch vazia para usar a chave por paciente.
+
+    Nunca descarta dados: se a tabela antiga já contiver linhas, a migração
+    para e deixa a conversão para um passo manual e explícito.
+    """
+    with app.app_context():
+        if db.engine.dialect.name != 'postgresql':
+            return
+
+        exists = db.session.execute(db.text(
+            "SELECT to_regclass('message_dispatch')"
+        )).scalar()
+        if not exists:
+            return
+
+        has_patient_id = db.session.execute(db.text("""
+            SELECT 1
+              FROM information_schema.columns
+             WHERE table_name = 'message_dispatch'
+               AND column_name = 'patient_id'
+        """)).scalar()
+        if has_patient_id:
+            return
+
+        rows = db.session.execute(db.text(
+            'SELECT COUNT(*) FROM message_dispatch'
+        )).scalar()
+        if rows and rows > 0:
+            print(
+                f'  ! message_dispatch tem {rows} linhas — NÃO recriada. '
+                f'Migração manual necessária.'
+            )
+            return
+
+        db.session.execute(db.text('DROP TABLE message_dispatch'))
+        db.session.commit()
+        print('  + message_dispatch descartada (vazia) para recriação')
+
+
 def migrate_database():
     """Migra o banco de dados adicionando novas tabelas e colunas"""
     with app.app_context():
@@ -88,6 +128,9 @@ def migrate_database():
 
             # Garantir preferência de marketing antes de carregar o modelo completo
             ensure_patient_marketing_column()
+
+            # A tabela Fase 1 estava vazia; recriar para a chave por paciente.
+            ensure_message_dispatch_schema()
 
             # Criar novas tabelas (se não existirem)
             db.create_all()

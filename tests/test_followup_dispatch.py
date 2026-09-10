@@ -7,7 +7,10 @@ from flask import Flask
 from models import (
     CosmeticProcedurePlan,
     MessageDispatch,
+    Note,
+    Patient,
     ProcedureExecution,
+    User,
     db,
 )
 from services.clinic_time import clinic_today
@@ -30,14 +33,32 @@ class FollowupDispatchTests(unittest.TestCase):
 
         with app.app_context():
             db.create_all()
+            doctor = User(
+                username='doctor',
+                email='doctor@example.com',
+                password_hash='test',
+                name='Doctor',
+                role='medico',
+            )
+            patient = Patient(name='Paciente Botox', phone='16999941774')
+            db.session.add_all([doctor, patient])
+            db.session.flush()
+            note = Note(
+                patient_id=patient.id,
+                doctor_id=doctor.id,
+                note_type='conduta',
+                category='cosmiatria',
+            )
+            db.session.add(note)
+            db.session.flush()
             self.botox_plan = CosmeticProcedurePlan(
-                note_id=1,
+                note_id=note.id,
                 name='Botox',
                 procedure_name='Botox',
                 follow_up_months=5,
             )
             self.other_plan = CosmeticProcedurePlan(
-                note_id=1,
+                note_id=note.id,
                 name='Sculptra',
                 procedure_name='Sculptra',
                 follow_up_months=18,
@@ -149,6 +170,41 @@ class FollowupDispatchTests(unittest.TestCase):
                 MessageDispatch.query.filter_by(execution_id=execution.id).count(),
                 2,
             )
+
+    def test_same_patient_same_day_creates_only_two_dispatches(self):
+        today = clinic_today()
+        with self.app.app_context():
+            for hour in (10, 14):
+                db.session.add(ProcedureExecution(
+                    plan_id=self.botox_plan_id,
+                    performed_date=datetime.combine(
+                        today,
+                        datetime.min.time().replace(hour=hour),
+                    ),
+                    execution_status='realizada',
+                    was_performed=True,
+                ))
+            db.session.commit()
+
+            self.assertEqual(MessageDispatch.query.count(), 2)
+            self.assertEqual(
+                {dispatch.message_type for dispatch in MessageDispatch.query.all()},
+                {'d0', 'm5'},
+            )
+
+    def test_same_patient_on_different_days_creates_four_dispatches(self):
+        today = clinic_today()
+        with self.app.app_context():
+            for day in (today - timedelta(days=1), today):
+                db.session.add(ProcedureExecution(
+                    plan_id=self.botox_plan_id,
+                    performed_date=datetime.combine(day, datetime.min.time()),
+                    execution_status='realizada',
+                    was_performed=True,
+                ))
+            db.session.commit()
+
+            self.assertEqual(MessageDispatch.query.count(), 4)
 
     def test_non_botox_execution_creates_no_dispatches(self):
         today = clinic_today()
