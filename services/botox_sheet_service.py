@@ -8,19 +8,36 @@ from collections import defaultdict, OrderedDict
 
 from sqlalchemy import text
 
+from services.message_dispatch_status import (
+    DISPATCH_KNOWN_STATUSES,
+    UNKNOWN_DISPATCH_STATUS,
+)
+
 
 ADVISORY_LOCK_KEY = 918273
 
 # Quando uma linha representa mais de uma execução, o status mais acionável
 # precisa prevalecer. Em especial, uma falha terminal nunca pode ser escondida
-# por uma execução enviada anteriormente.
+# por uma execução enviada anteriormente ou por um estado desconhecido.
 _DISPATCH_STATUS_PRIORITY = {
     'falhou': 50,
+    # Um estado desconhecido precisa ficar visível para não produzir um
+    # resumo enganoso, mas uma falha terminal continua vencendo-o.
+    UNKNOWN_DISPATCH_STATUS: 45,
     'reservada': 40,
     'pendente': 30,
     'enviada': 20,
     'cancelada': 10,
+    'pulada': 5,
 }
+
+
+def _normalized_dispatch_status(dispatch):
+    raw_status = getattr(dispatch, 'status', None)
+    status = raw_status.strip() if isinstance(raw_status, str) else ''
+    if status in DISPATCH_KNOWN_STATUSES:
+        return status
+    return UNKNOWN_DISPATCH_STATUS
 
 
 def _aggregate_dispatches(dispatches):
@@ -34,16 +51,27 @@ def _aggregate_dispatches(dispatches):
     if not dispatches:
         return None
 
-    status = max(
-        dispatches,
-        key=lambda dispatch: _DISPATCH_STATUS_PRIORITY.get(dispatch.status, 0),
-    ).status or ''
+    normalized = [
+        (_normalized_dispatch_status(dispatch), dispatch)
+        for dispatch in dispatches
+    ]
+    status, _dispatch = max(
+        normalized,
+        key=lambda item: _DISPATCH_STATUS_PRIORITY[item[0]],
+    )
     attempts = sum(dispatch.attempts or 0 for dispatch in dispatches)
     errors = [
         dispatch.last_error
         for dispatch in dispatches
         if dispatch.last_error
     ]
+    errors.extend(
+        'estado desconhecido: '
+        + (dispatch.status.strip() if isinstance(dispatch.status, str)
+           and dispatch.status.strip() else '(vazio)')
+        for normalized_status, dispatch in normalized
+        if normalized_status == UNKNOWN_DISPATCH_STATUS
+    )
     sent_at = max(
         (
             dispatch.sent_at

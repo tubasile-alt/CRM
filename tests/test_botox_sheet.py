@@ -336,6 +336,87 @@ class BotoxSheetRowsTests(unittest.TestCase):
         self.assertEqual(matrix[1][11], 'número recusado')
         self.assertEqual(matrix[1][12], '10/08/2026 10:00')
 
+    def test_mixed_dispatch_statuses_use_most_actionable_known_status(self):
+        with self.app.app_context():
+            executions = [
+                self._execution(
+                    procedure_name=f'Botox area {index}',
+                    performed_date=datetime(2026, 3, 10, 10 + index),
+                )
+                for index in range(4)
+            ]
+            db.session.add_all([
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=execution.id,
+                    message_type='d0',
+                    due_at=datetime(2026, 3, 10 + index).date(),
+                    status=status,
+                )
+                for index, (execution, status) in enumerate(zip(
+                    executions,
+                    ('reservada', 'pendente', 'enviada', 'cancelada'),
+                ))
+            ])
+            db.session.commit()
+
+            row = build_botox_sheet_rows()[1]
+
+        self.assertEqual(row[5], 'reservada')
+
+    def test_unknown_dispatch_status_is_visible_without_hiding_terminal_failure(self):
+        with self.app.app_context():
+            first = self._execution(
+                procedure_name='Botox glabela',
+                performed_date=datetime(2026, 3, 10, 10, 0),
+            )
+            second = self._execution(
+                procedure_name='Botox testa',
+                performed_date=datetime(2026, 3, 10, 15, 0),
+            )
+            db.session.add_all([
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=first.id,
+                    message_type='m5',
+                    due_at=datetime(2026, 8, 10).date(),
+                    status='estado_novo',
+                ),
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=second.id,
+                    message_type='m5',
+                    due_at=datetime(2026, 8, 11).date(),
+                    status='falhou',
+                    attempts=3,
+                    last_error='número recusado',
+                ),
+            ])
+            db.session.commit()
+
+            row = build_botox_sheet_rows()[1]
+
+        self.assertEqual(row[9], 'falhou (terminal)')
+        self.assertIn('número recusado', row[11])
+        self.assertIn('estado desconhecido: estado_novo', row[11])
+
+    def test_unknown_dispatch_status_does_not_render_an_invalid_raw_status(self):
+        with self.app.app_context():
+            execution = self._execution()
+            db.session.add(MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=execution.id,
+                message_type='d0',
+                due_at=datetime(2026, 3, 10).date(),
+                status='estado_novo',
+            ))
+            db.session.commit()
+
+            row = build_botox_sheet_rows()[1]
+
+        self.assertEqual(row[5], 'desconhecido')
+        self.assertEqual(row[7], 'estado desconhecido: estado_novo')
+
 
 if __name__ == '__main__':
     unittest.main()

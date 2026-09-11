@@ -14,3 +14,9 @@ Dispatch metadata must be matched to the stable procedure execution and message 
 **Why:** A retry would otherwise disappear from the sheet even though the dispatch still exists in the database.
 
 **How to apply:** Keep reconciliation keyed by execution identity when displaying status, attempts, errors, or terminal failures.
+
+The dispatch flow and Botox reconciliation share one status contract: `pendente`, `pulada`, `reservada`, `enviada`, `falhou`, and `cancelada`. Unknown persisted values must be shown as `desconhecido`; terminal `falhou` still wins aggregation.
+
+**Why:** A new integrator state must not silently become a misleading sheet summary, and an unexpected value must not hide a terminal delivery failure.
+
+**How to apply:** Update the shared status contract before adding a new state, and keep unknown-state visibility plus terminal-failure precedence covered by reconciliation tests.

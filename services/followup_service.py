@@ -8,6 +8,10 @@ from sqlalchemy import event, inspect, select, text
 
 from models import CosmeticProcedurePlan, MessageDispatch, ProcedureExecution
 from services.clinic_time import clinic_today
+from services.message_dispatch_status import (
+    DISPATCH_PENDING_STATUS,
+    DISPATCH_SKIPPED_STATUS,
+)
 
 
 FOLLOWUP_MONTHS_BOTOX = 5
@@ -35,7 +39,11 @@ def build_dispatch_rows(execution, plan, today=None):
 
     today = today or clinic_today()
     performed_date = execution.performed_date.date()
-    d0_status = 'pendente' if performed_date >= today else 'pulada'
+    d0_status = (
+        DISPATCH_PENDING_STATUS
+        if performed_date >= today
+        else DISPATCH_SKIPPED_STATUS
+    )
 
     return [
         {
@@ -48,7 +56,7 @@ def build_dispatch_rows(execution, plan, today=None):
             'execution_id': execution.id,
             'message_type': 'm5',
             'due_at': compute_m5_date(execution.performed_date),
-            'status': 'pendente',
+            'status': DISPATCH_PENDING_STATUS,
         },
     ]
 

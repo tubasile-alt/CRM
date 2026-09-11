@@ -19,6 +19,11 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy import and_, or_
 
 from services.clinic_time import clinic_today, get_brazil_time
+from services.message_dispatch_status import (
+    DISPATCH_ACTIVE_STATUSES,
+    DISPATCH_RESERVED_STATUS,
+    DISPATCH_RESULT_STATUSES,
+)
 
 
 integrations_bp = Blueprint(
@@ -132,7 +137,7 @@ def _consumed_today():
                 db.func.date(MessageDispatch.sent_at) == today,
             ),
             and_(
-                MessageDispatch.status == 'reservada',
+                MessageDispatch.status == DISPATCH_RESERVED_STATUS,
                 db.func.date(MessageDispatch.reserved_at) == today,
             ),
         )
@@ -163,7 +168,7 @@ def _reclaim_stale_reservations():
 
     cutoff = get_brazil_time() - timedelta(minutes=_reservation_ttl())
     reclaimed = db.session.query(MessageDispatch).filter(
-        MessageDispatch.status == 'reservada',
+        MessageDispatch.status == DISPATCH_RESERVED_STATUS,
         MessageDispatch.reserved_at < cutoff,
     ).update(
         {'status': 'pendente', 'reserved_at': None},
@@ -207,7 +212,7 @@ def _reserve(dispatches):
 
     reserved_at = get_brazil_time()
     for dispatch in dispatches:
-        dispatch.status = 'reservada'
+        dispatch.status = DISPATCH_RESERVED_STATUS
         dispatch.reserved_at = reserved_at
     db.session.commit()
 
@@ -217,7 +222,7 @@ def _reservation_diagnostics():
 
     cutoff = get_brazil_time() - timedelta(minutes=_reservation_ttl())
     base_query = db.session.query(MessageDispatch).filter(
-        MessageDispatch.status == 'reservada',
+        MessageDispatch.status == DISPATCH_RESERVED_STATUS,
     )
     return (
         base_query.count(),
@@ -347,7 +352,7 @@ def messages_update(dispatch_id):
 
     data = request.get_json(silent=True) or {}
     new_status = (data.get('status') or '').strip()
-    if new_status not in ('enviada', 'falhou', 'cancelada'):
+    if new_status not in DISPATCH_RESULT_STATUSES:
         return jsonify({
             'error': "status deve ser 'enviada', 'falhou' ou 'cancelada'",
         }), 400
@@ -356,7 +361,7 @@ def messages_update(dispatch_id):
     if not dispatch:
         return jsonify({'error': 'dispatch não encontrado'}), 404
 
-    if dispatch.status not in ('pendente', 'reservada'):
+    if dispatch.status not in DISPATCH_ACTIVE_STATUSES:
         return jsonify({
             'dispatch_id': dispatch.id,
             'status': dispatch.status,
