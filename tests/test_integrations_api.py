@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -522,6 +523,128 @@ def test_patch_accepts_reserved_and_clears_reservation(
         assert updated.sent_at is not None
 
         db.drop_all()
+
+
+def _patch_fake_dispatch(monkeypatch, dispatch):
+    committed = []
+
+    class FakeSession:
+        def get(self, _model, dispatch_id):
+            return dispatch if dispatch_id == dispatch.id else None
+
+        def commit(self):
+            committed.append(True)
+
+    monkeypatch.setitem(sys.modules, 'models', SimpleNamespace(
+        MessageDispatch=object,
+        db=SimpleNamespace(session=FakeSession()),
+    ))
+    monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
+    monkeypatch.setattr(integrations, 'clinic_today', lambda: date(2026, 9, 11))
+    return committed
+
+
+def test_patch_failure_requeues_with_exponential_backoff(monkeypatch):
+    dispatch = SimpleNamespace(
+        id=1,
+        status='reservada',
+        attempts=0,
+        due_at=date(2026, 9, 1),
+        reserved_at=datetime(2026, 9, 11, 10, 0),
+        sent_at=None,
+        last_error=None,
+    )
+    committed = _patch_fake_dispatch(monkeypatch, dispatch)
+
+    test_app = Flask(__name__)
+    test_app.config['TESTING'] = True
+    test_app.register_blueprint(integrations.integrations_bp)
+
+    with test_app.test_client() as client:
+        first = client.patch(
+            '/api/integrations/messages/1',
+            headers={'X-API-Key': 'expected'},
+            json={'status': 'falhou', 'error': 'timeout'},
+        )
+
+    assert first.status_code == 200
+    assert first.json['status'] == 'pendente'
+    assert first.json['attempts'] == 1
+    assert dispatch.status == 'pendente'
+    assert dispatch.due_at == date(2026, 9, 12)
+    assert dispatch.reserved_at is None
+    assert dispatch.last_error == 'timeout'
+    assert committed == [True]
+
+
+def test_patch_failure_becomes_terminal_after_attempt_limit(monkeypatch):
+    dispatch = SimpleNamespace(
+        id=1,
+        status='reservada',
+        attempts=2,
+        due_at=date(2026, 9, 12),
+        reserved_at=datetime(2026, 9, 11, 10, 0),
+        sent_at=None,
+        last_error='previous',
+    )
+    _patch_fake_dispatch(monkeypatch, dispatch)
+
+    test_app = Flask(__name__)
+    test_app.config['TESTING'] = True
+    test_app.register_blueprint(integrations.integrations_bp)
+
+    with test_app.test_client() as client:
+        response = client.patch(
+            '/api/integrations/messages/1',
+            headers={'X-API-Key': 'expected'},
+            json={'status': 'falhou', 'error': 'permanent'},
+        )
+
+    assert response.status_code == 200
+    assert response.json['status'] == 'falhou'
+    assert response.json['attempts'] == 3
+    assert dispatch.status == 'falhou'
+    assert dispatch.due_at == date(2026, 9, 12)
+    assert dispatch.last_error == 'permanent'
+
+
+def test_patch_accepts_cancelled_and_is_idempotent(monkeypatch):
+    dispatch = SimpleNamespace(
+        id=1,
+        status='reservada',
+        attempts=0,
+        due_at=date(2026, 9, 1),
+        reserved_at=datetime(2026, 9, 11, 10, 0),
+        sent_at=None,
+        last_error='old error',
+    )
+    _patch_fake_dispatch(monkeypatch, dispatch)
+
+    test_app = Flask(__name__)
+    test_app.config['TESTING'] = True
+    test_app.register_blueprint(integrations.integrations_bp)
+
+    with test_app.test_client() as client:
+        first = client.patch(
+            '/api/integrations/messages/1',
+            headers={'X-API-Key': 'expected'},
+            json={'status': 'cancelada'},
+        )
+        second = client.patch(
+            '/api/integrations/messages/1',
+            headers={'X-API-Key': 'expected'},
+            json={'status': 'enviada'},
+        )
+
+    assert first.status_code == 200
+    assert first.json['status'] == 'cancelada'
+    assert dispatch.status == 'cancelada'
+    assert dispatch.attempts == 0
+    assert dispatch.reserved_at is None
+    assert dispatch.last_error is None
+    assert second.status_code == 200
+    assert second.json['status'] == 'cancelada'
+    assert 'já processado' in second.json['note']
 
 
 def test_reclaim_returns_expired_reservation_to_pending(monkeypatch):

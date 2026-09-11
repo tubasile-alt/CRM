@@ -8,3 +8,9 @@ Message-dispatch schema changes must run through the post-merge migration flow, 
 **Why:** Multiple Botox areas can create separate executions for one patient on one day; deduplicating by execution sends duplicate messages and duplicates spreadsheet rows. Delivery needs independent fail-closed controls so an integration cannot send while only partially configured. The app uses Autoscale, so startup DDL can delay health checks. Development and production may also point at different databases; enabling listeners before verifying the production schema could break procedure creation.
 
 **How to apply:** After merge, verify the target schema, run the historical backfill as a dry run and review suppressed duplicates before any explicit commit, and only afterward enable the dispatch feature flag and restart the app. Rebuild the Botox sheet as one row per patient/date, storing all execution IDs in that row. Keep integration secrets absent until an intentional activation plan is approved. Never treat a development-schema check as proof of production readiness.
+
+Retry scheduling uses the existing `due_at` civil date as the next eligible date; the retry delay is exponential and a terminal failure remains `falhou`.
+
+**Why:** The current dispatch schema has no separate next-attempt timestamp, while `/due` already filters by `due_at`; using that field adds backoff without introducing another scheduling column or making retries immediately eligible.
+
+**How to apply:** Treat `attempts` as delivery attempts consumed by an external result, keep PATCH idempotent by ignoring terminal statuses, and preserve the same patient/type identity while moving eligibility forward.

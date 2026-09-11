@@ -29,6 +29,8 @@ integrations_bp = Blueprint(
 
 DEFAULT_DAILY_CAP = 20
 DEFAULT_RESERVATION_TTL = 30
+DEFAULT_MAX_ATTEMPTS = 3
+DEFAULT_RETRY_BACKOFF_DAYS = 1
 MAX_PAGE_SIZE = 50
 VALID_SEND_MODES = frozenset({'off', 'test', 'live'})
 
@@ -82,6 +84,31 @@ def _reservation_ttl():
         )))
     except (TypeError, ValueError):
         return DEFAULT_RESERVATION_TTL
+
+
+def _max_attempts():
+    """Maximum number of delivery attempts, including the first one."""
+    try:
+        return max(1, int(os.environ.get(
+            'DISPATCH_MAX_ATTEMPTS',
+            DEFAULT_MAX_ATTEMPTS,
+        )))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_ATTEMPTS
+
+
+def _retry_backoff_days(attempts):
+    """Return an exponential delay for the next delivery attempt."""
+    try:
+        base_days = max(1, int(os.environ.get(
+            'DISPATCH_RETRY_BACKOFF_DAYS',
+            DEFAULT_RETRY_BACKOFF_DAYS,
+        )))
+    except (TypeError, ValueError):
+        base_days = DEFAULT_RETRY_BACKOFF_DAYS
+
+    # The first retry waits base_days, the second waits twice that, etc.
+    return base_days * (2 ** max(0, attempts - 1))
 
 
 def _sent_today():
@@ -209,6 +236,7 @@ def _serialize(dispatch, patient):
         'patient_name': patient.name,
         'phone': format_phone_for_sheets(patient.phone),
         'due_at': dispatch.due_at.isoformat(),
+        'attempts': getattr(dispatch, 'attempts', 0) or 0,
     }
 
 
@@ -319,9 +347,9 @@ def messages_update(dispatch_id):
 
     data = request.get_json(silent=True) or {}
     new_status = (data.get('status') or '').strip()
-    if new_status not in ('enviada', 'falhou'):
+    if new_status not in ('enviada', 'falhou', 'cancelada'):
         return jsonify({
-            'error': "status deve ser 'enviada' ou 'falhou'",
+            'error': "status deve ser 'enviada', 'falhou' ou 'cancelada'",
         }), 400
 
     dispatch = db.session.get(MessageDispatch, dispatch_id)
@@ -335,15 +363,32 @@ def messages_update(dispatch_id):
             'note': 'já processado, sem alteração',
         })
 
-    dispatch.status = new_status
+    if new_status == 'falhou':
+        dispatch.attempts = (dispatch.attempts or 0) + 1
+        dispatch.last_error = (data.get('error') or '')[:500] or None
+        if dispatch.attempts < _max_attempts():
+            dispatch.status = 'pendente'
+            dispatch.due_at = (
+                clinic_today()
+                + timedelta(days=_retry_backoff_days(dispatch.attempts))
+            )
+        else:
+            dispatch.status = 'falhou'
+    else:
+        dispatch.status = new_status
+        if new_status == 'enviada':
+            dispatch.attempts = (dispatch.attempts or 0) + 1
+        dispatch.last_error = None
+
     dispatch.reserved_at = None
     dispatch.sent_at = get_brazil_time() if new_status == 'enviada' else None
-    dispatch.last_error = (data.get('error') or '')[:500] or None
     db.session.commit()
 
     return jsonify({
         'dispatch_id': dispatch.id,
         'status': dispatch.status,
+        'attempts': dispatch.attempts,
+        'due_at': dispatch.due_at.isoformat(),
     })
 
 
