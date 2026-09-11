@@ -59,7 +59,7 @@ def build_botox_sheet_rows():
             MessageDispatch.patient_id.in_(patient_ids)
         ).all()
     dispatch_by_key = {
-        (dispatch.patient_id, dispatch.message_type, dispatch.due_at): dispatch
+        (dispatch.execution_id, dispatch.message_type): dispatch
         for dispatch in dispatches
     }
 
@@ -74,25 +74,42 @@ def build_botox_sheet_rows():
         patient = group['patient']
         performed_date = group['performed_date']
         followup_date = group['followup_date']
-        disp_d0 = dispatch_by_key.get(
-            (patient.id, 'd0', performed_date.date())
-        )
-        disp_m5 = dispatch_by_key.get(
-            (
-                patient.id,
-                'm5',
-                followup_date.date() if followup_date else None,
-            )
-        )
+
+        def _dispatch(message_type):
+            for execution_id in group['execution_ids']:
+                dispatch = dispatch_by_key.get((execution_id, message_type))
+                if dispatch:
+                    return dispatch
+            return None
+
+        def _status(dispatch):
+            if not dispatch:
+                return ''
+            if dispatch.status == 'falhou':
+                return 'falhou (terminal)'
+            return dispatch.status or ''
+
+        def _attempts(dispatch):
+            return (dispatch.attempts or 0) if dispatch else ''
+
+        def _error(dispatch):
+            return (dispatch.last_error or '') if dispatch else ''
+
+        disp_d0 = _dispatch('d0')
+        disp_m5 = _dispatch('m5')
         matrix.append([
             ', '.join(str(execution_id) for execution_id in group['execution_ids']),
             patient.name or '',
             format_phone_for_sheets(patient.phone),
             _d(performed_date),
             _d(followup_date),
-            disp_d0.status if disp_d0 else '',
+            _status(disp_d0),
+            _attempts(disp_d0),
+            _error(disp_d0),
             _dt(disp_d0.sent_at) if disp_d0 else '',
-            disp_m5.status if disp_m5 else '',
+            _status(disp_m5),
+            _attempts(disp_m5),
+            _error(disp_m5),
             _dt(disp_m5.sent_at) if disp_m5 else '',
         ])
     return matrix

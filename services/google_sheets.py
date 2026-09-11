@@ -271,8 +271,9 @@ BOTOX_SPREADSHEET_ID = '1IUNWhBRzt5u6_ttfzjfTKckhSMOMx1l_s7uGnIom66o'
 BOTOX_SHEET_NAME     = 'Botox'
 BOTOX_HEADERS = [
     'execution_ids', 'Paciente', 'Celular', 'Data Realizado',
-    'Data Follow-up (5 meses)', 'Status D0', 'Enviada D0',
-    'Status 5m', 'Enviada 5m',
+    'Data Follow-up (5 meses)', 'Status D0', 'Tentativas D0',
+    'Último erro D0', 'Enviada D0', 'Status 5m', 'Tentativas 5m',
+    'Último erro 5m', 'Enviada 5m',
 ]
 
 
@@ -322,7 +323,7 @@ def write_botox_sheet(values_matrix):
 
         first_stale_row = len(values_matrix) + 1
         req.post(
-            f'{base}/values/{BOTOX_SHEET_NAME}!A{first_stale_row}:I100000:clear',
+            f'{base}/values/{BOTOX_SHEET_NAME}!A{first_stale_row}:M100000:clear',
             headers=h,
             timeout=30,
         )

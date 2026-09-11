@@ -85,12 +85,12 @@ class BotoxSheetRowsTests(unittest.TestCase):
         db.session.flush()
         return execution
 
-    def test_without_data_returns_only_nine_column_header(self):
+    def test_without_data_returns_only_header(self):
         with self.app.app_context():
             matrix = build_botox_sheet_rows()
 
         self.assertEqual(matrix, [list(BOTOX_HEADERS)])
-        self.assertEqual(len(matrix[0]), 9)
+        self.assertEqual(len(matrix[0]), 13)
 
     def test_realized_botox_without_dispatch_has_empty_status_columns(self):
         with self.app.app_context():
@@ -99,7 +99,7 @@ class BotoxSheetRowsTests(unittest.TestCase):
             matrix = build_botox_sheet_rows()
 
             self.assertEqual(matrix[1][0], str(execution.id))
-            self.assertEqual(matrix[1][5:9], ['', '', '', ''])
+            self.assertEqual(matrix[1][5:], ['', '', '', '', '', '', '', ''])
 
     def test_d0_dispatch_is_rendered(self):
         with self.app.app_context():
@@ -116,7 +116,9 @@ class BotoxSheetRowsTests(unittest.TestCase):
             row = build_botox_sheet_rows()[1]
 
         self.assertEqual(row[5], 'enviada')
-        self.assertEqual(row[6], '10/03/2026 15:45')
+        self.assertEqual(row[6], 0)
+        self.assertEqual(row[7], '')
+        self.assertEqual(row[8], '10/03/2026 15:45')
 
     def test_non_botox_is_not_included(self):
         with self.app.app_context():
@@ -208,8 +210,52 @@ class BotoxSheetRowsTests(unittest.TestCase):
             row = build_botox_sheet_rows()[1]
 
         self.assertEqual(row[5], 'enviada')
-        self.assertEqual(row[6], '10/03/2026 15:45')
-        self.assertEqual(row[7], 'pendente')
+        self.assertEqual(row[6], 0)
+        self.assertEqual(row[7], '')
+        self.assertEqual(row[8], '10/03/2026 15:45')
+        self.assertEqual(row[9], 'pendente')
+        self.assertEqual(row[10], 0)
+        self.assertEqual(row[11], '')
+
+    def test_pending_after_retry_shows_attempts_and_last_error(self):
+        with self.app.app_context():
+            execution = self._execution()
+            db.session.add(MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=execution.id,
+                message_type='d0',
+                due_at=datetime(2026, 3, 11).date(),
+                status='pendente',
+                attempts=1,
+                last_error='timeout',
+            ))
+            db.session.commit()
+            row = build_botox_sheet_rows()[1]
+
+        self.assertEqual(row[5], 'pendente')
+        self.assertEqual(row[6], 1)
+        self.assertEqual(row[7], 'timeout')
+        self.assertEqual(row[8], '')
+
+    def test_terminal_failure_is_marked_clearly(self):
+        with self.app.app_context():
+            execution = self._execution()
+            db.session.add(MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=execution.id,
+                message_type='m5',
+                due_at=datetime(2026, 8, 10).date(),
+                status='falhou',
+                attempts=3,
+                last_error='número recusado',
+            ))
+            db.session.commit()
+            row = build_botox_sheet_rows()[1]
+
+        self.assertEqual(row[9], 'falhou (terminal)')
+        self.assertEqual(row[10], 3)
+        self.assertEqual(row[11], 'número recusado')
+        self.assertEqual(row[12], '')
 
 
 if __name__ == '__main__':
