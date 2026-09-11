@@ -16,6 +16,37 @@ depends_on = None
 
 
 def upgrade():
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if inspector.has_table('patient_photo'):
+        columns = {
+            column['name']
+            for column in inspector.get_columns('patient_photo')
+        }
+        required_columns = {
+            'id',
+            'patient_id',
+            'data',
+            'mime_type',
+            'updated_at',
+        }
+        missing_columns = required_columns - columns
+        if missing_columns:
+            raise RuntimeError(
+                'patient_photo já existe, mas está incompleta; '
+                f'faltam: {sorted(missing_columns)}'
+            )
+
+        has_unique_patient_index = any(
+            index.get('unique') and index.get('column_names') == ['patient_id']
+            for index in inspector.get_indexes('patient_photo')
+        )
+        if not has_unique_patient_index:
+            raise RuntimeError(
+                'patient_photo já existe, mas não possui unicidade em patient_id'
+            )
+        return
+
     op.create_table(
         'patient_photo',
         sa.Column('id', sa.Integer(), nullable=False),

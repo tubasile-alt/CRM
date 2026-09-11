@@ -16,10 +16,27 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('push_subscription', sa.Column('endpoint_partial', sa.String(length=140), nullable=True))
-    op.add_column('push_subscription', sa.Column('platform', sa.String(length=40), nullable=True))
-    op.add_column('push_subscription', sa.Column('last_test_at', sa.DateTime(), nullable=True))
-    op.add_column('push_subscription', sa.Column('last_error', sa.Text(), nullable=True))
+    bind = op.get_bind()
+    existing_columns = {
+        column['name']
+        for column in sa.inspect(bind).get_columns('push_subscription')
+    }
+    diagnostic_columns = (
+        ('endpoint_partial', sa.String(length=140)),
+        ('platform', sa.String(length=40)),
+        ('last_test_at', sa.DateTime()),
+        ('last_error', sa.Text()),
+    )
+
+    # Some legacy databases received these columns from the old runtime
+    # compatibility helper before the schema entered Alembic. Treat those
+    # columns as adopted instead of failing on DuplicateColumn.
+    for name, column_type in diagnostic_columns:
+        if name not in existing_columns:
+            op.add_column(
+                'push_subscription',
+                sa.Column(name, column_type, nullable=True),
+            )
 
 
 def downgrade():
