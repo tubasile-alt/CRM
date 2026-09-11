@@ -12,10 +12,13 @@ resultado informado pelo integrador externo.
 
 import os
 import secrets
-from datetime import date, datetime
+from datetime import timedelta
 from functools import wraps
 
 from flask import Blueprint, jsonify, request
+from sqlalchemy import and_, or_
+
+from services.clinic_time import clinic_today, get_brazil_time
 
 
 integrations_bp = Blueprint(
@@ -25,6 +28,7 @@ integrations_bp = Blueprint(
 )
 
 DEFAULT_DAILY_CAP = 20
+DEFAULT_RESERVATION_TTL = 30
 MAX_PAGE_SIZE = 50
 VALID_SEND_MODES = frozenset({'off', 'test', 'live'})
 
@@ -69,12 +73,42 @@ def _daily_cap():
         return DEFAULT_DAILY_CAP
 
 
+def _reservation_ttl():
+    """Minutes until an abandoned reservation returns to the queue."""
+    try:
+        return max(1, int(os.environ.get(
+            'DISPATCH_RESERVATION_TTL_MINUTES',
+            DEFAULT_RESERVATION_TTL,
+        )))
+    except (TypeError, ValueError):
+        return DEFAULT_RESERVATION_TTL
+
+
 def _sent_today():
     from models import MessageDispatch, db
 
     return db.session.query(db.func.count(MessageDispatch.id)).filter(
         MessageDispatch.status == 'enviada',
-        db.func.date(MessageDispatch.sent_at) == date.today(),
+        db.func.date(MessageDispatch.sent_at) == clinic_today(),
+    ).scalar() or 0
+
+
+def _consumed_today():
+    """Count sent and currently reserved dispatches against the daily cap."""
+    from models import MessageDispatch, db
+
+    today = clinic_today()
+    return db.session.query(db.func.count(MessageDispatch.id)).filter(
+        or_(
+            and_(
+                MessageDispatch.status == 'enviada',
+                db.func.date(MessageDispatch.sent_at) == today,
+            ),
+            and_(
+                MessageDispatch.status == 'reservada',
+                db.func.date(MessageDispatch.reserved_at) == today,
+            ),
+        )
     ).scalar() or 0
 
 
@@ -87,12 +121,80 @@ def _pending_query():
         .join(Patient, Patient.id == MessageDispatch.patient_id)
         .filter(
             MessageDispatch.status == 'pendente',
-            MessageDispatch.due_at <= date.today(),
+            MessageDispatch.due_at <= clinic_today(),
             Patient.phone.isnot(None),
             Patient.phone != '',
             Patient.accepts_marketing.is_(True),
         )
         .order_by(MessageDispatch.due_at.asc(), MessageDispatch.id.asc())
+    )
+
+
+def _reclaim_stale_reservations():
+    """Return reservations older than the configured TTL to the pending queue."""
+    from models import MessageDispatch, db
+
+    cutoff = get_brazil_time() - timedelta(minutes=_reservation_ttl())
+    reclaimed = db.session.query(MessageDispatch).filter(
+        MessageDispatch.status == 'reservada',
+        MessageDispatch.reserved_at < cutoff,
+    ).update(
+        {'status': 'pendente', 'reserved_at': None},
+        synchronize_session=False,
+    )
+    if reclaimed:
+        db.session.commit()
+    return reclaimed
+
+
+def _lock_pending(limit):
+    """Select eligible pending dispatches, skipping locked rows on PostgreSQL."""
+    from models import MessageDispatch, Patient, db
+
+    query = (
+        db.session.query(MessageDispatch, Patient)
+        .join(Patient, Patient.id == MessageDispatch.patient_id)
+        .filter(
+            MessageDispatch.status == 'pendente',
+            MessageDispatch.due_at <= clinic_today(),
+            Patient.phone.isnot(None),
+            Patient.phone != '',
+            Patient.accepts_marketing.is_(True),
+        )
+        .order_by(MessageDispatch.due_at.asc(), MessageDispatch.id.asc())
+        .limit(limit)
+    )
+
+    if db.session.get_bind().dialect.name == 'postgresql':
+        query = query.with_for_update(
+            of=MessageDispatch,
+            skip_locked=True,
+        )
+
+    return query.all()
+
+
+def _reserve(dispatches):
+    """Mark the selected rows as reserved in one transaction."""
+    from models import db
+
+    reserved_at = get_brazil_time()
+    for dispatch in dispatches:
+        dispatch.status = 'reservada'
+        dispatch.reserved_at = reserved_at
+    db.session.commit()
+
+
+def _reservation_diagnostics():
+    from models import MessageDispatch, db
+
+    cutoff = get_brazil_time() - timedelta(minutes=_reservation_ttl())
+    base_query = db.session.query(MessageDispatch).filter(
+        MessageDispatch.status == 'reservada',
+    )
+    return (
+        base_query.count(),
+        base_query.filter(MessageDispatch.reserved_at < cutoff).count(),
     )
 
 
@@ -130,8 +232,10 @@ def messages_due():
             'note': 'DISPATCH_SEND_MODE=off — nenhuma mensagem liberada',
         })
 
+    _reclaim_stale_reservations()
+
     cap = _daily_cap()
-    used = _sent_today()
+    used = _consumed_today()
     remaining = max(0, cap - used)
     if remaining == 0:
         return jsonify({
@@ -141,7 +245,15 @@ def messages_due():
         })
 
     limit = min(_requested_limit(), remaining)
-    rows = _pending_query().all()
+    if limit == 0:
+        return jsonify({
+            'mode': mode,
+            'daily_cap': cap,
+            'sent_today': _sent_today(),
+            'messages': [],
+        })
+
+    rows = _lock_pending(limit * 3)
 
     if mode == 'test':
         allowed = {phone[-11:] for phone in _test_phones() if phone}
@@ -158,13 +270,16 @@ def messages_due():
                         if character.isdigit())[-11:] in allowed
         ]
 
+    selected = rows[:limit]
+    _reserve([dispatch for dispatch, _patient in selected])
+
     return jsonify({
         'mode': mode,
         'daily_cap': cap,
-        'sent_today': used,
+        'sent_today': _sent_today(),
         'messages': [
             _serialize(dispatch, patient)
-            for dispatch, patient in rows[:limit]
+            for dispatch, patient in selected
         ],
     })
 
@@ -174,6 +289,7 @@ def messages_due():
 def messages_preview():
     """Diagnóstico somente leitura, ignorando modo e cap."""
     rows = _pending_query().all()
+    reserved, stale_reserved = _reservation_diagnostics()
     by_type = {}
     for dispatch, _patient in rows:
         by_type[dispatch.message_type] = (
@@ -186,6 +302,8 @@ def messages_preview():
         'sent_today': _sent_today(),
         'total_vencidos': len(rows),
         'por_tipo': by_type,
+        'reservadas': reserved,
+        'reservadas_vencidas': stale_reserved,
         'amostra': [
             _serialize(dispatch, patient)
             for dispatch, patient in rows[:10]
@@ -210,7 +328,7 @@ def messages_update(dispatch_id):
     if not dispatch:
         return jsonify({'error': 'dispatch não encontrado'}), 404
 
-    if dispatch.status != 'pendente':
+    if dispatch.status not in ('pendente', 'reservada'):
         return jsonify({
             'dispatch_id': dispatch.id,
             'status': dispatch.status,
@@ -218,7 +336,8 @@ def messages_update(dispatch_id):
         })
 
     dispatch.status = new_status
-    dispatch.sent_at = datetime.utcnow() if new_status == 'enviada' else None
+    dispatch.reserved_at = None
+    dispatch.sent_at = get_brazil_time() if new_status == 'enviada' else None
     dispatch.last_error = (data.get('error') or '')[:500] or None
     db.session.commit()
 

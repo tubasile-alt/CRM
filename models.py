@@ -521,6 +521,7 @@ class MessageDispatch(db.Model):
     sent_at = db.Column(db.DateTime, nullable=True)
     last_error = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=get_brazil_time)
+    reserved_at = db.Column(db.DateTime, nullable=True)
 
     execution = db.relationship('ProcedureExecution', backref='dispatches')
     patient = db.relationship('Patient', backref='message_dispatches')

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -32,6 +32,7 @@ def fake_row(dispatch_id, phone, message_type='m5', status='pendente'):
         due_at=date(2026, 9, 1),
         status=status,
         sent_at=None,
+        reserved_at=None,
     )
     patient = SimpleNamespace(
         id=dispatch_id + 2000,
@@ -42,8 +43,21 @@ def fake_row(dispatch_id, phone, message_type='m5', status='pendente'):
 
 
 @pytest.fixture
-def integration_client(flask_app):
-    return flask_app.test_client()
+def integration_client():
+    test_app = Flask(__name__)
+    test_app.config.update(
+        TESTING=True,
+        SQLALCHEMY_DATABASE_URI='sqlite:///:memory:',
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    )
+    db.init_app(test_app)
+    test_app.register_blueprint(integrations.integrations_bp)
+
+    with test_app.app_context():
+        db.create_all()
+        yield test_app.test_client()
+        db.session.remove()
+        db.drop_all()
 
 
 def test_without_api_key_all_routes_return_503(
@@ -83,7 +97,7 @@ def test_due_is_silent_when_send_mode_is_absent(
     with monkeypatch.context() as context:
         context.setattr(
             integrations,
-            '_pending_query',
+            '_lock_pending',
             lambda: (_ for _ in ()).throw(
                 AssertionError('off não deve consultar a fila')
             ),
@@ -105,12 +119,13 @@ def test_test_mode_without_test_phone_is_empty(
     monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
     monkeypatch.setenv('DISPATCH_SEND_MODE', 'test')
     monkeypatch.delenv('DISPATCH_TEST_PHONES', raising=False)
+    monkeypatch.setattr(integrations, '_reclaim_stale_reservations', lambda: 0)
     monkeypatch.setattr(
         integrations,
-        '_pending_query',
-        lambda: FakeQuery([fake_row(1, '5516999941774')]),
+        '_lock_pending',
+        lambda limit: [fake_row(1, '5516999941774')],
     )
-    monkeypatch.setattr(integrations, '_sent_today', lambda: 0)
+    monkeypatch.setattr(integrations, '_consumed_today', lambda: 0)
 
     response = integration_client.get(
         '/api/integrations/messages/due',
@@ -128,15 +143,17 @@ def test_test_mode_only_releases_configured_phone(
     monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
     monkeypatch.setenv('DISPATCH_SEND_MODE', 'test')
     monkeypatch.setenv('DISPATCH_TEST_PHONES', '16999941774')
+    monkeypatch.setattr(integrations, '_reclaim_stale_reservations', lambda: 0)
     monkeypatch.setattr(
         integrations,
-        '_pending_query',
-        lambda: FakeQuery([
+        '_lock_pending',
+        lambda limit: [
             fake_row(1, '5516999941774'),
             fake_row(2, '5516999000000'),
-        ]),
+        ],
     )
-    monkeypatch.setattr(integrations, '_sent_today', lambda: 0)
+    monkeypatch.setattr(integrations, '_consumed_today', lambda: 0)
+    monkeypatch.setattr(integrations, '_reserve', lambda dispatches: None)
 
     response = integration_client.get(
         '/api/integrations/messages/due',
@@ -154,13 +171,18 @@ def test_live_mode_enforces_daily_cap(
     monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
     monkeypatch.setenv('DISPATCH_SEND_MODE', 'live')
     monkeypatch.setenv('DISPATCH_DAILY_CAP', '2')
+    monkeypatch.setattr(integrations, '_reclaim_stale_reservations', lambda: 0)
     monkeypatch.setattr(
         integrations,
-        '_pending_query',
-        lambda: FakeQuery([fake_row(index, '5516999941774')
-                           for index in range(1, 6)]),
+        '_lock_pending',
+        lambda limit: [
+            fake_row(index, '5516999941774')
+            for index in range(1, 6)
+        ],
     )
+    monkeypatch.setattr(integrations, '_consumed_today', lambda: 0)
     monkeypatch.setattr(integrations, '_sent_today', lambda: 0)
+    monkeypatch.setattr(integrations, '_reserve', lambda dispatches: None)
 
     response = integration_client.get(
         '/api/integrations/messages/due?limit=50',
@@ -179,10 +201,11 @@ def test_already_consumed_cap_returns_empty(
     monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
     monkeypatch.setenv('DISPATCH_SEND_MODE', 'live')
     monkeypatch.setenv('DISPATCH_DAILY_CAP', '2')
-    monkeypatch.setattr(integrations, '_sent_today', lambda: 2)
+    monkeypatch.setattr(integrations, '_reclaim_stale_reservations', lambda: 0)
+    monkeypatch.setattr(integrations, '_consumed_today', lambda: 2)
     monkeypatch.setattr(
         integrations,
-        '_pending_query',
+        '_lock_pending',
         lambda: (_ for _ in ()).throw(
             AssertionError('cap atingido não deve consultar a fila')
         ),
@@ -211,6 +234,11 @@ def test_preview_ignores_mode_and_does_not_change_status(
         lambda: FakeQuery([(dispatch, patient)]),
     )
     monkeypatch.setattr(integrations, '_sent_today', lambda: 0)
+    monkeypatch.setattr(
+        integrations,
+        '_reservation_diagnostics',
+        lambda: (0, 0),
+    )
 
     response = integration_client.get(
         '/api/integrations/messages/preview',
@@ -336,6 +364,271 @@ def test_patch_updates_and_is_idempotent(monkeypatch):
             assert unchanged.sent_at == sent_at
 
         db.drop_all()
+
+
+def test_due_reserves_dispatches_and_does_not_repeat(
+    integration_client,
+    monkeypatch,
+):
+    dispatch_1, patient_1 = fake_row(1, '5516999941774')
+    dispatch_2, patient_2 = fake_row(2, '5516999000000')
+    rows = [(dispatch_1, patient_1), (dispatch_2, patient_2)]
+    reserved = []
+
+    monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
+    monkeypatch.setenv('DISPATCH_SEND_MODE', 'live')
+    monkeypatch.setenv('DISPATCH_DAILY_CAP', '20')
+    monkeypatch.setattr(integrations, '_reclaim_stale_reservations', lambda: 0)
+    monkeypatch.setattr(integrations, '_consumed_today', lambda: 0)
+    monkeypatch.setattr(integrations, '_sent_today', lambda: 0)
+    monkeypatch.setattr(
+        integrations,
+        '_lock_pending',
+        lambda limit: [row for row in rows if row[0].status == 'pendente'],
+    )
+
+    def reserve(dispatches):
+        for dispatch in dispatches:
+            dispatch.status = 'reservada'
+            dispatch.reserved_at = datetime(2026, 9, 11, 10, 0)
+            reserved.append(dispatch.id)
+
+    monkeypatch.setattr(integrations, '_reserve', reserve)
+
+    first = integration_client.get(
+        '/api/integrations/messages/due?limit=2',
+        headers={'X-API-Key': 'expected'},
+    )
+    second = integration_client.get(
+        '/api/integrations/messages/due?limit=2',
+        headers={'X-API-Key': 'expected'},
+    )
+
+    assert first.status_code == 200
+    assert [item['dispatch_id'] for item in first.json['messages']] == [1, 2]
+    assert second.status_code == 200
+    assert second.json['messages'] == []
+    assert reserved == [1, 2]
+
+
+def test_test_mode_does_not_reserve_phone_outside_whitelist(
+    integration_client,
+    monkeypatch,
+):
+    allowed = fake_row(1, '5516999941774')
+    rejected = fake_row(2, '5516999000000')
+    rows = [allowed, rejected]
+
+    monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
+    monkeypatch.setenv('DISPATCH_SEND_MODE', 'test')
+    monkeypatch.setenv('DISPATCH_TEST_PHONES', '16999941774')
+    monkeypatch.setattr(integrations, '_reclaim_stale_reservations', lambda: 0)
+    monkeypatch.setattr(integrations, '_consumed_today', lambda: 0)
+    monkeypatch.setattr(integrations, '_sent_today', lambda: 0)
+    monkeypatch.setattr(integrations, '_lock_pending', lambda limit: rows)
+    monkeypatch.setattr(
+        integrations,
+        '_reserve',
+        lambda dispatches: [
+            setattr(dispatch, 'status', 'reservada')
+            for dispatch in dispatches
+        ],
+    )
+
+    response = integration_client.get(
+        '/api/integrations/messages/due?limit=2',
+        headers={'X-API-Key': 'expected'},
+    )
+
+    assert response.status_code == 200
+    assert [item['dispatch_id'] for item in response.json['messages']] == [1]
+    assert allowed[0].status == 'reservada'
+    assert rejected[0].status == 'pendente'
+
+
+def test_patch_accepts_reserved_and_clears_reservation(
+    monkeypatch,
+):
+    test_app = Flask(__name__)
+    test_app.config.update(
+        TESTING=True,
+        SQLALCHEMY_DATABASE_URI='sqlite:///:memory:',
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+    )
+    db.init_app(test_app)
+    test_app.register_blueprint(integrations.integrations_bp)
+
+    with test_app.app_context():
+        db.create_all()
+        doctor = User(
+            username='reservation-doctor',
+            email='reservation-doctor@example.com',
+            password_hash='test',
+            name='Doctor',
+            role='medico',
+        )
+        patient = Patient(
+            name='Paciente Reserva',
+            phone='16999941774',
+            accepts_marketing=True,
+        )
+        db.session.add_all([doctor, patient])
+        db.session.flush()
+        note = Note(
+            patient_id=patient.id,
+            doctor_id=doctor.id,
+            note_type='conduta',
+        )
+        db.session.add(note)
+        db.session.flush()
+        plan = CosmeticProcedurePlan(
+            note_id=note.id,
+            name='Botox',
+            procedure_name='Botox',
+        )
+        db.session.add(plan)
+        db.session.flush()
+        execution = ProcedureExecution(
+            plan_id=plan.id,
+            execution_status='realizada',
+            was_performed=True,
+        )
+        db.session.add(execution)
+        db.session.flush()
+        dispatch = MessageDispatch(
+            patient_id=patient.id,
+            execution_id=execution.id,
+            message_type='m5',
+            due_at=date(2026, 9, 1),
+            status='reservada',
+            reserved_at=datetime(2026, 9, 11, 9, 0),
+        )
+        db.session.add(dispatch)
+        db.session.commit()
+
+        client = test_app.test_client()
+        monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
+        response = client.patch(
+            f'/api/integrations/messages/{dispatch.id}',
+            headers={'X-API-Key': 'expected'},
+            json={'status': 'enviada'},
+        )
+
+        assert response.status_code == 200
+        assert response.json['status'] == 'enviada'
+        db.session.expire_all()
+        updated = db.session.get(MessageDispatch, dispatch.id)
+        assert updated.reserved_at is None
+        assert updated.sent_at is not None
+
+        db.drop_all()
+
+
+def test_reclaim_returns_expired_reservation_to_pending(monkeypatch):
+    reclaimed = []
+
+    class FakeColumn:
+        def __eq__(self, other):
+            return ('eq', other)
+
+        def __lt__(self, other):
+            return ('lt', other)
+
+    class FakeQueryForReclaim:
+        def filter(self, *criteria):
+            return self
+
+        def update(self, values, synchronize_session=False):
+            reclaimed.append((values, synchronize_session))
+            return 1
+
+    monkeypatch.setattr(
+        integrations,
+        '_reservation_ttl',
+        lambda: 30,
+    )
+
+    class FakeSession:
+        def query(self, _model):
+            return FakeQueryForReclaim()
+
+        def commit(self):
+            reclaimed.append('commit')
+
+    class FakeDb:
+        session = FakeSession()
+
+    monkeypatch.setitem(__import__('sys').modules, 'models', SimpleNamespace(
+        MessageDispatch=SimpleNamespace(
+            status=FakeColumn(),
+            reserved_at=FakeColumn(),
+        ),
+        db=FakeDb(),
+    ))
+
+    assert integrations._reclaim_stale_reservations() == 1
+    assert reclaimed[0][0] == {'status': 'pendente', 'reserved_at': None}
+    assert reclaimed[-1] == 'commit'
+
+
+def test_consumed_today_counts_sent_and_reserved(monkeypatch):
+    class FakeCountQuery:
+        def filter(self, *criteria):
+            return self
+
+        def scalar(self):
+            return 2
+
+    class FakeSession:
+        def query(self, _expression):
+            return FakeCountQuery()
+
+    class FakeDb:
+        session = FakeSession()
+
+        class func:
+            @staticmethod
+            def count(_value):
+                return object()
+
+            @staticmethod
+            def date(_value):
+                return object()
+
+        class or_:
+            pass
+
+    # Use the real SQLAlchemy helpers and model attributes through a stubbed
+    # session; the function should return the database count unchanged.
+    monkeypatch.setitem(__import__('sys').modules, 'models', SimpleNamespace(
+        MessageDispatch=SimpleNamespace(
+            id=object(),
+            status=object(),
+            sent_at=object(),
+            reserved_at=object(),
+        ),
+        db=FakeDb(),
+    ))
+    assert integrations._consumed_today() == 2
+
+
+def test_preview_reports_reservation_diagnostics(
+    integration_client,
+    monkeypatch,
+):
+    monkeypatch.setenv('INTEGRATIONS_API_KEY', 'expected')
+    monkeypatch.setattr(integrations, '_pending_query', lambda: FakeQuery([]))
+    monkeypatch.setattr(integrations, '_sent_today', lambda: 0)
+    monkeypatch.setattr(integrations, '_reservation_diagnostics', lambda: (2, 1))
+
+    response = integration_client.get(
+        '/api/integrations/messages/preview',
+        headers={'X-API-Key': 'expected'},
+    )
+
+    assert response.status_code == 200
+    assert response.json['reservadas'] == 2
+    assert response.json['reservadas_vencidas'] == 1
 
 
 def test_botox_sync_route_returns_service_result(
