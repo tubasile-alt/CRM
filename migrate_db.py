@@ -1,8 +1,16 @@
 import os
 import shutil
 from datetime import datetime
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import inspect
+
 from app import app, db
-from services.push_schema_service import ensure_push_subscription_schema
+
+
+MIGRATIONS_DIR = Path(__file__).resolve().parent / 'migrations'
 
 def backup_database():
     """Cria backup do banco de dados antes da migração"""
@@ -74,8 +82,34 @@ def ensure_patient_marketing_column():
         db.session.commit()
 
 
+def _alembic_config():
+    """Retorna uma configuração Alembic ligada ao diretório deste projeto."""
+    config = Config(str(MIGRATIONS_DIR / 'alembic.ini'))
+    config.set_main_option('script_location', str(MIGRATIONS_DIR))
+    return config
+
+
+def has_alembic_version_table():
+    """Indica se o banco já participa do histórico de migrations."""
+    return inspect(db.engine).has_table('alembic_version')
+
+
+def bootstrap_new_database():
+    """Cria um banco novo a partir dos modelos e o carimba no head."""
+    db.create_all()
+    print('✓ Schema inicial criado a partir dos modelos')
+    command.stamp(_alembic_config(), 'head')
+    print('✓ Banco novo carimbado no head do Alembic')
+
+
+def upgrade_versioned_database():
+    """Aplica somente as migrations pendentes em um banco versionado."""
+    command.upgrade(_alembic_config(), 'head')
+    print('✓ Migrations Alembic aplicadas até o head')
+
+
 def migrate_database():
-    """Migra o banco de dados adicionando novas tabelas e colunas"""
+    """Sincroniza o banco sem misturar bootstrap de modelos e Alembic."""
     with app.app_context():
         print('Iniciando migração segura do banco de dados...')
 
@@ -83,18 +117,17 @@ def migrate_database():
         backup_file = backup_database()
 
         try:
-            # Garantir colunas de etiquetagem em medications
+            if has_alembic_version_table():
+                print('✓ alembic_version encontrado; executando upgrade head')
+                upgrade_versioned_database()
+            else:
+                print('✓ alembic_version ausente; inicializando banco novo')
+                bootstrap_new_database()
+
+            # Estas correções mantêm compatibilidade com bases legadas que
+            # antecedem as migrations correspondentes. Não criam tabelas.
             ensure_medication_columns()
-
-            # Garantir preferência de marketing antes de carregar o modelo completo
             ensure_patient_marketing_column()
-
-            # Criar novas tabelas (se não existirem)
-            db.create_all()
-            print('✓ Novas tabelas criadas com sucesso')
-
-            ensure_push_subscription_schema()
-            print('✓ Estrutura de notificações push criada/verificada')
             
             # Criar índice único parcial (FASE 1)
             print('  Verificando índice único parcial para patient_doctor...')

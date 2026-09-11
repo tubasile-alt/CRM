@@ -18,6 +18,7 @@ Pillow
 openpyxl
 pandas
 APScheduler
+alembic>=1.13,<2.0
 google-api-python-client
 google-auth
 pywebpush
