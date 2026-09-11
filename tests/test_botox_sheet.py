@@ -1,5 +1,6 @@
 import unittest
 from datetime import datetime
+from unittest.mock import patch
 
 from flask import Flask
 
@@ -474,6 +475,55 @@ class BotoxSheetRowsTests(unittest.TestCase):
             row[7],
             f'execução {execution.id}: estado desconhecido: estado_novo',
         )
+
+    def test_unknown_dispatch_status_emits_safe_structured_alert(self):
+        with self.app.app_context():
+            execution = self._execution()
+            db.session.add(MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=execution.id,
+                message_type='d0',
+                due_at=datetime(2026, 3, 10).date(),
+                status='estado_novo',
+            ))
+            db.session.commit()
+
+            with patch(
+                'services.botox_sheet_service.logger.warning',
+            ) as warning:
+                build_botox_sheet_rows()
+
+        warning.assert_called_once()
+        message, = warning.call_args.args
+        alert = warning.call_args.kwargs['extra']
+        self.assertEqual(message, 'botox_sheet_unknown_dispatch_status')
+        self.assertEqual(alert['unknown_dispatch_count'], 1)
+        self.assertEqual(alert['unknown_status_values'], ['estado_novo'])
+        self.assertEqual(
+            alert['unknown_dispatches'],
+            [{'dispatch_id': 1, 'message_type': 'd0'}],
+        )
+        self.assertNotIn('Paciente Botox', str(alert))
+        self.assertNotIn('5516999941774', str(alert))
+
+    def test_unknown_dispatch_alert_ignores_other_message_types(self):
+        with self.app.app_context():
+            execution = self._execution()
+            db.session.add(MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=execution.id,
+                message_type='outro',
+                due_at=datetime(2026, 3, 10).date(),
+                status='estado_novo',
+            ))
+            db.session.commit()
+
+            with patch(
+                'services.botox_sheet_service.logger.warning',
+            ) as warning:
+                build_botox_sheet_rows()
+
+        warning.assert_not_called()
 
 
 if __name__ == '__main__':

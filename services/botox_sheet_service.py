@@ -5,6 +5,7 @@ Nenhum caminho de request escreve nela.
 """
 
 from collections import defaultdict, OrderedDict
+import logging
 
 from sqlalchemy import text
 
@@ -15,6 +16,8 @@ from services.message_dispatch_status import (
 
 
 ADVISORY_LOCK_KEY = 918273
+BOTOX_MESSAGE_TYPES = frozenset({'d0', 'm5'})
+logger = logging.getLogger(__name__)
 
 # Quando uma linha representa mais de uma execução, o status mais acionável
 # precisa prevalecer. Em especial, uma falha terminal nunca pode ser escondida
@@ -38,6 +41,52 @@ def _normalized_dispatch_status(dispatch):
     if status in DISPATCH_KNOWN_STATUSES:
         return status
     return UNKNOWN_DISPATCH_STATUS
+
+
+def _unknown_status_value(dispatch):
+    raw_status = getattr(dispatch, 'status', None)
+    value = raw_status.strip() if isinstance(raw_status, str) else ''
+    return value or '(vazio)'
+
+
+def _alert_unknown_dispatches(dispatches):
+    """Registra o diagnóstico mínimo necessário para investigar estados inválidos.
+
+    O alerta não inclui dados do paciente, telefone ou erro de entrega. O
+    logging é best-effort para que um handler operacional mal configurado não
+    impeça a reconstrução da planilha.
+    """
+    unknown_dispatches = [
+        dispatch
+        for dispatch in dispatches
+        if _normalized_dispatch_status(dispatch) == UNKNOWN_DISPATCH_STATUS
+    ]
+    if not unknown_dispatches:
+        return
+
+    alert = {
+        'unknown_dispatch_count': len(unknown_dispatches),
+        'unknown_status_values': sorted({
+            _unknown_status_value(dispatch)
+            for dispatch in unknown_dispatches
+        }),
+        'unknown_dispatches': [
+            {
+                'dispatch_id': dispatch.id,
+                'message_type': dispatch.message_type,
+            }
+            for dispatch in unknown_dispatches
+        ],
+    }
+    try:
+        logger.warning(
+            'botox_sheet_unknown_dispatch_status',
+            extra=alert,
+        )
+    except Exception:
+        # A reconstrução da planilha é o caminho principal e não pode falhar
+        # por causa de um sink de alertas indisponível.
+        pass
 
 
 def _aggregate_dispatches(dispatches):
@@ -139,6 +188,17 @@ def build_botox_sheet_rows():
         dispatches_by_key[
             (dispatch.execution_id, dispatch.message_type)
         ].append(dispatch)
+    execution_ids = {
+        execution_id
+        for group in groups.values()
+        for execution_id in group['execution_ids']
+    }
+    _alert_unknown_dispatches([
+        dispatch
+        for dispatch in dispatches
+        if dispatch.execution_id in execution_ids
+        and dispatch.message_type in BOTOX_MESSAGE_TYPES
+    ])
 
     def _d(value):
         return value.strftime('%d/%m/%Y') if value else ''
