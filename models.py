@@ -543,6 +543,26 @@ class MessageDispatch(db.Model):
     )
 
 
+class MessageDispatchStatusAudit(db.Model):
+    """Auditoria das correções manuais de estados inválidos de dispatch."""
+    __tablename__ = 'message_dispatch_status_audit'
+
+    id = db.Column(db.Integer, primary_key=True)
+    dispatch_id = db.Column(
+        db.Integer,
+        db.ForeignKey('message_dispatch.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    previous_status = db.Column(db.String(50), nullable=True)
+    new_status = db.Column(db.String(20), nullable=False)
+    actor = db.Column(db.String(100), nullable=False)
+    reason = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, default=get_brazil_time, nullable=False)
+
+    dispatch = db.relationship('MessageDispatch', backref='status_audits')
+
+
 # Modelos para Transplante Capilar
 class HairTransplant(db.Model):
     __tablename__ = 'hair_transplant'

@@ -21,8 +21,12 @@ from sqlalchemy import and_, or_
 from services.clinic_time import clinic_today, get_brazil_time
 from services.message_dispatch_status import (
     DISPATCH_ACTIVE_STATUSES,
+    DISPATCH_KNOWN_STATUSES,
     DISPATCH_RESERVED_STATUS,
     DISPATCH_RESULT_STATUSES,
+    DispatchStatusCorrectionError,
+    correct_unknown_dispatch,
+    list_unknown_dispatches,
 )
 
 
@@ -342,6 +346,67 @@ def messages_preview():
             for dispatch, patient in rows[:10]
         ],
     })
+
+
+@integrations_bp.route('/messages/unknown-status', methods=['GET'])
+@_api_key_required
+def messages_unknown_status():
+    """Relatório somente leitura dos dispatches fora do contrato."""
+    try:
+        report = list_unknown_dispatches(
+            limit=request.args.get('limit', 50),
+            offset=request.args.get('offset', 0),
+        )
+    except DispatchStatusCorrectionError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    return jsonify(report)
+
+
+@integrations_bp.route(
+    '/messages/<int:dispatch_id>/status-correction',
+    methods=['PATCH'],
+)
+@_api_key_required
+def messages_status_correction(dispatch_id):
+    """Aplica uma transição manual, explícita e auditada."""
+    data = request.get_json(silent=True) or {}
+    target_status = data.get('target_status', data.get('status'))
+    if not isinstance(target_status, str) or not target_status.strip():
+        return jsonify({
+            'error': 'target_status é obrigatório',
+            'accepted_statuses': sorted(DISPATCH_KNOWN_STATUSES),
+        }), 400
+
+    try:
+        result = correct_unknown_dispatch(
+            dispatch_id,
+            target_status,
+            actor=data.get('actor'),
+            reason=data.get('reason'),
+            expected_status=data.get('expected_status'),
+        )
+    except DispatchStatusCorrectionError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    if result is None:
+        return jsonify({'error': 'dispatch não encontrado'}), 404
+
+    dispatch = result['dispatch']
+    response = {
+        'dispatch_id': dispatch.id,
+        'status': dispatch.status,
+        'changed': result['changed'],
+        'previous_status': result['previous_status'],
+        'note': (
+            'corrigido e auditado'
+            if result['changed']
+            else 'já estava corrigido, sem alteração'
+        ),
+    }
+    if result['audit'] is not None:
+        response['audit_id'] = result['audit'].id
+    return jsonify(response)
 
 
 @integrations_bp.route('/messages/<int:dispatch_id>', methods=['PATCH'])

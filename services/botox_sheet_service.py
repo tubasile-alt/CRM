@@ -10,8 +10,9 @@ import logging
 from sqlalchemy import text
 
 from services.message_dispatch_status import (
-    DISPATCH_KNOWN_STATUSES,
     UNKNOWN_DISPATCH_STATUS,
+    normalize_dispatch_status,
+    unknown_dispatch_status_value,
 )
 
 
@@ -36,17 +37,11 @@ _DISPATCH_STATUS_PRIORITY = {
 
 
 def _normalized_dispatch_status(dispatch):
-    raw_status = getattr(dispatch, 'status', None)
-    status = raw_status.strip() if isinstance(raw_status, str) else ''
-    if status in DISPATCH_KNOWN_STATUSES:
-        return status
-    return UNKNOWN_DISPATCH_STATUS
+    return normalize_dispatch_status(getattr(dispatch, 'status', None))
 
 
 def _unknown_status_value(dispatch):
-    raw_status = getattr(dispatch, 'status', None)
-    value = raw_status.strip() if isinstance(raw_status, str) else ''
-    return value or '(vazio)'
+    return unknown_dispatch_status_value(getattr(dispatch, 'status', None))
 
 
 def _alert_unknown_dispatches(dispatches):
