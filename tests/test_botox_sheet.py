@@ -234,7 +234,7 @@ class BotoxSheetRowsTests(unittest.TestCase):
 
         self.assertEqual(row[5], 'pendente')
         self.assertEqual(row[6], 1)
-        self.assertEqual(row[7], 'timeout')
+        self.assertEqual(row[7], f'execução {execution.id}: timeout')
         self.assertEqual(row[8], '')
 
     def test_terminal_failure_is_marked_clearly(self):
@@ -254,7 +254,7 @@ class BotoxSheetRowsTests(unittest.TestCase):
 
         self.assertEqual(row[9], 'falhou (terminal)')
         self.assertEqual(row[10], 3)
-        self.assertEqual(row[11], 'número recusado')
+        self.assertEqual(row[11], f'execução {execution.id}: número recusado')
         self.assertEqual(row[12], '')
 
     def test_grouped_dispatches_aggregate_attempts_and_errors(self):
@@ -294,7 +294,10 @@ class BotoxSheetRowsTests(unittest.TestCase):
         self.assertEqual(matrix[1][0], f'{first.id}, {second.id}')
         self.assertEqual(matrix[1][5], 'pendente')
         self.assertEqual(matrix[1][6], 3)
-        self.assertEqual(matrix[1][7], 'timeout; número inválido')
+        self.assertEqual(
+            matrix[1][7],
+            f'execução {first.id}: timeout; execução {second.id}: número inválido',
+        )
 
     def test_grouped_dispatch_terminal_failure_overrides_sent_dispatch(self):
         with self.app.app_context():
@@ -333,8 +336,54 @@ class BotoxSheetRowsTests(unittest.TestCase):
         self.assertEqual(matrix[1][0], f'{first.id}, {second.id}')
         self.assertEqual(matrix[1][9], 'falhou (terminal)')
         self.assertEqual(matrix[1][10], 4)
-        self.assertEqual(matrix[1][11], 'número recusado')
+        self.assertEqual(
+            matrix[1][11],
+            f'execução {second.id}: número recusado',
+        )
         self.assertEqual(matrix[1][12], '10/08/2026 10:00')
+
+    def test_grouped_terminal_failures_keep_each_execution_id(self):
+        with self.app.app_context():
+            first = self._execution(
+                performed_date=datetime(2026, 3, 10, 10, 0),
+            )
+            second = self._execution(
+                procedure_name='Botox testa',
+                performed_date=datetime(2026, 3, 10, 15, 0),
+            )
+            db.session.add_all([
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=first.id,
+                    message_type='m5',
+                    due_at=datetime(2026, 8, 10).date(),
+                    status='falhou',
+                    attempts=3,
+                    last_error='número recusado',
+                ),
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=second.id,
+                    message_type='m5',
+                    due_at=datetime(2026, 8, 11).date(),
+                    status='falhou',
+                    attempts=4,
+                    last_error='janela expirada',
+                ),
+            ])
+            db.session.commit()
+
+            matrix = build_botox_sheet_rows()
+
+        self.assertEqual(len(matrix), 2)
+        self.assertEqual(matrix[1][0], f'{first.id}, {second.id}')
+        self.assertEqual(matrix[1][9], 'falhou (terminal)')
+        self.assertEqual(matrix[1][10], 7)
+        self.assertEqual(
+            matrix[1][11],
+            f'execução {first.id}: número recusado; '
+            f'execução {second.id}: janela expirada',
+        )
 
     def test_mixed_dispatch_statuses_use_most_actionable_known_status(self):
         with self.app.app_context():
@@ -397,8 +446,14 @@ class BotoxSheetRowsTests(unittest.TestCase):
             row = build_botox_sheet_rows()[1]
 
         self.assertEqual(row[9], 'falhou (terminal)')
-        self.assertIn('número recusado', row[11])
-        self.assertIn('estado desconhecido: estado_novo', row[11])
+        self.assertIn(
+            f'execução {second.id}: número recusado',
+            row[11],
+        )
+        self.assertIn(
+            f'execução {first.id}: estado desconhecido: estado_novo',
+            row[11],
+        )
 
     def test_unknown_dispatch_status_does_not_render_an_invalid_raw_status(self):
         with self.app.app_context():
@@ -415,7 +470,10 @@ class BotoxSheetRowsTests(unittest.TestCase):
             row = build_botox_sheet_rows()[1]
 
         self.assertEqual(row[5], 'desconhecido')
-        self.assertEqual(row[7], 'estado desconhecido: estado_novo')
+        self.assertEqual(
+            row[7],
+            f'execução {execution.id}: estado desconhecido: estado_novo',
+        )
 
 
 if __name__ == '__main__':

@@ -61,12 +61,12 @@ def _aggregate_dispatches(dispatches):
     )
     attempts = sum(dispatch.attempts or 0 for dispatch in dispatches)
     errors = [
-        dispatch.last_error
+        f'execução {dispatch.execution_id}: {dispatch.last_error}'
         for dispatch in dispatches
         if dispatch.last_error
     ]
     errors.extend(
-        'estado desconhecido: '
+        f'execução {dispatch.execution_id}: estado desconhecido: '
         + (dispatch.status.strip() if isinstance(dispatch.status, str)
            and dispatch.status.strip() else '(vazio)')
         for normalized_status, dispatch in normalized
