@@ -4,12 +4,60 @@ A planilha é um espelho de leitura: reconstruída por completo a cada execuçã
 Nenhum caminho de request escreve nela.
 """
 
-from collections import OrderedDict
+from collections import defaultdict, OrderedDict
 
 from sqlalchemy import text
 
 
 ADVISORY_LOCK_KEY = 918273
+
+# Quando uma linha representa mais de uma execução, o status mais acionável
+# precisa prevalecer. Em especial, uma falha terminal nunca pode ser escondida
+# por uma execução enviada anteriormente.
+_DISPATCH_STATUS_PRIORITY = {
+    'falhou': 50,
+    'reservada': 40,
+    'pendente': 30,
+    'enviada': 20,
+    'cancelada': 10,
+}
+
+
+def _aggregate_dispatches(dispatches):
+    """Resume dispatches do mesmo tipo sem esconder uma execução problemática.
+
+    A aba mantém uma linha por paciente/data, portanto uma linha pode
+    representar vários dispatches. Tentativas e erros são dados acumulados de
+    todas as execuções; o status é o estado mais acionável, com falha terminal
+    sempre vencendo os demais estados.
+    """
+    if not dispatches:
+        return None
+
+    status = max(
+        dispatches,
+        key=lambda dispatch: _DISPATCH_STATUS_PRIORITY.get(dispatch.status, 0),
+    ).status or ''
+    attempts = sum(dispatch.attempts or 0 for dispatch in dispatches)
+    errors = [
+        dispatch.last_error
+        for dispatch in dispatches
+        if dispatch.last_error
+    ]
+    sent_at = max(
+        (
+            dispatch.sent_at
+            for dispatch in dispatches
+            if dispatch.sent_at
+        ),
+        default=None,
+    )
+    return {
+        'status': status,
+        'attempts': attempts,
+        'last_error': '; '.join(errors),
+        'sent_at': sent_at,
+    }
 
 
 def build_botox_sheet_rows():
@@ -58,10 +106,11 @@ def build_botox_sheet_rows():
         dispatches = db.session.query(MessageDispatch).filter(
             MessageDispatch.patient_id.in_(patient_ids)
         ).all()
-    dispatch_by_key = {
-        (dispatch.execution_id, dispatch.message_type): dispatch
-        for dispatch in dispatches
-    }
+    dispatches_by_key = defaultdict(list)
+    for dispatch in dispatches:
+        dispatches_by_key[
+            (dispatch.execution_id, dispatch.message_type)
+        ].append(dispatch)
 
     def _d(value):
         return value.strftime('%d/%m/%Y') if value else ''
@@ -75,28 +124,31 @@ def build_botox_sheet_rows():
         performed_date = group['performed_date']
         followup_date = group['followup_date']
 
-        def _dispatch(message_type):
-            for execution_id in group['execution_ids']:
-                dispatch = dispatch_by_key.get((execution_id, message_type))
-                if dispatch:
-                    return dispatch
-            return None
+        def _dispatches(message_type):
+            return [
+                dispatch
+                for execution_id in group['execution_ids']
+                for dispatch in dispatches_by_key.get(
+                    (execution_id, message_type),
+                    [],
+                )
+            ]
 
         def _status(dispatch):
             if not dispatch:
                 return ''
-            if dispatch.status == 'falhou':
+            if dispatch['status'] == 'falhou':
                 return 'falhou (terminal)'
-            return dispatch.status or ''
+            return dispatch['status']
 
         def _attempts(dispatch):
-            return (dispatch.attempts or 0) if dispatch else ''
+            return dispatch['attempts'] if dispatch else ''
 
         def _error(dispatch):
-            return (dispatch.last_error or '') if dispatch else ''
+            return dispatch['last_error'] if dispatch else ''
 
-        disp_d0 = _dispatch('d0')
-        disp_m5 = _dispatch('m5')
+        disp_d0 = _aggregate_dispatches(_dispatches('d0'))
+        disp_m5 = _aggregate_dispatches(_dispatches('m5'))
         matrix.append([
             ', '.join(str(execution_id) for execution_id in group['execution_ids']),
             patient.name or '',
@@ -106,11 +158,11 @@ def build_botox_sheet_rows():
             _status(disp_d0),
             _attempts(disp_d0),
             _error(disp_d0),
-            _dt(disp_d0.sent_at) if disp_d0 else '',
+            _dt(disp_d0['sent_at']) if disp_d0 else '',
             _status(disp_m5),
             _attempts(disp_m5),
             _error(disp_m5),
-            _dt(disp_m5.sent_at) if disp_m5 else '',
+            _dt(disp_m5['sent_at']) if disp_m5 else '',
         ])
     return matrix
 

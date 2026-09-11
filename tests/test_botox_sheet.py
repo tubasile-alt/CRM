@@ -257,6 +257,85 @@ class BotoxSheetRowsTests(unittest.TestCase):
         self.assertEqual(row[11], 'número recusado')
         self.assertEqual(row[12], '')
 
+    def test_grouped_dispatches_aggregate_attempts_and_errors(self):
+        with self.app.app_context():
+            first = self._execution(
+                performed_date=datetime(2026, 3, 10, 10, 0),
+            )
+            second = self._execution(
+                procedure_name='Botox testa',
+                performed_date=datetime(2026, 3, 10, 15, 0),
+            )
+            db.session.add_all([
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=first.id,
+                    message_type='d0',
+                    due_at=datetime(2026, 3, 10).date(),
+                    status='pendente',
+                    attempts=1,
+                    last_error='timeout',
+                ),
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=second.id,
+                    message_type='d0',
+                    due_at=datetime(2026, 3, 11).date(),
+                    status='pendente',
+                    attempts=2,
+                    last_error='número inválido',
+                ),
+            ])
+            db.session.commit()
+
+            matrix = build_botox_sheet_rows()
+
+        self.assertEqual(len(matrix), 2)
+        self.assertEqual(matrix[1][0], f'{first.id}, {second.id}')
+        self.assertEqual(matrix[1][5], 'pendente')
+        self.assertEqual(matrix[1][6], 3)
+        self.assertEqual(matrix[1][7], 'timeout; número inválido')
+
+    def test_grouped_dispatch_terminal_failure_overrides_sent_dispatch(self):
+        with self.app.app_context():
+            first = self._execution(
+                performed_date=datetime(2026, 3, 10, 10, 0),
+            )
+            second = self._execution(
+                procedure_name='Botox testa',
+                performed_date=datetime(2026, 3, 10, 15, 0),
+            )
+            db.session.add_all([
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=first.id,
+                    message_type='m5',
+                    due_at=datetime(2026, 8, 10).date(),
+                    status='enviada',
+                    attempts=1,
+                    sent_at=datetime(2026, 8, 10, 10, 0),
+                ),
+                MessageDispatch(
+                    patient_id=self.patient_id,
+                    execution_id=second.id,
+                    message_type='m5',
+                    due_at=datetime(2026, 8, 11).date(),
+                    status='falhou',
+                    attempts=3,
+                    last_error='número recusado',
+                ),
+            ])
+            db.session.commit()
+
+            matrix = build_botox_sheet_rows()
+
+        self.assertEqual(len(matrix), 2)
+        self.assertEqual(matrix[1][0], f'{first.id}, {second.id}')
+        self.assertEqual(matrix[1][9], 'falhou (terminal)')
+        self.assertEqual(matrix[1][10], 4)
+        self.assertEqual(matrix[1][11], 'número recusado')
+        self.assertEqual(matrix[1][12], '10/08/2026 10:00')
+
 
 if __name__ == '__main__':
     unittest.main()
