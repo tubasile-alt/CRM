@@ -1,0 +1,162 @@
+Resposta honesta e útil do agente. Ele retratou as afirmações anteriores em vez de defendê-las — isso vale mais do que os três relatórios juntos.
+
+## O que a resposta muda
+
+**A verificação da cadeia era real, só estava mal rotulada.** `ScriptDirectory.get_heads()` é um jeito legítimo de checar heads e `down_revision`. Aquele "uma linha" continua valendo como evidência da cadeia. O que nunca existiu foi o comando.
+
+**Os smoke tests são mais fracos do que pareciam.** Importar a migration via `importlib` e chamar `upgrade()`/`downgrade()` direto com `MigrationContext` valida o corpo da função em SQLite. Não valida: a cadeia rodando ponta a ponta, a contabilidade do `alembic_version` (é justamente o que esse caminho pula), nem o comportamento no PostgreSQL — onde estão os nomes de índice reais, os tipos reais e o `SKIP LOCKED`.
+
+**Meu anexo estava desatualizado em dois pontos** — `alembic` entrou em `abb6e2f` e o `script_location` foi adicionado. Bom que ele corrigiu.
+
+## O achado novo, que ninguém mencionou
+
+A `i0d1e2f3a4b5` tem isto:
+
+```python
+def upgrade():
+    if sa.inspect(op.get_bind()).has_table('message_dispatch_status_audit'):
+        return
+```
+
+É um no-op silencioso. Se a tabela já existir — criada pelo `create_all()`, por exemplo — a migration "passa", o `alembic_version` avança, e ninguém sabe se o schema real bate com o que a migration descreve.
+
+Consequência prática: **`upgrade head` bem-sucedido deixa de ser prova de que o schema está correto.** A verificação tem que ser feita direto nas colunas e índices, sempre.
+
+Isso não é necessariamente errado como medida transitória — é o débito do `create_all()` se manifestando como "migration idempotente". Mas precisa estar documentado, e precisa saber se as outras três fazem o mesmo.
+
+Detalhe menor, vale perguntar: `previous_status` é `String(50)` e `new_status` é `String(20)`, sendo que `message_dispatch.status` é `String(20)`. Assimetria proposital ou descuido?
+
+---
+
+## Próximo prompt
+
+Sobre o Passo 2 do prompt anterior: **prefira o wrapper, não o Flask-Migrate.** O `alembic` já está declarado; o `env.py` já tem fallback que dispensa Flask-Migrate; e um script explícito é uma dependência a menos num monólito que já tem problema de import. Está no prompt abaixo.
+
+---
+
+### Tornar o Alembic executável e validar a cadeia em PostgreSQL
+
+Continuação. **Produção permanece read-only. Nenhuma trava é ativada. Cole a saída bruta dos comandos.**
+
+#### PASSO 1 — Perguntas antes de codar
+
+1. As migrations `f7a8b9c0d1e2`, `g8b9c0d1e2f3` e `h9c0d1e2f3a4` também têm guardas de no-op (`if has_table` / `if has_column` → `return`) no `upgrade()`? Cole o corpo das três.
+2. Em `i0d1e2f3a4b5`, `previous_status` é `String(50)` e `new_status` é `String(20)`, enquanto `message_dispatch.status` é `String(20)`. Proposital?
+3. A tabela `message_dispatch_status_audit` já existe em desenvolvimento? Foi criada por `create_all` ou pela migration?
+
+#### PASSO 2 — Entrypoint único de migration
+
+Crie `scripts/db.py`: um wrapper que roda o Alembic dentro do app context, expondo `heads`, `history`, `current`, `upgrade`, `downgrade` e `stamp`.
+
+Esqueleto:
+
+```python
+import sys
+from alembic import command
+from alembic.config import Config
+
+def main():
+    from app import app          # DISABLE_SCHEDULER=1 no ambiente
+    cfg = Config('migrations/alembic.ini')
+    with app.app_context():
+        # despachar sys.argv para command.upgrade/downgrade/current/heads/...
+        ...
+```
+
+Requisitos:
+
+- Não adicionar dependência nova. `alembic` já está no `requirements.txt`.
+- **Não** instalar Flask-Migrate. O `env.py` já tem fallback para `db.engine`, que funciona dentro do app context.
+- Definir `DISABLE_SCHEDULER=1` no próprio script, antes de importar `app`.
+- Documentar no topo do arquivo que **este é o único comando oficial de migration do projeto** e que `alembic` direto no shell não funciona.
+- Não alterar nenhuma migration existente, nem o `create_all()` do `migrate_db.py`.
+
+Prove:
+
+```bash
+python scripts/db.py heads      # UMA linha
+python scripts/db.py history    # saída bruta
+python scripts/db.py current    # banco de desenvolvimento
+```
+
+Se `heads` devolver mais de uma linha, pare.
+
+#### PASSO 3 — PostgreSQL descartável
+
+Banco PostgreSQL temporário, **nunca** o de produção. Aponte via `DATABASE_URL` só no ambiente do teste.
+
+Para cada item, reporte **o que foi observado**, não o esperado:
+
+**3.1 — Bootstrap em banco limpo.** Banco vazio, sem `alembic_version`. Rode o fluxo oficial de bootstrap. Reporte: revision resultante, número de tabelas criadas (esperado 42), e se `message_dispatch` tem `reserved_at`, `attempts`, `ix_dispatch_reservada`, `ux_dispatch_patient_type_due`, `ix_dispatch_due`.
+
+**3.2 — Cadeia limpa.** Banco vazio, **sem** bootstrap: `python scripts/db.py upgrade head`. Quantas tabelas existem depois? (Só 6 têm migration — confirme o número real.) Depois `downgrade -1` quatro vezes e `upgrade head` de novo. Cole cada saída.
+
+**3.3 — Guardas de no-op.** Crie a tabela `message_dispatch_status_audit` manualmente, rode `upgrade head` e reporte: a migration passou? O `alembic_version` avançou? Isso confirma ou não que um upgrade bem-sucedido não prova o schema.
+
+**3.4 — Legado sem `alembic_version`.** Schema por `create_all`, sem `alembic_version`. Rode o fluxo. Esperado: carimbar, não recriar.
+
+**3.5 — Legado incompleto.** Schema por `create_all`, depois remova manualmente `patient_funnel_status.seller_notes`. Rode o fluxo. **Esperado: falha explícita e legível.** Se passar em silêncio, é bug — reporte como tal.
+
+**3.6 — SQL compilado.** Compile a query de `_lock_pending` com o dialeto PostgreSQL e cole o SQL. Confirme que contém `FOR UPDATE OF message_dispatch SKIP LOCKED`. **Se vier `FOR UPDATE` sem o `OF message_dispatch`, pare e reporte** — sem o `OF`, a trava pega as linhas de `patient` e o CRM emperra para editar aqueles pacientes durante o envio.
+
+**3.7 — Concorrência SQL.** Popule ~20 dispatches `pendente` vencidos com pacientes de `phone` preenchido e `accepts_marketing = TRUE`. Sessão A abre transação e faz o `SELECT ... FOR UPDATE OF message_dispatch SKIP LOCKED LIMIT 5` sem commitar. Sessão B roda a mesma query. Reporte: os IDs são disjuntos? B respondeu na hora ou bloqueou?
+
+**3.8 — A trava não pode pegar `patient`.** Com a sessão A ainda aberta, uma sessão C roda `UPDATE patient SET attention_note = attention_note WHERE id = <paciente de uma linha travada>`. Esperado: completa imediatamente. Se bloquear, o `of=` está errado — pare e reporte. Depois, `ROLLBACK` em A.
+
+**3.9 — Concorrência HTTP.** Com chave de teste, `DISPATCH_SEND_MODE=test` e whitelist cobrindo os pacientes de teste, dispare duas chamadas simultâneas a `GET /api/integrations/messages/due?limit=5`. Reporte: os `dispatch_id` são disjuntos? Quantas linhas ficaram `reservada`? Alguma ficou reservada sem ter sido devolvida?
+
+**3.10 — Reclaim.** Force `reserved_at` de uma linha reservada para além do TTL, chame `/due` de novo. A linha voltou para `pendente`?
+
+**3.11 — Retry.** `PATCH {"status":"falhou"}` numa linha reservada: o que acontece com `attempts`, `status`, `reserved_at`? Repita até o limite — em que ponto vira terminal? `PATCH {"status":"cancelada"}` tira da fila?
+
+**3.12 — Auditoria.** As transições dos itens 3.9 a 3.11 geraram linhas em `message_dispatch_status_audit`? Cole uma amostra (sem dados de paciente).
+
+#### PASSO 4 — Produção, somente leitura
+
+Apenas `SELECT`. Nenhum `upgrade`, `stamp` ou DDL.
+
+```sql
+SELECT * FROM alembic_version;
+
+SELECT column_name, data_type, is_nullable
+  FROM information_schema.columns
+ WHERE table_name = 'message_dispatch' ORDER BY ordinal_position;
+
+SELECT indexname, indexdef FROM pg_indexes
+ WHERE tablename = 'message_dispatch';
+
+SELECT to_regclass('message_dispatch_status_audit');
+
+SELECT status, message_type, COUNT(*) FROM message_dispatch
+ GROUP BY status, message_type ORDER BY status, message_type;
+
+SELECT to_regclass('patient_photo'), to_regclass('push_subscription'),
+       to_regclass('commercial_task'), to_regclass('physical_agenda_import_log');
+
+SELECT table_name, column_name FROM information_schema.columns
+ WHERE (table_name = 'cosmetic_procedure_plan' AND column_name IN ('status','plan_name'))
+    OR (table_name = 'patient_funnel_status' AND column_name = 'seller_notes');
+```
+
+Se a primeira falhar porque `alembic_version` não existe, **isso é a resposta** — reporte assim, sem criar nada.
+
+#### RELATÓRIO FINAL
+
+1. Respostas do Passo 1, com o corpo das três migrations
+2. Saída bruta dos três comandos do Passo 2
+3. Itens 3.1 a 3.12, um a um, com o observado
+4. As 7 consultas do Passo 4
+5. Distância entre o head do repositório e a revision de produção: quais migrations faltam
+6. O que quebrou, com traceback
+7. Divergências entre relatórios anteriores e o observado agora
+
+#### NÃO FAÇA
+
+- Nada de escrita em produção
+- Não instale Flask-Migrate
+- Não altere migrations existentes
+- Não mexa no `create_all()` do `migrate_db.py`
+- Não configure `INTEGRATIONS_API_KEY` em produção nem mude `DISPATCH_SEND_MODE`
+- Não rode o backfill
+- Não conserte o que falhar — reporte
+- Não reformate saída de comando
