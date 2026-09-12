@@ -1,0 +1,643 @@
+# CRM Clínica Basile — API de disparo de mensagens
+
+**Repositório:** `tubasile-alt/CRM` · **Base auditada:** `main` @ `bbed0cb` (10/09/2026)
+**Deploy:** https://clinicabasile.replit.app — Replit Autoscale, público
+
+Documento único com o estado real do código, o que já existe, o que falta, e a
+especificação executável dos próximos PRs.
+
+Todos os `arquivo:linha` abaixo foram verificados no código, não inferidos.
+Onde há inferência, está marcado como tal.
+
+---
+
+## 1. Estado atual — a API JÁ EXISTE
+
+A Fase 4 foi implementada. Qualquer especificação que peça para criar a API do
+zero está desatualizada e vai duplicar código.
+
+| Componente | Onde está | Observação |
+|---|---|---|
+| Model `MessageDispatch` | `models.py:502` | dentro de `models.py`, não em arquivo separado |
+| Auth por API key | `routes/integrations.py:33` (`_api_key_required`) | inline, usa `secrets.compare_digest` |
+| Config das travas | `routes/integrations.py:48-70` | inline |
+| `GET /messages/due` | `routes/integrations.py:120` | |
+| `GET /messages/preview` | `routes/integrations.py:169` | diagnóstico read-only, ignora modo e cap |
+| `PATCH /messages/<id>` | `routes/integrations.py:193` | |
+| `POST /botox-sheet/sync` | `routes/integrations.py:228` | gatilho autenticado da planilha |
+| Blueprint registrado | `app.py:313, 327` + `csrf.exempt` em `328` | |
+| Geração da fila | `services/followup_service.py` | event listeners, **não** é job |
+| Backfill histórico | `scripts/backfill_botox_dispatches.py` | `--dry-run` é o padrão |
+| Testes | `tests/test_integrations_api.py` | |
+| Migration Alembic | criada no PR1 (`f7a8b9c0d1e2`) | não estava no repo original |
+
+### 1.1 Pontos de adaptação reais
+
+| # | O que | Valor real |
+|---|---|---|
+| A | import do `db` | `db = SQLAlchemy()` em `models.py:7` → `from models import db` |
+| B | paciente + celular | `Patient` (`models.py:42`), tabela `patient`, campo **`phone`** String(20) |
+| C | registro de blueprints | `app.py:313-333` — monolito, não factory |
+| D | execução de botox | `ProcedureExecution` (`models.py:482`), data em **`performed_date`** (DateTime) |
+| E | identificação de botox | `is_botox(plan.procedure_name)` via `CosmeticProcedurePlan.procedure_name` |
+| F | normalização de telefone | `format_phone_for_sheets` (`services/google_sheets.py:14`) — já existe, reusar |
+
+### 1.2 Schema real de `message_dispatch`
+
+```python
+id                 Integer, PK
+patient_id         Integer, FK patient.id, NOT NULL, index
+execution_id       Integer, FK procedure_execution.id ON DELETE CASCADE, NOT NULL, index
+message_type       String(20), NOT NULL
+due_at             Date, NOT NULL, index
+status             String(20), NOT NULL, default 'pendente'
+sent_at            DateTime, nullable
+last_error         Text, nullable
+created_at         DateTime, default get_brazil_time
+
+UniqueConstraint('patient_id', 'message_type', 'due_at', name='ux_dispatch_patient_type_due')
+Index('ix_dispatch_due', 'status', 'due_at')
+```
+
+**Não existe** coluna `attempts`. **Não existe** `updated_at`. **Não existe**
+`source_execution_id` — a coluna se chama `execution_id` e é NOT NULL.
+
+### 1.3 Statuses em uso
+
+`pendente` · `enviada` · `falhou` · **`pulada`**
+
+`pulada` só aparece em `services/followup_service.py:39` e no backfill — é o
+status do histórico que não deve disparar. **Nunca adicione um CHECK constraint
+em `status` baseado nos valores que aparecem nas rotas**, porque `pulada` não
+está lá e o backfill quebra.
+
+### 1.4 As quatro travas
+
+| Trava | Onde | Default | Efeito |
+|---|---|---|---|
+| `INTEGRATIONS_API_KEY` | `integrations.py:35` | ausente | todas as rotas retornam 503 |
+| `DISPATCH_SEND_MODE` | `integrations.py:49` | `off` | `off` → `/due` sempre vazio |
+| `DISPATCH_DAILY_CAP` | `integrations.py:62` | `20` | limite diário |
+| `MESSAGE_DISPATCH_ENABLED` | `followup_service.py:14` | ausente | `!= '1'` → nenhum dispatch é gerado |
+
+A quarta costuma passar despercebida. Com ela desligada, os listeners não
+rodam e nenhuma aplicação de botox gera dispatch.
+
+### 1.5 Filtro de consentimento
+
+`routes/integrations.py:89` filtra `Patient.accepts_marketing.is_(True)`
+(`models.py:47`). Manter. É a barreira de LGPD da fila.
+
+---
+
+## 2. Ambiente de deploy — Autoscale
+
+`.replit` → `deploymentTarget = "autoscale"`,
+run `gunicorn --config gunicorn.conf.py app:app`.
+`gunicorn.conf.py` → `workers=2, threads=2, timeout=120, preload_app=True`.
+
+### 2.1 O que o Autoscale NÃO quebra
+
+**A geração de dispatch está segura.** Ela é event listener SQLAlchemy
+(`followup_service.py:139,147`), executado dentro do request que marca a
+execução como `realizada`. Não depende de scheduler nem de instância acordada.
+
+Isso invalida a ideia original de um job APScheduler às 06:00 — no Autoscale
+seria não-confiável. A implementação atual é melhor.
+
+### 2.2 O que o Autoscale quebra
+
+**a) Scheduler interno não-confiável.** `app.py:4108-4139` pendura dois jobs:
+`mark_no_shows_grace_minutes(30)` a cada 5 min e `run_botox_sheet_sync()` a
+cada 6 h. Com zero instâncias, nenhum roda. Problema anterior à Fase 4.
+
+*Inferência não verificada:* com `preload_app=True`, o `app.py` é importado no
+processo master antes do fork. A thread do APScheduler nasce no master e não é
+herdada pelos workers. O provável é que os jobs rodem só no master — funciona,
+mas some quando a instância dorme.
+
+Teste para confirmar: conte quantas vezes `[AUTO-FALTOU] Scheduler iniciado`
+aparece no log de deploy (1 = só master; 3 = master + 2 workers) e verifique se
+houve algum `[BOTOX-SHEET]` nas últimas 24 h. Nenhum = job morto.
+
+**b) Cold start vs. chamada do n8n.** Às 13h e 19h30 a instância estará
+dormindo. A primeira request paga boot + import do `app.py` (4.261 linhas) +
+preload. E `/due` faz a query mais pesada da rota justamente nessa request.
+
+Resolve-se **no n8n, sem tocar no CRM**: GET de aquecimento numa rota leve ~60 s
+antes, timeout de 90 s na chamada real, 2 retries com backoff.
+
+**c) Cap diário não é atômico entre instâncias.** Tratado no PR2.
+
+### 2.3 Risco no post-merge
+
+`.replit` → `[postMerge] path = "scripts/post-merge.sh"`, `timeoutMs = 120000`
+→ `python migrate_db.py`.
+
+`migrate_db.py` roda `backup_database()` antes de tudo. Conforme o banco cresce,
+isso vai estourar os 120 s e o post-merge morre no meio da migração. Monitorar.
+
+---
+
+## 3. PR1 — migration (concluído, com pendência)
+
+### 3.1 Entregue
+
+- Revision `f7a8b9c0d1e2`, `down_revision = 'e2f3a4b5c6d7'`
+- `alembic heads` → uma linha, sem bifurcação ✓
+- Cadeia conferida contra os 11 arquivos do repo: `e2f3a4b5c6d7`
+  (create_physical_agenda_import_log) era de fato o head anterior ✓
+- `ensure_message_dispatch_schema()` removida do `migrate_db.py` — o
+  `DROP TABLE` a cada post-merge acabou ✓
+- `downgrade()` funcional, smoke test passou
+- Produção intocada
+
+### 3.2 PENDENTE — carimbar produção
+
+Produção nunca viu o Alembic. **Antes de aplicar qualquer `upgrade` lá:**
+
+```bash
+alembic current     # se voltar vazio, produção não está carimbada
+```
+
+Carimbar afirma que as 11 migrations anteriores já estão refletidas no schema.
+Verificar antes:
+
+```sql
+SELECT to_regclass('patient_photo'),
+       to_regclass('push_subscription'),
+       to_regclass('commercial_task'),
+       to_regclass('physical_agenda_import_log');
+
+SELECT column_name FROM information_schema.columns
+ WHERE table_name = 'cosmetic_procedure_plan'
+   AND column_name IN ('status', 'plan_name');
+
+SELECT column_name FROM information_schema.columns
+ WHERE table_name = 'patient_funnel_status'
+   AND column_name = 'seller_notes';
+```
+
+- Tudo presente → `alembic stamp f7a8b9c0d1e2` é seguro.
+- Algo faltando → carimbar a revision **anterior** àquela migration e rodar
+  `alembic upgrade head`.
+
+**Este stamp é pré-requisito do PR2.** PR2 é a primeira migration que vai de
+fato rodar em produção; sem o stamp, o `upgrade` tenta recriar
+`message_dispatch` e quebra com *table already exists*.
+
+### 3.3 Débito deixado em aberto
+
+`migrate_db.py:93` ainda tem `db.create_all()`.
+
+Contagem real: **42 tabelas em `models.py`, 5 criadas por migration**
+(`commercial_task`, `patient_photo`, `physical_agenda_import_log`,
+`procedure_execution`, `push_subscription`). As outras 37 existem só por causa
+do `create_all()`.
+
+**Não remova o `create_all()` agora** — quebra qualquer ambiente novo.
+
+O problema não é o schema (o `create_all` constrói a partir do model, com a
+mesma unique e os mesmos índices). O problema é a contabilidade: num banco novo,
+o `create_all()` cria a tabela e a `alembic_version` fica vazia; o
+`alembic upgrade head` seguinte quebra.
+
+Fecho correto, em PR próprio:
+
+```
+se alembic_version não existe  →  db.create_all() + alembic stamp head
+senão                          →  alembic upgrade head + db.create_all() (resto)
+```
+
+---
+
+## 4. PR2 — Reserva atômica no `/due`
+
+Branch sugerida: `feat/dispatch-reserva-atomica`.
+
+### 4.1 Problema
+
+`routes/integrations.py:143` faz `_pending_query().all()`, corta em memória e
+devolve — sem marcar nada. Duas chamadas concorrentes recebem a mesma lista.
+Com Autoscale (N instâncias) + gunicorn (4 handlers por instância) + retry do
+n8n após cold start, isso vira disparo duplicado para o mesmo paciente.
+
+### 4.2 Janela segura — a correção de fuso entra AQUI, não no PR3
+
+`sent_at` está **NULL em todas as linhas**: nunca houve PATCH bem-sucedido,
+porque a API key nunca foi configurada e as rotas retornam 503.
+
+Por quê isso importa: `get_brazil_time()` (`services/clinic_time.py:21`)
+devolve datetime **aware** em São Paulo, mas as colunas são `db.DateTime` sem
+`timezone=True` — o Postgres guarda o wall clock local. Já `sent_at` grava
+`datetime.utcnow()` (`integrations.py:216`), naive em UTC. A coluna acabaria
+com dois fusos misturados.
+
+Como ainda não há nenhum `sent_at` gravado, a correção é trivial agora e vira
+migração de dados depois do go-live.
+
+| Linha | Hoje | Vira |
+|---|---|---|
+| `integrations.py:75` | `date.today()` | `clinic_today()` |
+| `integrations.py:91` | `date.today()` | `clinic_today()` |
+| `integrations.py:216` | `datetime.utcnow()` | `get_brazil_time()` |
+
+Impacto prático hoje é baixo (13h e 19h30 BRT caem no mesmo dia UTC), mas
+qualquer batch que escorregue depois das 21h BRT reseta o cap um dia antes.
+
+### 4.3 Migration
+
+Nova revision, `down_revision = 'f7a8b9c0d1e2'`.
+
+```python
+def upgrade():
+    op.add_column(
+        'message_dispatch',
+        sa.Column('reserved_at', sa.DateTime(), nullable=True),
+    )
+    op.create_index(
+        'ix_dispatch_reservada',
+        'message_dispatch',
+        ['status', 'reserved_at'],
+    )
+
+
+def downgrade():
+    # devolver à fila antes de remover a coluna que sustenta o status
+    op.execute(
+        "UPDATE message_dispatch SET status = 'pendente' "
+        "WHERE status = 'reservada'"
+    )
+    op.drop_index('ix_dispatch_reservada', table_name='message_dispatch')
+    op.drop_column('message_dispatch', 'reserved_at')
+```
+
+No model (`models.py`, dentro de `MessageDispatch`):
+
+```python
+reserved_at = db.Column(db.DateTime, nullable=True)
+```
+
+Sem CHECK em `status`.
+
+### 4.4 Config nova
+
+```python
+DEFAULT_RESERVATION_TTL = 30
+
+
+def _reservation_ttl():
+    """Minutos até uma reserva órfã voltar para a fila."""
+    try:
+        return max(1, int(os.environ.get(
+            'DISPATCH_RESERVATION_TTL_MINUTES',
+            DEFAULT_RESERVATION_TTL,
+        )))
+    except (TypeError, ValueError):
+        return DEFAULT_RESERVATION_TTL
+```
+
+### 4.5 Recuperação de reservas órfãs — inline, sem scheduler
+
+Decisão deliberada: roda no começo do próprio `/due`, não num job, porque no
+Autoscale scheduler não é garantia.
+
+```python
+def _reclaim_stale_reservations():
+    from models import MessageDispatch, db
+
+    limite = get_brazil_time() - timedelta(minutes=_reservation_ttl())
+    devolvidas = db.session.query(MessageDispatch).filter(
+        MessageDispatch.status == 'reservada',
+        MessageDispatch.reserved_at < limite,
+    ).update(
+        {'status': 'pendente', 'reserved_at': None},
+        synchronize_session=False,
+    )
+    if devolvidas:
+        db.session.commit()
+    return devolvidas
+```
+
+Coberto pelo índice `ix_dispatch_reservada`. Custo desprezível.
+
+### 4.6 Seleção com trava
+
+```python
+def _lock_pending(limit):
+    """SELECT ... FOR UPDATE SKIP LOCKED dos vencidos elegíveis."""
+    from models import MessageDispatch, Patient, db
+
+    query = (
+        db.session.query(MessageDispatch, Patient)
+        .join(Patient, Patient.id == MessageDispatch.patient_id)
+        .filter(
+            MessageDispatch.status == 'pendente',
+            MessageDispatch.due_at <= clinic_today(),
+            Patient.phone.isnot(None),
+            Patient.phone != '',
+            Patient.accepts_marketing.is_(True),
+        )
+        .order_by(MessageDispatch.due_at.asc(), MessageDispatch.id.asc())
+        .limit(limit)
+    )
+
+    if db.session.get_bind().dialect.name == 'postgresql':
+        query = query.with_for_update(of=MessageDispatch, skip_locked=True)
+
+    return query.all()
+
+
+def _reserve(dispatches):
+    from models import db
+
+    agora = get_brazil_time()
+    for dispatch in dispatches:
+        dispatch.status = 'reservada'
+        dispatch.reserved_at = agora
+    db.session.commit()   # o commit solta a trava das não-selecionadas
+```
+
+**Três detalhes que não são opcionais:**
+
+1. **`of=MessageDispatch`.** Sem isso o `FOR UPDATE` trava também as linhas de
+   `patient` — e o CRM inteiro trava para editar aqueles pacientes enquanto o
+   n8n roda. É o erro mais caro possível neste PR.
+2. **Guarda de dialeto.** `skip_locked` é Postgres. Produção é `postgresql-16`,
+   mas se algum teste ou script rodar SQLite, sem a guarda quebra.
+3. **Over-fetch.** `LIMIT n FOR UPDATE SKIP LOCKED` no Postgres pode devolver
+   menos que `n` (o LIMIT é aplicado antes do skip). Chame com `limit * 3` e
+   corte depois.
+
+### 4.7 Cap diário passa a contar reservadas
+
+Senão o cap é contornável: o n8n chama duas vezes antes de confirmar qualquer
+envio e reserva 40 com cap de 20.
+
+```python
+def _consumed_today():
+    from models import MessageDispatch, db
+
+    hoje = clinic_today()
+    return db.session.query(db.func.count(MessageDispatch.id)).filter(
+        db.or_(
+            db.and_(
+                MessageDispatch.status == 'enviada',
+                db.func.date(MessageDispatch.sent_at) == hoje,
+            ),
+            db.and_(
+                MessageDispatch.status == 'reservada',
+                db.func.date(MessageDispatch.reserved_at) == hoje,
+            ),
+        )
+    ).scalar() or 0
+```
+
+Substitui `_sent_today()` no cálculo do `remaining`. Mantenha `_sent_today()`
+vivo para o campo `sent_today` da resposta — é o número que interessa no
+relatório.
+
+### 4.8 Nova ordem em `messages_due`
+
+```
+1. mode == 'off'            → retorna, sem tocar no banco   (preserva o teste atual)
+2. _reclaim_stale_reservations()
+3. remaining = cap - _consumed_today()
+4. remaining == 0           → retorna
+5. rows = _lock_pending(min(limit, remaining) * 3)
+6. filtro de whitelist (modo test) — em Python, dentro da transação
+7. selecionadas = rows[:min(limit, remaining)]
+8. _reserve(selecionadas)   → commit
+9. serializa
+```
+
+O filtro de whitelist **precisa** ficar entre 5 e 8. Se reservar antes de
+filtrar, os números fora da whitelist ficam presos em `reservada` por 30 min a
+cada chamada.
+
+### 4.9 O detalhe que trava a fila inteira se for esquecido
+
+`routes/integrations.py:213` tem hoje:
+
+```python
+if dispatch.status != 'pendente':
+    return jsonify({... 'note': 'já processado, sem alteração'})
+```
+
+Com reserva, **todo dispatch chega no PATCH em `reservada`**. Se esse guard não
+mudar, cada confirmação do n8n é ignorada, nada vira `enviada`, e em 30 min tudo
+volta para a fila — loop silencioso de reenvio, sem erro em lugar nenhum.
+
+```python
+if dispatch.status not in ('pendente', 'reservada'):
+    return jsonify({...})
+
+dispatch.status = new_status
+dispatch.reserved_at = None          # libera em qualquer desfecho
+dispatch.sent_at = get_brazil_time() if new_status == 'enviada' else None
+```
+
+Aceitar `pendente` também mantém compatibilidade com um PATCH que chegue fora do
+fluxo de reserva.
+
+### 4.10 `preview` ganha visibilidade das reservas
+
+Read-only, **sem** `_reclaim`. Adicionar ao payload:
+
+```python
+'reservadas': <count status='reservada'>,
+'reservadas_vencidas': <count status='reservada' AND reserved_at < limite>,
+```
+
+É o que se olha quando a fila parece parada.
+
+### 4.11 Testes
+
+**Quebram:** 6 testes em `tests/test_integrations_api.py` fazem
+`monkeypatch.setattr(integrations, '_pending_query', ...)` com um `FakeQuery` de
+`SimpleNamespace`. `_pending_query` some.
+
+Para a reescrita ser mecânica, mantenha dois seams patcháveis com estes nomes
+exatos: **`_lock_pending(limit)`** e **`_reserve(dispatches)`**.
+
+Os testes de `mode off` e `cap atingido` continuam valendo sem alteração, desde
+que a ordem de 4.8 seja respeitada — ambos afirmam que a fila **não** é
+consultada.
+
+**Novos, mínimo:**
+
+| Teste | Afirma |
+|---|---|
+| reserva marca status | após `/due`, as devolvidas estão `reservada` com `reserved_at` preenchido |
+| segunda chamada não repete | duas chamadas seguidas não devolvem o mesmo `dispatch_id` |
+| whitelist não reserva descartado | em modo test, número fora da whitelist continua `pendente` |
+| PATCH aceita reservada | `reservada` → `enviada` funciona e zera `reserved_at` |
+| reclaim devolve órfã | `reservada` com `reserved_at` antigo volta a `pendente` |
+| cap conta reservada | com cap=2 e 2 reservadas hoje, `/due` devolve vazio |
+
+O teste de concorrência real (duas transações simultâneas) só faz sentido contra
+Postgres. Se a suíte roda em SQLite, marque com `pytest.mark.skipif` no dialeto
+em vez de fingir que cobre.
+
+### 4.12 Efeito colateral conhecido
+
+`services/botox_sheet_service.py:93,95` escreve `dispatch.status` cru na
+planilha do Google. A partir do PR2 a equipe vai ver `reservada` nas colunas
+D0/M5. Não quebra nada. Decidir: deixar ou mapear para um rótulo
+(`"em envio"`). Se mapear, é no `botox_sheet_service`, não na rota.
+
+### 4.13 Contrato com o n8n — o que muda do lado de lá
+
+Nada obrigatório, mas dois comportamentos novos:
+
+- **Retry depois de timeout não duplica.** Se o n8n receber o lote e estourar
+  antes de confirmar, aquelas mensagens ficam travadas por até 30 min e o retry
+  pega um lote diferente. Efeito: atraso, nunca duplicata.
+- **Confirmar passa a ser obrigatório.** Antes, não mandar o PATCH só deixava a
+  linha pendente. Agora, não confirmar consome cap até o reclaim. Se o n8n não
+  confirmar, a fila anda devagar em vez de travar — mas anda devagar.
+
+### 4.14 Validação
+
+```bash
+alembic upgrade head && alembic downgrade -1 && alembic upgrade head
+pytest tests/ -q
+git diff --check
+```
+
+Em Postgres, o teste que importa de verdade:
+
+```sql
+-- sessão A
+BEGIN;
+SELECT id FROM message_dispatch
+ WHERE status = 'pendente' ORDER BY due_at, id LIMIT 5
+ FOR UPDATE SKIP LOCKED;
+-- (não dar COMMIT ainda)
+
+-- sessão B, em paralelo: mesma query
+-- deve devolver ids DIFERENTES, sem esperar
+```
+
+Se a sessão B ficar bloqueada em vez de pular, o `skip_locked` não chegou no SQL.
+
+---
+
+## 5. PR3 — Retry e ciclo de vida
+
+Escopo, sem detalhamento ainda:
+
+- Coluna `attempts` (Integer, NOT NULL, default 0) + migration
+- `falhou` deixa de ser terminal: requeue para `pendente` enquanto
+  `attempts < MAX`, com backoff; acima disso vira terminal
+- Aceitar `cancelada` no PATCH — hoje `routes/integrations.py:207` só aceita
+  `enviada` e `falhou`, e não há como tirar algo da fila pela API
+- `last_error` hoje trunca em 500 chars (`integrations.py:222`); revisar
+
+Pré-requisito: PR2 mergeado (o guard de status do PATCH já terá mudado).
+
+---
+
+## 6. PR4 — Tirar os jobs do APScheduler (opcional)
+
+`POST /api/integrations/botox-sheet/sync` **já existe**
+(`routes/integrations.py:228`) e já está pronto para ser chamado pelo n8n.
+
+Faltaria o equivalente para `mark_no_shows_grace_minutes`. Com os dois expostos
+como endpoint, o scheduler interno de `app.py:4108-4139` pode morrer e o sistema
+para de depender de instância acordada.
+
+---
+
+## 7. Sequência de ativação
+
+Uma trava por vez, nessa ordem:
+
+1. **`INTEGRATIONS_API_KEY`** → rotas saem do 503. Gerar com
+   `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+   Não repetir o valor em chat nem em log.
+2. **`MESSAGE_DISPATCH_ENABLED=1`** → passa a gerar dispatch de aplicações
+   novas. Nada é enviado (`SEND_MODE=off`).
+3. **`python scripts/backfill_botox_dispatches.py --dry-run`** → conferir os
+   números. Depois `--commit`.
+4. **`DISPATCH_SEND_MODE=test`** + `DISPATCH_TEST_PHONES` só com o seu número.
+5. **`DISPATCH_SEND_MODE=live`**, com `DISPATCH_DAILY_CAP=20`.
+
+O passo 2 vem antes do 3 de propósito: se ficar off, toda aplicação registrada
+nesse intervalo não gera dispatch, e o listener **não é retroativo** — só o
+backfill recupera.
+
+### Teste de aceitação
+
+```bash
+# 1) sem chave -> 401 (ou 503 se a chave não estiver configurada no servidor)
+curl -s -o /dev/null -w "sem chave: HTTP %{http_code}\n" \
+  "https://clinicabasile.replit.app/api/integrations/messages/due"
+
+# 2) com chave -> 200 + mode off + lista vazia
+curl -s -w "\ncom chave: HTTP %{http_code}\n" \
+  -H "X-API-Key: $INTEGRATIONS_API_KEY" \
+  "https://clinicabasile.replit.app/api/integrations/messages/due?limit=5"
+
+# 3) PATCH em id inexistente -> 404
+curl -s -X PATCH -w "\npatch inexistente: HTTP %{http_code}\n" \
+  -H "X-API-Key: $INTEGRATIONS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"enviada"}' \
+  "https://clinicabasile.replit.app/api/integrations/messages/999999"
+
+# 4) PATCH com status inválido -> 400
+curl -s -X PATCH -w "\nstatus inválido: HTTP %{http_code}\n" \
+  -H "X-API-Key: $INTEGRATIONS_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"banana"}' \
+  "https://clinicabasile.replit.app/api/integrations/messages/1"
+```
+
+Esperado: `401`, `200` com `{"mode":"off","messages":[],...}`, `404`, `400`.
+
+Considerar o cold start: a primeira chamada pode demorar. Use `--max-time 90`.
+
+---
+
+## 8. Regras de trabalho
+
+1. **Nada de envio.** O CRM não manda mensagem. Ele monta e registra a fila.
+2. **Travas nascem desligadas.** Não mudar o default de `DISPATCH_SEND_MODE`.
+3. **Migration reversível.** `downgrade()` funcional. Nada de `db.create_all()`
+   novo em produção.
+4. **Não tocar em rota existente** fora do escopo declarado do PR.
+5. **Não imprimir valores de Secret** em log, resposta de erro ou commit.
+6. **Um PR por vez, sem merge automático.**
+7. **Antes de implementar qualquer coisa, rodar os greps de existência.** Este
+   documento existe porque uma especificação anterior pedia para criar do zero
+   uma API que já estava em produção.
+
+```bash
+grep -rn "integrations/messages" --include=*.py .
+grep -rn "INTEGRATIONS_API_KEY" --include=*.py .
+grep -rn "DISPATCH_SEND_MODE" --include=*.py .
+grep -rni "class MessageDispatch" --include=*.py .
+```
+
+---
+
+## 9. Débitos e riscos conhecidos
+
+| # | Item | Onde | Severidade |
+|---|---|---|---|
+| 1 | Repositório **público** com backups SQL contendo dados de paciente (CPF, prontuário) e `password_hash` | `backup_before_recovery.sql`, `backups/` | crítico |
+| 2 | `create_all()` vs Alembic — duas fontes de schema | `migrate_db.py:93` | médio |
+| 3 | Scheduler interno não-confiável no Autoscale | `app.py:4108-4139` | médio |
+| 4 | `backup_database()` no post-merge pode estourar os 120 s | `.replit` + `migrate_db.py` | médio |
+| 5 | Sem rate limit nas rotas de integração | `routes/integrations.py` | baixo |
+| 6 | Sem README no repositório | — | baixo |
+| 7 | `app.py` com 4.261 linhas — migração para blueprints incompleta | `app.py` | baixo |
+
+Sobre o item 1: o repositório é público e a URL da API também. Fechar o repo não
+resolve sozinho — os backups estão no histórico dos 1.204 commits, então quem já
+clonou tem cópia. O conjunto completo seria: tornar privado, trocar as senhas de
+todos os usuários do CRM, purgar o histórico com `git filter-repo`, adicionar
+`backups/` e `*.sql` ao `.gitignore`, e rotacionar credenciais. A purga do
+histórico reescreve todos os commits e exige `push --force` em 66 branches —
+não é um PR, é operação manual no repositório.
