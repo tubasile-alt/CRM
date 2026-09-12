@@ -1,0 +1,94 @@
+O agente parou certo. E o erro que ele encontrou é o achado mais importante desta auditoria inteira.
+
+## Diagnóstico
+
+**Ressalva:** meu clone está em `bbed0cb`, antes dos PRs. Confirme se algum deles mudou isso. No commit que consigo ler:
+
+- `migrations/alembic.ini` **não define `script_location` nem `sqlalchemy.url`** — é o template do Flask-Migrate, que depende do CLI `flask db` para fornecer os dois.
+- `migrations/env.py` importa `flask.current_app` — precisa de app context, não roda solto.
+- **`alembic` não está no `requirements.txt`.**
+- **`Flask-Migrate` também não está no `requirements.txt`.**
+- Nenhum código fora de `migrations/` importa alembic — inclusive `migrate_db.py`, que usa `db.create_all()` puro.
+
+Ou seja: a cadeia Alembic deste repositório é decorativa. São 15 migrations (11 antigas + as 4 novas) e **nenhum comando documentado no projeto consegue executá-las**. O `alembic` CLI não tem config; o `flask db` não tem a dependência. O schema de produção veio do `create_all()` — que é exatamente o débito da seção 3.3 do documento, agora confirmado por outro caminho.
+
+## A pergunta que precisa de resposta
+
+Os relatórios do PR1, PR2 e PR3 afirmaram, em sequência:
+
+- "Cadeia Alembic: head `f7a8b9c0d1e2`"
+- "`alembic heads` → uma linha"
+- "Smoke test de `upgrade()` e `downgrade()`: passou"
+- "Migration `upgrade()`/`downgrade()` testada em SQLite"
+
+Nenhuma dessas saídas pode ter vindo do comando que agora falha por falta de `script_location`.
+
+Pergunte, textualmente: **por qual comando exato esses testes foram executados?** Três respostas possíveis, e a diferença importa:
+
+1. Um harness próprio que configura o Alembic programaticamente → existe, e o problema é só o CLI. Peça o caminho do arquivo.
+2. Os testes foram feitos importando a migration e chamando `upgrade()`/`downgrade()` direto → valida a função, não a cadeia. Muito mais fraco do que o relatório sugeria.
+3. Não foram executados → então PR1, PR2 e PR3 têm validação de migration autodeclarada e nenhuma delas foi verificada.
+
+Não trate como acusação. Trate como a informação que decide se você confia nos três relatórios anteriores.
+
+## Onde a cadeia está
+
+```
+f7a8b9c0d1e2  ← PR1, criar message_dispatch
+g8b9c0d1e2f3  ← PR2, reserved_at + ix_dispatch_reservada
+h9c0d1e2f3a4  ← PR3, attempts
+i0d1e2f3a4b5  ← ???  (ninguém disse o que faz)
+```
+
+Quatro migrations acumuladas, zero aplicadas em produção, e agora se sabe que não existe comando funcional para aplicá-las. A `i0d1e2f3a4b5` sequer foi descrita em nenhum relatório.
+
+Sobre as canceladas: #31, #32 e #33 eram coerência de datas, operador responsável e deduplicação de alertas — todas da aba Botox. Não removem nada da lista de débitos do documento. Estava certo cancelar por ora.
+
+---
+
+## Próximo prompt para o Replit
+
+Escopo estreito de propósito. Ainda não é o Bloco B.
+
+---
+
+### Tornar o Alembic executável — escopo mínimo
+
+Tarefa de correção de infraestrutura. **Não altere produção. Não altere nenhuma migration existente. Não implemente funcionalidade.**
+
+**PASSO 1 — Responda antes de mexer em qualquer arquivo:**
+
+1. Por qual comando exato foram executados os smoke tests de `upgrade()`/`downgrade()` reportados nos PRs 1, 2 e 3? Cole o comando e, se houver, o caminho do script/harness.
+2. A saída `alembic heads → f7a8b9c0d1e2` reportada no PR1 veio de onde?
+3. `alembic` e `Flask-Migrate` estão no `requirements.txt` atual? Cole o arquivo.
+4. O que faz a migration `i0d1e2f3a4b5`? Cole o arquivo inteiro.
+5. `migrations/alembic.ini` atual define `script_location`? Cole o arquivo.
+
+**PASSO 2 — Só depois de responder o Passo 1:**
+
+Torne a cadeia executável, com o menor diff possível. Ordem de preferência:
+
+1. Adicionar `Flask-Migrate` ao `requirements.txt`, registrar `Migrate(app, db)` em `app.py` junto das outras extensões, e documentar `flask db heads` / `flask db upgrade` como os comandos oficiais. É o que o `env.py` já espera — ele importa `current_app`.
+2. Se o item 1 for inviável, adicionar `alembic` ao `requirements.txt` e `script_location = migrations` ao `alembic.ini`, resolvendo o `current_app` do `env.py`.
+
+Não escolha sozinho entre as duas se houver dúvida — reporte o impedimento.
+
+**PASSO 3 — Prove que funciona:**
+
+```bash
+<comando oficial> heads      # tem que devolver UMA linha
+<comando oficial> history    # cole a saída bruta
+<comando oficial> current    # no banco de desenvolvimento
+```
+
+**NÃO FAÇA:**
+
+- Não rode nada contra o banco de produção
+- Não altere o conteúdo de nenhuma migration existente
+- Não mexa no `db.create_all()` do `migrate_db.py` nesta tarefa
+- Não reformate a saída dos comandos
+- Se algo falhar, pare e reporte com traceback
+
+---
+
+Depois que isso fechar, o Bloco B (PostgreSQL descartável + concorrência) roda como estava especificado. Quer o prompt anterior e este num arquivo só?
