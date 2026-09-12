@@ -1,0 +1,236 @@
+Prompt abaixo. Ele **não implementa nada novo** — só valida o que já foi mergeado e levanta o estado real. É o que precisa acontecer antes de qualquer coisa tocar produção.
+
+---
+
+# Validação em PostgreSQL e levantamento de estado — CRM Clínica Basile
+
+Tarefa de **validação e relatório**. Não implemente funcionalidade nova, não altere produção, não ative nenhuma trava.
+
+Contexto: os PRs de reserva atômica (`reserved_at`, `FOR UPDATE SKIP LOCKED`) e de retry (`attempts`) já estão mergeados, mas foram validados apenas com mocks e SQLite. O mecanismo central — `SKIP LOCKED` — só existe no caminho PostgreSQL, que a guarda de dialeto faz ser pulado em SQLite. Ou seja: está escrito, não verificado. Produção também ainda não foi confirmada.
+
+## REGRAS
+
+1. **Produção é read-only nesta tarefa.** Nenhum `upgrade`, `stamp`, `INSERT`, `UPDATE` ou DDL no banco de produção. Só `SELECT`.
+2. **Cole a saída bruta dos comandos.** Não reformate, não reescreva, não "organize". Um relatório anterior inverteu a direção das setas do `alembic history` e quase induziu a uma conclusão errada.
+3. **Nenhuma trava é ativada.** `DISPATCH_SEND_MODE` continua `off`. `INTEGRATIONS_API_KEY` não é configurada em produção nesta tarefa.
+4. **Não implemente as tasks #22, #27, #28, #29** nem mexa no scheduler.
+5. **Se algum passo falhar, pare e reporte.** Não conserte por conta própria — o objetivo é descobrir o que está quebrado, não mascarar.
+6. **Não imprima valores de Secret.**
+
+---
+
+## BLOCO A — Estado real (obrigatório, antes de tudo)
+
+Rode e cole a saída bruta:
+
+```bash
+alembic heads
+alembic history | head -12
+ls -1 migrations/versions/
+```
+
+E este, que lista revision/down_revision de cada arquivo:
+
+```bash
+for f in migrations/versions/*.py; do
+  r=$(grep -oP "^revision\s*=\s*['\"]\K[^'\"]+" "$f")
+  d=$(grep -oP "^down_revision\s*=\s*['\"]\K[^'\"]+" "$f")
+  echo "$r  <- down: ${d:-None}  ($(basename $f))"
+done
+```
+
+Responda explicitamente:
+
+| Pergunta | Resposta |
+|---|---|
+| Qual é o head atual? | |
+| `alembic heads` devolveu uma linha só? | |
+| Em qual revision entrou `reserved_at`? | |
+| Em qual revision entrou `ix_dispatch_reservada`? | |
+| Em qual revision entrou `attempts`? | |
+| A que itens correspondiam as tasks #31, #32 e #33 (canceladas)? | |
+
+**Se `alembic heads` devolver mais de uma linha, PARE.** Há bifurcação na cadeia e nada mais deve ser feito até resolver.
+
+Um relatório anterior afirmou que produção deveria estar em `g8b9c0d1e2f3` **e** ter a coluna `attempts` — mas `attempts` veio num PR posterior, com migration própria. Esclareça essa contradição antes de seguir.
+
+---
+
+## BLOCO B — PostgreSQL descartável (tasks #20 e #18, executadas juntas)
+
+As duas tasks são um trabalho só: a #20 cria o ambiente onde a #18 acontece. Não separe.
+
+Use um banco temporário, **nunca** o de produção. Aponte via `DATABASE_URL` no ambiente do teste.
+
+### B1 — Bootstrap em banco limpo
+
+Banco novo, vazio, sem `alembic_version`. Execute o fluxo oficial de bootstrap e reporte:
+
+- a `alembic_version` resultante é igual ao head do Bloco A?
+- quantas tabelas foram criadas? (esperado: 42, conforme `models.py`)
+- `message_dispatch` tem `reserved_at`, `attempts`, `ix_dispatch_reservada`, `ux_dispatch_patient_type_due`, `ix_dispatch_due`?
+
+### B2 — Ciclo completo de migration
+
+```bash
+alembic upgrade head
+alembic downgrade -1
+alembic downgrade -1
+alembic downgrade -1
+alembic upgrade head
+```
+
+Reporte a saída de cada passo. Qualquer erro, pare e cole o traceback inteiro.
+
+Confirme que o `downgrade` da revision de reserva devolveu as linhas `reservada` para `pendente` **antes** de remover a coluna.
+
+### B3 — Banco legado sem `alembic_version`
+
+Simule: crie o schema por `create_all`, apague a tabela `alembic_version` se existir, e rode o fluxo. Esperado: carimbar, não tentar recriar tabelas.
+
+### B4 — Banco legado incompleto
+
+Simule: crie o schema por `create_all` e depois remova manualmente uma coluna que alguma migration adiciona (ex.: `patient_funnel_status.seller_notes`). Rode o fluxo.
+
+**Esperado: falha explícita e legível.** Se passar silenciosamente, isso é um bug e deve ser reportado como tal.
+
+### B5 — O SQL gerado contém a trava certa
+
+Antes dos testes de concorrência, confirme que a cláusula chega ao SQL:
+
+```python
+from sqlalchemy.dialects import postgresql
+# compile a query de _lock_pending
+sql = str(query.statement.compile(dialect=postgresql.dialect()))
+print(sql)
+assert 'FOR UPDATE OF message_dispatch SKIP LOCKED' in sql
+```
+
+**Se aparecer `FOR UPDATE` sem o `OF message_dispatch`, pare e reporte.** Sem o `OF`, a trava pega também as linhas de `patient`, e o CRM inteiro emperra para editar aqueles pacientes enquanto o n8n roda. É o bug mais caro possível nesse código.
+
+### B6 — Concorrência, nível SQL
+
+No banco descartável, popule ~20 dispatches `pendente` vencidos, com pacientes que tenham `phone` preenchido e `accepts_marketing = TRUE`.
+
+```sql
+-- sessão A
+BEGIN;
+SELECT id FROM message_dispatch
+ WHERE status = 'pendente' AND due_at <= CURRENT_DATE
+ ORDER BY due_at, id LIMIT 5
+ FOR UPDATE OF message_dispatch SKIP LOCKED;
+-- NÃO commitar ainda
+```
+
+Com a sessão A aberta, na sessão B rode a mesma query.
+
+Reporte: os IDs devolvidos a B são diferentes dos de A? B respondeu imediatamente ou ficou bloqueada?
+
+**Esperado: IDs disjuntos, sem espera.** Se B bloquear, o `SKIP LOCKED` não chegou ao SQL.
+
+### B7 — A trava NÃO pode pegar `patient`
+
+Este é o teste que valida o `of=MessageDispatch`. Com a sessão A ainda aberta do passo B6:
+
+```sql
+-- sessão C
+UPDATE patient SET attention_note = attention_note
+ WHERE id = <um dos pacientes das linhas travadas em A>;
+```
+
+**Esperado: completa imediatamente.** Se ficar bloqueado, o `of=` está ausente ou errado. Pare e reporte.
+
+Feche a sessão A com `ROLLBACK` depois.
+
+### B8 — Concorrência, nível HTTP
+
+Contra o banco descartável, com `INTEGRATIONS_API_KEY` de teste, `DISPATCH_SEND_MODE=test` e `DISPATCH_TEST_PHONES` contendo os números dos pacientes de teste:
+
+Dispare duas chamadas simultâneas a `GET /api/integrations/messages/due?limit=5` (ex.: dois `curl` em background, ou `xargs -P 2`).
+
+Reporte:
+
+- os `dispatch_id` devolvidos nas duas respostas são disjuntos?
+- após as chamadas, quantas linhas estão em `reservada`? (esperado: soma das duas respostas, sem sobreposição)
+- alguma linha ficou `reservada` sem ter sido devolvida em nenhuma das respostas? (esperado: nenhuma)
+
+### B9 — Reclaim de reserva órfã
+
+Force `reserved_at` de uma linha `reservada` para o passado além do TTL. Chame `/due` de novo.
+
+Esperado: a linha volta para `pendente` e pode ser reservada outra vez.
+
+### B10 — Retry (PR3)
+
+No banco descartável, exercite o ciclo de falha:
+
+- `PATCH` com `{"status":"falhou"}` numa linha reservada → o que acontece com `attempts`, `status` e `reserved_at`?
+- repita até o limite de tentativas → em que ponto vira terminal?
+- `PATCH` com `{"status":"cancelada"}` → a linha sai da fila?
+
+Reporte o comportamento observado, não o esperado.
+
+---
+
+## BLOCO C — Produção, somente leitura
+
+**Apenas `SELECT`. Nenhuma escrita, nenhum `upgrade`, nenhum `stamp`.**
+
+```sql
+-- 1. em que revision a produção está
+SELECT * FROM alembic_version;
+
+-- 2. colunas de message_dispatch
+SELECT column_name, data_type, is_nullable
+  FROM information_schema.columns
+ WHERE table_name = 'message_dispatch'
+ ORDER BY ordinal_position;
+
+-- 3. índices e constraints
+SELECT indexname, indexdef FROM pg_indexes
+ WHERE tablename = 'message_dispatch';
+
+-- 4. estado atual da fila
+SELECT status, message_type, COUNT(*)
+  FROM message_dispatch
+ GROUP BY status, message_type
+ ORDER BY status, message_type;
+
+-- 5. tabelas das migrations anteriores
+SELECT to_regclass('patient_photo'),
+       to_regclass('push_subscription'),
+       to_regclass('commercial_task'),
+       to_regclass('physical_agenda_import_log');
+
+-- 6. colunas das migrations anteriores
+SELECT table_name, column_name FROM information_schema.columns
+ WHERE (table_name = 'cosmetic_procedure_plan' AND column_name IN ('status','plan_name'))
+    OR (table_name = 'patient_funnel_status' AND column_name = 'seller_notes');
+```
+
+Se a consulta 1 falhar porque a tabela `alembic_version` não existe, **isso é a resposta** — reporte assim, sem criar nada.
+
+---
+
+## RELATÓRIO FINAL
+
+1. Tabela do Bloco A preenchida, com a saída bruta dos comandos
+2. Resultado de B1 a B10, um a um, com o que **foi observado** (não o esperado)
+3. Saída das 6 consultas do Bloco C
+4. Distância entre o head do repositório e a revision de produção: quantas migrations faltam e quais
+5. Lista do que quebrou, se algo quebrou, com traceback
+6. Qualquer divergência entre o que os relatórios anteriores afirmaram e o que você observou agora
+
+## NÃO FAÇA
+
+- Não rode `upgrade`, `stamp` ou qualquer DDL em produção
+- Não configure `INTEGRATIONS_API_KEY` em produção
+- Não mude `DISPATCH_SEND_MODE`
+- Não rode o backfill
+- Não implemente tasks novas
+- Não conserte nada que falhar — reporte
+- Não reformate a saída dos comandos
+
+---
+
+Quer que eu salve isso como arquivo também?
