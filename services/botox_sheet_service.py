@@ -6,6 +6,8 @@ Nenhum caminho de request escreve nela.
 
 from collections import defaultdict, OrderedDict
 import logging
+from threading import Lock
+from time import monotonic
 
 from sqlalchemy import text
 
@@ -18,7 +20,10 @@ from services.message_dispatch_status import (
 
 ADVISORY_LOCK_KEY = 918273
 BOTOX_MESSAGE_TYPES = frozenset({'d0', 'm5'})
+UNKNOWN_DISPATCH_ALERT_WINDOW_SECONDS = 6 * 60 * 60
 logger = logging.getLogger(__name__)
+_unknown_dispatch_alerts = {}
+_unknown_dispatch_alerts_lock = Lock()
 
 # Quando uma linha representa mais de uma execução, o status mais acionável
 # precisa prevalecer. Em especial, uma falha terminal nunca pode ser escondida
@@ -59,29 +64,53 @@ def _alert_unknown_dispatches(dispatches):
     if not unknown_dispatches:
         return
 
-    alert = {
-        'unknown_dispatch_count': len(unknown_dispatches),
-        'unknown_status_values': sorted({
-            _unknown_status_value(dispatch)
-            for dispatch in unknown_dispatches
-        }),
-        'unknown_dispatches': [
-            {
-                'dispatch_id': dispatch.id,
-                'message_type': dispatch.message_type,
-            }
-            for dispatch in unknown_dispatches
-        ],
-    }
-    try:
-        logger.warning(
-            'botox_sheet_unknown_dispatch_status',
-            extra=alert,
-        )
-    except Exception:
-        # A reconstrução da planilha é o caminho principal e não pode falhar
-        # por causa de um sink de alertas indisponível.
-        pass
+    now = monotonic()
+    with _unknown_dispatch_alerts_lock:
+        expired = [
+            key
+            for key, alerted_at in _unknown_dispatch_alerts.items()
+            if now - alerted_at >= UNKNOWN_DISPATCH_ALERT_WINDOW_SECONDS
+        ]
+        for key in expired:
+            del _unknown_dispatch_alerts[key]
+
+        new_unknown_dispatches = []
+        new_keys = set()
+        for dispatch in unknown_dispatches:
+            key = (dispatch.id, _unknown_status_value(dispatch))
+            if key not in _unknown_dispatch_alerts and key not in new_keys:
+                new_unknown_dispatches.append(dispatch)
+                new_keys.add(key)
+
+        if not new_unknown_dispatches:
+            return
+
+        alert = {
+            'unknown_dispatch_count': len(new_unknown_dispatches),
+            'unknown_status_values': sorted({
+                _unknown_status_value(dispatch)
+                for dispatch in new_unknown_dispatches
+            }),
+            'unknown_dispatches': [
+                {
+                    'dispatch_id': dispatch.id,
+                    'message_type': dispatch.message_type,
+                }
+                for dispatch in new_unknown_dispatches
+            ],
+        }
+        try:
+            logger.warning(
+                'botox_sheet_unknown_dispatch_status',
+                extra=alert,
+            )
+        except Exception:
+            # A reconstrução da planilha é o caminho principal e não pode
+            # falhar por causa de um sink de alertas indisponível.
+            return
+
+        for key in new_keys:
+            _unknown_dispatch_alerts[key] = now
 
 
 def _aggregate_dispatches(dispatches):

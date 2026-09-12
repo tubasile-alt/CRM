@@ -14,11 +14,13 @@ from models import (
     db,
 )
 from services.botox_sheet_service import build_botox_sheet_rows
+from services import botox_sheet_service
 from services.google_sheets import BOTOX_HEADERS
 
 
 class BotoxSheetRowsTests(unittest.TestCase):
     def setUp(self):
+        botox_sheet_service._unknown_dispatch_alerts.clear()
         app = Flask(__name__)
         app.config.update(
             TESTING=True,
@@ -524,6 +526,92 @@ class BotoxSheetRowsTests(unittest.TestCase):
                 build_botox_sheet_rows()
 
         warning.assert_not_called()
+
+    def test_unknown_dispatch_alert_deduplicates_same_dispatch_and_status(self):
+        with self.app.app_context():
+            execution = self._execution()
+            db.session.add(MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=execution.id,
+                message_type='d0',
+                due_at=datetime(2026, 3, 10).date(),
+                status='estado_novo',
+            ))
+            db.session.commit()
+
+            with patch(
+                'services.botox_sheet_service.logger.warning',
+            ) as warning:
+                build_botox_sheet_rows()
+                build_botox_sheet_rows()
+
+        warning.assert_called_once()
+
+    def test_unknown_dispatch_alert_emits_new_status_or_dispatch(self):
+        with self.app.app_context():
+            first = self._execution()
+            second = self._execution(
+                procedure_name='Botox testa',
+                performed_date=datetime(2026, 3, 11, 14, 30),
+            )
+            first_dispatch = MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=first.id,
+                message_type='d0',
+                due_at=datetime(2026, 3, 10).date(),
+                status='estado_novo',
+            )
+            second_dispatch = MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=second.id,
+                message_type='d0',
+                due_at=datetime(2026, 3, 11).date(),
+                status='outro_estado',
+            )
+            db.session.add_all([first_dispatch, second_dispatch])
+            db.session.commit()
+
+            with patch(
+                'services.botox_sheet_service.logger.warning',
+            ) as warning:
+                build_botox_sheet_rows()
+                first_dispatch.status = 'estado_corrigido'
+                db.session.commit()
+                build_botox_sheet_rows()
+
+        self.assertEqual(warning.call_count, 2)
+        self.assertEqual(
+            warning.call_args_list[1].kwargs['extra']['unknown_dispatches'],
+            [{'dispatch_id': first_dispatch.id, 'message_type': 'd0'}],
+        )
+
+    def test_unknown_dispatch_alert_repeats_after_window(self):
+        with self.app.app_context():
+            execution = self._execution()
+            db.session.add(MessageDispatch(
+                patient_id=self.patient_id,
+                execution_id=execution.id,
+                message_type='d0',
+                due_at=datetime(2026, 3, 10).date(),
+                status='estado_novo',
+            ))
+            db.session.commit()
+
+            with patch(
+                'services.botox_sheet_service.logger.warning',
+            ) as warning, patch(
+                'services.botox_sheet_service.monotonic',
+                side_effect=[
+                    100,
+                    100 + botox_sheet_service.UNKNOWN_DISPATCH_ALERT_WINDOW_SECONDS - 1,
+                    100 + botox_sheet_service.UNKNOWN_DISPATCH_ALERT_WINDOW_SECONDS,
+                ],
+            ):
+                build_botox_sheet_rows()
+                build_botox_sheet_rows()
+                build_botox_sheet_rows()
+
+        self.assertEqual(warning.call_count, 2)
 
 
 if __name__ == '__main__':
