@@ -311,6 +311,7 @@ from routes.checkout_api import checkout_api_bp
 from routes.evolutions_api import evolutions_api_bp
 from routes.cosmetic_api import cosmetic_api_bp
 from routes.integrations import integrations_bp
+from routes.botox_followup import botox_followup_bp
 
 app.register_blueprint(surgical_map_bp)
 app.register_blueprint(waiting_room_bp)
@@ -325,6 +326,7 @@ app.register_blueprint(checkout_api_bp)
 app.register_blueprint(evolutions_api_bp)
 app.register_blueprint(cosmetic_api_bp)
 app.register_blueprint(integrations_bp)
+app.register_blueprint(botox_followup_bp)
 csrf.exempt(integrations_bp)
 
 @login_manager.user_loader

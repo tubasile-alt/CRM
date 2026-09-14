@@ -10,3 +10,4 @@
 - [Botox sheet reconciliation](botox-sheet-reconciliation.md) — the shared sheet is a full DB mirror; Autoscale scheduling is best-effort and first sync requires a manual tab backup.
 - [Alembic bootstrap boundary](alembic-bootstrap-boundary.md) — only databases without alembic_version use model bootstrap; versioned databases advance through Alembic.
 - [PostgreSQL test environment isolation](postgres-test-environment.md) — verify child-process database identity; shell assignment order can target inherited development DB.
+- [SQLite test isolation](sqlite-test-isolation.md) — Flask-SQLAlchemy in-memory app tests can leak sessions across fixtures when mixed with the global app fixture.
