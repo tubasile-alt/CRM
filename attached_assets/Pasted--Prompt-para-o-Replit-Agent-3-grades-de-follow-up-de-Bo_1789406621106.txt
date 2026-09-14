@@ -1,0 +1,990 @@
+# Prompt para o Replit Agent — 3 grades de follow-up de Botox
+
+Cole tudo abaixo (deste ponto até o fim do arquivo) no Replit Agent.
+
+---
+
+## Contexto
+
+Este é um CRM Flask (`app.py` + blueprints em `routes/`, SQLAlchemy, Jinja).
+Na aba **Sale** (`templates/sale.html`) existe hoje um painel roxo
+"Botox Follow-up (5 meses)" que renderiza **cards** a partir de
+`GET /api/crm/botox-follow-ups` (`routes/crm.py`).
+
+Quero substituir esse painel por **um painel com três abas, cada uma com uma grade (tabela)**:
+
+1. **Vencidos — contatar**: Botox realizados cujo follow-up de 5 meses já venceu. Uma linha por paciente (a aplicação vencida mais recente), com botão de WhatsApp.
+2. **Chamados pelo n8n (M5)**: disparos automáticos M5 registrados na tabela `message_dispatch` pelo pipeline externo (n8n consome `/api/integrations/messages/due` e devolve o resultado via `PATCH`).
+3. **Recorrentes**: pacientes com 2+ aplicações de Botox, mostrando as datas.
+
+### Regras de negócio que o código já implementa (não alterar)
+
+- **Uma aplicação = um dia.** Duas execuções no mesmo dia contam como uma. (Mesmo agrupamento de `services/botox_sheet_service.py`.)
+- **Data de follow-up:** usa `ProcedureExecution.followup_date` quando gravado; só calcula `performed_date + 5 meses` como fallback. (O endpoint antigo ignorava o campo gravado — isso era uma divergência com o `botox_sheet_service`.)
+- **Escopo do médico:** se `current_user.is_doctor()`, filtra por `note.doctor_id`.
+- **`accepts_marketing`:** quem não tem opt-in nunca entra na fila do n8n. Na grade 1 esses pacientes aparecem com o badge `sem opt-in`.
+- Nenhum endpoint escreve no banco. **Nenhuma migration é necessária** — não há campo novo.
+
+---
+
+## Passo 1 — Criar `routes/botox_followup.py`
+
+Crie o arquivo com exatamente este conteúdo:
+
+```python
+"""Grades de follow-up de Botox da aba Sale.
+
+Três leituras independentes sobre os mesmos dados:
+
+1. /api/crm/botox/vencidos    — Botox realizados há 5 meses ou mais (contatar)
+2. /api/crm/botox/m5          — disparos M5 registrados pelo pipeline externo (n8n)
+3. /api/crm/botox/recorrentes — pacientes com duas ou mais aplicações
+
+Nenhum endpoint escreve. Todos respeitam o escopo do médico logado.
+"""
+
+from datetime import datetime, time, timedelta
+from urllib.parse import quote
+
+from dateutil.relativedelta import relativedelta
+from flask import Blueprint, jsonify, request
+from flask_login import current_user, login_required
+
+from models import (
+    CosmeticProcedurePlan,
+    MessageDispatch,
+    Note,
+    Patient,
+    ProcedureExecution,
+    db,
+)
+from services.clinic_time import clinic_today
+from services.followup_service import FOLLOWUP_MONTHS_BOTOX
+
+
+botox_followup_bp = Blueprint('botox_followup', __name__)
+
+DEFAULT_WINDOW_DAYS = 90
+MAX_ROWS = 500
+
+# Rótulos de retorno vindos de ProcedureExecution.followup_status
+FOLLOWUP_STATUS_LABELS = {
+    'pendente': 'sem resposta',
+    'contatado': 'contatado',
+    'agendado': 'agendou',
+    'sem_resposta': 'sem resposta',
+}
+
+
+# ── Helpers ───────────────────────────────────────────────────────────
+
+def _digits(value):
+    return ''.join(character for character in (value or '') if character.isdigit())
+
+
+def _whatsapp_url(patient, message):
+    phone = _digits(patient.phone)
+    if not phone:
+        return None
+    return f'https://wa.me/{phone}?text={quote(message)}'
+
+
+def _iso(value):
+    return value.isoformat() if value else None
+
+
+def _as_date(value):
+    """Aceita date ou datetime e devolve sempre date."""
+    return value.date() if hasattr(value, 'date') else value
+
+
+def _botox_query():
+    """Execuções de Botox realizadas, já no escopo do médico logado."""
+    query = (
+        db.session.query(ProcedureExecution, CosmeticProcedurePlan, Note, Patient)
+        .join(CosmeticProcedurePlan, ProcedureExecution.plan_id == CosmeticProcedurePlan.id)
+        .join(Note, CosmeticProcedurePlan.note_id == Note.id)
+        .join(Patient, Note.patient_id == Patient.id)
+        .filter(
+            ProcedureExecution.execution_status == 'realizada',
+            ProcedureExecution.performed_date.isnot(None),
+            db.func.lower(CosmeticProcedurePlan.procedure_name).like('%botox%'),
+        )
+    )
+    if current_user.is_doctor():
+        query = query.filter(Note.doctor_id == current_user.id)
+    return query
+
+
+def _followup_date_for(execution):
+    """Data de follow-up gravada; na ausência, performed_date + 5 meses.
+
+    Mesma regra usada por services/botox_sheet_service.py — o campo gravado
+    manda, o cálculo é só fallback para execuções antigas.
+    """
+    if execution.followup_date:
+        return _as_date(execution.followup_date)
+    return _as_date(
+        execution.performed_date + relativedelta(months=FOLLOWUP_MONTHS_BOTOX)
+    )
+
+
+def _group_by_patient_day(rows):
+    """Agrupa execuções por (paciente, dia) — duas aplicações no mesmo dia são uma.
+
+    Espelha o agrupamento de botox_sheet_service.build_botox_sheet_rows.
+    """
+    groups = {}
+    for execution, _plan, _note, patient in rows:
+        performed = _as_date(execution.performed_date)
+        key = (patient.id, performed)
+        group = groups.setdefault(key, {
+            'patient': patient,
+            'performed_date': performed,
+            'followup_date': None,
+            'execution_ids': [],
+            'followup_status': None,
+        })
+        group['execution_ids'].append(execution.id)
+        if group['followup_date'] is None:
+            group['followup_date'] = _followup_date_for(execution)
+        if group['followup_status'] is None and execution.followup_status:
+            group['followup_status'] = execution.followup_status
+    return groups
+
+
+def _m5_dispatch_map(patient_ids):
+    """Dispatches M5 indexados por (patient_id, due_at)."""
+    if not patient_ids:
+        return {}
+    dispatches = (
+        db.session.query(MessageDispatch)
+        .filter(
+            MessageDispatch.patient_id.in_(patient_ids),
+            MessageDispatch.message_type == 'm5',
+        )
+        .all()
+    )
+    return {
+        (dispatch.patient_id, dispatch.due_at): dispatch
+        for dispatch in dispatches
+    }
+
+
+def _m5_cell(dispatch, patient):
+    """Coluna 'M5 automático' da grade 1."""
+    if dispatch is None:
+        if not patient.accepts_marketing:
+            return {'status': 'sem_optin', 'label': 'sem opt-in', 'sent_at': None}
+        return {'status': None, 'label': '—', 'sent_at': None}
+
+    labels = {
+        'enviada': 'enviada',
+        'falhou': 'falhou',
+        'pendente': 'pendente',
+        'pulada': 'pulada',
+    }
+    label = labels.get(dispatch.status, dispatch.status)
+    if dispatch.status == 'enviada' and dispatch.sent_at:
+        label = f'enviada {dispatch.sent_at.strftime("%d/%m")}'
+    return {
+        'status': dispatch.status,
+        'label': label,
+        'sent_at': _iso(dispatch.sent_at),
+    }
+
+
+# ── Grade 1: vencidos ─────────────────────────────────────────────────
+
+@botox_followup_bp.route('/api/crm/botox/vencidos')
+@login_required
+def botox_vencidos():
+    """Botox cujo follow-up de 5 meses já venceu — uma linha por paciente."""
+    today = clinic_today()
+    groups = _group_by_patient_day(_botox_query().all())
+
+    # Uma linha por paciente: a aplicação vencida mais recente.
+    latest = {}
+    for group in groups.values():
+        patient = group['patient']
+        if not _digits(patient.phone):
+            continue
+        if group['followup_date'] > today:
+            continue
+        current = latest.get(patient.id)
+        if current is None or group['performed_date'] > current['performed_date']:
+            latest[patient.id] = group
+
+    dispatch_map = _m5_dispatch_map(list(latest.keys()))
+
+    result = []
+    for group in latest.values():
+        patient = group['patient']
+        followup_date = group['followup_date']
+        dispatch = dispatch_map.get((patient.id, followup_date))
+        overdue_days = (today - followup_date).days
+        first_name = (patient.name or '').split(' ')[0]
+
+        result.append({
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'phone': patient.phone,
+            'execution_ids': group['execution_ids'],
+            'performed_date': _iso(group['performed_date']),
+            'followup_date': _iso(followup_date),
+            'overdue_days': overdue_days,
+            'severity': 'alta' if overdue_days >= 60 else ('media' if overdue_days >= 30 else 'baixa'),
+            'accepts_marketing': bool(patient.accepts_marketing),
+            'm5': _m5_cell(dispatch, patient),
+            'whatsapp_url': _whatsapp_url(
+                patient,
+                f'Olá {first_name}, tudo bem? Já faz 5 meses da sua aplicação de '
+                f'Botox — quer agendar a próxima?',
+            ),
+        })
+
+    result.sort(key=lambda row: row['overdue_days'], reverse=True)
+    return jsonify({'rows': result[:MAX_ROWS], 'total': len(result)})
+
+
+# ── Grade 2: chamados pelo n8n (M5) ───────────────────────────────────
+
+@botox_followup_bp.route('/api/crm/botox/m5')
+@login_required
+def botox_m5():
+    """Disparos M5 registrados pelo pipeline externo."""
+    try:
+        window_days = int(request.args.get('days', DEFAULT_WINDOW_DAYS))
+    except (TypeError, ValueError):
+        window_days = DEFAULT_WINDOW_DAYS
+
+    query = (
+        db.session.query(MessageDispatch, Patient, ProcedureExecution)
+        .join(Patient, Patient.id == MessageDispatch.patient_id)
+        .outerjoin(
+            ProcedureExecution,
+            ProcedureExecution.id == MessageDispatch.execution_id,
+        )
+        .filter(MessageDispatch.message_type == 'm5')
+    )
+
+    if window_days > 0:
+        cutoff = clinic_today() - timedelta(days=window_days)
+        query = query.filter(MessageDispatch.due_at >= cutoff)
+
+    status_filter = (request.args.get('status') or '').strip()
+    if status_filter:
+        query = query.filter(MessageDispatch.status == status_filter)
+
+    if current_user.is_doctor():
+        query = (
+            query.join(
+                CosmeticProcedurePlan,
+                CosmeticProcedurePlan.id == ProcedureExecution.plan_id,
+            )
+            .join(Note, Note.id == CosmeticProcedurePlan.note_id)
+            .filter(Note.doctor_id == current_user.id)
+        )
+
+    # Ordena no Python: evita depender de nulls_last/nullslast, que mudou de
+    # nome entre SQLAlchemy 1.4 e 2.0 (sqlalchemy não está pinado no projeto).
+    rows = query.order_by(MessageDispatch.due_at.desc()).all()
+    def _sort_key(row):
+        dispatch = row[0]
+        if dispatch.sent_at:
+            return (1, dispatch.sent_at)
+        return (0, datetime.combine(dispatch.due_at, time.min))
+
+    rows.sort(key=_sort_key, reverse=True)
+
+    counters = {'enviada': 0, 'falhou': 0, 'pendente': 0, 'pulada': 0}
+
+    result = []
+    for dispatch, patient, execution in rows:
+        counters[dispatch.status] = counters.get(dispatch.status, 0) + 1
+        first_name = (patient.name or '').split(' ')[0]
+        followup_status = execution.followup_status if execution else None
+
+        result.append({
+            'dispatch_id': dispatch.id,
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'phone': patient.phone,
+            'due_at': _iso(dispatch.due_at),
+            'sent_at': _iso(dispatch.sent_at),
+            'status': dispatch.status,
+            'last_error': dispatch.last_error,
+            'retorno': FOLLOWUP_STATUS_LABELS.get(followup_status, '—'),
+            'retorno_status': followup_status,
+            'whatsapp_url': _whatsapp_url(
+                patient,
+                f'Olá {first_name}, tudo bem?',
+            ),
+        })
+
+    return jsonify({
+        'rows': result[:MAX_ROWS],
+        'total': len(result),
+        'counters': counters,
+        'window_days': window_days,
+    })
+
+
+# ── Grade 3: recorrentes ──────────────────────────────────────────────
+
+@botox_followup_bp.route('/api/crm/botox/recorrentes')
+@login_required
+def botox_recorrentes():
+    """Pacientes com duas ou mais aplicações de Botox (um dia = uma aplicação)."""
+    try:
+        min_count = max(2, int(request.args.get('min', 2)))
+    except (TypeError, ValueError):
+        min_count = 2
+
+    today = clinic_today()
+    groups = _group_by_patient_day(_botox_query().all())
+
+    by_patient = {}
+    for group in groups.values():
+        patient = group['patient']
+        entry = by_patient.setdefault(patient.id, {
+            'patient': patient,
+            'dates': [],
+        })
+        entry['dates'].append(group['performed_date'])
+
+    total_patients = len(by_patient)
+
+    result = []
+    for entry in by_patient.values():
+        dates = sorted(set(entry['dates']))
+        if len(dates) < min_count:
+            continue
+
+        patient = entry['patient']
+        gaps = [
+            (dates[index + 1] - dates[index]).days
+            for index in range(len(dates) - 1)
+        ]
+        avg_gap_months = round(sum(gaps) / len(gaps) / 30.44, 1) if gaps else None
+        months_since_last = round((today - dates[-1]).days / 30.44, 1)
+        first_name = (patient.name or '').split(' ')[0]
+
+        result.append({
+            'patient_id': patient.id,
+            'patient_name': patient.name,
+            'phone': patient.phone,
+            'count': len(dates),
+            'dates': [date.isoformat() for date in dates],
+            'last_date': dates[-1].isoformat(),
+            'avg_gap_months': avg_gap_months,
+            'months_since_last': months_since_last,
+            'whatsapp_url': _whatsapp_url(
+                patient,
+                f'Olá {first_name}, tudo bem?',
+            ),
+        })
+
+    result.sort(key=lambda row: (row['count'], row['last_date']), reverse=True)
+
+    counts = [row['count'] for row in result]
+    gaps = [row['avg_gap_months'] for row in result if row['avg_gap_months']]
+
+    return jsonify({
+        'rows': result[:MAX_ROWS],
+        'total': len(result),
+        'total_botox_patients': total_patients,
+        'avg_applications': round(sum(counts) / len(counts), 1) if counts else 0,
+        'median_gap_months': sorted(gaps)[len(gaps) // 2] if gaps else None,
+    })
+```
+
+---
+
+## Passo 2 — Registrar o blueprint em `app.py`
+
+No bloco de imports de blueprints, logo depois de `from routes.integrations import integrations_bp`, adicione:
+
+```python
+from routes.botox_followup import botox_followup_bp
+```
+
+E logo depois de `app.register_blueprint(integrations_bp)`, adicione:
+
+```python
+app.register_blueprint(botox_followup_bp)
+```
+
+Não mexer no `csrf.exempt(integrations_bp)` — as rotas novas são GET autenticado e devem continuar sob CSRF/login normal.
+
+---
+
+## Passo 3 — CSS em `templates/sale.html`
+
+Dentro do `<style>` do bloco `extra_css`, logo **depois** da linha:
+
+```css
+.fq-empty { font-size: .75rem; color: #3a5068; font-style: italic; padding: 0 0 .6rem; }
+```
+
+insira:
+
+```css
+/* ── Botox Follow-up: abas + grades ───────────────────── */
+.bx-tabs {
+    display: flex; gap: .25rem; padding: 0 .65rem;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    overflow-x: auto;
+}
+.bx-tab {
+    appearance: none; background: none; border: 0; cursor: pointer;
+    font-family: 'Figtree', sans-serif; font-size: .76rem; font-weight: 600; color: #5a7a96;
+    padding: .6rem .8rem; display: flex; align-items: center; gap: .4rem; white-space: nowrap;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color .15s, border-color .15s;
+}
+.bx-tab:hover { color: #c9d8e8; }
+.bx-tab[aria-selected="true"] { color: #a78bfa; border-bottom-color: #a78bfa; }
+.bx-tab:focus-visible { outline: 2px solid #a78bfa; outline-offset: -2px; border-radius: 6px; }
+.bx-pill {
+    font-size: .63rem; font-weight: 700; border-radius: 20px; padding: .08rem .45rem;
+    background: rgba(167,139,250,.14); border: 1px solid rgba(167,139,250,.4); color: #a78bfa;
+    font-variant-numeric: tabular-nums;
+}
+.bx-tab[aria-selected="false"] .bx-pill {
+    background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.12); color: #5a7a96;
+}
+
+.bx-toolbar {
+    display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+    padding: .65rem 1rem; background: rgba(0,0,0,.1);
+}
+.bx-search {
+    flex: 1; min-width: 180px;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px; padding: .4rem .7rem; color: #e2eaf4;
+    font-family: 'Figtree', sans-serif; font-size: .78rem;
+}
+.bx-search::placeholder { color: #5a7a96; }
+.bx-search:focus { outline: none; border-color: rgba(167,139,250,.5); }
+.bx-hint { font-size: .68rem; color: #5a7a96; margin-left: auto; }
+
+.bx-tbl-wrap { overflow-x: auto; max-height: 460px; overflow-y: auto; }
+.bx-tbl { width: 100%; border-collapse: collapse; font-size: .78rem; min-width: 720px; }
+.bx-tbl thead th {
+    position: sticky; top: 0; z-index: 2;
+    background: #26374b; color: #5a7a96;
+    font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    text-align: left; padding: .5rem .85rem; white-space: nowrap;
+    border-bottom: 1px solid rgba(255,255,255,.08); cursor: pointer; user-select: none;
+}
+.bx-tbl th.num, .bx-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bx-tbl th .bx-arrow { opacity: .5; font-size: .6rem; margin-left: .2rem; }
+.bx-tbl tbody tr { border-bottom: 1px solid rgba(255,255,255,.04); }
+.bx-tbl tbody tr:nth-child(odd) { background: rgba(255,255,255,.015); }
+.bx-tbl tbody tr:hover { background: rgba(167,139,250,.06); }
+.bx-tbl tbody td { padding: .55rem .85rem; color: #c9d8e8; vertical-align: middle; white-space: nowrap; }
+.bx-tbl td.bx-name { color: #e2eaf4; font-weight: 600; }
+.bx-tbl td.bx-phone { color: #5a7a96; font-size: .72rem; font-variant-numeric: tabular-nums; }
+.bx-tbl td.bx-date { font-variant-numeric: tabular-nums; }
+
+.bx-tbl td.bx-stripe { border-left: 3px solid transparent; padding-left: .7rem; }
+.bx-tbl tr.sev-alta  td.bx-stripe { border-left-color: #f87171; }
+.bx-tbl tr.sev-media td.bx-stripe { border-left-color: #fbbf24; }
+.bx-tbl tr.sev-baixa td.bx-stripe { border-left-color: #5a7a96; }
+
+.bx-badge {
+    display: inline-flex; align-items: center; gap: .28rem;
+    font-size: .66rem; font-weight: 700; border-radius: 6px; padding: .15rem .45rem;
+    border: 1px solid; white-space: nowrap;
+}
+.bx-b-enviada  { background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.45); color: #34d399; }
+.bx-b-pendente { background: rgba(251,191,36,.1);  border-color: rgba(251,191,36,.4);  color: #fbbf24; }
+.bx-b-falhou   { background: rgba(248,113,113,.1); border-color: rgba(248,113,113,.45); color: #f87171; }
+.bx-b-sem_optin, .bx-b-pulada { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.15); color: #5a7a96; }
+.bx-b-none     { background: transparent; border-color: rgba(255,255,255,.12); color: #5a7a96; }
+
+.bx-wa {
+    display: inline-flex; align-items: center; gap: .3rem; text-decoration: none;
+    background: linear-gradient(135deg, rgba(34,197,94,.25), rgba(34,197,94,.08));
+    border: 1px solid rgba(34,197,94,.4); border-radius: 8px;
+    padding: .28rem .55rem; color: #86efac; font-size: .7rem; font-weight: 700;
+    transition: background .2s;
+}
+.bx-wa:hover { background: linear-gradient(135deg, rgba(34,197,94,.4), rgba(34,197,94,.15)); color: #86efac; }
+
+.bx-dates { display: flex; gap: .3rem; flex-wrap: wrap; }
+.bx-chip {
+    font-size: .66rem; font-variant-numeric: tabular-nums;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 5px; padding: .1rem .35rem; color: #c9d8e8;
+}
+.bx-chip.is-last { background: rgba(167,139,250,.12); border-color: rgba(167,139,250,.4); color: #a78bfa; }
+
+.bx-err { font-size: .68rem; color: #f87171; opacity: .85; white-space: normal; }
+
+.bx-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap;
+    padding: .5rem 1rem; border-top: 1px solid rgba(255,255,255,.08);
+    font-size: .68rem; color: #5a7a96;
+}
+.bx-foot b { color: #c9d8e8; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 560px) { .bx-hint { display: none; } }
+
+.followup-body {
+    padding: 0 1rem .85rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+.followup-chip {
+    background: rgba(251,191,36,.12);
+    border: 1px solid rgba(251,191,36,.3);
+    border-radius: 20px;
+    padding: .25rem .75rem;
+    font-size: .72rem;
+    color: #fbbf24;
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+.followup-chip a { color: #fbbf24; text-decoration: none; }
+.followup-chip a:hover { text-decoration: underline; }
+.overdue-tag { color: #f87171; font-weight: 700; }
+```
+
+---
+
+## Passo 4 — HTML em `templates/sale.html`
+
+**Substituir integralmente** o bloco atual que começa em
+`<!-- ── Painel 3: Botox Follow-up ──────────────────────── -->`
+e termina no `</div>` que fecha `<div class="fq-panel fq-botox" id="panelBotoxFollowup" ...>`
+(o bloco inteiro, incluindo `bodyBotoxFollowup`), por:
+
+```html
+<!-- ── Painel 3: Follow-up Botox (3 grades) ───────────── -->
+    <div class="fq-panel fq-botox" id="panelBotoxFollowup" style="display:none;">
+        <div class="fq-header" style="cursor:default;">
+            <h6>
+                <span class="live-dot" style="background:#a78bfa;"></span>
+                <i class="bi bi-syringe" style="color:#a78bfa;"></i>
+                Follow-up Botox
+            </h6>
+            <span style="font-size:.68rem;color:#5a7a96;" id="bxSyncLabel"></span>
+        </div>
+
+        <div class="bx-tabs" role="tablist" aria-label="Grades de follow-up Botox">
+            <button class="bx-tab" role="tab" aria-selected="true" aria-controls="bxPane1" id="bxTab1" type="button">
+                Vencidos — contatar <span class="bx-pill" id="bxCount1">0</span>
+            </button>
+            <button class="bx-tab" role="tab" aria-selected="false" aria-controls="bxPane2" id="bxTab2" type="button">
+                Chamados pelo n8n (M5) <span class="bx-pill" id="bxCount2">0</span>
+            </button>
+            <button class="bx-tab" role="tab" aria-selected="false" aria-controls="bxPane3" id="bxTab3" type="button">
+                Recorrentes <span class="bx-pill" id="bxCount3">0</span>
+            </button>
+        </div>
+
+        <!-- Grade 1 -->
+        <div id="bxPane1" role="tabpanel" aria-labelledby="bxTab1">
+            <div class="bx-toolbar">
+                <input class="bx-search" id="bxSearch1" type="search" placeholder="Buscar paciente…" oninput="bxFilter(1)">
+                <span class="fq-legend" style="background:none;padding:0;">
+                    <span><span class="fq-legend-dot red"></span>+60 d</span>
+                    <span><span class="fq-legend-dot" style="background:#fbbf24;"></span>+30 d</span>
+                </span>
+                <span class="bx-hint">Botox realizado há 5 meses ou mais</span>
+            </div>
+            <div class="bx-tbl-wrap">
+                <table class="bx-tbl">
+                    <thead><tr>
+                        <th class="bx-stripe" onclick="bxSort(1,'patient_name')">Paciente</th>
+                        <th>Telefone</th>
+                        <th onclick="bxSort(1,'performed_date')">Realizado</th>
+                        <th onclick="bxSort(1,'followup_date')">Venceu em</th>
+                        <th class="num" onclick="bxSort(1,'overdue_days')">Atraso <span class="bx-arrow">▼</span></th>
+                        <th>M5 automático</th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody id="bxBody1"></tbody>
+                </table>
+            </div>
+            <div class="bx-foot"><span id="bxFoot1">—</span><span>Fonte: procedure_execution + message_dispatch</span></div>
+        </div>
+
+        <!-- Grade 2 -->
+        <div id="bxPane2" role="tabpanel" aria-labelledby="bxTab2" hidden>
+            <div class="bx-toolbar">
+                <input class="bx-search" id="bxSearch2" type="search" placeholder="Buscar paciente…" oninput="bxFilter(2)">
+                <select class="ctrl-select" id="bxStatus2" onchange="bxLoadM5()">
+                    <option value="">Todos os status</option>
+                    <option value="enviada">Enviadas</option>
+                    <option value="falhou">Falhas</option>
+                    <option value="pendente">Pendentes na fila</option>
+                </select>
+                <select class="ctrl-select" id="bxDays2" onchange="bxLoadM5()">
+                    <option value="90">Últimos 90 dias</option>
+                    <option value="30">Últimos 30 dias</option>
+                    <option value="0">Tudo</option>
+                </select>
+                <span class="bx-hint">Disparos registrados via /api/integrations/messages</span>
+            </div>
+            <div class="bx-tbl-wrap">
+                <table class="bx-tbl">
+                    <thead><tr>
+                        <th class="bx-stripe" onclick="bxSort(2,'patient_name')">Paciente</th>
+                        <th>Telefone</th>
+                        <th onclick="bxSort(2,'due_at')">Vencimento M5</th>
+                        <th onclick="bxSort(2,'sent_at')">Enviada em <span class="bx-arrow">▼</span></th>
+                        <th onclick="bxSort(2,'status')">Status</th>
+                        <th>Retorno</th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody id="bxBody2"></tbody>
+                </table>
+            </div>
+            <div class="bx-foot"><span id="bxFoot2">—</span><span id="bxFoot2b"></span></div>
+        </div>
+
+        <!-- Grade 3 -->
+        <div id="bxPane3" role="tabpanel" aria-labelledby="bxTab3" hidden>
+            <div class="bx-toolbar">
+                <input class="bx-search" id="bxSearch3" type="search" placeholder="Buscar paciente…" oninput="bxFilter(3)">
+                <select class="ctrl-select" id="bxMin3" onchange="bxLoadRecorrentes()">
+                    <option value="2">2 ou mais aplicações</option>
+                    <option value="3">3 ou mais aplicações</option>
+                    <option value="4">4 ou mais aplicações</option>
+                </select>
+                <span class="bx-hint">Uma aplicação = um dia com Botox realizado</span>
+            </div>
+            <div class="bx-tbl-wrap">
+                <table class="bx-tbl">
+                    <thead><tr>
+                        <th class="bx-stripe" onclick="bxSort(3,'patient_name')">Paciente</th>
+                        <th class="num" onclick="bxSort(3,'count')">Aplicações <span class="bx-arrow">▼</span></th>
+                        <th>Datas</th>
+                        <th class="num" onclick="bxSort(3,'avg_gap_months')">Intervalo médio</th>
+                        <th class="num" onclick="bxSort(3,'months_since_last')">Desde a última</th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody id="bxBody3"></tbody>
+                </table>
+            </div>
+            <div class="bx-foot"><span id="bxFoot3">—</span><span id="bxFoot3b"></span></div>
+        </div>
+    </div>
+```
+
+---
+
+## Passo 5 — JavaScript em `templates/sale.html`
+
+**Substituir integralmente** o bloco que começa em
+`// ── Botox Follow-up Panel ────────────────────────────────`
+e vai até imediatamente antes de `// ── Grupos ──────────────────────────────────────────────────`
+(ou seja: as funções `loadBotoxFollowups` e `renderBotoxFollowupCards` inteiras, e a variável `botoxFollowupData`), por:
+
+```javascript
+// ── Follow-up Botox: 3 grades ────────────────────────────
+const bxState = {
+    1: { rows: [], sort: 'overdue_days', dir: -1, q: '' },
+    2: { rows: [], sort: 'sent_at',      dir: -1, q: '' },
+    3: { rows: [], sort: 'count',        dir: -1, q: '' },
+};
+
+function bxDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso.split('T')[0] + 'T12:00:00');
+    return d.toLocaleDateString('pt-BR');
+}
+function bxDateTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('pt-BR') + ' ' +
+           d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+function bxEsc(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[c]);
+}
+const BX_WA_ICON = '<i class="bi bi-whatsapp"></i>';
+
+function bxWa(url, label) {
+    if (!url) return '<span style="color:#5a7a96;font-size:.7rem;">sem telefone</span>';
+    return `<a class="bx-wa" href="${bxEsc(url)}" target="_blank" rel="noopener">${BX_WA_ICON}${label}</a>`;
+}
+
+function bxShowPanel() {
+    document.getElementById('panelBotoxFollowup').style.display = '';
+}
+
+// ── Abas ────────────────────────────────────────────────
+function bxSelectTab(index) {
+    [1, 2, 3].forEach(i => {
+        const tab = document.getElementById('bxTab' + i);
+        const pane = document.getElementById('bxPane' + i);
+        const on = i === index;
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        pane.hidden = !on;
+    });
+}
+
+// ── Ordenação e busca (client-side) ─────────────────────
+function bxSort(grid, field) {
+    const state = bxState[grid];
+    state.dir = state.sort === field ? -state.dir : -1;
+    state.sort = field;
+    bxRender(grid);
+}
+function bxFilter(grid) {
+    bxState[grid].q = (document.getElementById('bxSearch' + grid).value || '')
+        .trim().toLowerCase();
+    bxRender(grid);
+}
+function bxVisible(grid) {
+    const state = bxState[grid];
+    let rows = state.rows;
+    if (state.q) {
+        rows = rows.filter(r => (r.patient_name || '').toLowerCase().includes(state.q));
+    }
+    const field = state.sort, dir = state.dir;
+    return rows.slice().sort((a, b) => {
+        const av = a[field], bv = b[field];
+        if (av == null && bv == null) return 0;
+        if (av == null) return 1;
+        if (bv == null) return -1;
+        if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+        return String(av).localeCompare(String(bv), 'pt-BR') * dir;
+    });
+}
+
+// ── Grade 1: vencidos ───────────────────────────────────
+function bxLoadVencidos() {
+    fetch('/api/crm/botox/vencidos?t=' + Date.now())
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(data => {
+            bxState[1].rows = data.rows || [];
+            bxState[1].meta = data;
+            document.getElementById('bxCount1').textContent = data.total || 0;
+            bxShowPanel();
+            bxRender(1);
+        })
+        .catch(e => {
+            console.error('[BOTOX] vencidos:', e);
+            document.getElementById('bxBody1').innerHTML =
+                '<tr><td colspan="7" style="color:#f87171;padding:1rem;">Falha ao carregar.</td></tr>';
+        });
+}
+
+// ── Grade 2: M5 (n8n) ───────────────────────────────────
+function bxLoadM5() {
+    const days = document.getElementById('bxDays2').value;
+    const status = document.getElementById('bxStatus2').value;
+    const qs = new URLSearchParams({ days, t: Date.now() });
+    if (status) qs.set('status', status);
+    fetch('/api/crm/botox/m5?' + qs)
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(data => {
+            bxState[2].rows = data.rows || [];
+            bxState[2].meta = data;
+            document.getElementById('bxCount2').textContent = data.total || 0;
+            bxShowPanel();
+            bxRender(2);
+        })
+        .catch(e => {
+            console.error('[BOTOX] m5:', e);
+            document.getElementById('bxBody2').innerHTML =
+                '<tr><td colspan="7" style="color:#f87171;padding:1rem;">Falha ao carregar.</td></tr>';
+        });
+}
+
+// ── Grade 3: recorrentes ────────────────────────────────
+function bxLoadRecorrentes() {
+    const min = document.getElementById('bxMin3').value;
+    fetch('/api/crm/botox/recorrentes?min=' + min + '&t=' + Date.now())
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(data => {
+            bxState[3].rows = data.rows || [];
+            bxState[3].meta = data;
+            document.getElementById('bxCount3').textContent = data.total || 0;
+            bxShowPanel();
+            bxRender(3);
+        })
+        .catch(e => {
+            console.error('[BOTOX] recorrentes:', e);
+            document.getElementById('bxBody3').innerHTML =
+                '<tr><td colspan="6" style="color:#f87171;padding:1rem;">Falha ao carregar.</td></tr>';
+        });
+}
+
+// ── Render ──────────────────────────────────────────────
+function bxRender(grid) {
+    const rows = bxVisible(grid);
+    const body = document.getElementById('bxBody' + grid);
+    const meta = bxState[grid].meta || {};
+
+    if (grid === 1) {
+        body.innerHTML = rows.length ? rows.map(r => `
+            <tr class="sev-${r.severity}">
+                <td class="bx-name bx-stripe">${bxEsc(r.patient_name)}</td>
+                <td class="bx-phone">${bxEsc(r.phone || '—')}</td>
+                <td class="bx-date">${bxDate(r.performed_date)}</td>
+                <td class="bx-date">${bxDate(r.followup_date)}</td>
+                <td class="num">${r.overdue_days} d</td>
+                <td><span class="bx-badge bx-b-${r.m5.status || 'none'}">${bxEsc(r.m5.label)}</span></td>
+                <td>${bxWa(r.whatsapp_url, 'WhatsApp')}</td>
+            </tr>`).join('')
+            : '<tr><td colspan="7" class="fq-empty" style="padding:1rem;">Nenhum follow-up vencido.</td></tr>';
+        const semContato = (bxState[1].rows || []).filter(r => !r.m5.status || r.m5.status === 'sem_optin').length;
+        document.getElementById('bxFoot1').innerHTML =
+            `Mostrando <b>${rows.length}</b> de <b>${meta.total || 0}</b> vencidos · ${semContato} sem contato automático`;
+        return;
+    }
+
+    if (grid === 2) {
+        body.innerHTML = rows.length ? rows.map(r => `
+            <tr>
+                <td class="bx-name bx-stripe">${bxEsc(r.patient_name)}</td>
+                <td class="bx-phone">${bxEsc(r.phone || '—')}</td>
+                <td class="bx-date">${bxDate(r.due_at)}</td>
+                <td class="bx-date">${bxDateTime(r.sent_at)}</td>
+                <td><span class="bx-badge bx-b-${r.status}">${bxEsc(r.status)}</span></td>
+                <td>${r.last_error
+                        ? `<span class="bx-err">${bxEsc(r.last_error)}</span>`
+                        : `<span class="bx-badge bx-b-${r.retorno_status === 'agendado' ? 'enviada' : 'none'}">${bxEsc(r.retorno)}</span>`}</td>
+                <td>${bxWa(r.whatsapp_url, 'Conversa')}</td>
+            </tr>`).join('')
+            : '<tr><td colspan="7" class="fq-empty" style="padding:1rem;">Nenhum disparo M5 registrado nesta janela.</td></tr>';
+        const c = meta.counters || {};
+        document.getElementById('bxFoot2').innerHTML =
+            `<b>${meta.total || 0}</b> disparos · <b>${c.enviada || 0}</b> enviadas · <b>${c.falhou || 0}</b> falhas · <b>${c.pendente || 0}</b> na fila`;
+        document.getElementById('bxFoot2b').textContent =
+            meta.window_days ? `Janela: ${meta.window_days} dias` : 'Janela: tudo';
+        return;
+    }
+
+    body.innerHTML = rows.length ? rows.map(r => {
+        const chips = r.dates.map((d, i) =>
+            `<span class="bx-chip${i === r.dates.length - 1 ? ' is-last' : ''}">${bxDate(d)}</span>`
+        ).join('');
+        return `
+            <tr>
+                <td class="bx-name bx-stripe">${bxEsc(r.patient_name)}</td>
+                <td class="num">${r.count}</td>
+                <td><span class="bx-dates">${chips}</span></td>
+                <td class="num">${r.avg_gap_months != null ? r.avg_gap_months.toFixed(1) + ' m' : '—'}</td>
+                <td class="num">${r.months_since_last.toFixed(1)} m</td>
+                <td>${bxWa(r.whatsapp_url, 'WhatsApp')}</td>
+            </tr>`;
+    }).join('')
+        : '<tr><td colspan="6" class="fq-empty" style="padding:1rem;">Nenhum paciente recorrente.</td></tr>';
+
+    const taxa = meta.total_botox_patients
+        ? Math.round((meta.total / meta.total_botox_patients) * 100) : 0;
+    document.getElementById('bxFoot3').innerHTML =
+        `<b>${meta.total || 0}</b> recorrentes · <b>${meta.avg_applications || 0}</b> aplicações em média` +
+        (meta.median_gap_months ? ` · intervalo mediano <b>${meta.median_gap_months} m</b>` : '');
+    document.getElementById('bxFoot3b').innerHTML =
+        `Taxa de recorrência: <b>${meta.total || 0}</b> de <b>${meta.total_botox_patients || 0}</b> (${taxa}%)`;
+}
+
+function bxLoadAll() {
+    bxLoadVencidos();
+    bxLoadM5();
+    bxLoadRecorrentes();
+    const now = new Date();
+    document.getElementById('bxSyncLabel').textContent =
+        'Atualizado ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    [1, 2, 3].forEach(i => {
+        const tab = document.getElementById('bxTab' + i);
+        if (tab) tab.addEventListener('click', () => bxSelectTab(i));
+    });
+});
+```
+
+---
+
+## Passo 6 — Ajustar o init
+
+No final do `<script>`, dentro do `DOMContentLoaded`, substituir:
+
+```javascript
+    loadFunnel();
+    loadFeitos();
+    loadBotoxFollowups();
+    document.getElementById('funnelMonthFilter').addEventListener('change', () => {
+        loadFunnel();
+        loadBotoxFollowups();
+    });
+    document.getElementById('funnelYearFilter').addEventListener('change', () => {
+        loadFunnel();
+        loadBotoxFollowups();
+    });
+```
+
+por:
+
+```javascript
+    loadFunnel();
+    loadFeitos();
+    // As grades de Botox são independentes do período do funil — carregam uma vez.
+    bxLoadAll();
+    document.getElementById('funnelMonthFilter').addEventListener('change', loadFunnel);
+    document.getElementById('funnelYearFilter').addEventListener('change', loadFunnel);
+```
+
+---
+
+## Passo 7 — Limpar o endpoint antigo (opcional, faça por último)
+
+`routes/crm.py` → `GET /api/crm/botox-follow-ups` (por volta da linha 941) fica sem nenhum consumidor depois desta mudança.
+**Não apague agora.** Confirme no navegador que as três grades carregam, e só então remova a função `get_botox_follow_ups`.
+
+---
+
+## Verificação (rode antes de dizer que terminou)
+
+1. `python -c "import app"` — deve importar sem erro.
+2. Abrir `/sale` logado. O painel "Follow-up Botox" aparece com 3 abas e contadores.
+3. Clicar nas 3 abas — cada uma renderiza sua tabela sem erro no console.
+4. `curl` autenticado (ou o devtools) nos 3 endpoints, todos devem devolver 200 com `{"rows": [...], "total": N}`:
+   - `/api/crm/botox/vencidos`
+   - `/api/crm/botox/m5?days=90`
+   - `/api/crm/botox/recorrentes?min=2`
+5. Buscar um nome no campo de busca de cada aba — filtra.
+6. Clicar num cabeçalho de coluna — reordena.
+
+---
+
+## ⚠️ A aba 2 pode aparecer vazia — e isso não é bug
+
+A tabela `message_dispatch` só é populada se `MESSAGE_DISPATCH_ENABLED=1` estiver no ambiente
+(`services/followup_service.py` linha 14 — os listeners saem cedo sem isso).
+
+Se a aba "Chamados pelo n8n (M5)" vier com 0 linhas, **não invente dados nem mude a query**. Verifique nesta ordem:
+
+| Variável | Efeito se ausente/off |
+|---|---|
+| `MESSAGE_DISPATCH_ENABLED=1` | nenhuma linha em `message_dispatch` é criada |
+| `INTEGRATIONS_API_KEY` | `/api/integrations/*` devolve 503 — o n8n não consegue ler a fila |
+| `DISPATCH_SEND_MODE` | `off` (padrão) → a fila devolve lista vazia; use `test` ou `live` |
+| `DISPATCH_DAILY_CAP` | padrão 20/dia |
+
+Para popular retroativamente os dispatches dos Botox já realizados, existe
+`scripts/backfill_botox_dispatches.py` no repositório. **Rode em dry-run primeiro** e só depois
+aplique — ele cria linhas em `message_dispatch` para execuções antigas.
+
+---
+
+## Não faça
+
+- Não criar migration — nenhum campo novo é necessário.
+- Não alterar `services/followup_service.py`, `services/botox_sheet_service.py` nem `routes/integrations.py`.
+- Não mudar o painel 1 (Consultas de Hoje) nem o painel 2 (Follow-ups Atrasados).
+- Não usar `nulls_last()`/`nullslast()` do SQLAlchemy — o projeto não pina a versão e o nome mudou entre 1.4 e 2.0; a ordenação por `sent_at` já é feita no Python de propósito.
