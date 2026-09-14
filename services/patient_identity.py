@@ -1,5 +1,7 @@
 """Shared helpers extracted from app.py without behavior changes."""
 
+from datetime import date
+
 from models import Patient
 from models import PatientDoctor
 from models import db
@@ -39,6 +41,16 @@ def normalize_patient_name(name):
         return ''
     return re.sub(r'\s+', ' ', str(name).strip()).lower()
 
+
+def _safe_candidate_birth_date(value):
+    """Converte datas válidas e ignora anos legados fora do intervalo Python."""
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
 def find_possible_duplicate_patients(name, doctor_id=None, limit=8):
     """Procura pacientes com nome igual ou muito parecido ao informado.
 
@@ -56,7 +68,14 @@ def find_possible_duplicate_patients(name, doctor_id=None, limit=8):
 
     # Candidatos: nomes que contenham o primeiro token (reduz o conjunto),
     # comparação final feita em Python sobre o nome normalizado.
-    candidates = Patient.query.filter(
+    candidates = db.session.query(
+        Patient.id,
+        Patient.name,
+        Patient.phone,
+        db.cast(Patient.birth_date, db.String).label('birth_date_text'),
+        Patient.cpf,
+        Patient.city,
+    ).filter(
         Patient.name.ilike(f'%{first_token}%')
     ).limit(200).all()
 
@@ -79,7 +98,7 @@ def find_possible_duplicate_patients(name, doctor_id=None, limit=8):
                 'name': cand.name,
                 'patient_code': code,
                 'phone': cand.phone,
-                'birth_date': cand.birth_date,
+                'birth_date': _safe_candidate_birth_date(cand.birth_date_text),
                 'cpf': cand.cpf,
                 'city': cand.city,
                 'exact': cand_norm == target,

@@ -7,4 +7,4 @@ Date fields received from forms must be parsed and validated at the API boundary
 
 **Why:** PostgreSQL can contain dates with years beyond Python's supported range; calling `isoformat()` or calculating age on those values raises an exception during normal page rendering.
 
-**How to apply:** Use strict ISO parsing for new birth-date input and safe serialization/age guards for existing patient data. Treat cleanup of known corrupt production rows as an explicit, separately approved data task.
+**How to apply:** Use strict ISO parsing for new input and safe serialization/age guards. For searches over legacy rows, project date columns as text and validate them before conversion; ORM hydration can fail before serialization. Treat cleanup as a separately approved data task.
