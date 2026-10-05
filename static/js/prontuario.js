@@ -3837,11 +3837,144 @@ function trackerDateLabel(value) {
   return raw;
 }
 
+function trackerDateForApi(value) {
+  const raw = trackerDisplayValue(value).trim();
+  let year;
+  let month;
+  let day;
+
+  const isoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/);
+  const brazilianDate = raw.match(/^(\d{1,2})[/. -](\d{1,2})[/. -](\d{4})(?:$|\s)/);
+  if (isoDate) {
+    [, year, month, day] = isoDate;
+  } else if (brazilianDate) {
+    [, day, month, year] = brazilianDate;
+  } else {
+    return "";
+  }
+
+  const y = Number(year);
+  const m = Number(month);
+  const d = Number(day);
+  const check = new Date(Date.UTC(y, m - 1, d));
+  if (
+    !Number.isInteger(y) ||
+    check.getUTCFullYear() !== y ||
+    check.getUTCMonth() !== m - 1 ||
+    check.getUTCDate() !== d
+  ) {
+    return "";
+  }
+  return `${String(y).padStart(4, "0")}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 function trackerFieldLabel(key) {
   return trackerFieldLabels[key] || key
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function trackerSurgeryDetails(match) {
+  const excludedFields = new Set([
+    "data",
+    "nome",
+    "cpf",
+    "telefone",
+    "phone",
+    "email",
+    "patient_id",
+    "match_score",
+    "match_label"
+  ]);
+  const fields = Object.entries(match)
+    .filter(([key, value]) => !excludedFields.has(key.toLowerCase()) && trackerDisplayValue(value))
+    .map(([key, value]) => `${trackerFieldLabel(key)}: ${trackerDisplayValue(value)}`);
+  return fields.join("\n") || "Dados da cirurgia importados do CapillaryTracker.";
+}
+
+function trackerSurgerySourceMarker(match, surgeryDate) {
+  const trackerId = trackerDisplayValue(match.id).trim();
+  if (trackerId) return `CapillaryTracker ID: ${trackerId}`;
+
+  const sourceFields = Object.entries(match)
+    .filter(([key]) => !["match_score", "match_label"].includes(key))
+    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
+  const sourceText = `${surgeryDate}|${JSON.stringify(sourceFields)}`;
+  let hash = 2166136261;
+  for (let index = 0; index < sourceText.length; index += 1) {
+    hash = Math.imul(hash ^ sourceText.charCodeAt(index), 16777619);
+  }
+  return `CapillaryTracker REF: ${(hash >>> 0).toString(16)}`;
+}
+
+async function registerTrackerSurgery(match, button) {
+  if (!ensureClinicalEditAllowed()) return;
+
+  const patientId = getPatientId();
+  const surgeryDate = trackerDateForApi(match.data);
+  if (!patientId || !surgeryDate) {
+    showAlert("A cirurgia não tem uma data válida. Use o registro manual acima.", "warning");
+    return;
+  }
+  if (match.match_label !== "exato") {
+    showAlert("O registro direto exige correspondência exata do nome. Use o registro manual para conferir este caso.", "warning");
+    return;
+  }
+
+  const sourceMarker = trackerSurgerySourceMarker(match, surgeryDate);
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "Registrando...";
+
+  try {
+    const existingSurgeries = await core.fetchJson(`/api/patient/${patientId}/surgeries`);
+    const alreadyRegistered = (existingSurgeries || []).some((surgery) =>
+      String(surgery.observations || "").includes(sourceMarker)
+    );
+    if (alreadyRegistered) {
+      button.textContent = "Já registrada";
+      button.classList.remove("btn-success");
+      button.classList.add("btn-outline-success");
+      showAlert("Esta cirurgia do CapillaryTracker já está registrada no prontuário.", "info");
+      return;
+    }
+
+    const sameDateExists = (existingSurgeries || []).some(
+      (surgery) => surgery.surgery_date_iso === surgeryDate
+    );
+    if (
+      sameDateExists &&
+      !confirm("Já existe uma cirurgia registrada nesta data. Deseja registrar também esta cirurgia do CapillaryTracker?")
+    ) {
+      button.disabled = false;
+      button.textContent = originalLabel;
+      return;
+    }
+
+    const result = await core.fetchJson(`/api/patient/${patientId}/surgery`, {
+      method: "POST",
+      body: JSON.stringify({
+        surgery_date: surgeryDate,
+        surgery_type: "Capilar",
+        surgical_data: trackerSurgeryDetails(match),
+        observations: `Importada do CapillaryTracker. ${sourceMarker}`
+      })
+    });
+    if (!result?.success) {
+      throw new Error(result?.error || "Não foi possível registrar a cirurgia.");
+    }
+
+    button.textContent = "Cirurgia registrada";
+    button.classList.remove("btn-success");
+    button.classList.add("btn-outline-success");
+    showAlert("Cirurgia do CapillaryTracker registrada no prontuário.", "success");
+    await loadSurgeries();
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = originalLabel;
+    showAlert(error?.message || "Erro ao registrar cirurgia do Tracker.", "danger");
+  }
 }
 
 function renderTrackerSurgery(match) {
@@ -3872,6 +4005,25 @@ function renderTrackerSurgery(match) {
     ? `${label} · ${Math.round(score * 100)}%`
     : label;
   header.appendChild(badge);
+
+  if (canEditClinical()) {
+    const surgeryDate = trackerDateForApi(match.data);
+    if (match.match_label === "exato" && surgeryDate) {
+      const registerButton = document.createElement("button");
+      registerButton.type = "button";
+      registerButton.className = "btn btn-sm btn-success";
+      registerButton.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Registrar cirurgia';
+      registerButton.addEventListener("click", () => registerTrackerSurgery(match, registerButton));
+      header.appendChild(registerButton);
+    } else {
+      const hint = document.createElement("small");
+      hint.className = "text-muted";
+      hint.textContent = match.match_label !== "exato"
+        ? "Correspondência não exata: confira e use o registro manual."
+        : "Sem data válida: use o registro manual.";
+      header.appendChild(hint);
+    }
+  }
   body.appendChild(header);
 
   const details = document.createElement("dl");
@@ -3922,7 +4074,7 @@ async function loadTrackerSurgeries() {
     const data = await core.fetchJson(`/api/patient/${patientId}/tracker-surgeries`);
     const matches = Array.isArray(data?.matches) ? data.matches : [];
     if (!matches.length) {
-      status.textContent = "Nenhuma cirurgia correspondente encontrada no Tracker.";
+      status.textContent = "Nenhuma cirurgia correspondente encontrada. O registro manual acima continua disponível.";
       return;
     }
 
