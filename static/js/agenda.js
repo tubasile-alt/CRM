@@ -1715,44 +1715,117 @@ function validateActivationRequiredFields() {
     return values;
 }
 
-function renderActivationWarnings(data, patientId, doctorId) {
-    window._ativarCtx.warnings = data.warnings || [];
-    const alertaDiv = document.getElementById('ativarAlertas');
-    const lista = document.getElementById('ativarAlertalista');
-    alertaDiv.classList.remove('d-none');
+function setActivationDirectButtonState(pending, hasDuplicates = false) {
+    const button = document.getElementById('ativarDiretoBtn');
+    const label = document.getElementById('ativarDiretoBtnLabel');
+    if (!button || !label) return;
 
+    button.disabled = !!pending;
+    button.classList.toggle('btn-success', !hasDuplicates);
+    button.classList.toggle('btn-outline-danger', hasDuplicates);
+    label.textContent = pending
+        ? 'Verificando duplicidades...'
+        : hasDuplicates
+            ? 'Ignorar aviso e ativar como novo'
+            : 'Ativar como novo paciente definitivo (gerar código)';
+}
+
+function renderActivationWarnings(data, patientId, doctorId) {
+    const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+    window._ativarCtx.warnings = warnings;
+    const alertaDiv = document.getElementById('ativarAlertas');
+    const alertaMensagem = document.getElementById('ativarAlertasMensagem');
+    const lista = document.getElementById('ativarAlertalista');
     const mergeDiv = document.getElementById('ativarMergeOpcoes');
     const mergeLista = document.getElementById('ativarMergeLista');
+    const exactNameMatch = warnings.some(w => w.reason === 'nome_exato');
+    const reasonLabels = {
+        'nome_exato': 'Nome exatamente igual',
+        'nome_semelhante': 'Nome semelhante',
+        'mesmo_cpf': 'Mesmo CPF',
+        'mesmo_telefone': 'Mesmo telefone'
+    };
+
+    alertaMensagem.textContent = exactNameMatch
+        ? 'Existe um cadastro com o mesmo nome. Confira os dados antes de continuar.'
+        : 'Encontramos cadastros com dados parecidos ou iguais. Confira cada resultado antes de continuar.';
+    alertaDiv.classList.remove('d-none');
     mergeDiv.classList.remove('d-none');
+    lista.replaceChildren();
+    mergeLista.replaceChildren();
 
-    lista.innerHTML = '';
-    mergeLista.innerHTML = '';
-    data.warnings.forEach(w => {
-        const reasonLabel = {
-            'nome_semelhante': 'Nome semelhante',
-            'mesmo_cpf': 'Mesmo CPF',
-            'mesmo_telefone': 'Mesmo telefone'
-        }[w.reason] || w.reason;
+    warnings.forEach(warning => {
+        const card = document.createElement('div');
+        card.className = 'border rounded bg-white p-2 mb-2 small';
 
-        lista.innerHTML += `<div class="small mb-1">
-            <span class="badge bg-secondary">${reasonLabel}</span>
-            <strong>${w.name}</strong>
-            ${w.phone ? `· ${w.phone}` : ''}
-            ${w.cpf ? `· CPF: ${w.cpf}` : ''}
-        </div>`;
+        const name = document.createElement('strong');
+        name.textContent = warning.name || 'Paciente sem nome';
+        card.appendChild(name);
 
-        mergeLista.innerHTML += `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
-            onclick="event.stopPropagation(); const values = validateActivationRequiredFields(); if(!values){return;}_finalizarAtivacao(${patientId}, ${doctorId}, ${w.id}, true, values.phone, values.cpf)">
-            <span><strong>${w.name}</strong>
-            ${w.phone ? `<span class='text-muted ms-2 small'>${w.phone}</span>` : ''}
-            ${w.cpf ? `<span class='text-muted ms-2 small'>CPF: ${w.cpf}</span>` : ''}
-            <span class='ms-2 badge bg-secondary small'>${reasonLabel}</span></span>
-            <span class="badge bg-primary">Vincular</span>
-        </button>`;
+        const identifiers = document.createElement('div');
+        identifiers.className = 'text-muted';
+        const identityParts = [`Cadastro #${warning.id}`];
+        if (warning.patient_code !== null && warning.patient_code !== undefined) {
+            identityParts.push(`Código ${warning.patient_code}`);
+        }
+        identifiers.textContent = identityParts.join(' · ');
+        card.appendChild(identifiers);
+
+        const reasons = Array.isArray(warning.match_reasons) && warning.match_reasons.length
+            ? warning.match_reasons
+            : [warning.reason];
+        const badges = document.createElement('div');
+        badges.className = 'mt-1';
+        reasons.forEach(reason => {
+            const badge = document.createElement('span');
+            badge.className = `badge ${reason === 'nome_exato' || reason === 'mesmo_cpf' ? 'bg-danger' : 'bg-secondary'} me-1`;
+            badge.textContent = reasonLabels[reason] || reason || 'Possível correspondência';
+            badges.appendChild(badge);
+        });
+        card.appendChild(badges);
+
+        const details = [];
+        if (warning.phone) details.push(`Telefone: ${warning.phone}`);
+        if (warning.cpf) details.push(`CPF: ${warning.cpf}`);
+        if (warning.birth_date) {
+            const rawDate = String(warning.birth_date).slice(0, 10);
+            const parsedDate = new Date(`${rawDate}T00:00:00`);
+            details.push(`Nascimento: ${Number.isNaN(parsedDate.getTime()) ? rawDate : parsedDate.toLocaleDateString('pt-BR')}`);
+        }
+        if (details.length) {
+            const detailLine = document.createElement('div');
+            detailLine.className = 'mt-1';
+            detailLine.textContent = details.join(' · ');
+            card.appendChild(detailLine);
+        }
+        lista.appendChild(card);
+
+        const mergeButton = document.createElement('button');
+        mergeButton.type = 'button';
+        mergeButton.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2';
+
+        const mergeLabel = document.createElement('span');
+        mergeLabel.className = 'me-2';
+        mergeLabel.textContent = `Vincular ao cadastro #${warning.id} — ${warning.name || 'Paciente sem nome'}`;
+        mergeButton.appendChild(mergeLabel);
+
+        const mergeBadge = document.createElement('span');
+        mergeBadge.className = 'badge bg-primary';
+        mergeBadge.textContent = 'Vincular';
+        mergeButton.appendChild(mergeBadge);
+        mergeButton.addEventListener('click', () => {
+            const values = validateActivationRequiredFields();
+            if (!values) return;
+            _finalizarAtivacao(
+                patientId, doctorId, warning.id, true, values.phone, values.cpf
+            );
+        });
+        mergeLista.appendChild(mergeButton);
     });
 
     document.getElementById('ativarInstrucao').textContent =
-        'Foram encontrados cadastros possivelmente duplicados. Escolha vincular a um existente ou ativar como novo.';
+        'A opção recomendada é vincular ao cadastro correto. Se confirmar que são pessoas diferentes, você poderá ignorar o aviso e receberá uma confirmação adicional.';
+    setActivationDirectButtonState(false, warnings.length > 0);
 }
 
 window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingPhone, existingCpf) {
@@ -1766,11 +1839,13 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
     document.getElementById('ativarTelefoneErro').classList.add('d-none');
     document.getElementById('ativarCpfErro').classList.add('d-none');
     document.getElementById('ativarAlertas').classList.add('d-none');
+    document.getElementById('ativarAlertasMensagem').textContent = '';
     document.getElementById('ativarAlertalista').innerHTML = '';
     document.getElementById('ativarMergeOpcoes').classList.add('d-none');
     document.getElementById('ativarMergeLista').innerHTML = '';
     document.getElementById('ativarInstrucao').textContent =
         'Verificando duplicidades...';
+    setActivationDirectButtonState(true, false);
 
     if (!doctorId) {
         doctorId = window.currentDoctorId;
@@ -1788,6 +1863,7 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
         if (data.success) {
             document.getElementById('ativarInstrucao').textContent =
                 'Revise os dados e confirme para ativar como novo paciente definitivo.';
+            setActivationDirectButtonState(false, false);
             return;
         }
         if (data.error === 'required_fields' || data.error === 'phone_required' || data.error === 'cpf_required') {
@@ -1797,15 +1873,22 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
                 if (item.field === 'phone') document.getElementById('ativarTelefoneErro').classList.remove('d-none');
                 if (item.field === 'cpf') document.getElementById('ativarCpfErro').classList.remove('d-none');
             });
+            setActivationDirectButtonState(false, false);
             return;
         }
         if (data.warning === 'duplicates_found') {
             renderActivationWarnings(data, patientId, doctorId);
         } else if (data.error) {
+            document.getElementById('ativarInstrucao').textContent =
+                'Não foi possível concluir a verificação. Feche e abra novamente antes de ativar.';
             showAlert(data.error, 'danger');
         }
     })
-    .catch(() => showAlert('Erro ao verificar duplicados', 'danger'));
+    .catch(() => {
+        document.getElementById('ativarInstrucao').textContent =
+            'Não foi possível verificar duplicidades. Feche e abra novamente antes de ativar.';
+        showAlert('Erro ao verificar duplicados', 'danger');
+    });
 
     const modal = new bootstrap.Modal(document.getElementById('ativarProvisiorioModal'));
     modal.show();
@@ -1819,15 +1902,41 @@ window.abrirModalAtivacao = function(patientId, patientName, doctorId, existingP
         document.getElementById('ativarTelefoneErro').classList.add('d-none');
         document.getElementById('ativarCpfErro').classList.add('d-none');
         const forceActivation = (ctx.warnings || []).length > 0;
-        _finalizarAtivacao(ctx.patientId, ctx.doctorId, null, forceActivation, values.phone, values.cpf);
+        if (forceActivation) {
+            const matches = ctx.warnings
+                .slice(0, 3)
+                .map(warning => `• ${warning.name || 'Paciente'} (cadastro #${warning.id})`)
+                .join('\n');
+            const confirmed = window.confirm(
+                `Há possível duplicidade:\n${matches}\n\n` +
+                'Criar outro cadastro pode dividir o prontuário e o histórico do paciente. ' +
+                'Confirma que são pessoas diferentes e deseja continuar?'
+            );
+            if (!confirmed) return;
+        }
+        _finalizarAtivacao(
+            ctx.patientId, ctx.doctorId, null, forceActivation,
+            values.phone, values.cpf,
+            forceActivation ? ctx.warnings.map(warning => warning.id) : []
+        );
     };
 };
 
-window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, phone, cpf) {
+window._finalizarAtivacao = function(
+    patientId, doctorId, mergeIntoId, force, phone, cpf, confirmedDuplicateIds = []
+) {
     const payload = { doctor_id: doctorId, force: !!force };
     if (mergeIntoId) payload.merge_into_patient_id = mergeIntoId;
     if (phone) payload.phone = phone;
     if (cpf) payload.cpf = cpf;
+    if (Array.isArray(confirmedDuplicateIds) && confirmedDuplicateIds.length) {
+        payload.confirmed_duplicate_patient_ids = confirmedDuplicateIds;
+    }
+
+    setActivationDirectButtonState(true, (window._ativarCtx.warnings || []).length > 0);
+    document.querySelectorAll('#ativarMergeLista button').forEach(button => {
+        button.disabled = true;
+    });
 
     fetch(`/api/patients/${patientId}/ativar`, {
         method: 'POST',
@@ -1849,10 +1958,21 @@ window._finalizarAtivacao = function(patientId, doctorId, mergeIntoId, force, ph
                         if (item.field === 'phone') document.getElementById('ativarTelefoneErro').classList.remove('d-none');
                         if (item.field === 'cpf') document.getElementById('ativarCpfErro').classList.remove('d-none');
                     });
+                    setActivationDirectButtonState(false, (window._ativarCtx.warnings || []).length > 0);
                     showAlert(data.message || 'Informe telefone e CPF antes de ativar.', 'danger');
                 } else {
+                    setActivationDirectButtonState(false, (window._ativarCtx.warnings || []).length > 0);
+                    document.querySelectorAll('#ativarMergeLista button').forEach(button => {
+                        button.disabled = false;
+                    });
                     showAlert(data.error || 'Erro ao ativar cadastro', 'danger');
                 }
     })
-    .catch(() => showAlert('Erro ao ativar cadastro', 'danger'));
+    .catch(() => {
+        setActivationDirectButtonState(false, (window._ativarCtx.warnings || []).length > 0);
+        document.querySelectorAll('#ativarMergeLista button').forEach(button => {
+            button.disabled = false;
+        });
+        showAlert('Erro ao ativar cadastro', 'danger');
+    });
 };

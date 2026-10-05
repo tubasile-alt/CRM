@@ -1257,19 +1257,21 @@
                     </div>
                 </div>
                 <div id="ativarAlertas" class="alert alert-warning d-none mb-3">
-                    <strong><i class="bi bi-exclamation-triangle-fill"></i> Possíveis duplicados encontrados:</strong>
+                    <strong><i class="bi bi-exclamation-triangle-fill"></i> Atenção: pode ser o mesmo paciente</strong>
+                    <p id="ativarAlertasMensagem" class="small mt-2 mb-2"></p>
                     <div id="ativarAlertalista" class="mt-2"></div>
                 </div>
                 <p class="text-muted small mb-3" id="ativarInstrucao">
                     Escolha uma das opções abaixo para ativar o cadastro.
                 </p>
                 <div class="d-grid gap-2">
-                    <button class="btn btn-success" id="ativarDiretoBtn">
-                        <i class="bi bi-person-plus-fill"></i> Ativar como novo paciente definitivo (gerar código)
+                    <button class="btn btn-success" id="ativarDiretoBtn" disabled>
+                        <i class="bi bi-person-plus-fill"></i>
+                        <span id="ativarDiretoBtnLabel">Verificando duplicidades...</span>
                     </button>
                 </div>
                 <div id="ativarMergeOpcoes" class="mt-3 d-none">
-                    <p class="fw-semibold mb-2">Ou vincular ao paciente ativo existente:</p>
+                    <p class="fw-semibold mb-2">Opção mais segura: vincular ao cadastro existente</p>
                     <div id="ativarMergeLista" class="list-group"></div>
                 </div>
             </div>

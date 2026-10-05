@@ -2705,12 +2705,38 @@ def link_doctor_patient():
 
 
 def _activation_warnings_for(provisional, doctor_id, phone_value=None, cpf_value=None):
-    warnings = []
+    warnings_by_id = {}
 
     name_dups = find_possible_duplicate_patients(provisional.name, doctor_id=doctor_id)
     name_dups = [d for d in name_dups if d['id'] != provisional.id]
-    if name_dups:
-        warnings.extend([{**d, 'reason': 'nome_semelhante'} for d in name_dups])
+    for duplicate in name_dups:
+        reasons = ['nome_exato' if duplicate.get('exact') else 'nome_semelhante']
+        warnings_by_id[duplicate['id']] = {
+            **duplicate,
+            'reason': reasons[0],
+            'match_reasons': reasons,
+        }
+
+    def add_match(patient, reason):
+        warning = warnings_by_id.get(patient.id)
+        if warning:
+            if reason not in warning['match_reasons']:
+                warning['match_reasons'].append(reason)
+            return
+
+        patient_doctor = PatientDoctor.query.filter_by(
+            patient_id=patient.id, doctor_id=doctor_id
+        ).first()
+        warnings_by_id[patient.id] = {
+            'id': patient.id,
+            'name': patient.name,
+            'patient_code': patient_doctor.patient_code if patient_doctor else None,
+            'phone': patient.phone,
+            'cpf': patient.cpf,
+            'birth_date': patient.birth_date,
+            'reason': reason,
+            'match_reasons': [reason],
+        }
 
     cpf_to_check = cpf_value or provisional.cpf
     if cpf_to_check:
@@ -2720,9 +2746,7 @@ def _activation_warnings_for(provisional, doctor_id, phone_value=None, cpf_value
             Patient.status_cadastral == 'ativo'
         ).all()
         for p in cpf_dups:
-            if not any(w['id'] == p.id for w in warnings):
-                warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_cpf',
-                                 'phone': p.phone, 'cpf': p.cpf})
+            add_match(p, 'mesmo_cpf')
 
     phone_to_check = phone_value or provisional.phone
     if phone_to_check:
@@ -2732,11 +2756,30 @@ def _activation_warnings_for(provisional, doctor_id, phone_value=None, cpf_value
             Patient.status_cadastral == 'ativo'
         ).all()
         for p in phone_dups:
-            if not any(w['id'] == p.id for w in warnings):
-                warnings.append({'id': p.id, 'name': p.name, 'reason': 'mesmo_telefone',
-                                 'phone': p.phone, 'cpf': p.cpf})
+            add_match(p, 'mesmo_telefone')
 
-    return warnings
+    return sorted(
+        warnings_by_id.values(),
+        key=lambda warning: (
+            warning.get('reason') != 'nome_exato',
+            -len(warning.get('match_reasons', [])),
+            warning.get('name', '').casefold(),
+        ),
+    )
+
+
+def _duplicate_override_is_confirmed(force, warnings, confirmed_ids):
+    """Aceita a exceção somente se o usuário confirmou exatamente os IDs exibidos."""
+    if not force or not isinstance(confirmed_ids, list):
+        return False
+    if not all(
+        isinstance(patient_id, int) and not isinstance(patient_id, bool)
+        for patient_id in confirmed_ids
+    ):
+        return False
+    if len(confirmed_ids) != len(set(confirmed_ids)):
+        return False
+    return set(confirmed_ids) == {warning['id'] for warning in warnings}
 
 
 def _activation_required_errors(provisional, phone_input='', cpf_input=''):
@@ -2863,15 +2906,20 @@ def ativar_paciente(patient_id):
     if phone_input or cpf_input:
         db.session.flush()
 
-    # --- Alertas de duplicidade (antes de forçar) ---
-    if not force:
-        warnings = _activation_warnings_for(provisional, doctor_id, phone_input, cpf_input)
-        if warnings:
+    # Revalida duplicidades mesmo após o preview para evitar decisões com dados
+    # desatualizados. A confirmação precisa corresponder à lista que o usuário viu.
+    warnings = _activation_warnings_for(provisional, doctor_id, phone_input, cpf_input)
+    if warnings and not merge_into_id:
+        confirmed_ids = data.get('confirmed_duplicate_patient_ids')
+        if not _duplicate_override_is_confirmed(force, warnings, confirmed_ids):
             return jsonify({
                 'success': False,
                 'warning': 'duplicates_found',
                 'warnings': warnings,
-                'message': 'Possíveis cadastros duplicados encontrados. Revise antes de ativar.'
+                'message': (
+                    'Encontramos possíveis cadastros duplicados. '
+                    'Revise a lista atual antes de confirmar que deseja criar outro.'
+                )
             }), 409
 
     try:
