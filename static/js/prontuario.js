@@ -3804,6 +3804,139 @@ async function loadSurgeries() {
   }
 }
 
+const trackerFieldLabels = {
+  id: "ID no Tracker",
+  nome: "Nome registrado",
+  surgery_type: "Tipo de cirurgia",
+  procedure_name: "Procedimento",
+  tipo: "Tipo de cirurgia",
+  procedimento: "Procedimento",
+  medico: "Médico",
+  observacoes: "Observações",
+  observations: "Observações",
+  necroses: "Necroses"
+};
+
+function trackerDisplayValue(value) {
+  if (value === null || value === undefined || value === "") return "";
+  if (Array.isArray(value)) return value.map(trackerDisplayValue).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch (_) {
+      return "[valor indisponível]";
+    }
+  }
+  return String(value);
+}
+
+function trackerDateLabel(value) {
+  const raw = trackerDisplayValue(value).trim();
+  const isoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDate) return `${isoDate[3]}/${isoDate[2]}/${isoDate[1]}`;
+  return raw;
+}
+
+function trackerFieldLabel(key) {
+  return trackerFieldLabels[key] || key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function renderTrackerSurgery(match) {
+  const card = document.createElement("article");
+  card.className = "card mb-3 border-primary-subtle";
+
+  const body = document.createElement("div");
+  body.className = "card-body";
+
+  const header = document.createElement("div");
+  header.className = "d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3";
+
+  const title = document.createElement("h6");
+  title.className = "mb-0";
+  const date = trackerDateLabel(match.data);
+  title.textContent = date ? `Cirurgia em ${date}` : "Cirurgia registrada no Tracker";
+  header.appendChild(title);
+
+  const score = Number(match.match_score);
+  const label = {
+    exato: "Nome exato",
+    provavel: "Nome provável",
+    possivel: "Nome possível"
+  }[match.match_label] || "Correspondência";
+  const badge = document.createElement("span");
+  badge.className = "badge text-bg-info";
+  badge.textContent = Number.isFinite(score)
+    ? `${label} · ${Math.round(score * 100)}%`
+    : label;
+  header.appendChild(badge);
+  body.appendChild(header);
+
+  const details = document.createElement("dl");
+  details.className = "row small mb-0";
+  const excludedFields = new Set(["data", "match_score", "match_label", "necroses"]);
+  Object.entries(match).forEach(([key, value]) => {
+    if (excludedFields.has(key)) return;
+    const text = trackerDisplayValue(value);
+    if (!text) return;
+
+    const term = document.createElement("dt");
+    term.className = "col-sm-4 text-muted";
+    term.textContent = trackerFieldLabel(key);
+    const definition = document.createElement("dd");
+    definition.className = "col-sm-8";
+    definition.style.whiteSpace = "pre-wrap";
+    definition.textContent = text;
+    details.append(term, definition);
+  });
+  if (details.childElementCount) body.appendChild(details);
+
+  const necroses = trackerDisplayValue(match.necroses);
+  if (necroses) {
+    const note = document.createElement("p");
+    note.className = "small mt-3 mb-0";
+    const label = document.createElement("strong");
+    label.textContent = "Necroses: ";
+    note.append(label, document.createTextNode(necroses));
+    body.appendChild(note);
+  }
+
+  card.appendChild(body);
+  return card;
+}
+
+async function loadTrackerSurgeries() {
+  const patientId = getPatientId();
+  const button = document.getElementById("trackerSurgerySearchButton");
+  const status = document.getElementById("trackerSurgeryStatus");
+  const list = document.getElementById("trackerSurgeriesList");
+  if (!patientId || !button || !status || !list) return;
+
+  button.disabled = true;
+  status.textContent = "Consultando o CapillaryTracker…";
+  list.replaceChildren();
+
+  try {
+    const data = await core.fetchJson(`/api/patient/${patientId}/tracker-surgeries`);
+    const matches = Array.isArray(data?.matches) ? data.matches : [];
+    if (!matches.length) {
+      status.textContent = "Nenhuma cirurgia correspondente encontrada no Tracker.";
+      return;
+    }
+
+    status.textContent = `${matches.length} cirurgia(s) encontrada(s) no CapillaryTracker.`;
+    matches.forEach((match) => list.appendChild(renderTrackerSurgery(match)));
+  } catch (error) {
+    status.textContent = error?.message || "Não foi possível consultar o CapillaryTracker.";
+    status.classList.remove("text-muted");
+    status.classList.add("text-danger");
+  } finally {
+    button.disabled = false;
+  }
+}
+
 /* =========================
    TIMELINE LOAD
 ========================= */

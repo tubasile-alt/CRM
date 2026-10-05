@@ -1,6 +1,6 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, abort, current_app, jsonify, request
 from flask_login import login_required, current_user
-from models import db, TransplantSurgeryRecord, SurgeryEvolution
+from models import db, Patient, PatientDoctor, TransplantSurgeryRecord, SurgeryEvolution
 from datetime import datetime
 from services.access_control import can_manage_owned_record
 
@@ -36,6 +36,63 @@ def get_patient_surgeries(patient_id):
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@patient_bp.route('/<int:patient_id>/tracker-surgeries', methods=['GET'])
+@login_required
+def get_tracker_surgeries(patient_id):
+    """Consulta cirurgias do Tracker sem gravar dados no CRM."""
+    patient = Patient.query.get_or_404(patient_id)
+
+    is_admin = current_user.is_admin()
+    is_secretary = current_user.is_secretary()
+    is_assigned_doctor = (
+        current_user.is_doctor()
+        and PatientDoctor.query.filter_by(
+            patient_id=patient_id,
+            doctor_id=current_user.id,
+        ).first()
+        is not None
+    )
+    if not (is_admin or is_secretary or is_assigned_doctor):
+        abort(403)
+
+    from services.capillary_tracker import TrackerNotConfigured, search_by_name
+
+    try:
+        matches = search_by_name(patient.name)
+    except TrackerNotConfigured:
+        current_app.logger.warning(
+            "CapillaryTracker não configurado ou recusou a solicitação"
+        )
+        response = jsonify({
+            'error': 'CapillaryTracker indisponível ou configuração incompleta.'
+        })
+        response.status_code = 503
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+    except Exception as exc:
+        # Não registrar a mensagem da exceção: ela pode conter o nome pesquisado.
+        current_app.logger.warning(
+            "Falha ao consultar CapillaryTracker (error_type=%s)",
+            type(exc).__name__,
+        )
+        response = jsonify({
+            'error': 'Não foi possível consultar o CapillaryTracker. Tente novamente.'
+        })
+        response.status_code = 502
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    response = jsonify({
+        'success': True,
+        'source': 'CapillaryTracker',
+        'read_only': True,
+        'matches': matches,
+    })
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
 
 @patient_bp.route('/<int:patient_id>/surgery', methods=['POST'])
 @login_required

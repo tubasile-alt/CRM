@@ -1526,6 +1526,29 @@
             <div id="surgeriesList" class="mb-3">
               <p class="text-muted text-center">Carregando cirurgias...</p>
             </div>
+
+            <div class="card mt-4 border-primary-subtle" id="trackerSurgeryCard">
+              <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <div>
+                  <h6 class="mb-1">CapillaryTracker</h6>
+                  <small class="text-muted">Consulta somente leitura. Os dados não são salvos no CRM.</small>
+                </div>
+                <button
+                  type="button"
+                  id="trackerSurgerySearchButton"
+                  class="btn btn-outline-primary btn-sm"
+                  onclick="loadTrackerSurgeries()"
+                >
+                  <i class="bi bi-search me-1"></i>Buscar cirurgias
+                </button>
+              </div>
+              <div class="card-body">
+                <p id="trackerSurgeryStatus" class="small text-muted mb-2" role="status" aria-live="polite">
+                  Clique em “Buscar cirurgias” para consultar o Tracker pelo nome do paciente.
+                </p>
+                <div id="trackerSurgeriesList"></div>
+              </div>
+            </div>
           </div>
 
           <div class="tab-pane fade" id="data-consulta">
