@@ -3917,9 +3917,24 @@ async function registerTrackerSurgery(match, button) {
     showAlert("A cirurgia não tem uma data válida. Use o registro manual acima.", "warning");
     return;
   }
-  if (match.match_label !== "exato") {
-    showAlert("O registro direto exige correspondência exata do nome. Use o registro manual para conferir este caso.", "warning");
+  if (!["exato", "provavel"].includes(match.match_label)) {
+    showAlert("O registro direto exige correspondência exata ou provável. Use o registro manual para conferir este caso.", "warning");
     return;
+  }
+
+  if (match.match_label === "provavel") {
+    const currentPatientName =
+      window.__PRONTUARIO_CONFIG?.patientName || window.patientName || "Paciente atual";
+    const trackerName = trackerDisplayValue(match.nome) || "Nome não informado";
+    const score = Number(match.match_score);
+    const scoreText = Number.isFinite(score) ? ` (${Math.round(score * 100)}%)` : "";
+    const confirmed = confirm(
+      `A correspondência é provável, não exata.${scoreText}\n\n` +
+      `Paciente aberto no CRM: ${currentPatientName}\n` +
+      `Nome retornado pelo Tracker: ${trackerName}\n\n` +
+      "Confirma que é a mesma pessoa e deseja registrar esta cirurgia no prontuário?"
+    );
+    if (!confirmed) return;
   }
 
   const sourceMarker = trackerSurgerySourceMarker(match, surgeryDate);
@@ -4008,18 +4023,21 @@ function renderTrackerSurgery(match) {
 
   if (canEditClinical()) {
     const surgeryDate = trackerDateForApi(match.data);
-    if (match.match_label === "exato" && surgeryDate) {
+    if (["exato", "provavel"].includes(match.match_label) && surgeryDate) {
       const registerButton = document.createElement("button");
       registerButton.type = "button";
       registerButton.className = "btn btn-sm btn-success";
       registerButton.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Registrar cirurgia';
+      if (match.match_label === "provavel") {
+        registerButton.title = "Correspondência provável: será necessário confirmar o paciente antes do registro.";
+      }
       registerButton.addEventListener("click", () => registerTrackerSurgery(match, registerButton));
       header.appendChild(registerButton);
     } else {
       const hint = document.createElement("small");
       hint.className = "text-muted";
-      hint.textContent = match.match_label !== "exato"
-        ? "Correspondência não exata: confira e use o registro manual."
+      hint.textContent = !["exato", "provavel"].includes(match.match_label)
+        ? "Correspondência possível: use o registro manual para conferir."
         : "Sem data válida: use o registro manual.";
       header.appendChild(hint);
     }
