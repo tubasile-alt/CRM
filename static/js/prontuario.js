@@ -1078,8 +1078,26 @@ function getPlanExecutions(planId) {
   return planExecutionsByPlanId[String(planId)] || [];
 }
 
+function getExecutionStatus(execution) {
+  return execution.execution_status || (execution.was_performed ? "realizada" : "agendada");
+}
+
+// Sessão agendada ainda não realizada (ex.: criada por "Refazer"); a mais próxima primeiro.
+function getPlanPendingExecution(plan) {
+  return getPlanExecutions(plan.id)
+    .filter((execution) => getExecutionStatus(execution) === "agendada")
+    .sort((a, b) => String(a.scheduled_date || "").localeCompare(String(b.scheduled_date || "")))[0] || null;
+}
+
+function getPlanLastRealizedExecution(plan) {
+  return getPlanExecutions(plan.id)
+    .filter((execution) => getExecutionStatus(execution) === "realizada")
+    .sort((a, b) => String(b.performed_date || "").localeCompare(String(a.performed_date || "")))[0] || null;
+}
+
+// Realizado = já tem sessão feita e nenhuma nova sessão agendada pendente.
 function getPlanPerformed(plan) {
-  return getPlanExecutions(plan.id).some((execution) => (execution.execution_status || (execution.was_performed ? "realizada" : "agendada")) === "realizada");
+  return Boolean(getPlanLastRealizedExecution(plan)) && !getPlanPendingExecution(plan);
 }
 
 function getPlanRealizedValue(plan) {
@@ -1179,21 +1197,27 @@ function renderCosmeticSummaryCards(summary, contextLabel) {
 }
 
 function renderProcedureCard(proc) {
-  const value = parseFloat(proc.budget ?? proc.value) || 0;
   const executions = getPlanExecutions(proc.id);
-  const lastExecution = executions[0] || null;
+  const pendingExecution = getPlanPendingExecution(proc);
+  const lastRealized = getPlanLastRealizedExecution(proc);
   const performed = getPlanPerformed(proc);
-  const performedDateText = lastExecution
-    ? `${lastExecution.performed_date ? formatDateBR(lastExecution.performed_date) : "-"}`
-    : "-";
+  const value = pendingExecution && pendingExecution.charged_value !== null && pendingExecution.charged_value !== undefined
+    ? parseFloat(pendingExecution.charged_value) || 0
+    : parseFloat(proc.budget ?? proc.value) || 0;
+  const performedDateText = lastRealized?.performed_date ? formatDateBR(lastRealized.performed_date) : "-";
   const iconClass = performed
     ? "bi-check-circle-fill text-success"
-    : "bi-x-circle-fill text-danger";
+    : pendingExecution
+      ? "bi-clock-fill text-warning"
+      : "bi-x-circle-fill text-danger";
+  const editTarget = pendingExecution || lastRealized || executions[0] || null;
 
   const procIndex = cosmeticPlans.indexOf(proc);
-  const markDoneAction = proc.id
-    ? `performCosmeticProcedure(${proc.id}, '${core.escapeHtml(proc.name)}')`
-    : `saveProcThenMarkDone(${procIndex}, '${core.escapeHtml(proc.name)}')`;
+  const markDoneAction = pendingExecution
+    ? `completeScheduledExecution(${pendingExecution.id})`
+    : proc.id
+      ? `performCosmeticProcedure(${proc.id}, '${core.escapeHtml(proc.name)}')`
+      : `saveProcThenMarkDone(${procIndex}, '${core.escapeHtml(proc.name)}')`;
 
   return `
     <div class="card mb-2 border-0 shadow-sm ${performed ? "opacity-75" : ""}">
@@ -1213,7 +1237,10 @@ function renderProcedureCard(proc) {
                   ${core.escapeHtml(proc.observations)}
                 </div>` : ''}
                 <div class="text-muted small">R$ ${formatMoneyBRL(value)}</div>
-                <div class="small text-muted mt-1">Realizado em: ${core.escapeHtml(performedDateText)}</div>
+                <div class="small text-muted mt-1">${pendingExecution && lastRealized ? "Último realizado" : "Realizado em"}: ${core.escapeHtml(performedDateText)}</div>
+                ${pendingExecution ? `<div class="small fw-semibold text-warning-emphasis mt-1">
+                  <i class="bi bi-arrow-repeat"></i> Nova sessão: ${pendingExecution.scheduled_date ? formatDateBR(pendingExecution.scheduled_date) : "-"}
+                </div>` : ''}
               </div>
             </div>
           </div>
@@ -1221,7 +1248,10 @@ function renderProcedureCard(proc) {
             ${!performed ? `<button class="btn btn-sm btn-outline-success py-1 px-2" title="Marcar como realizado" onclick="${markDoneAction}">
               <i class="bi bi-check-lg"></i>
             </button>` : ''}
-            ${executions.length > 0 ? `<button class="btn btn-sm btn-outline-primary py-1 px-2" title="Editar execução" onclick="promptEditExecution(${executions[0].id})">
+            ${performed && proc.id ? `<button class="btn btn-sm btn-outline-success py-1 px-2" title="Refazer ${core.escapeHtml(proc.procedure_name || proc.name)}" onclick="promptRedoProcedure(${proc.id})">
+              <i class="bi bi-arrow-repeat"></i> Refazer
+            </button>` : ''}
+            ${editTarget ? `<button class="btn btn-sm btn-outline-primary py-1 px-2" title="Editar execução" onclick="promptEditExecution(${editTarget.id})">
               <i class="bi bi-pencil"></i>
             </button>` : ''}
             <button class="btn btn-sm btn-outline-danger py-1 px-2" title="Deletar planejamento" onclick="deleteCosmeticPlan(${proc.id ?? 'null'}, '${core.escapeHtml(proc.name)}', ${procIndex})">
@@ -2597,6 +2627,142 @@ async function performCosmeticProcedure(planId, procedureName, consultationId = 
     }
     await loadExistingPlans();
     showAlert("Procedimento marcado como realizado", "success");
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao registrar realização", "danger");
+  }
+}
+
+function getLocalTodayISO() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function openRedoProcedureModal(defaults = {}) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById("redoProcedureModal");
+    const titleEl = document.getElementById("redoProcedureModalTitle");
+    const dateEl = document.getElementById("redoProcedureDate");
+    const valueEl = document.getElementById("redoProcedureValue");
+    const confirmBtn = document.getElementById("confirmRedoProcedure");
+
+    if (!modalEl || !dateEl || !valueEl || !confirmBtn || !window.bootstrap) {
+      showAlert("Erro ao abrir modal", "danger");
+      resolve(null);
+      return;
+    }
+
+    if (titleEl) {
+      titleEl.innerHTML = `<i class="bi bi-arrow-repeat"></i> Refazer ${core.escapeHtml(defaults.procedureName || "procedimento")}`;
+    }
+    dateEl.value = defaults.date || getLocalTodayISO();
+    valueEl.value = defaults.value ?? "";
+
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+    let settled = false;
+    const cleanup = () => {
+      confirmBtn.removeEventListener("click", onConfirm);
+      modalEl.removeEventListener("hidden.bs.modal", onHidden);
+    };
+
+    const onConfirm = () => {
+      settled = true;
+      cleanup();
+      modal.hide();
+      resolve({ date: dateEl.value || null, value: valueEl.value });
+    };
+
+    const onHidden = () => {
+      if (!settled) {
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    confirmBtn.addEventListener("click", onConfirm);
+    modalEl.addEventListener("hidden.bs.modal", onHidden);
+    modal.show();
+  });
+}
+
+// "Refazer": cria nova sessão agendada no mesmo plano; ela volta ao card como pendente.
+async function promptRedoProcedure(planId) {
+  const plan = cosmeticPlans.find((p) => Number(p.id) === Number(planId));
+  if (!plan) {
+    showAlert("Procedimento não encontrado. Tente recarregar a página.", "danger");
+    return;
+  }
+
+  const lastRealized = getPlanLastRealizedExecution(plan);
+  const lastValue = lastRealized && lastRealized.charged_value !== null && lastRealized.charged_value !== undefined
+    ? lastRealized.charged_value
+    : null;
+
+  const result = await openRedoProcedureModal({
+    procedureName: plan.procedure_name || plan.name,
+    value: lastValue ?? (parseFloat(plan.budget ?? plan.value) || 0)
+  });
+  if (!result) return;
+
+  if (!result.date) {
+    showAlert("Informe a data da nova sessão", "warning");
+    return;
+  }
+
+  const payload = normalizeCosmeticExecutionPayload({
+    execution_status: "agendada",
+    scheduled_date: result.date,
+    charged_value: result.value
+  });
+  if (payload.charged_value !== null && (isNaN(payload.charged_value) || payload.charged_value < 0)) {
+    showAlert("Valor inválido", "warning");
+    return;
+  }
+
+  try {
+    const response = await createExecution(planId, payload);
+    if (!response.success) {
+      showAlert(response.error || "Erro ao registrar nova sessão", "danger");
+      return;
+    }
+    await loadExistingPlans();
+    showAlert("Nova sessão adicionada ao planejamento. Marque ✓ quando for realizada.", "success");
+  } catch (error) {
+    console.error(error);
+    showAlert("Erro ao registrar nova sessão", "danger");
+  }
+}
+
+// ✓ numa sessão agendada: marca como realizada (sem criar outra) e envia ao checkout.
+async function completeScheduledExecution(executionId) {
+  const entry = Object.values(planExecutionsByPlanId).flat().find((e) => Number(e.id) === Number(executionId));
+  if (!entry) return;
+
+  const payload = await openSimplifiedExecutionModal({
+    performed_date: getLocalTodayISO()
+  });
+  if (!payload) return;
+
+  if (!payload.performed_date) {
+    showAlert("Data de realização é obrigatória", "warning");
+    return;
+  }
+
+  try {
+    const result = await updateExecution(executionId, {
+      execution_status: "realizada",
+      performed_date: payload.performed_date,
+      followup_status: "pendente"
+    });
+    if (!result.success) {
+      showAlert(result.error || "Erro ao registrar realização", "danger");
+      return;
+    }
+    await loadExistingPlans();
+    showAlert("Procedimento marcado como realizado e enviado ao checkout", "success");
   } catch (error) {
     console.error(error);
     showAlert("Erro ao registrar realização", "danger");
@@ -4303,6 +4469,8 @@ window.promptCreateExecution = promptCreateExecution;
 window.promptEditExecution = promptEditExecution;
 window.removeExecution = removeExecution;
 window.performCosmeticProcedure = performCosmeticProcedure;
+window.promptRedoProcedure = promptRedoProcedure;
+window.completeScheduledExecution = completeScheduledExecution;
 window.updatePlanName = updatePlanName;
 window.generateBudget = generateBudget;
 window.highlightConsultationGroup = highlightConsultationGroup;

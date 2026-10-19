@@ -141,6 +141,63 @@ class FinancialCheckoutTests(unittest.TestCase):
             names = [item['name'] for item in payment.procedures]
             self.assertEqual(names, ['Consulta Particular', 'Botox'])
 
+    @patch('threading.Thread')
+    def test_completing_scheduled_redo_session_creates_checkout(self, thread_mock):
+        self.login(self.doctor_id)
+
+        created = self.client.post(
+            f'/api/cosmetic-plans/{self.plan_id}/executions',
+            json={
+                'execution_status': 'agendada',
+                'scheduled_date': '2026-10-19',
+                'charged_value': 1300,
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertIsNone(created.get_json()['payment_id'])
+        execution_id = created.get_json()['execution']['id']
+
+        with self.app.app_context():
+            self.assertEqual(Payment.query.count(), 0)
+
+        response = self.client.put(
+            f'/api/executions/{execution_id}',
+            json={'execution_status': 'realizada', 'performed_date': '2026-10-19'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertTrue(body['success'])
+        self.assertIsNotNone(body['payment_id'])
+        thread_mock.assert_called_once()
+
+        with self.app.app_context():
+            payment = Payment.query.one()
+            self.assertEqual(payment.status, 'pendente')
+            botox_items = [item for item in payment.procedures if item.get('execution_id') == execution_id]
+            self.assertEqual(len(botox_items), 1)
+            self.assertEqual(botox_items[0]['value'], 1300.0)
+
+    @patch('threading.Thread')
+    def test_editing_already_realized_session_does_not_create_new_checkout(self, thread_mock):
+        self.login(self.doctor_id)
+
+        created = self.client.post(
+            f'/api/cosmetic-plans/{self.plan_id}/executions',
+            json={'execution_status': 'realizada', 'performed_date': '2026-07-15', 'charged_value': 850},
+        )
+        execution_id = created.get_json()['execution']['id']
+
+        response = self.client.put(
+            f'/api/executions/{execution_id}',
+            json={'execution_status': 'realizada', 'performed_date': '2026-07-15', 'notes': 'ajuste'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.get_json()['payment_id'])
+        with self.app.app_context():
+            self.assertEqual(Payment.query.count(), 1)
+
     def test_checkout_list_separates_today_and_old_pending(self):
         today = get_brazil_time()
         old_day = today - timedelta(days=3)

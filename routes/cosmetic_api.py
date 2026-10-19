@@ -211,6 +211,7 @@ def update_execution(execution_id):
 
     execution = ProcedureExecution.query.get_or_404(execution_id)
     data = request.get_json(silent=True) or {}
+    previous_status = (execution.execution_status or ('realizada' if execution.was_performed else 'agendada')).lower()
 
     if 'scheduled_date' in data:
         execution.scheduled_date = _parse_date_or_datetime(data.get('scheduled_date'))
@@ -252,8 +253,20 @@ def update_execution(execution_id):
     
     was_realizado = execution.execution_status == 'realizada'
 
+    # Sessão agendada concluída agora (ex.: "Refazer" → ✓): envia ao checkout da secretaria.
+    payment = None
+    if was_realizado and previous_status != 'realizada':
+        db.session.flush()
+        payment = ensure_checkout_for_execution(execution.plan, execution)
+
     db.session.commit()
-    app.logger.info('execution_updated id=%s plan_id=%s user_id=%s', execution.id, execution.plan_id, current_user.id)
+    app.logger.info(
+        'execution_updated id=%s plan_id=%s user_id=%s payment_id=%s',
+        execution.id,
+        execution.plan_id,
+        current_user.id,
+        payment.id if payment else None,
+    )
     
     # Sincronizar com Google Sheets se foi marcado como realizado
     if was_realizado:
@@ -318,8 +331,12 @@ def update_execution(execution_id):
             thread.start()
         except Exception as e:
             app.logger.error(f'Erro ao iniciar sincronização Google Sheets: {e}')
-    
-    return jsonify({'success': True, 'execution': _serialize_execution(execution)})
+
+    return jsonify({
+        'success': True,
+        'execution': _serialize_execution(execution),
+        'payment_id': payment.id if payment else None,
+    })
 
 
 @cosmetic_api_bp.route('/api/executions/<int:execution_id>', methods=['DELETE'])
