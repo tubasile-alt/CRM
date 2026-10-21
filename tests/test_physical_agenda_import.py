@@ -269,6 +269,49 @@ class PhysicalAgendaImportRouteTests(unittest.TestCase):
         self.assertTrue(response.get_json()['suggestions'])
         self.assertEqual(patients_before, patients_after)
 
+    def test_short_name_requires_review_before_provisional_creation(self):
+        with self.app.app_context():
+            patient = Patient(
+                name='PRISCILA ABEM ATHAR PARENTE',
+                status_cadastral='ativo',
+            )
+            db.session.add(patient)
+            db.session.flush()
+            db.session.add(PatientDoctor(
+                patient_id=patient.id,
+                doctor_id=self.doctor_id,
+                patient_code=1002,
+            ))
+            db.session.commit()
+            patient_id = patient.id
+            patients_before = Patient.query.count()
+
+        response = self.client.post('/api/agenda-fisica/pacientes-provisorios', json={
+            'doctor_id': self.doctor_id,
+            'patient_name': 'PRISCILA PARENTE',
+        })
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.get_json()['suggestions'][0]['patient_name'],
+            'PRISCILA ABEM ATHAR PARENTE',
+        )
+        with self.app.app_context():
+            self.assertEqual(Patient.query.count(), patients_before)
+
+        confirmed = self.client.post('/api/agenda-fisica/pacientes-provisorios', json={
+            'doctor_id': self.doctor_id,
+            'patient_name': 'PRISCILA PARENTE',
+            'confirm_no_match': True,
+        })
+        self.assertEqual(confirmed.status_code, 201)
+        created_id = confirmed.get_json()['patient']['patient_id']
+        with self.app.app_context():
+            PatientDoctor.query.filter_by(patient_id=created_id).delete()
+            Patient.query.filter_by(id=created_id).delete()
+            PatientDoctor.query.filter_by(patient_id=patient_id).delete()
+            Patient.query.filter_by(id=patient_id).delete()
+            db.session.commit()
+
     def test_existing_provisional_is_reused_instead_of_duplicated(self):
         response = self.client.post('/api/agenda-fisica/pacientes-provisorios', json={
             'doctor_id': self.doctor_id,

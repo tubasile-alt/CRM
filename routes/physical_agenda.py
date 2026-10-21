@@ -249,11 +249,13 @@ def create_provisional_patient():
 
     active_suggestions = suggest_active_patients(patient_name, phone, doctor_id)
     strong_matches = [suggestion for suggestion in active_suggestions if suggestion['score'] >= 0.9]
-    if strong_matches:
+    confirmed_no_match = data.get('confirm_no_match') is True
+    if strong_matches or (active_suggestions and not confirmed_no_match):
+        suggestions_to_review = strong_matches or active_suggestions
         return _error_with_data(
-            'Paciente ativo semelhante encontrado. Selecione o cadastro existente.',
+            'Encontramos paciente(s) ativo(s) semelhante(s). Selecione um cadastro ou confirme que nenhum corresponde.',
             409,
-            suggestions=strong_matches,
+            suggestions=suggestions_to_review,
         )
 
     existing_provisional = find_equivalent_provisional(patient_name, phone, doctor_id)

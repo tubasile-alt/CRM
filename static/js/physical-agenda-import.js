@@ -338,7 +338,7 @@
         cell.append(badge, name, changeButton);
     }
 
-    function createProvisionalButton(row, container) {
+    function createProvisionalButton(row, container, confirmNoMatch = false) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'btn btn-sm btn-outline-warning mt-1';
@@ -367,6 +367,7 @@
                         doctor_id: doctorSelect.value,
                         patient_name: patientName,
                         phone,
+                        confirm_no_match: confirmNoMatch,
                     }),
                 });
                 const data = await response.json().catch(() => null);
@@ -446,7 +447,7 @@
                 delete row.dataset.patientId;
                 delete row.dataset.patientStatus;
                 setValidationState(row, 'Criará provisório', 'text-warning');
-                createProvisionalButton(row, actionArea);
+                createProvisionalButton(row, actionArea, true);
                 return;
             }
             const option = select.options[select.selectedIndex];

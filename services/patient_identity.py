@@ -85,7 +85,16 @@ def find_possible_duplicate_patients(name, doctor_id=None, limit=8):
         if not cand_norm:
             continue
         ratio = SequenceMatcher(None, target, cand_norm).ratio()
-        if cand_norm == target or ratio >= 0.85:
+        target_tokens = set(target.split())
+        candidate_tokens = set(cand_norm.split())
+        token_subset_match = (
+            min(len(target_tokens), len(candidate_tokens)) >= 2
+            and (
+                target_tokens <= candidate_tokens
+                or candidate_tokens <= target_tokens
+            )
+        )
+        if cand_norm == target or ratio >= 0.85 or token_subset_match:
             code = None
             if doctor_id:
                 pd = PatientDoctor.query.filter_by(

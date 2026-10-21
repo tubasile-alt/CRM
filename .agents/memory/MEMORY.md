@@ -1,4 +1,5 @@
 - [Patient code policy](patient-code-policy.md) — new codes start at 1001; uniqueness via PARTIAL unique index (WHERE patient_code>=1001) so historical dupes (264) survive; never plain UNIQUE until FASE 2.
+- [Patient duplicate review](patient-duplicate-review.md) — do not silently create from weak name candidates; require review and an explicit “none match” decision, while keeping strong identifier matches blocked.
 - [Preview workflow orphan process](preview-workflow-quirk.md) — a stale Flask process can occupy port 5000 while the workflow appears healthy but preview connections fail.
 - [Autoscale cold-start readiness](autoscale-cold-start.md) — preload the Flask app before Gunicorn exposes its socket so health checks cannot reach half-loaded workers.
 - [Deployment static asset cache](deployment-static-cache.md) — reuse of a fixed asset version can leave production serving JavaScript older than the current source.
