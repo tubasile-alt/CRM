@@ -3972,7 +3972,18 @@ async function loadSurgeries() {
 
 const trackerFieldLabels = {
   id: "ID no Tracker",
-  nome: "Nome registrado",
+  nome: "Nome completo",
+  nome_completo: "Nome completo",
+  full_name: "Nome completo",
+  patient_name: "Nome completo",
+  unidade: "Unidade",
+  unit: "Unidade",
+  unidade_nome: "Unidade",
+  unit_name: "Unidade",
+  nome_unidade: "Unidade",
+  clinic: "Unidade",
+  clinic_name: "Unidade",
+  location: "Unidade",
   surgery_type: "Tipo de cirurgia",
   procedure_name: "Procedimento",
   tipo: "Tipo de cirurgia",
@@ -4039,6 +4050,23 @@ function trackerFieldLabel(key) {
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[_-]+/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function trackerCandidateField(match, aliases) {
+  const normalizeKey = (value) => String(value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  const values = Object.entries(match || {});
+  for (const alias of aliases) {
+    const normalizedAlias = normalizeKey(alias);
+    const entry = values.find(([key, value]) =>
+      normalizeKey(key) === normalizedAlias && trackerDisplayValue(value).trim()
+    );
+    if (entry) return trackerDisplayValue(entry[1]).trim();
+  }
+  return "";
 }
 
 function trackerSurgeryDetails(match) {
@@ -4165,14 +4193,37 @@ function renderTrackerSurgery(match) {
   const body = document.createElement("div");
   body.className = "card-body";
 
-  const header = document.createElement("div");
-  header.className = "d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3";
+  const disclosure = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.className = "d-flex flex-wrap justify-content-between align-items-center gap-2";
+  summary.style.cursor = "pointer";
 
-  const title = document.createElement("h6");
-  title.className = "mb-0";
-  const date = trackerDateLabel(match.data);
-  title.textContent = date ? `Cirurgia em ${date}` : "Cirurgia registrada no Tracker";
-  header.appendChild(title);
+  const name = trackerCandidateField(match, [
+    "nome",
+    "nome_completo",
+    "full_name",
+    "patient_name",
+    "nome_paciente"
+  ]) || "Nome não informado";
+  const nameLabel = document.createElement("strong");
+  nameLabel.textContent = name;
+  summary.appendChild(nameLabel);
+
+  const unit = trackerCandidateField(match, [
+    "unidade",
+    "unit",
+    "unidade_nome",
+    "unit_name",
+    "nome_unidade",
+    "clinic",
+    "clinic_name",
+    "location",
+    "filial"
+  ]) || "Unidade não informada";
+  const unitLabel = document.createElement("span");
+  unitLabel.className = "small text-muted";
+  unitLabel.textContent = `Unidade: ${unit}`;
+  summary.appendChild(unitLabel);
 
   const score = Number(match.match_score);
   const label = {
@@ -4185,7 +4236,19 @@ function renderTrackerSurgery(match) {
   badge.textContent = Number.isFinite(score)
     ? `${label} · ${Math.round(score * 100)}%`
     : label;
-  header.appendChild(badge);
+  summary.appendChild(badge);
+  disclosure.appendChild(summary);
+
+  const expanded = document.createElement("div");
+  expanded.className = "pt-3";
+  const header = document.createElement("div");
+  header.className = "d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3";
+
+  const title = document.createElement("h6");
+  title.className = "mb-0";
+  const date = trackerDateLabel(match.data);
+  title.textContent = date ? `Cirurgia em ${date}` : "Cirurgia registrada no Tracker";
+  header.appendChild(title);
 
   if (canEditClinical()) {
     const surgeryDate = trackerDateForApi(match.data);
@@ -4208,7 +4271,7 @@ function renderTrackerSurgery(match) {
       header.appendChild(hint);
     }
   }
-  body.appendChild(header);
+  expanded.appendChild(header);
 
   const details = document.createElement("dl");
   details.className = "row small mb-0";
@@ -4227,7 +4290,7 @@ function renderTrackerSurgery(match) {
     definition.textContent = text;
     details.append(term, definition);
   });
-  if (details.childElementCount) body.appendChild(details);
+  if (details.childElementCount) expanded.appendChild(details);
 
   const necroses = trackerDisplayValue(match.necroses);
   if (necroses) {
@@ -4236,9 +4299,11 @@ function renderTrackerSurgery(match) {
     const label = document.createElement("strong");
     label.textContent = "Necroses: ";
     note.append(label, document.createTextNode(necroses));
-    body.appendChild(note);
+    expanded.appendChild(note);
   }
 
+  disclosure.appendChild(expanded);
+  body.appendChild(disclosure);
   card.appendChild(body);
   return card;
 }
