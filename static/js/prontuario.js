@@ -4262,7 +4262,16 @@ async function loadTrackerSurgeries() {
       return;
     }
 
-    status.textContent = `${matches.length} cirurgia(s) encontrada(s) no CapillaryTracker.`;
+    const hasExactMatch = matches.some((match) => match?.match_label === "exato");
+    status.classList.remove("text-danger", "text-warning");
+    if (hasExactMatch) {
+      status.classList.add("text-muted");
+      status.textContent = `${matches.length} cirurgia(s) encontrada(s) no CapillaryTracker, incluindo correspondência exata.`;
+    } else {
+      status.classList.remove("text-muted");
+      status.classList.add("text-warning");
+      status.textContent = `Não encontrei correspondência exata. Mostrando ${matches.length} opção(ões) parecida(s); confira o nome e os dados antes de registrar.`;
+    }
     matches.forEach((match) => list.appendChild(renderTrackerSurgery(match)));
   } catch (error) {
     status.textContent = error?.message || "Não foi possível consultar o CapillaryTracker.";
