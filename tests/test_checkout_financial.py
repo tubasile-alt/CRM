@@ -6,7 +6,7 @@ from unittest.mock import patch
 from flask import Flask
 from flask_login import LoginManager
 
-from models import Appointment, CosmeticProcedurePlan, Note, Patient, Payment, User, db
+from models import Appointment, CosmeticProcedurePlan, Note, Patient, Payment, ProcedureExecution, User, db
 from routes.checkout_api import checkout_api_bp
 from routes.cosmetic_api import cosmetic_api_bp
 from services.clinic_time import get_brazil_time
@@ -145,10 +145,21 @@ class FinancialCheckoutTests(unittest.TestCase):
     def test_completing_scheduled_redo_session_creates_checkout(self, thread_mock):
         self.login(self.doctor_id)
 
+        with self.app.app_context():
+            original_execution = ProcedureExecution(
+                plan_id=self.plan_id,
+                execution_status='realizada',
+                was_performed=True,
+                performed_date=datetime(2026, 7, 15),
+                charged_value=850,
+            )
+            db.session.add(original_execution)
+            db.session.commit()
+            original_execution_id = original_execution.id
+
         created = self.client.post(
-            f'/api/cosmetic-plans/{self.plan_id}/executions',
+            f'/api/cosmetic-plans/{self.plan_id}/redo',
             json={
-                'execution_status': 'agendada',
                 'scheduled_date': '2026-10-19',
                 'charged_value': 1300,
             },
@@ -156,9 +167,15 @@ class FinancialCheckoutTests(unittest.TestCase):
         self.assertEqual(created.status_code, 201)
         self.assertIsNone(created.get_json()['payment_id'])
         execution_id = created.get_json()['execution']['id']
+        new_plan_id = created.get_json()['plan']['id']
 
         with self.app.app_context():
             self.assertEqual(Payment.query.count(), 0)
+            self.assertEqual(CosmeticProcedurePlan.query.count(), 2)
+            self.assertNotEqual(new_plan_id, self.plan_id)
+            self.assertEqual(ProcedureExecution.query.get(original_execution_id).plan_id, self.plan_id)
+            self.assertEqual(ProcedureExecution.query.get(execution_id).plan_id, new_plan_id)
+            self.assertEqual(ProcedureExecution.query.get(execution_id).execution_status, 'agendada')
 
         response = self.client.put(
             f'/api/executions/{execution_id}',
@@ -177,6 +194,7 @@ class FinancialCheckoutTests(unittest.TestCase):
             botox_items = [item for item in payment.procedures if item.get('execution_id') == execution_id]
             self.assertEqual(len(botox_items), 1)
             self.assertEqual(botox_items[0]['value'], 1300.0)
+            self.assertEqual(botox_items[0]['plan_id'], new_plan_id)
 
     @patch('threading.Thread')
     def test_editing_already_realized_session_does_not_create_new_checkout(self, thread_mock):

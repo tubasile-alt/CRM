@@ -2133,6 +2133,14 @@ async function createExecution(planId, payload) {
   });
 }
 
+async function createIndependentRedoPlan(planId, payload) {
+  return core.fetchJson(`/api/cosmetic-plans/${planId}/redo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+    body: JSON.stringify(payload)
+  });
+}
+
 async function updateExecution(executionId, payload) {
   return core.fetchJson(`/api/executions/${executionId}`, {
     method: "PUT",
@@ -2688,7 +2696,7 @@ function openRedoProcedureModal(defaults = {}) {
   });
 }
 
-// "Refazer": cria nova sessão agendada no mesmo plano; ela volta ao card como pendente.
+// "Refazer": cria outro planejamento, com histórico e sessão próprios.
 async function promptRedoProcedure(planId) {
   const plan = cosmeticPlans.find((p) => Number(p.id) === Number(planId));
   if (!plan) {
@@ -2723,16 +2731,16 @@ async function promptRedoProcedure(planId) {
   }
 
   try {
-    const response = await createExecution(planId, payload);
+    const response = await createIndependentRedoPlan(planId, payload);
     if (!response.success) {
-      showAlert(response.error || "Erro ao registrar nova sessão", "danger");
+      showAlert(response.error || "Erro ao criar novo planejamento", "danger");
       return;
     }
     await loadExistingPlans();
-    showAlert("Nova sessão adicionada ao planejamento. Marque ✓ quando for realizada.", "success");
+    showAlert("Novo planejamento criado. Marque ✓ quando este Botox for realizado.", "success");
   } catch (error) {
     console.error(error);
-    showAlert("Erro ao registrar nova sessão", "danger");
+    showAlert("Erro ao criar novo planejamento", "danger");
   }
 }
 
