@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <title>Sala de espera · Clínica Basile</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #101114;
+            color: #f5f5f7;
+            font-synthesis: none;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-width: 220px;
+            overflow: hidden;
+            background: #101114;
+        }
+        .panel {
+            width: 100%;
+            max-height: 100vh;
+            overflow: auto;
+            padding: 12px 14px 14px;
+            border-radius: 0 0 16px 16px;
+            background: linear-gradient(145deg, #202126, #141518 72%);
+            box-shadow: 0 12px 32px #0008;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .title {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 650;
+            letter-spacing: .01em;
+        }
+        .count {
+            display: inline-grid;
+            min-width: 25px;
+            height: 25px;
+            padding: 0 7px;
+            place-items: center;
+            border: 1px solid #ffffff18;
+            border-radius: 999px;
+            background: #ffffff12;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .toggle {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 8px;
+            padding: 4px 0;
+            border: 0;
+            background: transparent;
+            color: #b7bbc5;
+            font: inherit;
+            font-size: 11px;
+            text-align: left;
+            cursor: pointer;
+        }
+        .toggle:focus-visible, .patient:focus-visible, .retry:focus-visible {
+            outline: 2px solid #87b8ff;
+            outline-offset: 3px;
+        }
+        .list {
+            display: grid;
+            gap: 7px;
+            margin-top: 8px;
+        }
+        .patient {
+            display: block;
+            width: 100%;
+            padding: 9px 10px;
+            border: 1px solid #ffffff12;
+            border-radius: 10px;
+            background: #ffffff08;
+            color: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+        .patient:hover { background: #ffffff12; }
+        .patient-name {
+            display: block;
+            overflow: hidden;
+            font-size: 12px;
+            font-weight: 600;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .patient-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 9px;
+            margin-top: 4px;
+            color: #adb2bd;
+            font-size: 10px;
+        }
+        .message {
+            margin: 10px 0 0;
+            color: #aeb3be;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        .message.error { color: #ffaaa8; }
+        .retry {
+            margin-top: 7px;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            color: #a9caff;
+            font: inherit;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+    <main class="panel">
+        <header class="header">
+            <h1 class="title">Sala de espera</h1>
+            <span class="count" id="patient-count" aria-label="Pacientes aguardando">—</span>
+        </header>
+        <button class="toggle" id="toggle-list" type="button" aria-expanded="true" aria-controls="waiting-list">
+            <span id="list-label">Carregando pacientes…</span>
+            <span id="toggle-icon" aria-hidden="true">⌃</span>
+        </button>
+        <section class="list" id="waiting-list" aria-live="polite"></section>
+        <p class="message" id="status-message" role="status" hidden></p>
+        <button class="retry" id="retry-button" type="button" hidden>Tentar novamente</button>
+    </main>
+    <script>
+        (() => {
+            const countNode = document.getElementById('patient-count');
+            const toggle = document.getElementById('toggle-list');
+            const list = document.getElementById('waiting-list');
+            const label = document.getElementById('list-label');
+            const icon = document.getElementById('toggle-icon');
+            const message = document.getElementById('status-message');
+            const retry = document.getElementById('retry-button');
+            let expanded = true;
+            let patientCount = 0;
+
+            function notifyNative(type, payload = {}) {
+                const handler = window.webkit?.messageHandlers?.notch;
+                if (!handler || typeof handler.postMessage !== 'function') return false;
+                handler.postMessage({ type, ...payload });
+                return true;
+            }
+
+            function setExpanded(value) {
+                expanded = value;
+                list.hidden = !expanded;
+                toggle.setAttribute('aria-expanded', String(expanded));
+                icon.textContent = expanded ? '⌃' : '⌄';
+                notifyNative('resize', { expanded, count: patientCount });
+            }
+
+            function addMeta(container, value) {
+                if (value === null || value === undefined || String(value).trim() === '') return;
+                const part = document.createElement('span');
+                part.textContent = String(value);
+                container.appendChild(part);
+            }
+
+            function openPatient(patientId) {
+                const id = Number(patientId);
+                if (!Number.isSafeInteger(id) || id <= 0) return;
+                const path = `/prontuario/${encodeURIComponent(id)}`;
+                if (!notifyNative('open', { path })) window.location.href = path;
+            }
+
+            function renderPatients(patients) {
+                list.replaceChildren();
+                patientCount = patients.length;
+                countNode.textContent = String(patientCount);
+                countNode.setAttribute('aria-label', `${patientCount} paciente(s) aguardando`);
+                label.textContent = patientCount === 1
+                    ? '1 paciente aguardando'
+                    : `${patientCount} pacientes aguardando`;
+                message.hidden = true;
+                retry.hidden = true;
+
+                if (patientCount === 0) {
+                    message.textContent = 'Nenhum paciente aguardando no momento.';
+                    message.className = 'message';
+                    message.hidden = false;
+                }
+
+                patients.forEach((patient) => {
+                    const patientId = patient.patient_id;
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'patient';
+                    button.disabled = !Number.isSafeInteger(Number(patientId)) || Number(patientId) <= 0;
+                    button.addEventListener('click', () => openPatient(patientId));
+
+                    const name = document.createElement('span');
+                    name.className = 'patient-name';
+                    name.textContent = patient.patient_name || 'Paciente';
+                    const meta = document.createElement('span');
+                    meta.className = 'patient-meta';
+                    addMeta(meta, patient.scheduled_time ? `Horário ${patient.scheduled_time}` : '');
+                    addMeta(meta, patient.doctor_name || patient.medico_name || patient.doctor);
+                    addMeta(meta, patient.room ? `Sala ${patient.room}` : '');
+                    const waitingMinutes = patient.wait_time_minutes ?? patient.wait_time;
+                    if (waitingMinutes !== null && waitingMinutes !== undefined && waitingMinutes !== '') {
+                        addMeta(meta, `${waitingMinutes} min de espera`);
+                    }
+                    button.append(name, meta);
+                    list.appendChild(button);
+                });
+                notifyNative('resize', { expanded, count: patientCount });
+            }
+
+            async function loadPatients() {
+                retry.hidden = true;
+                message.hidden = true;
+                label.textContent = 'Atualizando…';
+                try {
+                    const response = await fetch('/espera/api/list', {
+                        method: 'GET',
+                        credentials: 'same-origin',
+                        cache: 'no-store',
+                        headers: { Accept: 'application/json' },
+                    });
+                    if (response.redirected || response.status === 401) {
+                        throw new Error('session');
+                    }
+                    const contentType = response.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json')) {
+                        throw new Error(response.status === 200 ? 'session' : 'network');
+                    }
+                    if (!response.ok) throw new Error('network');
+                    const data = await response.json();
+                    if (!Array.isArray(data.waiting_list)) throw new Error('network');
+                    renderPatients(data.waiting_list);
+                } catch (error) {
+                    list.replaceChildren();
+                    message.className = 'message error';
+                    if (error.message === 'session') {
+                        message.textContent = 'Sua sessão expirou. Entre novamente para acessar a sala de espera.';
+                        const loginLink = document.createElement('a');
+                        loginLink.href = '/login?next=%2Fespera%2Fnotch';
+                        loginLink.textContent = ' Fazer login';
+                        loginLink.style.color = 'inherit';
+                        message.appendChild(loginLink);
+                        label.textContent = 'Sessão expirada';
+                    } else {
+                        message.textContent = 'Não foi possível carregar a sala de espera. Verifique sua conexão.';
+                        retry.hidden = false;
+                        label.textContent = 'Falha ao atualizar';
+                    }
+                    message.hidden = false;
+                }
+            }
+
+            toggle.addEventListener('click', () => setExpanded(!expanded));
+            retry.addEventListener('click', loadPatients);
+            setExpanded(true);
+            loadPatients();
+            window.setInterval(loadPatients, 30000);
+        })();
+    </script>
+</body>
+</html>

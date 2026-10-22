@@ -14,6 +14,12 @@ waiting_room_bp = Blueprint('waiting_room', __name__, url_prefix='/espera')
 waiting_service = WaitingService()
 logger = logging.getLogger(__name__)
 
+@waiting_room_bp.route('/notch', methods=['GET'])
+@login_required
+def notch():
+    """Interface compacta usada pelo aplicativo de notch do macOS."""
+    return render_template('waiting_room_notch.html')
+
 @waiting_room_bp.route('/api/checkin/<int:appointment_id>', methods=['POST'])
 @login_required
 def check_in(appointment_id):
