@@ -524,7 +524,9 @@ def login():
         
         if user and user.check_password(password):
             login_user(user, remember=True)
-            next_page = request.args.get('next')
+            next_page = request.args.get('next') or request.form.get('next')
+            if not next_page or not next_page.startswith('/') or next_page.startswith('//'):
+                next_page = None
             return redirect(next_page or url_for('index'))
         else:
             flash('Email ou senha incorretos.', 'danger')

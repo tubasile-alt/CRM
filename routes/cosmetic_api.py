@@ -158,6 +158,81 @@ def create_plan_execution(plan_id):
     }), 201
 
 
+@cosmetic_api_bp.route('/api/cosmetic-plans/<int:plan_id>/redo', methods=['POST'])
+@login_required
+def redo_cosmetic_plan(plan_id):
+    """Cria um novo planejamento independente para repetir um procedimento."""
+    if not current_user.is_doctor() and not current_user.is_secretary():
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    source_plan = CosmeticProcedurePlan.query.get_or_404(plan_id)
+    if current_user.is_doctor() and source_plan.note.doctor_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Não autorizado'}), 403
+
+    data = request.get_json(silent=True) or {}
+    scheduled_date = _parse_date_or_datetime(data.get('scheduled_date'))
+    if not scheduled_date:
+        return jsonify({'success': False, 'error': 'scheduled_date é obrigatório'}), 400
+
+    raw_value = data.get('charged_value')
+    if raw_value in (None, ''):
+        value = source_plan.final_budget or source_plan.planned_value
+    else:
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'charged_value inválido'}), 400
+        if value < 0:
+            return jsonify({'success': False, 'error': 'charged_value não pode ser negativo'}), 400
+
+    new_plan = CosmeticProcedurePlan(
+        note_id=source_plan.note_id,
+        name=source_plan.name,
+        procedure_name=source_plan.procedure_name,
+        status='ativo',
+        planned_value=value,
+        final_budget=value,
+        follow_up_months=source_plan.follow_up_months,
+        observations=source_plan.observations,
+    )
+
+    try:
+        db.session.add(new_plan)
+        db.session.flush()
+        execution = _build_execution_from_payload(new_plan, {
+            'execution_status': 'agendada',
+            'scheduled_date': scheduled_date.isoformat(),
+            'charged_value': value,
+            'notes': data.get('notes'),
+            'followup_status': 'pendente',
+        })
+        db.session.add(execution)
+        db.session.commit()
+    except ValueError as exc:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except Exception:
+        db.session.rollback()
+        app = current_app._get_current_object()
+        app.logger.exception('Falha ao criar planejamento independente a partir do plano %s', plan_id)
+        return jsonify({'success': False, 'error': 'Erro ao criar novo planejamento'}), 500
+
+    return jsonify({
+        'success': True,
+        'plan': {
+            'id': new_plan.id,
+            'name': new_plan.name,
+            'procedure_name': new_plan.procedure_name,
+            'planned_value': float(new_plan.planned_value or 0),
+            'final_budget': float(new_plan.final_budget or 0),
+            'follow_up_months': new_plan.follow_up_months,
+            'observations': new_plan.observations,
+        },
+        'execution': _serialize_execution(execution),
+        'payment_id': None,
+    }), 201
+
+
 @cosmetic_api_bp.route('/api/cosmetic-plans/<int:plan_id>/executions', methods=['GET'])
 @login_required
 def list_plan_executions(plan_id):

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>Sala de espera</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      --panel: rgba(10, 10, 11, .97);
+      --secondary: rgba(235, 235, 245, .58);
+      --separator: rgba(255, 255, 255, .09);
+      --green: #30d158;
+      --orange: #ff9f0a;
+      --red: #ff453a;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100%; margin: 0; background: transparent; overflow: hidden; }
+    button, a { font: inherit; }
+
+    .notch {
+      width: 100%;
+      color: white;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-top: 0;
+      border-radius: 0 0 24px 24px;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, .42);
+      overflow: hidden;
+    }
+
+    .compact {
+      width: 100%; height: 38px; padding: 0 15px;
+      display: grid; grid-template-columns: minmax(92px, 1fr) 74px minmax(92px, 1fr); align-items: center; gap: 5px;
+      color: inherit; background: transparent; border: 0; cursor: pointer;
+      -webkit-app-region: drag;
+    }
+    .compact:active { opacity: .72; }
+    .compact-main, .compact-status { display: flex; align-items: center; min-width: 0; }
+    .compact-main { gap: 8px; font-size: 12px; font-weight: 650; letter-spacing: .01em; }
+    .compact-status { justify-content: flex-end; gap: 6px; color: var(--secondary); font-size: 11px; white-space: nowrap; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 9px rgba(48, 209, 88, .7); }
+    .live-dot.empty { background: #636366; box-shadow: none; }
+    .live-dot.error { background: var(--red); box-shadow: 0 0 9px rgba(255, 69, 58, .6); }
+
+    .expanded { display: none; padding: 3px 12px 13px; }
+    body.is-expanded .expanded { display: block; }
+    .header { display: flex; align-items: end; justify-content: space-between; padding: 10px 4px 13px; }
+    .eyebrow { margin: 0 0 3px; color: var(--secondary); font-size: 10px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 20px; line-height: 1.1; letter-spacing: -.025em; }
+    .refresh { width: 30px; height: 30px; border: 0; border-radius: 50%; color: var(--secondary); background: rgba(255,255,255,.08); cursor: pointer; }
+    .refresh:active { transform: scale(.92); }
+    .refresh.loading svg { animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .list { max-height: 390px; overflow-y: auto; scrollbar-width: none; }
+    .list::-webkit-scrollbar { display: none; }
+    .patient {
+      width: 100%; min-height: 62px; padding: 10px 9px;
+      display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+      color: white; text-align: left; text-decoration: none; background: transparent; border: 0; border-top: 1px solid var(--separator); border-radius: 11px;
+      cursor: pointer;
+    }
+    .patient:hover { background: rgba(255,255,255,.07); }
+    .patient:active { transform: scale(.985); }
+    .priority { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .priority.medium { background: var(--orange); }
+    .priority.long { background: var(--red); }
+    .patient-copy { min-width: 0; }
+    .patient-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 620; }
+    .patient-meta { margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--secondary); font-size: 10px; }
+    .wait { min-width: 49px; font-size: 13px; font-variant-numeric: tabular-nums; font-weight: 650; text-align: right; }
+    .wait small { display: block; margin-top: 2px; color: var(--secondary); font-size: 9px; font-weight: 500; }
+
+    .empty { padding: 38px 12px 42px; color: var(--secondary); text-align: center; font-size: 12px; }
+    .empty-icon { display: block; margin-bottom: 9px; color: #636366; font-size: 25px; }
+    .footer { padding: 10px 5px 1px; color: rgba(235,235,245,.42); font-size: 9px; text-align: center; }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .notch { transition: border-radius .24s cubic-bezier(.2,.8,.2,1); }
+      .patient, .refresh { transition: transform .12s ease, background-color .12s ease; }
+    }
+    @media (prefers-reduced-transparency: reduce) { .notch { background: #0a0a0b; } }
+    @media (prefers-contrast: more) { .notch { border-color: rgba(255,255,255,.35); } }
+  </style>
+</head>
+<body>
+  <main class="notch" aria-live="polite">
+    <button class="compact" id="toggle" type="button" aria-expanded="false" aria-controls="details">
+      <span class="compact-main"><span class="live-dot empty" id="liveDot"></span>Sala de espera</span>
+      <span aria-hidden="true"></span>
+      <span class="compact-status" id="compactStatus">Carregando…</span>
+    </button>
+
+    <section class="expanded" id="details">
+      <header class="header">
+        <div><p class="eyebrow">Clínica Basile</p><h1 id="heading">Sala de espera</h1></div>
+        <button class="refresh" id="refresh" type="button" aria-label="Atualizar sala de espera" title="Atualizar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 11a8 8 0 1 0-2.3 5.7L20 14"/><path d="M20 6v5h-5"/></svg>
+        </button>
+      </header>
+      <div class="list" id="list"></div>
+      <div class="footer" id="footer">Atualização automática a cada 30 segundos</div>
+    </section>
+  </main>
+
+  <script>
+    (() => {
+      const state = { expanded: false, patients: [], timer: null };
+      const $ = (id) => document.getElementById(id);
+      const native = (message) => {
+        try { window.webkit.messageHandlers.notch.postMessage(message); } catch (_) {}
+      };
+
+      function setExpanded(expanded) {
+        state.expanded = expanded;
+        document.body.classList.toggle('is-expanded', expanded);
+        $('toggle').setAttribute('aria-expanded', String(expanded));
+        native({ type: 'resize', expanded, count: state.patients.length });
+      }
+
+      function minutesSince(iso, fallback = 0) {
+        const value = Date.parse(iso || '');
+        return Number.isFinite(value) ? Math.max(0, Math.floor((Date.now() - value) / 60000)) : fallback;
+      }
+
+      function priorityClass(minutes) {
+        if (minutes >= 30) return 'long';
+        if (minutes >= 15) return 'medium';
+        return '';
+      }
+
+      function patientRow(patient) {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'patient';
+        row.dataset.checkedIn = patient.checked_in_time || '';
+        row.dataset.fallbackMinutes = patient.wait_time_minutes ?? 0;
+
+        const dot = document.createElement('span');
+        dot.className = `priority ${priorityClass(minutesSince(row.dataset.checkedIn, Number(row.dataset.fallbackMinutes)))}`;
+        const copy = document.createElement('span');
+        copy.className = 'patient-copy';
+        const name = document.createElement('span');
+        name.className = 'patient-name';
+        name.textContent = patient.patient_name || 'Paciente';
+        const meta = document.createElement('span');
+        meta.className = 'patient-meta';
+        meta.textContent = [patient.scheduled_time && `Agendado ${patient.scheduled_time}`, patient.room].filter(Boolean).join(' · ') || patient.appointment_type || 'Consulta';
+        copy.append(name, meta);
+        const wait = document.createElement('span');
+        wait.className = 'wait';
+        wait.innerHTML = '<span data-role="minutes"></span><small>aguardando</small>';
+        row.append(dot, copy, wait);
+        row.addEventListener('click', () => native({ type: 'open', path: `/prontuario/${patient.patient_id}?appointment_id=${patient.appointment_id}` }));
+        return row;
+      }
+
+      function updateClocks() {
+        document.querySelectorAll('.patient').forEach((row) => {
+          const minutes = minutesSince(row.dataset.checkedIn, Number(row.dataset.fallbackMinutes));
+          row.querySelector('[data-role="minutes"]').textContent = `${minutes} min`;
+          row.querySelector('.priority').className = `priority ${priorityClass(minutes)}`;
+        });
+      }
+
+      function render() {
+        const count = state.patients.length;
+        $('compactStatus').textContent = count ? `${count} ${count === 1 ? 'aguardando' : 'aguardando'}` : 'Ninguém aguardando';
+        $('heading').textContent = count ? `${count} ${count === 1 ? 'paciente' : 'pacientes'}` : 'Sala de espera';
+        $('liveDot').className = `live-dot${count ? '' : ' empty'}`;
+        const list = $('list');
+        list.replaceChildren();
+        if (!count) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.innerHTML = '<span class="empty-icon">✓</span>Nenhum paciente aguardando';
+          list.append(empty);
+        } else {
+          state.patients.forEach((patient) => list.append(patientRow(patient)));
+        }
+        updateClocks();
+        if (state.expanded) native({ type: 'resize', expanded: true, count });
+      }
+
+      async function load() {
+        $('refresh').classList.add('loading');
+        try {
+          const response = await fetch('/espera/api/list', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+          state.patients = Array.isArray(data.waiting_list) ? data.waiting_list : [];
+          $('footer').textContent = 'Atualização automática a cada 30 segundos';
+          render();
+        } catch (_) {
+          $('compactStatus').textContent = 'Sem conexão';
+          $('liveDot').className = 'live-dot error';
+          $('footer').textContent = 'Não foi possível atualizar · tente novamente';
+        } finally {
+          $('refresh').classList.remove('loading');
+        }
+      }
+
+      $('toggle').addEventListener('click', () => setExpanded(!state.expanded));
+      $('refresh').addEventListener('click', load);
+      document.addEventListener('keydown', (event) => { if (event.key === 'Escape') setExpanded(false); });
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+      setInterval(updateClocks, 1000);
+      state.timer = setInterval(load, 30000);
+      load();
+    })();
+  </script>
+</body>
+</html>

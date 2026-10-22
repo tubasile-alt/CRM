@@ -74,6 +74,13 @@ def get_waiting_list():
         'stats': stats
     })
 
+
+@waiting_room_bp.route('/notch', methods=['GET'])
+@login_required
+def notch():
+    """Interface compacta usada pelo aplicativo de notch do macOS."""
+    return render_template('waiting_room_notch.html')
+
 @waiting_room_bp.route('/api/assign-room/<int:appointment_id>', methods=['POST'])
 @login_required
 def assign_room(appointment_id):

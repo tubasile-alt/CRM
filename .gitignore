@@ -29,3 +29,4 @@ instance/
 *.sqlite
 *.sqlite3
 .DS_Store
+macos/CRMNotch/.build/
