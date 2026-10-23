@@ -1,0 +1,1224 @@
+/* ==================== AGENDA — BARRA LATERAL ESCURA (Sugestão 3) ====================
+ * Escopo: apenas a página da Agenda (body.agenda-shell / .agenda-apple).
+ * Princípios Apple: fonte do sistema, hierarquia por peso/tamanho, feedback no
+ * pointer-down, material escuro para a barra estrutural, arraste com alça,
+ * limiar de movimento e volta pelo mesmo caminho ao cancelar; respeito a
+ * reduced-motion / reduced-transparency / contrast.
+ * Cores: paleta oficial Basile (Deep Blue, Medium Blue, Light Blue).
+ */
+
+body.agenda-shell {
+    --aa-brand-deep: #0050a0;
+    --aa-brand-medium: #0098d9;
+    --aa-brand-light: #8fd3f4;
+    --aa-navy: #0c1b33;
+    --aa-navy-2: #10284a;
+    --aa-accent: var(--aa-brand-deep);
+    --aa-accent-press: #004487;
+    --aa-label: #141414;
+    --aa-label-2: #4b4f56;
+    --aa-label-3: #80858d;
+    --aa-separator: rgba(60, 60, 67, 0.1);
+    --aa-fill: rgba(120, 120, 128, 0.08);
+    --aa-fill-2: rgba(120, 120, 128, 0.14);
+    --aa-surface: #ffffff;
+    --aa-page: #f5f6f8;
+    --aa-green: #34c759;
+    --aa-green-text: #1f7a37;
+    --aa-orange: #ff9500;
+    --aa-orange-text: #9a5300;
+    --aa-red: #ff3b30;
+    --aa-side-w: 280px;
+    --aa-ease: cubic-bezier(0.25, 1, 0.5, 1);
+
+    background: var(--aa-page);
+    color: var(--aa-label);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-left: var(--aa-side-w);
+}
+
+body.agenda-shell > .container-fluid.py-4 {
+    padding: 26px 30px 96px !important;
+}
+
+/* ---------- Barra lateral ---------- */
+
+.ag-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--aa-side-w);
+    z-index: 1030;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 22px 14px 14px;
+    overflow-y: auto;
+    background: linear-gradient(180deg, var(--aa-navy) 0%, var(--aa-navy-2) 100%);
+    color: #e9f1fb;
+}
+
+.ag-logo {
+    display: block;
+    padding: 2px 8px 18px;
+}
+
+.ag-logo img {
+    height: 30px;
+    width: auto;
+}
+
+.ag-side-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 14px;
+}
+
+.ag-sidebar .side-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    font-size: 0.875rem;
+    color: rgba(233, 241, 251, 0.75);
+    text-decoration: none;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.ag-sidebar .side-link i {
+    width: 18px;
+    font-size: 0.95rem;
+    text-align: center;
+}
+
+.ag-sidebar .side-link:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+}
+
+.ag-sidebar .side-link.active {
+    background: rgba(143, 211, 244, 0.16);
+    color: #fff;
+    font-weight: 600;
+}
+
+.ag-sidebar .side-link .badge {
+    margin-left: auto;
+}
+
+/* Mini calendário (renderizado por agenda.js) em material escuro */
+.ag-sidebar .mini-calendar {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 12px 10px 8px;
+}
+
+.ag-sidebar .mini-calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2px 6px;
+}
+
+.ag-sidebar .mini-calendar-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.ag-sidebar .mini-calendar-title::first-letter {
+    text-transform: uppercase;
+}
+
+.ag-sidebar .mini-calendar-header button {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--aa-brand-light);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ag-sidebar .mini-calendar-header button:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.ag-sidebar .mini-calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    row-gap: 1px;
+}
+
+.ag-sidebar .mini-calendar-day {
+    text-align: center;
+    font-size: 0.625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: rgba(233, 241, 251, 0.5);
+    padding: 2px 0 5px;
+}
+
+.ag-sidebar .mini-calendar-date {
+    width: 28px;
+    height: 28px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    color: #e9f1fb;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.ag-sidebar .mini-calendar-date:empty {
+    pointer-events: none;
+}
+
+.ag-sidebar .mini-calendar-date:not(:empty):hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.ag-sidebar .mini-calendar-date.today {
+    color: var(--aa-brand-light);
+    font-weight: 700;
+}
+
+.ag-sidebar .mini-calendar-date.selected {
+    background: var(--aa-brand-medium);
+    color: #fff;
+    font-weight: 600;
+}
+
+.ag-side-section {
+    margin-top: 14px;
+}
+
+.ag-side-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(233, 241, 251, 0.5);
+    padding: 0 10px 4px;
+}
+
+.ag-side-count {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+}
+
+.ag-side-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+}
+
+.ag-side-row b {
+    font-weight: 600;
+    color: var(--aa-brand-light);
+    font-variant-numeric: tabular-nums;
+}
+
+.ag-side-row-warn b {
+    color: #ffb340;
+}
+
+.ag-sidebar .waiting-room-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.ag-sidebar .waiting-patient-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    transform: none;
+}
+
+.ag-sidebar .waiting-patient-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+    transform: none;
+    box-shadow: none;
+    border: none;
+}
+
+.ag-sidebar .waiting-patient-name {
+    color: #e9f1fb;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ag-sidebar .waiting-patient-time {
+    color: var(--aa-brand-light);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.ag-sidebar .waiting-empty {
+    padding: 6px 10px;
+    font-size: 0.8125rem;
+    color: rgba(233, 241, 251, 0.45);
+}
+
+.ag-side-user {
+    margin-top: auto;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.ag-user-btn {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #e9f1fb;
+    text-align: left;
+}
+
+.ag-user-btn:hover,
+.ag-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.ag-user-btn > .bi {
+    margin-left: auto;
+    opacity: 0.6;
+}
+
+.ag-avatar {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--aa-brand-medium), var(--aa-brand-deep));
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.ag-user-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.2;
+}
+
+.ag-user-text b {
+    font-size: 0.875rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ag-user-text small {
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+.ag-icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(233, 241, 251, 0.8);
+    text-decoration: none;
+}
+
+.ag-menu-btn,
+.ag-scrim {
+    display: none;
+}
+
+/* ---------- Cabeçalho ---------- */
+
+.agenda-apple .ag-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+}
+
+.agenda-apple .ag-top h1 {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+    font-size: 1.875rem;
+    font-weight: 700;
+    letter-spacing: -0.022em;
+    line-height: 1.15;
+}
+
+.agenda-apple .ag-sub {
+    margin-top: 4px;
+    font-size: 0.875rem;
+    color: var(--aa-label-3);
+}
+
+.agenda-apple .agenda-last-updated {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.agenda-apple .agenda-last-updated:not(:empty)::before {
+    content: '·';
+    margin: 0 4px;
+}
+
+.agenda-apple .ag-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.agenda-apple .ag-seg {
+    display: inline-flex;
+    background: var(--aa-fill-2);
+    border-radius: 9px;
+    padding: 2px;
+    gap: 0;
+}
+
+.agenda-apple .ag-seg button {
+    border: none;
+    background: transparent;
+    color: var(--aa-label);
+    border-radius: 7px;
+    padding: 5px 13px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    transition: background-color 200ms var(--aa-ease), box-shadow 200ms var(--aa-ease);
+}
+
+.agenda-apple .ag-seg button:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.agenda-apple .ag-seg button.active {
+    background: var(--aa-surface);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+
+.agenda-apple .ag-capsule {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 999px;
+    background: var(--aa-fill);
+    color: var(--aa-accent);
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    white-space: nowrap;
+    transition: background-color 120ms ease;
+}
+
+.agenda-apple .ag-capsule:hover {
+    background: var(--aa-fill-2);
+}
+
+.agenda-apple .ag-capsule.ag-primary {
+    background: var(--aa-accent);
+    color: #fff;
+}
+
+.agenda-apple .ag-capsule.ag-primary:hover {
+    background: var(--aa-accent-press);
+}
+
+/* Secretária: abas Agenda/Checkout + filtro por médico */
+.agenda-apple .ag-filters {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.agenda-apple .ag-tabs {
+    display: inline-flex;
+    background: var(--aa-fill-2);
+    border-radius: 9px;
+    padding: 2px;
+    border: none;
+}
+
+.agenda-apple .ag-tabs .nav-link {
+    border: none;
+    border-radius: 7px;
+    padding: 5px 14px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--aa-label);
+    background: transparent;
+}
+
+.agenda-apple .ag-tabs .nav-link.active {
+    background: var(--aa-surface);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.agenda-apple .ag-tab-badge {
+    margin-left: 6px;
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--aa-red);
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+}
+
+.agenda-apple .doctor-filter-btns {
+    flex-wrap: wrap;
+}
+
+.agenda-apple .doctor-filter-btns .btn {
+    border: none;
+    border-radius: 7px;
+    padding: 5px 13px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--aa-label);
+    background: transparent;
+    box-shadow: none;
+}
+
+.agenda-apple .doctor-filter-btns .btn.active {
+    background: var(--aa-surface);
+    font-weight: 600;
+    color: var(--aa-label);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+/* ---------- Próximo paciente (médico) ---------- */
+
+.agenda-apple .ag-next {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--aa-surface);
+    border: 1px solid rgba(0, 152, 217, 0.25);
+    border-radius: 18px;
+    box-shadow: 0 0 0 4px rgba(143, 211, 244, 0.18);
+    padding: 18px 22px;
+    margin-bottom: 18px;
+}
+
+.agenda-apple .ag-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--aa-brand-medium);
+}
+
+.agenda-apple .ag-next-name {
+    margin-top: 3px;
+    font-size: 1.375rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.agenda-apple .ag-next-meta {
+    font-size: 0.875rem;
+    color: var(--aa-label-2);
+}
+
+.agenda-apple .ag-next-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ---------- Lista do dia ---------- */
+
+.agenda-apple .ag-list {
+    background: var(--aa-surface);
+    border: 1px solid var(--aa-separator);
+    border-radius: 18px;
+    padding: 6px 0;
+}
+
+.agenda-apple .ag-row,
+.agenda-apple .ag-slot {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 2px 8px;
+    border-radius: 9px;
+}
+
+.agenda-apple .ag-row {
+    padding: 9px 16px 9px 14px;
+    border-left: 4px solid var(--bar, transparent);
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: background-color 120ms ease;
+}
+
+.agenda-apple .ag-row:hover {
+    background: var(--aa-fill);
+}
+
+.agenda-apple .ag-time {
+    flex-shrink: 0;
+    width: 46px;
+    display: flex;
+    flex-direction: column;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.agenda-apple .ag-time small {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--aa-label-3);
+}
+
+.agenda-apple .ag-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 4px 10px;
+    flex-wrap: wrap;
+}
+
+.agenda-apple .ag-name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.agenda-apple .ag-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.agenda-apple .ag-stars {
+    margin-left: 4px;
+    font-size: 0.75rem;
+}
+
+.agenda-apple .ag-meta {
+    font-size: 0.8125rem;
+    color: var(--aa-label-3);
+}
+
+.agenda-apple .ag-tag {
+    align-self: center;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+
+.agenda-apple .ag-tag-orange {
+    background: rgba(255, 149, 0, 0.18);
+    color: var(--aa-orange-text);
+}
+
+.agenda-apple .ag-tag-red {
+    background: rgba(255, 59, 48, 0.12);
+    color: #d70015;
+}
+
+.agenda-apple .ag-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.agenda-apple .ag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    border-radius: 999px;
+    padding: 4px 11px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+    transition: transform 100ms ease-out, filter 120ms ease;
+}
+
+.agenda-apple button.ag-pill:hover {
+    filter: brightness(0.95);
+}
+
+.agenda-apple .ag-pill-green { background: var(--aa-green); color: #fff; }
+.agenda-apple .ag-pill-blue { background: var(--aa-accent); color: #fff; }
+.agenda-apple .ag-pill-orange { background: var(--aa-orange); color: #fff; }
+.agenda-apple .ag-pill-green-soft { background: rgba(52, 199, 89, 0.16); color: var(--aa-green-text); }
+.agenda-apple .ag-pill-red-soft { background: rgba(255, 59, 48, 0.14); color: #b0201a; }
+.agenda-apple .ag-pill-yellow-soft { background: rgba(255, 204, 0, 0.28); color: #6b5100; }
+.agenda-apple .ag-pill-orange-soft { background: rgba(255, 149, 0, 0.18); color: var(--aa-orange-text); }
+.agenda-apple .ag-pill-neutral { background: var(--aa-fill-2); color: var(--aa-label-2); }
+.agenda-apple .ag-pill-ghost { background: transparent; color: var(--aa-label-3); padding: 4px 7px; }
+
+/* Estados */
+.agenda-apple .ag-row.is-done {
+    padding-top: 5px;
+    padding-bottom: 5px;
+    font-size: 0.8125rem;
+    border-left-color: rgba(0, 0, 0, 0.08);
+}
+
+.agenda-apple .ag-row.is-done .ag-time,
+.agenda-apple .ag-row.is-done .ag-name {
+    color: #a1a5ab;
+    font-weight: 500;
+}
+
+.agenda-apple .ag-row.is-done .ag-name {
+    font-size: 0.875rem;
+}
+
+.agenda-apple .ag-row.is-missed .ag-name {
+    text-decoration: line-through;
+}
+
+.agenda-apple .ag-row.is-provisorio .ag-name {
+    color: var(--aa-orange-text);
+}
+
+.agenda-apple .ag-row.is-waiting {
+    background: rgba(255, 204, 0, 0.08);
+}
+
+.agenda-apple .ag-row.is-surgery {
+    background: rgba(255, 59, 48, 0.05);
+}
+
+/* Horários livres (secretária) */
+.agenda-apple .ag-slot {
+    padding: 3px 16px 3px 18px;
+    cursor: pointer;
+    color: #b0b4ba;
+    font-size: 0.8125rem;
+}
+
+.agenda-apple .ag-slot .ag-time {
+    font-weight: 500;
+}
+
+.agenda-apple .ag-slot-line {
+    flex: 1;
+    height: 1px;
+    background: repeating-linear-gradient(90deg, #d5d8dc 0 4px, transparent 4px 8px);
+}
+
+.agenda-apple .ag-slot-add {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--aa-accent);
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+.agenda-apple .ag-slot:hover {
+    background: rgba(0, 152, 217, 0.06);
+}
+
+.agenda-apple .ag-slot:hover .ag-slot-add {
+    opacity: 1;
+}
+
+.agenda-apple .ag-grip,
+.agenda-apple .ag-grip-space {
+    flex-shrink: 0;
+    width: 18px;
+}
+
+.agenda-apple .ag-grip {
+    border: none;
+    background: transparent;
+    padding: 6px 0;
+    margin: -6px 0;
+    color: #b8bcc2;
+    font-size: 1rem;
+    cursor: grab;
+    touch-action: none;
+    border-radius: 6px;
+}
+
+.agenda-apple .ag-grip:hover {
+    color: var(--aa-label-2);
+}
+
+/* Linha do "agora" */
+.agenda-apple .ag-now {
+    position: relative;
+    height: 16px;
+    margin: 2px 8px;
+    pointer-events: none;
+}
+
+.agenda-apple .ag-now::before {
+    content: '';
+    position: absolute;
+    left: 62px;
+    right: 12px;
+    top: 50%;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--aa-red);
+}
+
+.agenda-apple .ag-now span {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: var(--aa-red);
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.agenda-apple .ag-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 48px 16px;
+    color: var(--aa-label-3);
+    font-size: 0.9375rem;
+}
+
+.agenda-apple .ag-empty i {
+    font-size: 1.75rem;
+    color: #c4c7cc;
+}
+
+/* Entrada da lista só ao trocar de dia/filtro */
+.agenda-apple .ag-list.aa-animate > .ag-row,
+.agenda-apple .ag-list.aa-animate > .ag-slot {
+    animation: aa-row-in 220ms var(--aa-ease) both;
+}
+
+@keyframes aa-row-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ---------- Arrastar para remarcar ---------- */
+
+body.ag-dragging {
+    cursor: grabbing;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body.ag-dragging .agenda-apple .ag-row:hover,
+body.ag-dragging .agenda-apple .ag-slot:hover {
+    background: transparent;
+}
+
+body.ag-dragging .agenda-apple .ag-slot-add {
+    opacity: 0;
+}
+
+.agenda-apple .ag-row.is-drag-origin {
+    opacity: 0.4;
+    border-left-style: dashed;
+    outline: 1.5px dashed #b8bcc2;
+    outline-offset: -1px;
+}
+
+body.ag-dragging .agenda-apple .is-drop-target,
+body.ag-dragging .agenda-apple .is-drop-target:hover {
+    background: rgba(0, 152, 217, 0.1);
+    box-shadow: inset 0 0 0 2px var(--aa-brand-medium);
+}
+
+.agenda-apple .ag-slot.is-drop-target .ag-time {
+    color: var(--aa-accent);
+    font-weight: 700;
+}
+
+/* Cópia que segue o ponteiro (fica no <body>, fora de .agenda-apple) */
+.ag-row.ag-floating {
+    position: fixed;
+    z-index: 2000;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 9px 16px 9px 14px;
+    border-radius: 9px;
+    border-left: 4px solid var(--bar, transparent);
+    background: #fff;
+    box-shadow: 0 18px 40px rgba(0, 40, 90, 0.22), 0 2px 6px rgba(0, 0, 0, 0.08);
+    font-size: 0.875rem;
+    pointer-events: none;
+    transform-origin: 30px 50%;
+    will-change: transform;
+}
+
+.ag-row.ag-floating .ag-grip {
+    width: 18px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #4b4f56;
+}
+
+.ag-row.ag-floating .ag-time {
+    width: 46px;
+    display: flex;
+    flex-direction: column;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #0050a0;
+}
+
+.ag-row.ag-floating .ag-time small {
+    font-size: 0.6875rem;
+    color: #80858d;
+}
+
+.ag-row.ag-floating .ag-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+.ag-row.ag-floating .ag-name {
+    font-size: 0.9375rem;
+    font-weight: 600;
+}
+
+.ag-row.ag-floating .ag-meta {
+    font-size: 0.8125rem;
+    color: #80858d;
+}
+
+.ag-row.ag-floating .ag-tag,
+.ag-row.ag-floating .ag-actions {
+    display: none;
+}
+
+.ag-row.ag-floating.is-settling {
+    transition: transform 240ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Aviso inferior (remarcando / desfazer) */
+.agenda-apple .ag-toast {
+    position: fixed;
+    left: calc(50% + var(--aa-side-w) / 2);
+    bottom: 24px;
+    transform: translateX(-50%);
+    z-index: 2001;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: calc(100vw - var(--aa-side-w) - 32px);
+    padding: 10px 10px 10px 18px;
+    border-radius: 999px;
+    background: rgba(20, 20, 20, 0.86);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    color: #fff;
+    font-size: 0.8125rem;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.agenda-apple .ag-toast[hidden] {
+    display: none;
+}
+
+.agenda-apple .ag-toast > span {
+    padding-right: 8px;
+}
+
+.agenda-apple .ag-toast kbd {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.6875rem;
+}
+
+.agenda-apple .ag-toast button {
+    border: none;
+    border-radius: 999px;
+    padding: 5px 14px;
+    background: rgba(255, 255, 255, 0.16);
+    color: var(--aa-brand-light);
+    font-weight: 600;
+    font-size: 0.8125rem;
+}
+
+/* ---------- Modo mês (FullCalendar) ---------- */
+
+.agenda-apple .ag-month {
+    background: var(--aa-surface);
+    border: 1px solid var(--aa-separator);
+    border-radius: 18px;
+    padding: 16px;
+}
+
+.agenda-apple .fc {
+    font-size: 0.875rem;
+}
+
+.agenda-apple .fc .fc-toolbar-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.agenda-apple .fc .fc-button {
+    border: none;
+    border-radius: 999px;
+    background: var(--aa-fill);
+    color: var(--aa-accent);
+    font-weight: 500;
+    box-shadow: none !important;
+}
+
+.agenda-apple .fc .fc-button-active,
+.agenda-apple .fc .fc-button:hover {
+    background: var(--aa-fill-2) !important;
+    color: var(--aa-accent) !important;
+}
+
+.agenda-apple .fc-theme-standard td,
+.agenda-apple .fc-theme-standard th,
+.agenda-apple .fc-theme-standard .fc-scrollgrid {
+    border-color: var(--aa-separator);
+}
+
+/* ---------- Feedback de toque: no pointer-down ---------- */
+
+.agenda-apple .ag-seg button:active,
+.agenda-apple .ag-capsule:active,
+.agenda-apple button.ag-pill:active,
+.ag-sidebar .side-link:active,
+.ag-sidebar .mini-calendar-date:not(:empty):active {
+    transform: scale(0.96);
+    transition: transform 100ms ease-out;
+}
+
+/* ---------- Telas menores: barra lateral vira gaveta ---------- */
+
+@media (max-width: 991.98px) {
+    body.agenda-shell {
+        padding-left: 0;
+    }
+
+    body.agenda-shell > .container-fluid.py-4 {
+        padding: 72px 16px 96px !important;
+    }
+
+    .ag-sidebar {
+        transform: translateX(-100%);
+        transition: transform 280ms var(--aa-ease);
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.35);
+    }
+
+    body.ag-side-open .ag-sidebar {
+        transform: none;
+    }
+
+    .ag-menu-btn {
+        position: fixed;
+        top: 14px;
+        left: 14px;
+        z-index: 1029;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border: none;
+        border-radius: 12px;
+        background: var(--aa-navy);
+        color: #fff;
+        font-size: 1.35rem;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+    }
+
+    .ag-scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 1029;
+        background: rgba(0, 0, 0, 0.35);
+    }
+
+    .ag-scrim[hidden] {
+        display: none;
+    }
+
+    .agenda-apple .ag-toast {
+        left: 50%;
+        max-width: calc(100vw - 32px);
+        border-radius: 18px;
+    }
+}
+
+@media (max-width: 640px) {
+    .agenda-apple .ag-top h1 {
+        font-size: 1.5rem;
+    }
+
+    .agenda-apple .ag-toolbar .ag-capsule.ag-primary span {
+        display: none;
+    }
+
+    .agenda-apple .ag-row {
+        flex-wrap: wrap;
+        row-gap: 6px;
+    }
+
+    .agenda-apple .ag-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        padding-left: 60px;
+    }
+
+    .agenda-apple.is-secretary .ag-actions {
+        padding-left: 92px;
+    }
+
+    .agenda-apple .ag-next-actions {
+        width: 100%;
+    }
+
+    .agenda-apple .ag-next-actions .ag-capsule {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+/* ---------- Acessibilidade ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .agenda-apple .ag-list.aa-animate > .ag-row,
+    .agenda-apple .ag-list.aa-animate > .ag-slot {
+        animation: aa-fade-in 150ms ease both;
+    }
+
+    .ag-sidebar {
+        transition: none;
+    }
+
+    .agenda-apple .ag-seg button:active,
+    .agenda-apple .ag-capsule:active,
+    .agenda-apple button.ag-pill:active,
+    .ag-sidebar .side-link:active,
+    .ag-sidebar .mini-calendar-date:not(:empty):active {
+        transform: none;
+    }
+}
+
+@keyframes aa-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .agenda-apple .ag-toast {
+        background: #1c1c1e;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+@media (prefers-contrast: more) {
+    body.agenda-shell {
+        --aa-separator: rgba(0, 0, 0, 0.4);
+        --aa-label-3: #4a4a4f;
+    }
+
+    .ag-sidebar .side-link,
+    .ag-side-title,
+    .ag-sidebar .mini-calendar-day {
+        color: #fff;
+    }
+}
+
+@media print {
+    body.agenda-shell {
+        padding-left: 0;
+        background: #fff;
+    }
+
+    .ag-sidebar,
+    .ag-menu-btn,
+    .ag-toolbar,
+    .ag-filters,
+    #agNextCard,
+    .ag-slot,
+    .ag-toast,
+    .ag-grip,
+    #chat-hub-fab {
+        display: none !important;
+    }
+
+    .agenda-apple .ag-list.aa-animate > .ag-row {
+        animation: none;
+    }
+}

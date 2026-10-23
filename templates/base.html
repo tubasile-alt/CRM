@@ -61,8 +61,10 @@
   }
   </style>
   </head>
-<body class="{% if current_user.is_authenticated %}has-fixed-navbar{% endif %}" data-user-id="{{ current_user.id if current_user.is_authenticated else 0 }}">
+<body class="{% block body_class %}{% if current_user.is_authenticated %}has-fixed-navbar{% endif %}{% endblock %}" data-user-id="{{ current_user.id if current_user.is_authenticated else 0 }}">
     {% if current_user.is_authenticated %}
+    {% block main_nav %}
+    {% import "_main_nav.html" as main_nav with context %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top main-navbar">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
@@ -73,65 +75,7 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    {% if current_user.is_doctor() %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
-                            <i class="bi bi-speedometer2"></i> Dashboard
-                        </a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'agenda' %}active{% endif %}" href="{{ url_for('agenda') }}">
-                            <i class="bi bi-calendar3"></i> Agenda
-                        </a>
-                    </li>
-                    {% if current_user.is_doctor() or current_user.is_secretary() or current_user.is_admin() %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'physical_agenda.import_page' %}active{% endif %}" href="{{ url_for('physical_agenda.import_page') }}">
-                            <i class="bi bi-journal-arrow-up"></i> Importar Agenda Física
-                        </a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'surgical_map.index' %}active{% endif %}" href="{{ url_for('surgical_map.index') }}">
-                            <i class="bi bi-clipboard2-pulse"></i> Mapa Cirúrgico
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'crm.crm_page' %}active{% endif %}" href="{{ url_for('crm.crm_page') }}">
-                            <i class="bi bi-graph-up"></i> CRM
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'crm.sales_funnel' %}active{% endif %}" href="{{ url_for('crm.sales_funnel') }}">
-                            <i class="bi bi-funnel"></i> Sales
-                        </a>
-                    </li>
-                    {% if current_user.is_doctor() %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'dermascribe' in request.endpoint %}active{% endif %}" href="{{ url_for('dermascribe.index') }}">
-                            <i class="bi bi-prescription2"></i> DermaScribe
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'settings.index' %}active{% endif %}" href="{{ url_for('settings.index') }}">
-                            <i class="bi bi-gear"></i> Configurações
-                        </a>
-                    </li>
-                    {% endif %}
-                    {% if current_user.is_doctor() or current_user.role_clinico in ('SECRETARY', 'ADMIN') %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'audit_patients_page' %}active{% endif %}" href="{{ url_for('audit_patients_page') }}">
-                            <i class="bi bi-clipboard-data"></i> Auditoria
-                        </a>
-                    </li>
-                    {% endif %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.endpoint == 'chat' %}active{% endif %}" href="{{ url_for('chat') }}">
-                            <i class="bi bi-chat-dots"></i> Chat
-                            <span id="chat-badge" class="badge bg-danger ms-1" style="display: none;">0</span>
-                        </a>
-                    </li>
+                    {{ main_nav.main_nav_links('navbar') }}
                     <li class="nav-item">
                         <a class="nav-link" href="#" id="toggle-chat-sound" title="Alternar som do chat">
                             <i class="bi bi-volume-up" id="chat-sound-icon"></i>
@@ -144,18 +88,14 @@
                             <i class="bi bi-person-circle"></i> {{ current_user.name }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            {% if current_user.is_doctor() %}
-                            <li><button class="dropdown-item" type="button" id="enable-push-notifications"><i class="bi bi-bell"></i> Ativar notificações neste iPhone</button></li>
-                            <li><button class="dropdown-item" type="button" id="test-push-notification" disabled><i class="bi bi-send-check"></i> Enviar notificação de teste</button></li>
-                            <li><hr class="dropdown-divider"></li>
-                            {% endif %}
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+                            {{ main_nav.user_menu_items() }}
                         </ul>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
+    {% endblock %}
     {% endif %}
 
     {% if IS_PREVIEW %}

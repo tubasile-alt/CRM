@@ -35,11 +35,6 @@
     let currentView = 'day';
     let currentEvent = null;
     let webcamStream = null;
-    const AGENDA_DEFAULT_START_MINUTES = 7 * 60;
-    const AGENDA_DEFAULT_END_MINUTES = 20 * 60;
-    const AGENDA_SLOT_MINUTES = 15;
-    const AGENDA_SLOT_HEIGHT = 44;
-    const AGENDA_CARD_INSET = 3;
 
     window.parseLocalDateTime = function(isoString) {
         if (!isoString) return null;
@@ -97,6 +92,8 @@
         startWaitingRoomUpdates();
         startWaitingClock();
         setupWebcamHandlers();
+        _setupDragToReschedule();
+        _setupSidebarToggle();
 
         // Polling automático: atualiza apenas blocos com status alterado, a cada 60 segundos.
         // Ignora quando há um modal aberto para não interromper interações em curso.
@@ -374,7 +371,6 @@
         console.log("Inicializando Agenda. Data Atual:", selectedDate.toISOString());
         const scheduleDate = document.getElementById('scheduleDate');
         if (scheduleDate) scheduleDate.textContent = formatDateBR(selectedDate);
-        renderTimeColumn();
     };
 
     window.openNewAppointmentAtTime = function(hour, minutes) {
@@ -418,133 +414,6 @@
         new bootstrap.Modal(modalEl).show();
     };
 
-    function _minutesSinceMidnight(date) {
-        return date.getHours() * 60 + date.getMinutes();
-    }
-
-    function _appointmentInterval(app) {
-        const start = parseLocalDateTime(app.start);
-        if (!start || Number.isNaN(start.getTime())) return null;
-
-        const parsedEnd = parseLocalDateTime(app.end);
-        const minimumEnd = new Date(start.getTime() + AGENDA_SLOT_MINUTES * 60000);
-        const end = parsedEnd && !Number.isNaN(parsedEnd.getTime()) && parsedEnd > start
-            ? parsedEnd
-            : minimumEnd;
-
-        return {
-            app,
-            start,
-            end,
-            layoutEnd: end > minimumEnd ? end : minimumEnd,
-            lane: 0,
-            laneCount: 1
-        };
-    }
-
-    function _timelineBounds(intervals) {
-        if (!intervals.length) {
-            return {
-                startMinutes: AGENDA_DEFAULT_START_MINUTES,
-                endMinutes: AGENDA_DEFAULT_END_MINUTES
-            };
-        }
-
-        const earliest = Math.min(...intervals.map(item => _minutesSinceMidnight(item.start)));
-        const latest = Math.max(...intervals.map(item => _minutesSinceMidnight(item.layoutEnd)));
-        return {
-            startMinutes: Math.min(AGENDA_DEFAULT_START_MINUTES, Math.floor(earliest / 60) * 60),
-            endMinutes: Math.max(AGENDA_DEFAULT_END_MINUTES, Math.ceil(latest / 60) * 60)
-        };
-    }
-
-    function _assignOverlapLanes(intervals) {
-        const sorted = [...intervals].sort((a, b) => a.start - b.start);
-        let active = [];
-        let group = [];
-        let groupLaneCount = 1;
-
-        const finishGroup = () => {
-            group.forEach(item => { item.laneCount = groupLaneCount; });
-            group = [];
-            groupLaneCount = 1;
-        };
-
-        sorted.forEach(item => {
-            active = active.filter(activeItem => activeItem.layoutEnd > item.start);
-            if (active.length === 0 && group.length > 0) finishGroup();
-
-            const usedLanes = new Set(active.map(activeItem => activeItem.lane));
-            let lane = 0;
-            while (usedLanes.has(lane)) lane += 1;
-            item.lane = lane;
-            active.push(item);
-            group.push(item);
-            groupLaneCount = Math.max(groupLaneCount, active.length, lane + 1);
-        });
-
-        if (group.length > 0) finishGroup();
-        return sorted;
-    }
-
-    function renderTimeColumn(startMinutes = AGENDA_DEFAULT_START_MINUTES, endMinutes = AGENDA_DEFAULT_END_MINUTES) {
-        const timeColumn = document.getElementById('timeColumn');
-        if (!timeColumn) return;
-        timeColumn.innerHTML = '';
-        for (let totalMinutes = startMinutes; totalMinutes < endMinutes; totalMinutes += AGENDA_SLOT_MINUTES) {
-            const hour = Math.floor(totalMinutes / 60);
-            const minutes = totalMinutes % 60;
-            const slot = document.createElement('div');
-            slot.className = 'hour-slot';
-            slot.textContent = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-            slot.style.cursor = 'pointer';
-            slot.onclick = () => window.openNewAppointmentAtTime(hour, minutes);
-            timeColumn.appendChild(slot);
-        }
-    }
-
-    function _renderAppointmentGridLines(appointmentsGrid, slotCount) {
-        appointmentsGrid.innerHTML = '';
-        appointmentsGrid.style.height = `${slotCount * AGENDA_SLOT_HEIGHT}px`;
-        for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
-            const line = document.createElement('div');
-            line.className = 'agenda-grid-line';
-            line.style.top = `${slotIndex * AGENDA_SLOT_HEIGHT}px`;
-            line.setAttribute('aria-hidden', 'true');
-            appointmentsGrid.appendChild(line);
-        }
-    }
-
-    function _positionAppointmentBlock(block, interval, timelineStartMinutes, timelineEndMinutes) {
-        const startMinutes = _minutesSinceMidnight(interval.start);
-        const endMinutes = _minutesSinceMidnight(interval.end);
-        const visibleStart = Math.max(startMinutes, timelineStartMinutes);
-        const visibleEnd = Math.min(Math.max(endMinutes, visibleStart + AGENDA_SLOT_MINUTES), timelineEndMinutes);
-        const pixelsPerMinute = AGENDA_SLOT_HEIGHT / AGENDA_SLOT_MINUTES;
-        const top = (visibleStart - timelineStartMinutes) * pixelsPerMinute + AGENDA_CARD_INSET;
-        const height = Math.max(
-            AGENDA_SLOT_HEIGHT - AGENDA_CARD_INSET * 2,
-            (visibleEnd - visibleStart) * pixelsPerMinute - AGENDA_CARD_INSET * 2
-        );
-        const leftTrack = interval.lane * 100 / interval.laneCount;
-        const rightTrack = (interval.laneCount - interval.lane - 1) * 100 / interval.laneCount;
-        const innerGap = interval.laneCount > 1 ? 2 : 6;
-
-        block.style.top = `${top}px`;
-        block.style.height = `${height}px`;
-        block.style.left = `calc(${leftTrack}% + ${interval.lane === 0 ? 6 : innerGap}px)`;
-        block.style.right = `calc(${rightTrack}% + ${interval.lane === interval.laneCount - 1 ? 6 : innerGap}px)`;
-        block.dataset.lane = String(interval.lane);
-        block.dataset.laneCount = String(interval.laneCount);
-        if (interval.laneCount > 1) block.classList.add('appointment-block--overlap');
-    }
-
-    window.__agendaTimeline = {
-        appointmentInterval: _appointmentInterval,
-        assignOverlapLanes: _assignOverlapLanes,
-        timelineBounds: _timelineBounds
-    };
-
     window.renderMiniCalendar = function() {
         const miniCalendar = document.getElementById('miniCalendar');
         if (!miniCalendar) return;
@@ -556,11 +425,11 @@
 
         let html = `
             <div class="mini-calendar-header">
-                <button onclick="previousMonth()"><i class="bi bi-chevron-left"></i></button>
-                <div style="font-size: 14px; font-weight: 600;">
+                <button onclick="previousMonth()" aria-label="Mês anterior"><i class="bi bi-chevron-left"></i></button>
+                <div class="mini-calendar-title">
                     ${new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                 </div>
-                <button onclick="nextMonth()"><i class="bi bi-chevron-right"></i></button>
+                <button onclick="nextMonth()" aria-label="Próximo mês"><i class="bi bi-chevron-right"></i></button>
             </div>
             <div class="mini-calendar-grid">
                 ${['Dom','Seg','Ter','Qua','Qui','Sex','Sab'].map(d => `<div class="mini-calendar-day">${d}</div>`).join('')}
@@ -612,88 +481,161 @@
         return 'appointment-particular';
     }
 
-    function _buildAppointmentBlock(app) {
+    // Cor da barra lateral de cada linha, por tipo de consulta
+    const TYPE_COLORS = {
+        'appointment-particular': '#ffc107',
+        'appointment-patologia': '#287f8c',
+        'appointment-botox': '#6f42c1',
+        'appointment-laser': '#fd7e14',
+        'appointment-preenchimento': '#e83e8c',
+        'appointment-sculptra': '#d85b32',
+        'appointment-ulthera': '#0056b3',
+        'appointment-morpheus': '#5146a5',
+        'appointment-infiltracao-capilar': '#28a745',
+        'appointment-soroterapia': '#17a2b8',
+        'appointment-pequena-cirurgia': '#c2185b',
+        'appointment-retirada-de-ponto': '#7b1fa2',
+        'appointment-nitrogenio-liquido': '#0097a7',
+        'appointment-transplante': '#dc3545',
+        'appointment-implante-capilar': '#17a2b8',
+        'appointment-retorno': '#0098d9',
+        'appointment-unimed': '#198754',
+        'appointment-cortesia': '#6c757d',
+        'appointment-cirurgia': '#ff3b30'
+    };
+
+    // Grade da secretária: 07:00–20:00 em intervalos de 15 min (mesma grade da agenda antiga)
+    const DAY_START_MIN = 7 * 60;
+    const DAY_END_MIN = 20 * 60;
+    const SLOT_MIN = 15;
+
+    function pad2(n) { return String(n).padStart(2, '0'); }
+    function minutesToHHMM(m) { return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`; }
+    function minutesOfDay(date) { return date.getHours() * 60 + date.getMinutes(); }
+    function toLocalISO(date) {
+        return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}:00`;
+    }
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function appInfo(app) {
+        const props = app.extendedProps || {};
         const start = parseLocalDateTime(app.start);
-        const timeStr = String(start.getHours()).padStart(2, '0') + ':' + String(start.getMinutes()).padStart(2, '0');
-        const patientName = app.title ? app.title.split(' - ')[0] : 'Paciente';
-        const ivpStars = app.extendedProps?.ivpStars;
-        const starsHtml = ivpStars ? `<span class="text-warning ms-1">${'⭐'.repeat(ivpStars)}</span>` : '';
+        const end = parseLocalDateTime(app.end);
+        const duration = end && start ? Math.max(SLOT_MIN, Math.round((end - start) / 60000)) : SLOT_MIN;
+        const status = props.status || app.status || 'agendado';
+        const isSurgeryMap = !!props.isSurgeryMap;
+        const typeClass = isSurgeryMap ? 'appointment-cirurgia'
+            : getAppointmentTypeClass(props.appointmentType || app.appointmentType, props.patientType || app.patientType);
+        return {
+            start, end, duration, status, isSurgeryMap, typeClass,
+            startMin: start ? minutesOfDay(start) : 0,
+            patientName: app.title ? app.title.split(' - ')[0] : 'Paciente',
+            appointmentType: props.appointmentType || app.appointmentType || 'Particular',
+            patientType: props.patientType || app.patientType || 'Particular',
+            patientCode: props.patientCode ?? null,
+            patientId: props.patientId || app.patientId,
+            doctorId: props.doctorId || app.doctorId,
+            doctorName: props.doctorName || '',
+            isProvisorio: (props.statusCadastral || 'ativo') === 'provisorio',
+            isWaiting: !!(props.waiting || app.waiting),
+            checkedInTime: props.checkedInTime || null,
+            ivpStars: props.ivpStars,
+            isDone: status === 'atendido' || status === 'faltou'
+        };
+    }
 
-        const appointmentType = app.extendedProps?.appointmentType || app.appointmentType || 'Particular';
-        const patientType = app.extendedProps?.patientType || app.patientType || 'Particular';
-        const patientCode = app.extendedProps?.patientCode || null;
-        const status = app.extendedProps?.status || app.status || 'agendado';
-        const statusCadastral = app.extendedProps?.statusCadastral || 'ativo';
-        const isProvisorio = statusCadastral === 'provisorio';
-        const typeClass = getAppointmentTypeClass(appointmentType, patientType);
-        const statusClass = `status-${status}`;
-        const patientId = app.extendedProps?.patientId || app.patientId;
-        const doctorId = app.extendedProps?.doctorId || app.doctorId;
-        const isSurgeryMap = app.extendedProps?.isSurgeryMap || false;
+    function canReschedule(app, info) {
+        return !!window.isSecretary && /^\d+$/.test(String(app.id)) && !info.isSurgeryMap && !info.isDone && !info.isWaiting;
+    }
 
-        const block = document.createElement('div');
-        block.className = `appointment-block ${typeClass} ${statusClass}${isProvisorio ? ' appointment-provisorio' : ''}`;
-        if (isSurgeryMap) block.classList.add('appointment-cirurgia');
-        block.style.cursor = 'pointer';
-        block.dataset.appointmentId = app.id;
-
-        const isWaiting = app.extendedProps?.waiting || app.waiting || false;
-        let actionBadgeHtml = '';
-
-        if (isProvisorio) {
-            actionBadgeHtml = `<button class="btn btn-sm btn-warning btn-ativar-provisorio"
-                    onclick="event.stopPropagation(); openEditAppointmentModalById('${app.id}')"
-                    title="Editar cadastro provisório"><i class="bi bi-pencil-square"></i> <span class="appointment-action-label">Editar cadastro</span></button>`;
-        } else if (status === 'atendido') {
-            actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
-        } else if (status === 'faltou') {
-            actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
-                    <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> <span class="appointment-action-label">Check In</span></button>`;
-        } else if (isWaiting) {
-            actionBadgeHtml = `
-                    <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
-                    <button class="btn btn-sm btn-success ms-2" onclick="event.stopPropagation(); doCheckout('${app.id}')" title="Finalizar atendimento">
-                        <i class="bi bi-check2-circle"></i> Finalizar
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger ms-1" onclick="event.stopPropagation(); removeFromWaiting('${app.id}')" title="Remover da espera (sem finalizar)">
-                        <i class="bi bi-x-circle"></i> Remover
-                    </button>
-                `;
-        } else {
-            actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> <span class="appointment-action-label">Check In</span></button>`;
+    function _buildActions(app, info) {
+        const id = app.id;
+        let html = '';
+        if (info.isProvisorio) {
+            html = `<button class="ag-pill ag-pill-orange-soft" onclick="event.stopPropagation(); openEditAppointmentModalById('${id}')"
+                    title="Editar cadastro provisório"><i class="bi bi-pencil-square"></i> Editar cadastro</button>`;
+        } else if (info.status === 'atendido') {
+            html = `<span class="ag-pill ag-pill-green-soft"><i class="bi bi-check-circle-fill"></i> Atendido</span>`;
+        } else if (info.status === 'faltou') {
+            html = `<span class="ag-pill ag-pill-red-soft"><i class="bi bi-x-circle-fill"></i> Faltou</span>
+                    <button class="ag-pill ag-pill-neutral" onclick="event.stopPropagation(); doCheckin('${id}')" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+        } else if (info.isWaiting) {
+            html = `<span class="ag-pill ag-pill-yellow-soft"><i class="bi bi-hourglass-split"></i> Na espera</span>
+                    <button class="ag-pill ag-pill-blue" onclick="event.stopPropagation(); doCheckout('${id}')" title="Finalizar atendimento"><i class="bi bi-check2-circle"></i> Finalizar</button>
+                    <button class="ag-pill ag-pill-ghost" onclick="event.stopPropagation(); removeFromWaiting('${id}')" title="Remover da espera (sem finalizar)" aria-label="Remover da espera"><i class="bi bi-x-lg"></i></button>`;
+        } else if (!info.isSurgeryMap) {
+            html = `<button class="ag-pill ag-pill-green" onclick="event.stopPropagation(); doCheckin('${id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
         }
 
-        if (isProvisorio && (window.isSecretary || window.isDoctor)) {
-            const existingPhone = app.extendedProps?.phone || '';
-            const existingCpf = app.extendedProps?.cpf || '';
-            actionBadgeHtml += `<button class="btn btn-sm btn-warning ms-1 btn-ativar-provisorio"
-                    onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'}, '${(existingPhone || '').replace(/'/g,"\\'")}', '${(existingCpf || '').replace(/'/g,"\\'")}')"
-                    title="Ativar cadastro deste paciente"><i class="bi bi-person-check"></i> <span class="appointment-action-label">Ativar</span></button>`;
+        if (info.isProvisorio && (window.isSecretary || window.isDoctor)) {
+            const props = app.extendedProps || {};
+            const q = v => String(v || '').replace(/'/g, "\\'");
+            html += `<button class="ag-pill ag-pill-orange"
+                    onclick="event.stopPropagation(); abrirModalAtivacao(${info.patientId}, '${q(info.patientName)}', ${info.doctorId || 'null'}, '${q(props.phone)}', '${q(props.cpf)}')"
+                    title="Ativar cadastro deste paciente"><i class="bi bi-person-check"></i> Ativar</button>`;
         }
-
-        if (isSurgeryMap && patientId) {
-            actionBadgeHtml += `<button class="btn btn-sm btn-primary ms-2" onclick="event.stopPropagation(); goToPatientChart(${patientId}, '${app.id}')" title="Ver prontuário"><i class="bi bi-file-medical"></i> Prontuário</button>`;
+        if (info.isSurgeryMap && info.patientId) {
+            html += `<button class="ag-pill ag-pill-neutral" onclick="event.stopPropagation(); goToPatientChart(${info.patientId}, '${id}')" title="Ver prontuário"><i class="bi bi-file-medical"></i> Prontuário</button>`;
         }
+        return html;
+    }
 
-        const codeLabel = isProvisorio
-            ? `<span class="badge bg-warning text-dark ms-1" style="font-size:0.65rem;vertical-align:middle;">⏳ PROVISÓRIO</span>`
-            : `<span class="appointment-code">cod:${patientCode !== null ? patientCode : '-'}</span>`;
+    function _buildAppointmentBlock(app) {
+        const info = appInfo(app);
+        const timeStr = info.start ? minutesToHHMM(info.startMin) : '--:--';
+        const draggable = canReschedule(app, info);
 
-        block.innerHTML = `
-                <div class="appointment-content">
-                    <div class="appointment-info-line">
-                        <span class="appointment-time-badge">${timeStr}</span>
-                        <span class="appointment-name" onclick="event.stopPropagation(); if(${patientId || 0} && !${isProvisorio}) { goToPatientChart(${patientId || 0}, '${app.id}') } else if(${isProvisorio}) { showAlert('Cadastro provisório — ative primeiro para acessar o prontuário.', 'warning') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }" style="cursor:pointer; text-decoration:underline;">${patientName}${starsHtml}</span>
-                        ${codeLabel}
-                        <span class="appointment-type-label">pac:${patientType}</span>
-                        <span class="appointment-consult-label">cons:${appointmentType}</span>
-                        ${actionBadgeHtml}
-                    </div>
-                </div>
-            `;
+        const row = document.createElement('div');
+        row.className = 'ag-row'
+            + (info.isDone ? ' is-done' : '')
+            + (info.status === 'faltou' ? ' is-missed' : '')
+            + (info.isProvisorio ? ' is-provisorio' : '')
+            + (info.isWaiting ? ' is-waiting' : '')
+            + (info.isSurgeryMap ? ' is-surgery' : '');
+        row.style.setProperty('--bar', TYPE_COLORS[info.typeClass] || '#ffc107');
+        row.dataset.appointmentId = app.id;
+        row.dataset.slot = timeStr;
+        row.dataset.min = info.startMin;
 
-        block.onclick = () => selectAppointment(app);
-        return block;
+        const stars = info.ivpStars ? `<span class="ag-stars">${'⭐'.repeat(info.ivpStars)}</span>` : '';
+        const meta = [escapeHtml(info.appointmentType)];
+        if (window.isSecretary) {
+            if (!info.isProvisorio) meta.push(`cód ${info.patientCode !== null ? escapeHtml(info.patientCode) : '-'}`);
+            meta.push(escapeHtml(info.patientType));
+            if (!currentDoctorFilter && info.doctorName) meta.push(escapeHtml(info.doctorName));
+        }
+        const tags = (info.isProvisorio ? '<span class="ag-tag ag-tag-orange">Provisório</span>' : '')
+            + (info.isSurgeryMap ? '<span class="ag-tag ag-tag-red">Cirurgia</span>' : '');
+        const grip = draggable
+            ? `<button type="button" class="ag-grip" aria-label="Arrastar para remarcar" title="Arraste para remarcar"><i class="bi bi-grip-vertical"></i></button>`
+            : (window.isSecretary ? '<span class="ag-grip-space"></span>' : '');
+        const duration = info.duration > SLOT_MIN ? `<small>${info.duration} min</small>` : '';
+        const nameClick = `event.stopPropagation(); if(${info.patientId || 0} && !${info.isProvisorio}) { goToPatientChart(${info.patientId || 0}, '${app.id}') } else if(${info.isProvisorio}) { showAlert('Cadastro provisório — ative primeiro para acessar o prontuário.', 'warning') } else { showAlert('Paciente não vinculado ao prontuário', 'warning') }`;
+
+        row.innerHTML = `
+            ${grip}
+            <span class="ag-time">${timeStr}${duration}</span>
+            <div class="ag-main">
+                <span class="ag-name" onclick="${nameClick}">${escapeHtml(info.patientName)}${stars}</span>${tags}
+                <span class="ag-meta">${meta.join(' · ')}</span>
+            </div>
+            <div class="ag-actions">${_buildActions(app, info)}</div>`;
+
+        row.onclick = () => selectAppointment(app);
+        return row;
+    }
+
+    function _buildFreeSlot(min) {
+        const row = document.createElement('div');
+        row.className = 'ag-slot';
+        row.dataset.slot = minutesToHHMM(min);
+        row.dataset.min = min;
+        row.innerHTML = `<span class="ag-grip-space"></span><span class="ag-time">${minutesToHHMM(min)}</span>
+            <span class="ag-slot-line"></span><span class="ag-slot-add"><i class="bi bi-plus-lg"></i> Agendar</span>`;
+        row.onclick = () => window.openNewAppointmentAtTime(Math.floor(min / 60), min % 60);
+        return row;
     }
 
     function updateProvisorioBadge() {
@@ -717,64 +659,386 @@
         }
     }
 
+    function getDayAppointments() {
+        const selectedDateStr = selectedDate.toDateString();
+        return appointmentsList.filter(app => {
+            const start = parseLocalDateTime(app.start);
+            if (!start || start.toDateString() !== selectedDateStr) return false;
+            const doctorId = parseInt(app.extendedProps?.doctorId || app.doctorId || app.doctor_id);
+            return !currentDoctorFilter || doctorId === currentDoctorFilter;
+        }).sort((a, b) => parseLocalDateTime(a.start) - parseLocalDateTime(b.start));
+    }
+
+    function isSelectedDateToday() {
+        return selectedDate.toDateString() === todayISO_BR().toDateString();
+    }
+
+    // Linhas do dia, em ordem. Médico: só consultas. Secretária: grade de 15 min com os horários
+    // livres; consultas simultâneas aparecem todas no mesmo horário e as fora de 07:00–20:00
+    // vêm antes/depois da grade (nunca somem).
+    function buildDayRows(dayAppointments, withFreeSlots) {
+        const infos = dayAppointments
+            .map(app => ({ app, info: appInfo(app) }))
+            .filter(({ info }) => info.start)
+            .sort((x, y) => x.info.start - y.info.start);
+        if (!withFreeSlots) return infos.map(({ app }) => ({ type: 'appointment', app }));
+
+        // Horários dentro de uma consulta (mínimo de 15 min) não aparecem como livres
+        const covered = new Set();
+        infos.forEach(({ info }) => {
+            for (let m = info.startMin; m < info.startMin + info.duration; m += SLOT_MIN) {
+                covered.add(Math.floor(m / SLOT_MIN) * SLOT_MIN);
+            }
+        });
+        const rows = [];
+        const pushApps = list => list.forEach(({ app }) => rows.push({ type: 'appointment', app }));
+        pushApps(infos.filter(({ info }) => info.startMin < DAY_START_MIN));
+        for (let min = DAY_START_MIN; min < DAY_END_MIN; min += SLOT_MIN) {
+            const here = infos.filter(({ info }) => info.startMin >= min && info.startMin < min + SLOT_MIN);
+            if (here.length) pushApps(here);
+            else if (!covered.has(min)) rows.push({ type: 'free', min });
+        }
+        pushApps(infos.filter(({ info }) => info.startMin >= DAY_END_MIN));
+        return rows;
+    }
+
+    window.__agendaDayLayout = { buildDayRows };
+
+    function _renderRows(grid, dayAppointments) {
+        const rows = buildDayRows(dayAppointments, !!window.isSecretary);
+        rows.forEach(row => grid.appendChild(
+            row.type === 'free' ? _buildFreeSlot(row.min) : _buildAppointmentBlock(row.app)
+        ));
+        return rows.filter(row => row.type === 'free').length;
+    }
+
+    function _insertNowLine(grid) {
+        if (!isSelectedDateToday()) return;
+        const nowMin = minutesOfDay(todayISO_BR());
+        const rows = [...grid.querySelectorAll('[data-min]')];
+        if (!rows.length) return;
+        const line = document.createElement('div');
+        line.className = 'ag-now';
+        line.innerHTML = `<span>${minutesToHHMM(nowMin)}</span>`;
+        const next = rows.find(r => parseInt(r.dataset.min) > nowMin);
+        if (next) grid.insertBefore(line, next);
+        else grid.appendChild(line);
+    }
+
+    function _renderNextCard(dayAppointments) {
+        const card = document.getElementById('agNextCard');
+        if (!card) return;
+        card.innerHTML = '';
+        if (window.isSecretary || !isSelectedDateToday()) return;
+
+        const nowMin = minutesOfDay(todayISO_BR());
+        const infos = dayAppointments.map(app => ({ app, info: appInfo(app) }))
+            .filter(({ info }) => !info.isDone && !info.isSurgeryMap);
+        const waiting = infos.find(({ info }) => info.isWaiting);
+        const upcoming = infos.find(({ info }) => info.startMin >= nowMin - 10);
+        const pick = waiting || upcoming;
+        if (!pick) return;
+
+        const { app, info } = pick;
+        let eyebrow;
+        if (info.isWaiting) {
+            const since = info.checkedInTime ? minutesSince(info.checkedInTime) : null;
+            eyebrow = since !== null ? `Na sala de espera · há ${since} min` : 'Na sala de espera';
+        } else {
+            const diff = info.startMin - nowMin;
+            eyebrow = diff > 0 ? `Próximo paciente · em ${diff} min` : 'Próximo paciente · agora';
+        }
+        const meta = [minutesToHHMM(info.startMin), escapeHtml(info.appointmentType)];
+        if (info.patientCode !== null) meta.push(`Cód. ${escapeHtml(info.patientCode)}`);
+        meta.push(escapeHtml(info.patientType));
+
+        const canOpenChart = info.patientId && !info.isProvisorio;
+        card.innerHTML = `
+            <section class="ag-next" aria-label="Próximo paciente">
+                <div>
+                    <div class="ag-eyebrow">${eyebrow}</div>
+                    <div class="ag-next-name">${escapeHtml(info.patientName)}</div>
+                    <div class="ag-next-meta">${meta.join(' · ')}</div>
+                </div>
+                <div class="ag-next-actions">
+                    <button type="button" class="ag-capsule" data-act="details">Detalhes</button>
+                    ${canOpenChart ? `<button type="button" class="ag-capsule ag-primary" data-act="chart"><i class="bi bi-file-medical"></i> Abrir prontuário</button>` : ''}
+                </div>
+            </section>`;
+        card.querySelector('[data-act="details"]').onclick = () => selectAppointment(app);
+        const chartBtn = card.querySelector('[data-act="chart"]');
+        if (chartBtn) chartBtn.onclick = () => goToPatientChart(info.patientId, app.id);
+    }
+
+    function _renderDayStats(dayAppointments, freeCount) {
+        const infos = dayAppointments.map(appInfo);
+        const total = infos.length;
+        const done = infos.filter(i => i.status === 'atendido').length;
+        const missed = infos.filter(i => i.status === 'faltou').length;
+        const stats = window.isSecretary
+            ? [['Agendados', total], ['Horários livres', freeCount], ['Atendidos', done]]
+            : [['Atendidos', `${done} de ${total}`], ['Faltas', missed]];
+        const el = document.getElementById('agDayStats');
+        if (el) el.innerHTML = stats.map(([l, v]) => `<div class="ag-side-row"><span>${l}</span><b>${v}</b></div>`).join('');
+
+        const sub = document.getElementById('agSubtitle');
+        if (sub) {
+            const parts = [`${total} ${total === 1 ? 'consulta' : 'consultas'}`];
+            if (window.isSecretary) {
+                parts.push(`${freeCount} ${freeCount === 1 ? 'horário livre' : 'horários livres'}`);
+                const activeBtn = document.querySelector('.doctor-filter-btns .btn.active');
+                parts.push(currentDoctorFilter && activeBtn ? activeBtn.textContent.trim() : 'todos os médicos');
+            }
+            sub.textContent = parts.join(' · ');
+        }
+    }
+
     window.renderDayView = function() {
         const appointmentsGrid = document.getElementById('appointmentsGrid');
         if (!appointmentsGrid) return;
+        appointmentsGrid.innerHTML = '';
         updateProvisorioBadge();
 
-        console.log("Renderizando Agenda. Filtro Médico ID:", currentDoctorFilter);
-        console.log("Total de agendamentos carregados:", appointmentsList.length);
+        // Animar a entrada só quando o dia/filtro muda, não no auto-refresh
+        const renderKey = selectedDate.toDateString() + '|' + (currentDoctorFilter || 'all');
+        appointmentsGrid.classList.toggle('aa-animate', appointmentsGrid.dataset.renderKey !== renderKey);
+        appointmentsGrid.dataset.renderKey = renderKey;
 
-        const dayAppointments = appointmentsList.filter(app => {
-            const start = parseLocalDateTime(app.start);
-            if (!start) return false;
+        const dayAppointments = getDayAppointments();
+        const freeCount = _renderRows(appointmentsGrid, dayAppointments);
+        _renderNextCard(dayAppointments);
+        _renderDayStats(dayAppointments, freeCount);
 
-            const appDateStr = start.getFullYear() + '-' +
-                               String(start.getMonth() + 1).padStart(2, '0') + '-' +
-                               String(start.getDate()).padStart(2, '0');
-
-            const selectedDateStr = selectedDate.getFullYear() + '-' +
-                                   String(selectedDate.getMonth() + 1).padStart(2, '0') + '-' +
-                                   String(selectedDate.getDate()).padStart(2, '0');
-
-            const isSameDate = appDateStr === selectedDateStr;
-
-            const doctorId = parseInt(app.extendedProps?.doctorId || app.doctorId || app.doctor_id);
-            const isDoctorMatch = !currentDoctorFilter || doctorId === currentDoctorFilter;
-
-            return isSameDate && isDoctorMatch;
-        });
-
-        console.log("Agendamentos filtrados para exibição:", dayAppointments.length);
-
-        if (dayAppointments.length === 0 && appointmentsList.length > 0) {
-            console.log("DEBUG: Datas dos agendamentos carregados:", appointmentsList.map(a => a.start));
-            console.log("DEBUG: Fuso horário local:", new Date().toString());
-        }
-
-        if (dayAppointments.length === 0) {
-            renderTimeColumn();
-            _renderAppointmentGridLines(
-                appointmentsGrid,
-                (AGENDA_DEFAULT_END_MINUTES - AGENDA_DEFAULT_START_MINUTES) / AGENDA_SLOT_MINUTES
-            );
-            appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
+        if (!window.isSecretary && dayAppointments.length === 0) {
+            appointmentsGrid.innerHTML = '<div class="ag-empty"><i class="bi bi-calendar2-check"></i>Nenhum paciente marcado para este dia</div>';
             return;
         }
-
-        const intervals = dayAppointments.map(_appointmentInterval).filter(Boolean);
-        const bounds = _timelineBounds(intervals);
-        const laidOutIntervals = _assignOverlapLanes(intervals);
-        const slotCount = (bounds.endMinutes - bounds.startMinutes) / AGENDA_SLOT_MINUTES;
-        renderTimeColumn(bounds.startMinutes, bounds.endMinutes);
-        _renderAppointmentGridLines(appointmentsGrid, slotCount);
-
-        laidOutIntervals.forEach(interval => {
-            const block = _buildAppointmentBlock(interval.app);
-            _positionAppointmentBlock(block, interval, bounds.startMinutes, bounds.endMinutes);
-            appointmentsGrid.appendChild(block);
-        });
+        _insertNowLine(appointmentsGrid);
     };
+
+    // ==================== ARRASTAR PARA REMARCAR (secretária) ====================
+    let dragState = null;
+    const DRAG_THRESHOLD = 6;
+    const EDGE_SCROLL_ZONE = 80;
+
+    function _setupDragToReschedule() {
+        const grid = document.getElementById('appointmentsGrid');
+        if (!grid || !window.isSecretary) return;
+
+        grid.addEventListener('pointerdown', e => {
+            const grip = e.target.closest('.ag-grip');
+            if (!grip || e.button !== 0 || dragState) return;
+            const row = grip.closest('.ag-row');
+            const app = appointmentsList.find(a => String(a.id) === row.dataset.appointmentId);
+            if (!app) return;
+            e.preventDefault();
+            grip.setPointerCapture(e.pointerId);
+            dragState = { app, row, grip, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY, started: false, target: null };
+        });
+        // O clique na alça não abre o modal da linha
+        grid.addEventListener('click', e => { if (e.target.closest('.ag-grip')) e.stopPropagation(); }, true);
+        // Teclado: Enter/Espaço na alça abre a edição, onde também se troca o horário
+        grid.addEventListener('keydown', e => {
+            const grip = e.target.closest('.ag-grip');
+            if (!grip || (e.key !== 'Enter' && e.key !== ' ')) return;
+            e.preventDefault();
+            const app = appointmentsList.find(a => String(a.id) === grip.closest('.ag-row').dataset.appointmentId);
+            if (app) selectAppointment(app);
+        });
+
+        document.addEventListener('pointermove', e => {
+            if (!dragState || e.pointerId !== dragState.pointerId) return;
+            dragState.x = e.clientX;
+            dragState.y = e.clientY;
+            if (!dragState.started) {
+                if (Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY) < DRAG_THRESHOLD) return;
+                _startDrag();
+            }
+            _updateDrag();
+        });
+        document.addEventListener('pointerup', e => {
+            if (!dragState || e.pointerId !== dragState.pointerId) return;
+            if (!dragState.started) { dragState = null; return; }
+            const target = dragState.target;
+            if (target && target.dataset.slot !== dragState.row.dataset.slot) _commitDrag(target);
+            else _cancelDrag();
+        });
+        document.addEventListener('pointercancel', e => {
+            if (dragState && e.pointerId === dragState.pointerId) _cancelDrag();
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && dragState && dragState.started) _cancelDrag();
+        });
+    }
+
+    function _startDrag() {
+        const { row } = dragState;
+        const rect = row.getBoundingClientRect();
+        const floating = row.cloneNode(true);
+        floating.classList.add('ag-floating');
+        floating.removeAttribute('data-slot');
+        floating.removeAttribute('data-min');
+        floating.style.left = `${rect.left}px`;
+        floating.style.top = `${rect.top}px`;
+        floating.style.width = `${rect.width}px`;
+        document.body.appendChild(floating);
+        row.classList.add('is-drag-origin');
+        document.body.classList.add('ag-dragging');
+        Object.assign(dragState, { started: true, floating, rect });
+        _autoScrollLoop();
+    }
+
+    function _updateDrag() {
+        const s = dragState;
+        s.floating.style.transform = `translate(${s.x - s.startX}px, ${s.y - s.startY}px) scale(1.02)`;
+
+        const under = document.elementFromPoint(s.x, s.y);
+        const target = under ? under.closest('#appointmentsGrid [data-slot]') : null;
+        if (target !== s.target) {
+            if (s.target) s.target.classList.remove('is-drop-target');
+            s.target = target && target !== s.row ? target : null;
+            if (s.target) s.target.classList.add('is-drop-target');
+        }
+        const name = appInfo(s.app).patientName;
+        const to = s.target ? s.target.dataset.slot : null;
+        const timeEl = s.floating.querySelector('.ag-time');
+        if (timeEl) timeEl.firstChild.textContent = to || s.row.dataset.slot;
+        const fit = s.target && s.target.classList.contains('ag-row') ? ' (encaixe)' : '';
+        _showToast(to
+            ? `<i class="bi bi-arrows-move"></i> Remarcar <b>${escapeHtml(name)}</b> de ${s.row.dataset.slot} para <b>${to}</b>${fit} <kbd>Esc</kbd> cancela`
+            : `<i class="bi bi-arrows-move"></i> Arraste <b>${escapeHtml(name)}</b> até um horário <kbd>Esc</kbd> cancela`);
+    }
+
+    function _autoScrollLoop() {
+        if (!dragState || !dragState.started) return;
+        const y = dragState.y;
+        let speed = 0;
+        if (y < EDGE_SCROLL_ZONE) speed = -Math.ceil((EDGE_SCROLL_ZONE - y) / 6);
+        else if (y > window.innerHeight - EDGE_SCROLL_ZONE) speed = Math.ceil((y - (window.innerHeight - EDGE_SCROLL_ZONE)) / 6);
+        if (speed) {
+            // 'instant': o Bootstrap liga scroll-behavior: smooth no <html>, o que atrasaria o arraste
+            window.scrollBy({ top: speed, behavior: 'instant' });
+            _updateDrag();
+        }
+        requestAnimationFrame(_autoScrollLoop);
+    }
+
+    function _endDrag() {
+        const s = dragState;
+        dragState = null;
+        if (!s) return;
+        if (s.target) s.target.classList.remove('is-drop-target');
+        s.row.classList.remove('is-drag-origin');
+        document.body.classList.remove('ag-dragging');
+        try { s.grip.releasePointerCapture(s.pointerId); } catch (_) { /* já liberado */ }
+        return s;
+    }
+
+    function _animateFloatingTo(floating, dx, dy, done) {
+        const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) { floating.remove(); done && done(); return; }
+        floating.classList.add('is-settling');
+        floating.style.transform = `translate(${dx}px, ${dy}px) scale(1)`;
+        let finished = false;
+        const finish = () => { if (finished) return; finished = true; floating.remove(); done && done(); };
+        floating.addEventListener('transitionend', finish, { once: true });
+        setTimeout(finish, 320);
+    }
+
+    function _cancelDrag() {
+        const s = _endDrag();
+        if (!s) return;
+        _hideToast();
+        // Volta pelo mesmo caminho até a posição de origem
+        const r = s.row.getBoundingClientRect();
+        _animateFloatingTo(s.floating, r.left - s.rect.left, r.top - s.rect.top);
+    }
+
+    function _commitDrag(target) {
+        const s = _endDrag();
+        const { app } = s;
+        const r = target.getBoundingClientRect();
+        _animateFloatingTo(s.floating, r.left - s.rect.left, r.top - s.rect.top, () => {
+            const [h, m] = target.dataset.slot.split(':').map(Number);
+            const info = appInfo(app);
+            const newStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), h, m);
+            const newEnd = new Date(newStart.getTime() + info.duration * 60000);
+            _rescheduleAppointment(app, toLocalISO(newStart), toLocalISO(newEnd), { undoable: true });
+        });
+    }
+
+    function _rescheduleAppointment(app, start, end, { undoable }) {
+        const previous = { start: app.start, end: app.end };
+        const name = appInfo(app).patientName;
+        app.start = start;
+        app.end = end;
+        renderDayView();
+
+        fetch(`/api/appointments/${app.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify({ start, end })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) throw new Error(data.error || 'Erro ao remarcar');
+            const hhmm = start.slice(11, 16);
+            if (undoable) {
+                _showToast(`<i class="bi bi-check-circle-fill"></i> <b>${escapeHtml(name)}</b> remarcado para <b>${hhmm}</b>`, {
+                    timeout: 8000,
+                    action: { label: 'Desfazer', run: () => _rescheduleAppointment(app, previous.start, previous.end, { undoable: false }) }
+                });
+            } else {
+                _showToast(`<i class="bi bi-arrow-counterclockwise"></i> Remarcação desfeita`, { timeout: 3000 });
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            app.start = previous.start;
+            app.end = previous.end;
+            renderDayView();
+            _hideToast();
+            showAlert(err.message || 'Erro ao remarcar', 'danger');
+        });
+    }
+
+    // Celular/tablet: a barra lateral vira gaveta, aberta pelo botão de menu
+    function _setupSidebarToggle() {
+        const btn = document.getElementById('agMenuBtn');
+        const scrim = document.getElementById('agScrim');
+        if (!btn || !scrim) return;
+        const setOpen = open => {
+            document.body.classList.toggle('ag-side-open', open);
+            btn.setAttribute('aria-expanded', String(open));
+            scrim.hidden = !open;
+        };
+        btn.addEventListener('click', () => setOpen(!document.body.classList.contains('ag-side-open')));
+        scrim.addEventListener('click', () => setOpen(false));
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
+    }
+
+    let _toastTimer = null;
+    function _showToast(html, { timeout = 0, action = null } = {}) {
+        const toast = document.getElementById('agToast');
+        if (!toast) return;
+        clearTimeout(_toastTimer);
+        toast.innerHTML = `<span>${html}</span>`;
+        if (action) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = action.label;
+            btn.onclick = () => { _hideToast(); action.run(); };
+            toast.appendChild(btn);
+        }
+        toast.hidden = false;
+        if (timeout) _toastTimer = setTimeout(_hideToast, timeout);
+    }
+
+    function _hideToast() {
+        const toast = document.getElementById('agToast');
+        if (toast) toast.hidden = true;
+        clearTimeout(_toastTimer);
+    }
 
     window.goToPatientChart = function(patientId, appointmentId, dpId) {
         if (dpId) {
@@ -856,15 +1120,8 @@
         return document.querySelector('.modal.show') !== null;
     }
 
-    function _getAppointmentStateKey(app) {
-        const status = app.extendedProps?.status || app.status || 'agendado';
-        const waiting = !!(app.extendedProps?.waiting || app.waiting);
-        const statusCadastral = app.extendedProps?.statusCadastral || 'ativo';
-        return `${status}|${waiting}|${statusCadastral}`;
-    }
-
     function _autoRefreshAppointments() {
-        if (_isAnyModalOpen()) return;
+        if (_isAnyModalOpen() || dragState) return;
 
         const year = selectedDate.getFullYear();
         const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
@@ -876,32 +1133,12 @@
         fetch(url)
             .then(r => r.json())
             .then(newData => {
-                if (_isAnyModalOpen()) return;
-
-                const oldIds = new Set(appointmentsList.map(a => String(a.id)));
-                const newIds = new Set(newData.map(a => String(a.id)));
-                const sameIdSet = oldIds.size === newIds.size && [...newIds].every(id => oldIds.has(id));
-
-                if (!sameIdSet) {
-                    appointmentsList = newData;
-                    renderDayView();
-                    _updateLastUpdatedLabel();
-                    if (calendar && currentView === 'month') calendar.refetchEvents();
-                    return;
-                }
-
-                const oldMap = {};
-                appointmentsList.forEach(a => { oldMap[String(a.id)] = a; });
-
-                const anyChanged = newData.some(newApp => {
-                    const oldApp = oldMap[String(newApp.id)];
-                    return oldApp && _getAppointmentStateKey(newApp) !== _getAppointmentStateKey(oldApp);
-                });
-
+                if (_isAnyModalOpen() || dragState) return;
+                const changed = JSON.stringify(newData) !== JSON.stringify(appointmentsList);
                 appointmentsList = newData;
+                renderDayView();
                 _updateLastUpdatedLabel();
-                if (anyChanged) renderDayView();
-                if (anyChanged && calendar && currentView === 'month') calendar.refetchEvents();
+                if (changed && calendar && currentView === 'month') calendar.refetchEvents();
             })
             .catch(err => console.error('Erro no auto-refresh da agenda:', err));
     }
@@ -1176,14 +1413,12 @@
             const items = d.waiting_list || [];
             waitingRoomData = items;
             list.innerHTML = items.length ? items.map(p => `
-                <div class="waiting-patient-item" data-checkedin="${p.checked_in_time || ''}" onclick="goToPatientChart(${p.patient_id}, ${p.appointment_id})" style="cursor:pointer; padding: 8px; border-bottom: 1px solid #eee; transition: background 0.2s;">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span style="font-weight: 500;">${p.patient_name}</span>
-                        <small class="text-muted">(<span data-role="wait">${(p.wait_time_minutes ?? 0)} min</span>)</small>
-                    </div>
+                <div class="waiting-patient-item" data-checkedin="${p.checked_in_time || ''}" onclick="goToPatientChart(${p.patient_id}, ${p.appointment_id})">
+                    <span class="waiting-patient-name">${p.patient_name}</span>
+                    <span class="waiting-patient-time"><span data-role="wait">${(p.wait_time_minutes ?? 0)} min</span></span>
                 </div>`).join('') : '<div class="waiting-empty">Sala de espera vazia</div>';
-            
-            // Adicionar hover effect via JS se necessário, mas CSS é melhor
+            const countBadge = document.getElementById('waitingCountBadge');
+            if (countBadge) countBadge.textContent = items.length;
         });
     }
 
@@ -1426,7 +1661,7 @@
         const monthBtn = document.getElementById('monthViewBtn');
         
         if (view === 'day') {
-            if (dayContent) dayContent.style.display = 'grid';
+            if (dayContent) dayContent.style.display = '';
             if (monthContent) monthContent.style.display = 'none';
             if (dayBtn) dayBtn.classList.add('active');
             if (monthBtn) monthBtn.classList.remove('active');
@@ -1436,7 +1671,10 @@
             if (dayBtn) dayBtn.classList.remove('active');
             if (monthBtn) monthBtn.classList.add('active');
             if (!calendar) initializeMonthCalendar();
+            else calendar.updateSize();
         }
+        const nextCard = document.getElementById('agNextCard');
+        if (nextCard) nextCard.style.display = view === 'day' ? '' : 'none';
     };
 
     window.showDuplicatePatientModal = function(data) {
