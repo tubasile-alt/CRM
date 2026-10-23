@@ -523,13 +523,16 @@
         const props = app.extendedProps || {};
         const start = parseLocalDateTime(app.start);
         const end = parseLocalDateTime(app.end);
-        const duration = end && start ? Math.max(SLOT_MIN, Math.round((end - start) / 60000)) : SLOT_MIN;
+        // actualDuration é a duração gravada (preservada ao remarcar); duration tem no mínimo um slot,
+        // para exibição e para marcar os horários ocupados
+        const actualDuration = end && start && end > start ? Math.round((end - start) / 60000) : SLOT_MIN;
+        const duration = Math.max(SLOT_MIN, actualDuration);
         const status = props.status || app.status || 'agendado';
         const isSurgeryMap = !!props.isSurgeryMap;
         const typeClass = isSurgeryMap ? 'appointment-cirurgia'
             : getAppointmentTypeClass(props.appointmentType || app.appointmentType, props.patientType || app.patientType);
         return {
-            start, end, duration, status, isSurgeryMap, typeClass,
+            start, end, duration, actualDuration, status, isSurgeryMap, typeClass,
             startMin: start ? minutesOfDay(start) : 0,
             patientName: app.title ? app.title.split(' - ')[0] : 'Paciente',
             appointmentType: props.appointmentType || app.appointmentType || 'Particular',
@@ -686,8 +689,9 @@
         // Horários dentro de uma consulta (mínimo de 15 min) não aparecem como livres
         const covered = new Set();
         infos.forEach(({ info }) => {
-            for (let m = info.startMin; m < info.startMin + info.duration; m += SLOT_MIN) {
-                covered.add(Math.floor(m / SLOT_MIN) * SLOT_MIN);
+            const firstSlot = Math.floor(info.startMin / SLOT_MIN) * SLOT_MIN;
+            for (let m = firstSlot; m < info.startMin + info.duration; m += SLOT_MIN) {
+                covered.add(m);
             }
         });
         const rows = [];
@@ -702,7 +706,7 @@
         return rows;
     }
 
-    window.__agendaDayLayout = { buildDayRows };
+    window.__agendaDayLayout = { buildDayRows, appInfo };
 
     function _renderRows(grid, dayAppointments) {
         const rows = buildDayRows(dayAppointments, !!window.isSecretary);
@@ -962,7 +966,7 @@
             const [h, m] = target.dataset.slot.split(':').map(Number);
             const info = appInfo(app);
             const newStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate(), h, m);
-            const newEnd = new Date(newStart.getTime() + info.duration * 60000);
+            const newEnd = new Date(newStart.getTime() + info.actualDuration * 60000);
             _rescheduleAppointment(app, toLocalISO(newStart), toLocalISO(newEnd), { undoable: true });
         });
     }
@@ -982,6 +986,7 @@
         .then(r => r.json())
         .then(data => {
             if (!data.success) throw new Error(data.error || 'Erro ao remarcar');
+            if (calendar) calendar.refetchEvents();
             const hhmm = start.slice(11, 16);
             if (undoable) {
                 _showToast(`<i class="bi bi-check-circle-fill"></i> <b>${escapeHtml(name)}</b> remarcado para <b>${hhmm}</b>`, {
@@ -1671,7 +1676,10 @@
             if (dayBtn) dayBtn.classList.remove('active');
             if (monthBtn) monthBtn.classList.add('active');
             if (!calendar) initializeMonthCalendar();
-            else calendar.updateSize();
+            else {
+                calendar.refetchEvents();
+                calendar.updateSize();
+            }
         }
         const nextCard = document.getElementById('agNextCard');
         if (nextCard) nextCard.style.display = view === 'day' ? '' : 'none';

@@ -82,6 +82,29 @@ console.log(JSON.stringify([rows[0], rows[1], rows[rows.length - 2], rows[rows.l
 
         self.assertEqual(result, ['consulta 1', 'livre 07:00', 'livre 19:45', 'consulta 2'])
 
+    def test_off_grid_appointment_covers_every_slot_it_overlaps(self):
+        result = run_day_layout_script("""
+const apps = [
+  { id: 1, start: '2026-10-23T09:10:00', end: '2026-10-23T09:40:00' }
+];
+const rows = rowsSummary(__agendaDayLayout.buildDayRows(apps, true));
+const from = rows.indexOf('livre 08:45');
+console.log(JSON.stringify(rows.slice(from, from + 3)));
+""")
+
+        # 09:15 e 09:30 estão dentro da consulta e não podem aparecer como livres.
+        self.assertEqual(result, ['livre 08:45', 'consulta 1', 'livre 09:45'])
+
+    def test_rescheduling_keeps_the_real_duration_of_short_appointments(self):
+        result = run_day_layout_script("""
+const info = __agendaDayLayout.appInfo(
+  { id: 1, start: '2026-10-23T09:00:00', end: '2026-10-23T09:05:00' }
+);
+console.log(JSON.stringify({ actual: info.actualDuration, display: info.duration }));
+""")
+
+        self.assertEqual(result, {'actual': 5, 'display': 15})
+
     def test_doctor_view_lists_only_booked_appointments_in_time_order(self):
         result = run_day_layout_script("""
 const apps = [
