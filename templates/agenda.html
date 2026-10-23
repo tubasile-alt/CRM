@@ -4,699 +4,118 @@
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css" rel="stylesheet">
-<style>
-.daily-agenda-container {
-    display: flex;
-    gap: 0;
-    margin-top: 20px;
-    align-items: flex-start;
-}
-
-.sidebar-container {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    width: 280px;
-    flex-shrink: 0;
-}
-
-.daily-agenda-divider {
-    width: 2px;
-    background: linear-gradient(to bottom, #d9d9d9, #f0f0f0);
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
-    margin: 0 15px;
-    flex-shrink: 0;
-}
-
-.mini-calendar {
-    width: 100%;
-    flex-shrink: 0;
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12), 
-                0 4px 8px rgba(0, 0, 0, 0.08),
-                inset 1px 1px 0 rgba(255, 255, 255, 0.8);
-    height: fit-content;
-    border: 1px solid rgba(200, 210, 220, 0.5);
-    transition: all 0.3s ease;
-}
-
-.mini-calendar:hover {
-    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15),
-                0 6px 12px rgba(0, 0, 0, 0.1),
-                inset 1px 1px 0 rgba(255, 255, 255, 0.9);
-    transform: translateY(-2px);
-}
-
-.mini-calendar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.mini-calendar-header button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 18px;
-    padding: 0;
-}
-
-.mini-calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
-    margin-bottom: 10px;
-}
-
-.mini-calendar-day {
-    text-align: center;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 4px 2px;
-    color: #666;
-    word-wrap: break-word;
-}
-
-.mini-calendar-date {
-    text-align: center;
-    padding: 6px 4px;
-    font-size: 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    background: #f8f9fa;
-    transition: all 0.2s;
-    word-break: break-word;
-}
-
-.mini-calendar-date:hover {
-    background: #e9ecef;
-}
-
-.mini-calendar-date.selected {
-    background: #0d6efd;
-    color: white;
-    font-weight: bold;
-}
-
-.mini-calendar-date.today {
-    border: 2px solid #0d6efd;
-}
-
-.daily-schedule {
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    overflow: hidden;
-    flex: 1;
-    min-width: 0;
-}
-
-.schedule-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px;
-    border-bottom: 2px solid #f0f0f0;
-    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
-    color: white;
-}
-
-.schedule-header h3 {
-    margin: 0;
-}
-
-.schedule-nav {
-    display: flex;
-    gap: 10px;
-}
-
-.schedule-nav button {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.schedule-nav button:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
-.view-toggle {
-    display: flex;
-    gap: 5px;
-}
-
-.view-toggle button {
-    padding: 6px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    transition: all 0.2s;
-}
-
-.view-toggle button.active {
-    background: rgba(255, 255, 255, 0.4);
-    border-color: white;
-}
-
-.hourly-grid {
-    --agenda-slot-height: 44px;
-    display: grid;
-    grid-template-columns: 60px 1fr;
-    gap: 0;
-    height: 600px;
-    overflow-y: auto;
-    align-items: start;
-}
-
-.time-column {
-    border-right: 2px solid #f0f0f0;
-    background: #f8f9fa;
-    padding: 0;
-}
-
-.hour-slot {
-    height: var(--agenda-slot-height);
-    border-bottom: 1px solid #e9ecef;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    color: #666;
-    font-weight: 500;
-}
-
-.appointments-grid {
-    position: relative;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.appointment-block {
-    position: absolute;
-    padding: 4px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    border-left: 4px solid;
-    transition: all 0.2s;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    min-height: 0;
-    overflow: hidden;
-    z-index: 1;
-}
-
-.appointment-block:hover {
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    transform: translateY(-1px);
-    z-index: 3;
-}
-
-.appointment-block--overlap {
-    padding-left: 6px;
-    padding-right: 6px;
-}
-
-.appointment-block--overlap .appointment-info-line {
-    gap: 6px;
-}
-
-.appointment-block--overlap .appointment-code,
-.appointment-block--overlap .appointment-type-label,
-.appointment-block--overlap .appointment-consult-label {
-    display: none;
-}
-
-.appointment-block--overlap .appointment-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.appointment-block--overlap .appointment-action-label {
-    display: none;
-}
-
-.appointment-block--overlap .btn-ativar-provisorio,
-.appointment-block--overlap .checkin-btn {
-    padding-left: 7px;
-    padding-right: 7px;
-    margin-left: 2px !important;
-}
-
-.agenda-grid-line {
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: var(--agenda-slot-height);
-    border-bottom: 1px solid #e9ecef;
-    pointer-events: none;
-}
-
-.agenda-grid-line:nth-child(4n) {
-    border-bottom-color: #d8dee4;
-}
-
-.appointments-grid .appointment-block.status-atendido {
-    position: absolute;
-}
-
-.appointment-time {
-    font-size: 12px;
-    font-weight: 600;
-    margin-bottom: 3px;
-}
-
-.appointment-content {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    height: 100%;
-    justify-content: center;
-}
-
-.appointment-info-line {
-    display: flex;
-    gap: 10px;
-    font-size: 13px;
-    font-weight: bold;
-    align-items: center;
-    flex-wrap: nowrap;
-    overflow: hidden;
-    min-width: 0;
-}
-
-.appointment-time-badge {
-    background: rgba(0,0,0,0.15);
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.appointment-name {
-    font-weight: bold;
-    font-size: 13px;
-    white-space: nowrap;
-    flex-shrink: 1;
-    min-width: 0;
-}
-
-.appointment-code {
-    font-weight: bold;
-    font-size: 13px;
-    opacity: 0.9;
-}
-
-.appointment-type-label {
-    font-size: 13px;
-    font-weight: bold;
-    opacity: 0.85;
-}
-
-.appointment-consult-label {
-    font-size: 13px;
-    font-weight: bold;
-    opacity: 0.85;
-}
-
-.appointment-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 4px;
-    font-size: 11px;
-}
-
-.appointment-cell {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.appointment-patient-type {
-    font-size: 10px;
-    opacity: 0.85;
-}
-
-.appointment-consult-type {
-    font-size: 10px;
-    opacity: 0.85;
-}
-
-/* Cores por tipo de consulta */
-.appointment-particular {
-    background: #fff3cd;
-    border-left-color: #ffc107;
-    color: #856404;
-}
-
-.appointment-patologia {
-    background: #d9eef2;
-    border-left-color: #287f8c;
-    color: #174b53;
-}
-
-.appointment-botox {
-    background: #e7d4f5;
-    border-left-color: #6f42c1;
-    color: #3d1f66;
-}
-
-.appointment-retorno-botox {
-    background: #d8c5e8;
-    border-left-color: #5a32a3;
-    color: #2d1a4d;
-}
-
-.appointment-laser {
-    background: #ffe0b6;
-    border-left-color: #fd7e14;
-    color: #664d1a;
-}
-
-.appointment-preenchimento {
-    background: #fdd5e5;
-    border-left-color: #e83e8c;
-    color: #7a1f42;
-}
-
-.appointment-sculptra {
-    background: #ffe0d6;
-    border-left-color: #d85b32;
-    color: #71301d;
-}
-
-.appointment-ulthera {
-    background: #d4e7f5;
-    border-left-color: #0056b3;
-    color: #002855;
-}
-
-.appointment-morpheus {
-    background: #dddaf5;
-    border-left-color: #5146a5;
-    color: #29245c;
-}
-
-.appointment-infiltracao-capilar {
-    background: #d5e8d4;
-    border-left-color: #28a745;
-    color: #145323;
-}
-
-.appointment-soroterapia {
-    background: #d1ecf1;
-    border-left-color: #17a2b8;
-    color: #0c5460;
-}
-
-.appointment-pequena-cirurgia {
-    background: #f5d9e8;
-    border-left-color: #c2185b;
-    color: #6a0d2c;
-}
-
-.appointment-retirada-de-ponto {
-    background: #e8d7f1;
-    border-left-color: #7b1fa2;
-    color: #3d0d51;
-}
-
-.appointment-nitrogenio-liquido {
-    background: #d4f1f9;
-    border-left-color: #0097a7;
-    color: #004d54;
-}
-
-.appointment-transplante {
-    background: #f8d7da;
-    border-left-color: #dc3545;
-    color: #842029;
-}
-
-.appointment-transplante-capilar {
-    background: #f8d7da;
-    border-left-color: #dc3545;
-    color: #842029;
-}
-
-.appointment-implante-capilar {
-    background: #e8f4f8;
-    border-left-color: #17a2b8;
-    color: #0c5460;
-}
-
-.appointment-provisorio {
-    border-left: 5px solid #e67e00 !important;
-    background: #fff8e6 !important;
-    box-shadow: 0 0 0 1px rgba(230, 126, 0, 0.35) inset !important;
-    opacity: 1 !important;
-}
-.appointment-provisorio .appointment-name {
-    color: #7a4600 !important;
-    font-style: italic;
-}
-.appointment-provisorio .appointment-code {
-    display: none;
-}
-.btn-ativar-provisorio {
-    font-size: 0.72rem;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 10px;
-    background: #e67e00 !important;
-    border-color: #c96800 !important;
-    color: #fff !important;
-    box-shadow: 0 1px 4px rgba(230,126,0,0.35);
-}
-
-.appointment-cirurgia {
-    background: #dc3545 !important;
-    border-left-color: #842029 !important;
-    color: #ffffff !important;
-    font-weight: bold !important;
-    box-shadow: 0 0 15px rgba(220, 53, 69, 0.4) !important;
-    border: 2px solid #842029 !important;
-}
-
-.appointment-cirurgia .appointment-time-badge {
-    background: rgba(255, 255, 255, 0.3) !important;
-    color: white !important;
-}
-
-.appointment-cirurgia .appointment-name {
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.appointment-cirurgia::after {
-    content: ' ✂️ CIRURGIA';
-    font-size: 10px;
-    background: white;
-    color: #dc3545;
-    padding: 1px 5px;
-    border-radius: 10px;
-    margin-left: 10px;
-    vertical-align: middle;
-}
-
-.appointment-retorno {
-    background: #cfe2ff;
-    border-left-color: #0d6efd;
-    color: #084298;
-}
-
-.appointment-unimed {
-    background: #d1e7dd;
-    border-left-color: #198754;
-    color: #0f5132;
-}
-
-.appointment-cortesia {
-    background: #e2e3e5;
-    border-left-color: #6c757d;
-    color: #383d41;
-}
-
-.status-confirmado {
-    opacity: 1;
-}
-
-.status-agendado {
-    opacity: 0.8;
-}
-
-.status-faltou {
-    opacity: 0.5;
-    text-decoration: line-through;
-}
-
-.status-atendido {
-    opacity: 1;
-    font-style: italic;
-    border-width: 3px !important;
-    box-shadow: 0 0 0 1px rgba(25, 135, 84, 0.5) inset;
-}
-
-.empty-schedule {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 400px;
-    color: #999;
-    font-size: 16px;
-}
-
-@media (max-width: 1024px) {
-    .daily-agenda-container {
-        gap: 10px;
-    }
-    
-    .sidebar-container {
-        width: 260px;
-    }
-    
-    .schedule-nav {
-        flex-direction: column;
-        gap: 8px;
-    }
-}
-
-@media (max-width: 768px) {
-    .daily-agenda-container {
-        flex-direction: column;
-        gap: 20px;
-    }
-    
-    .sidebar-container {
-        width: 100%;
-        order: 2;
-        flex-direction: row;
-        gap: 10px;
-    }
-    
-    .mini-calendar {
-        flex: 1;
-    }
-    
-    .waiting-room-panel {
-        flex: 1;
-    }
-    
-    .daily-schedule {
-        order: 1;
-    }
-    
-    .daily-agenda-divider {
-        display: none;
-    }
-    
-    .schedule-header {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .schedule-nav {
-        width: 100%;
-    }
-    
-    .view-toggle {
-        width: 100%;
-    }
-}
-
-#calendar {
-    display: none;
-}
-    .waiting-patient-item {
-        padding: 10px;
-        border-bottom: 1px solid #eee;
-        transition: all 0.2s;
-        cursor: pointer;
-    }
-    
-    .waiting-patient-item:hover {
-        background-color: #f0f7ff;
-        border-left: 4px solid #0d6efd;
-    }
-    
-    .waiting-patient-item:last-child {
-        border-bottom: none;
-    }
-</style>
+<link href="{{ url_for('static', filename='css/agenda-apple.css') }}?v=20261023-sidebar" rel="stylesheet">
+{% endblock %}
+
+{% block body_class %}agenda-shell{% endblock %}
+
+{% block main_nav %}
+{% import "_main_nav.html" as main_nav with context %}
+{% set is_doc = current_user.is_doctor() %}
+<aside class="ag-sidebar" id="agSidebar" aria-label="Navegação e resumo do dia">
+    <a class="ag-logo" href="{{ url_for('index') }}">
+        <img src="{{ url_for('static', filename='img/logo_basile_branco.png') }}" alt="Clínica Basile">
+    </a>
+
+    <nav class="ag-side-nav">
+        {{ main_nav.main_nav_links('sidebar') }}
+    </nav>
+
+    <div class="mini-calendar" id="miniCalendar"></div>
+
+    <div class="ag-side-section">
+        <div class="ag-side-title">Sala de espera <span id="waitingCountBadge" class="ag-side-count">0</span></div>
+        <div class="waiting-room-list" id="waitingRoomList">
+            <div class="waiting-empty">Sala de espera vazia</div>
+        </div>
+    </div>
+
+    <div class="ag-side-section">
+        <div class="ag-side-title">Hoje</div>
+        <div id="agDayStats"></div>
+        <div class="ag-side-row" id="waitingCounter"><span>Na espera</span><b id="waitingCount">0</b></div>
+        <div class="ag-side-row ag-side-row-warn" id="provisorioCounter" style="display:none;" title="Pacientes aguardando ativação de cadastro">
+            <span>Pend. ativação</span><b id="provisorioCount">0</b>
+        </div>
+    </div>
+
+    <div class="ag-side-user dropup">
+        <button class="ag-user-btn" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="ag-avatar">{{ (current_user.name or '?')[:1] }}</span>
+            <span class="ag-user-text"><b>{{ current_user.name }}</b><small>{{ 'Médico' if is_doc else 'Secretária' }}</small></span>
+            <i class="bi bi-three-dots"></i>
+        </button>
+        <a href="#" id="toggle-chat-sound" class="ag-icon-btn" title="Alternar som do chat"><i class="bi bi-volume-up" id="chat-sound-icon"></i></a>
+        <ul class="dropdown-menu">
+            {{ main_nav.user_menu_items() }}
+        </ul>
+    </div>
+</aside>
+<button class="ag-menu-btn" type="button" id="agMenuBtn" aria-controls="agSidebar" aria-expanded="false" aria-label="Abrir menu">
+    <i class="bi bi-list"></i>
+</button>
+<div class="ag-scrim" id="agScrim" hidden></div>
 {% endblock %}
 
 {% block content %}
-<!-- TAB NAVIGATION FOR SECRETARY -->
+<div class="agenda-apple {{ 'is-doctor' if current_user.is_doctor() else 'is-secretary' }}">
+
+<header class="ag-top">
+    <div class="ag-title">
+        <h1 id="scheduleDate"></h1>
+        <div class="ag-sub"><span id="agSubtitle"></span> <span id="agendaLastUpdated" class="agenda-last-updated"></span></div>
+    </div>
+    <div class="ag-toolbar">
+        <div class="ag-seg" role="group" aria-label="Navegar entre dias">
+            <button type="button" onclick="previousDay()" aria-label="Dia anterior"><i class="bi bi-chevron-left"></i></button>
+            <button type="button" onclick="todayDay()">Hoje</button>
+            <button type="button" onclick="nextDay()" aria-label="Próximo dia"><i class="bi bi-chevron-right"></i></button>
+        </div>
+        <div class="ag-seg view-toggle" role="group" aria-label="Visualização">
+            <button type="button" class="active" id="dayViewBtn" onclick="switchView('day')">Dia</button>
+            <button type="button" id="monthViewBtn" onclick="switchView('month')">Mês</button>
+        </div>
+        <div class="dropdown">
+            <button class="ag-capsule" type="button" data-bs-toggle="dropdown" aria-label="Mais ações"><i class="bi bi-three-dots"></i></button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#searchPatientModal"><i class="bi bi-search"></i> Procurar paciente</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportAgenda('pdf')"><i class="bi bi-file-pdf"></i> Exportar PDF</a></li>
+                <li><a class="dropdown-item" href="#" onclick="exportAgenda('excel')"><i class="bi bi-file-excel"></i> Exportar Excel</a></li>
+                <li><a class="dropdown-item" href="#" onclick="window.print()"><i class="bi bi-printer"></i> Imprimir</a></li>
+            </ul>
+        </div>
+        <button class="ag-capsule ag-primary" type="button" data-bs-toggle="modal" data-bs-target="#newAppointmentModal">
+            <i class="bi bi-plus-lg"></i> <span>Novo</span>
+        </button>
+    </div>
+</header>
+
 {% if not current_user.is_doctor() %}
-<ul class="nav nav-tabs mb-4" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda-content" type="button" role="tab">
-            <i class="bi bi-calendar-event"></i> Agenda
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link position-relative" id="checkout-tab" data-bs-toggle="tab" data-bs-target="#checkout-content" type="button" role="tab">
-            <i class="bi bi-credit-card"></i> Checkout
-            <span id="pendingCheckoutBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none; font-size: 0.65rem;">
-                0
-            </span>
-        </button>
-    </li>
-</ul>
+<div class="ag-filters">
+    <ul class="nav ag-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="agenda-tab" data-bs-toggle="tab" data-bs-target="#agenda-content" type="button" role="tab">
+                <i class="bi bi-calendar-event"></i> Agenda
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link position-relative" id="checkout-tab" data-bs-toggle="tab" data-bs-target="#checkout-content" type="button" role="tab">
+                <i class="bi bi-credit-card"></i> Checkout
+                <span id="pendingCheckoutBadge" class="ag-tab-badge" style="display: none;">0</span>
+            </button>
+        </li>
+    </ul>
+    <div class="doctor-filter-btns ag-seg" role="group" aria-label="Filtrar por médico">
+        <button class="btn active" onclick="filterByDoctor('all', this)">Todos</button>
+        {% for doctor in doctors %}
+        <button class="btn" id="btn-doc-{{ doctor.id }}" onclick="filterByDoctor({{ doctor.id }}, this)">{{ doctor.name }}</button>
+        {% endfor %}
+    </div>
+</div>
 {% endif %}
 
 <div class="tab-content">
     <div class="tab-pane fade show active" id="agenda-content" role="tabpanel">
-
-<div class="row mb-4">
-    <div class="col-12">
-        <h2 class="mb-4">Agenda Médica</h2>
-        <div id="waitingCounter" class="badge bg-warning text-dark mb-3" style="font-size: 1.1rem;">
-            <i class="bi bi-people"></i> <span id="waitingCount">0</span> aguardando
-        </div>
-        <div id="provisorioCounter" class="badge mb-3 ms-2" style="font-size: 1.1rem; background:#e67e00; color:#fff; display:none; cursor:pointer;" title="Pacientes aguardando ativação de cadastro">
-            <i class="bi bi-person-exclamation"></i> <span id="provisorioCount">0</span> pend. ativação
-        </div>
-        {% if not current_user.is_doctor() %}
-        <div class="btn-group w-100 mb-3 doctor-filter-btns" style="display: flex; flex-wrap: wrap;">
-            <button class="btn btn-sm btn-outline-primary active" onclick="filterByDoctor('all', this)">Todos</button>
-            {% for doctor in doctors %}
-            <button class="btn btn-sm btn-outline-primary" id="btn-doc-{{ doctor.id }}" onclick="filterByDoctor({{ doctor.id }}, this)">{{ doctor.name }}</button>
-            {% endfor %}
-        </div>
-        {% endif %}
-        <div class="d-flex gap-2 flex-wrap mb-3">
-            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newAppointmentModal">
-                <i class="bi bi-plus-circle"></i> <span class="d-none d-md-inline">Novo Agendamento</span><span class="d-md-none">Novo</span>
-            </button>
-            <div class="btn-group">
-                <button class="btn btn-success btn-sm dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-download"></i> <span class="d-none d-md-inline">Exportar</span>
-                </button>
-                <ul class="dropdown-menu">
-                    <li><a class="dropdown-item" href="#" onclick="exportAgenda('pdf')"><i class="bi bi-file-pdf"></i> PDF</a></li>
-                    <li><a class="dropdown-item" href="#" onclick="exportAgenda('excel')"><i class="bi bi-file-excel"></i> Excel</a></li>
-                </ul>
-            </div>
-            <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">
-                <i class="bi bi-printer"></i> <span class="d-none d-md-inline">Imprimir</span>
-            </button>
-            <button class="btn btn-info btn-sm text-white" data-bs-toggle="modal" data-bs-target="#searchPatientModal">
-                <i class="bi bi-search"></i> Procurar Paciente
-            </button>
-        </div>
-    </div>
-</div>
 
 <!-- Modal Procurar Paciente -->
 <div class="modal fade" id="searchPatientModal" tabindex="-1">
@@ -788,51 +207,14 @@
     </div>
 </div>
 
-<div class="daily-agenda-container">
-    <!-- LEFT SIDEBAR: MINI CALENDAR + WAITING ROOM -->
-    <div class="sidebar-container">
-        <!-- MINI CALENDAR -->
-        <div class="mini-calendar" id="miniCalendar"></div>
-        
-        <!-- SALA DE ESPERA -->
-        <div class="waiting-room-panel" id="waitingRoomPanel">
-            <div class="waiting-room-header">
-                <i class="bi bi-hourglass-split"></i> Sala de Espera
-                <span class="waiting-count-badge" id="waitingCountBadge">0</span>
-            </div>
-            <div class="waiting-room-list" id="waitingRoomList">
-                <div class="waiting-empty">Nenhum paciente aguardando</div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- DIVIDER -->
-    <div class="daily-agenda-divider"></div>
-    
-    <!-- DAILY SCHEDULE -->
-    <div class="daily-schedule">
-        <div class="schedule-header">
-            <h3 id="scheduleDate"></h3>
-            <div class="schedule-nav">
-                <button onclick="previousDay()"><i class="bi bi-chevron-left"></i> Anterior</button>
-                <button onclick="todayDay()">Hoje</button>
-                <button onclick="nextDay()">Próximo <i class="bi bi-chevron-right"></i></button>
-            </div>
-            <div class="view-toggle">
-                <button class="active" id="dayViewBtn" onclick="switchView('day')">Dia</button>
-                <button id="monthViewBtn" onclick="switchView('month')">Mês</button>
-            </div>
-            <div id="agendaLastUpdated" style="font-size:0.75rem;color:#6c757d;align-self:center;margin-left:auto;padding-left:12px;white-space:nowrap;"></div>
-        </div>
-        <div id="dayViewContent" class="hourly-grid">
-            <div class="time-column" id="timeColumn"></div>
-            <div class="appointments-grid" id="appointmentsGrid"></div>
-        </div>
-        <div id="monthViewContent" style="display: none;">
-            <div id="calendar"></div>
-        </div>
-    </div>
+<div id="agNextCard"></div>
+<div id="dayViewContent" class="ag-day">
+    <div class="ag-list" id="appointmentsGrid" aria-live="polite"></div>
 </div>
+<div id="monthViewContent" class="ag-month" style="display: none;">
+    <div id="calendar"></div>
+</div>
+<div class="ag-toast" id="agToast" role="status" hidden></div>
 
     </div>
 
@@ -855,6 +237,8 @@
     </div>
     {% endif %}
 </div>
+
+</div>{# /.agenda-apple #}
 
 <div class="modal fade" id="newAppointmentModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable" style="max-width: 900px;">
@@ -1375,6 +759,6 @@ let currentView = 'day';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/locales/pt-br.global.min.js"></script>
-<script src="{{ url_for('static', filename='js/agenda.js') }}?v=20261023-timeline-alignment"></script>
+<script src="{{ url_for('static', filename='js/agenda.js') }}?v=20261023-sidebar2"></script>
 <script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
 {% endblock %}

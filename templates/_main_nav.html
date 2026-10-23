@@ -1,0 +1,48 @@
+{# Itens do menu principal, compartilhados entre a navbar do topo (base.html)
+   e a barra lateral da Agenda. variant: 'navbar' (li > a.nav-link) ou 'sidebar' (a.side-link). #}
+
+{% macro _item(variant, href, icon, label, active=False, extra_attrs='', badge='') %}
+{% if variant == 'navbar' %}
+<li class="nav-item">
+    <a class="nav-link {% if active %}active{% endif %}" href="{{ href }}" {{ extra_attrs|safe }}>
+        <i class="bi bi-{{ icon }}"></i> {{ label }}{{ badge|safe }}
+    </a>
+</li>
+{% else %}
+<a class="side-link {% if active %}active{% endif %}" href="{{ href }}" {{ extra_attrs|safe }}>
+    <i class="bi bi-{{ icon }}"></i><span>{{ label }}</span>{{ badge|safe }}
+</a>
+{% endif %}
+{% endmacro %}
+
+{% macro main_nav_links(variant='navbar') %}
+{% if current_user.is_doctor() %}
+{{ _item(variant, url_for('dashboard'), 'speedometer2', 'Dashboard', request.endpoint == 'dashboard') }}
+{% endif %}
+{{ _item(variant, url_for('agenda'), 'calendar3', 'Agenda', request.endpoint == 'agenda') }}
+{% if current_user.is_doctor() or current_user.is_secretary() or current_user.is_admin() %}
+{{ _item(variant, url_for('physical_agenda.import_page'), 'journal-arrow-up', 'Importar Agenda Física', request.endpoint == 'physical_agenda.import_page') }}
+{% endif %}
+{{ _item(variant, url_for('surgical_map.index'), 'clipboard2-pulse', 'Mapa Cirúrgico', request.endpoint == 'surgical_map.index') }}
+{{ _item(variant, url_for('crm.crm_page'), 'graph-up', 'CRM', request.endpoint == 'crm.crm_page') }}
+{{ _item(variant, url_for('crm.sales_funnel'), 'funnel', 'Sales', request.endpoint == 'crm.sales_funnel') }}
+{% if current_user.is_doctor() %}
+{{ _item(variant, url_for('dermascribe.index'), 'prescription2', 'DermaScribe', 'dermascribe' in request.endpoint) }}
+{{ _item(variant, url_for('settings.index'), 'gear', 'Configurações', request.endpoint == 'settings.index') }}
+{% endif %}
+{% if current_user.is_doctor() or current_user.role_clinico in ('SECRETARY', 'ADMIN') %}
+{{ _item(variant, url_for('audit_patients_page'), 'clipboard-data', 'Auditoria', request.endpoint == 'audit_patients_page') }}
+{% endif %}
+{{ _item(variant, url_for('chat'), 'chat-dots', 'Chat', request.endpoint == 'chat',
+         badge='<span id="chat-badge" class="badge bg-danger ms-1" style="display: none;">0</span>') }}
+{% endmacro %}
+
+{# Itens do menu do usuário (notificações push do médico + sair). #}
+{% macro user_menu_items() %}
+{% if current_user.is_doctor() %}
+<li><button class="dropdown-item" type="button" id="enable-push-notifications"><i class="bi bi-bell"></i> Ativar notificações neste iPhone</button></li>
+<li><button class="dropdown-item" type="button" id="test-push-notification" disabled><i class="bi bi-send-check"></i> Enviar notificação de teste</button></li>
+<li><hr class="dropdown-divider"></li>
+{% endif %}
+<li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
+{% endmacro %}
