@@ -35,6 +35,11 @@
     let currentView = 'day';
     let currentEvent = null;
     let webcamStream = null;
+    const AGENDA_DEFAULT_START_MINUTES = 7 * 60;
+    const AGENDA_DEFAULT_END_MINUTES = 20 * 60;
+    const AGENDA_SLOT_MINUTES = 15;
+    const AGENDA_SLOT_HEIGHT = 44;
+    const AGENDA_CARD_INSET = 3;
 
     window.parseLocalDateTime = function(isoString) {
         if (!isoString) return null;
@@ -413,21 +418,132 @@
         new bootstrap.Modal(modalEl).show();
     };
 
-    function renderTimeColumn() {
+    function _minutesSinceMidnight(date) {
+        return date.getHours() * 60 + date.getMinutes();
+    }
+
+    function _appointmentInterval(app) {
+        const start = parseLocalDateTime(app.start);
+        if (!start || Number.isNaN(start.getTime())) return null;
+
+        const parsedEnd = parseLocalDateTime(app.end);
+        const minimumEnd = new Date(start.getTime() + AGENDA_SLOT_MINUTES * 60000);
+        const end = parsedEnd && !Number.isNaN(parsedEnd.getTime()) && parsedEnd > start
+            ? parsedEnd
+            : minimumEnd;
+
+        return {
+            app,
+            start,
+            end,
+            layoutEnd: end > minimumEnd ? end : minimumEnd,
+            lane: 0,
+            laneCount: 1
+        };
+    }
+
+    function _timelineBounds(intervals) {
+        if (!intervals.length) {
+            return {
+                startMinutes: AGENDA_DEFAULT_START_MINUTES,
+                endMinutes: AGENDA_DEFAULT_END_MINUTES
+            };
+        }
+
+        const earliest = Math.min(...intervals.map(item => _minutesSinceMidnight(item.start)));
+        const latest = Math.max(...intervals.map(item => _minutesSinceMidnight(item.layoutEnd)));
+        return {
+            startMinutes: Math.min(AGENDA_DEFAULT_START_MINUTES, Math.floor(earliest / 60) * 60),
+            endMinutes: Math.max(AGENDA_DEFAULT_END_MINUTES, Math.ceil(latest / 60) * 60)
+        };
+    }
+
+    function _assignOverlapLanes(intervals) {
+        const sorted = [...intervals].sort((a, b) => a.start - b.start);
+        let active = [];
+        let group = [];
+        let groupLaneCount = 1;
+
+        const finishGroup = () => {
+            group.forEach(item => { item.laneCount = groupLaneCount; });
+            group = [];
+            groupLaneCount = 1;
+        };
+
+        sorted.forEach(item => {
+            active = active.filter(activeItem => activeItem.layoutEnd > item.start);
+            if (active.length === 0 && group.length > 0) finishGroup();
+
+            const usedLanes = new Set(active.map(activeItem => activeItem.lane));
+            let lane = 0;
+            while (usedLanes.has(lane)) lane += 1;
+            item.lane = lane;
+            active.push(item);
+            group.push(item);
+            groupLaneCount = Math.max(groupLaneCount, active.length, lane + 1);
+        });
+
+        if (group.length > 0) finishGroup();
+        return sorted;
+    }
+
+    function renderTimeColumn(startMinutes = AGENDA_DEFAULT_START_MINUTES, endMinutes = AGENDA_DEFAULT_END_MINUTES) {
         const timeColumn = document.getElementById('timeColumn');
         if (!timeColumn) return;
         timeColumn.innerHTML = '';
-        for (let hour = 7; hour <= 19; hour++) {
-            for (let minutes = 0; minutes < 60; minutes += 15) {
-                const slot = document.createElement('div');
-                slot.className = 'hour-slot';
-                slot.textContent = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-                slot.style.cursor = 'pointer';
-                slot.onclick = () => window.openNewAppointmentAtTime(hour, minutes);
-                timeColumn.appendChild(slot);
-            }
+        for (let totalMinutes = startMinutes; totalMinutes < endMinutes; totalMinutes += AGENDA_SLOT_MINUTES) {
+            const hour = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            const slot = document.createElement('div');
+            slot.className = 'hour-slot';
+            slot.textContent = `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            slot.style.cursor = 'pointer';
+            slot.onclick = () => window.openNewAppointmentAtTime(hour, minutes);
+            timeColumn.appendChild(slot);
         }
     }
+
+    function _renderAppointmentGridLines(appointmentsGrid, slotCount) {
+        appointmentsGrid.innerHTML = '';
+        appointmentsGrid.style.height = `${slotCount * AGENDA_SLOT_HEIGHT}px`;
+        for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
+            const line = document.createElement('div');
+            line.className = 'agenda-grid-line';
+            line.style.top = `${slotIndex * AGENDA_SLOT_HEIGHT}px`;
+            line.setAttribute('aria-hidden', 'true');
+            appointmentsGrid.appendChild(line);
+        }
+    }
+
+    function _positionAppointmentBlock(block, interval, timelineStartMinutes, timelineEndMinutes) {
+        const startMinutes = _minutesSinceMidnight(interval.start);
+        const endMinutes = _minutesSinceMidnight(interval.end);
+        const visibleStart = Math.max(startMinutes, timelineStartMinutes);
+        const visibleEnd = Math.min(Math.max(endMinutes, visibleStart + AGENDA_SLOT_MINUTES), timelineEndMinutes);
+        const pixelsPerMinute = AGENDA_SLOT_HEIGHT / AGENDA_SLOT_MINUTES;
+        const top = (visibleStart - timelineStartMinutes) * pixelsPerMinute + AGENDA_CARD_INSET;
+        const height = Math.max(
+            AGENDA_SLOT_HEIGHT - AGENDA_CARD_INSET * 2,
+            (visibleEnd - visibleStart) * pixelsPerMinute - AGENDA_CARD_INSET * 2
+        );
+        const leftTrack = interval.lane * 100 / interval.laneCount;
+        const rightTrack = (interval.laneCount - interval.lane - 1) * 100 / interval.laneCount;
+        const innerGap = interval.laneCount > 1 ? 2 : 6;
+
+        block.style.top = `${top}px`;
+        block.style.height = `${height}px`;
+        block.style.left = `calc(${leftTrack}% + ${interval.lane === 0 ? 6 : innerGap}px)`;
+        block.style.right = `calc(${rightTrack}% + ${interval.lane === interval.laneCount - 1 ? 6 : innerGap}px)`;
+        block.dataset.lane = String(interval.lane);
+        block.dataset.laneCount = String(interval.laneCount);
+        if (interval.laneCount > 1) block.classList.add('appointment-block--overlap');
+    }
+
+    window.__agendaTimeline = {
+        appointmentInterval: _appointmentInterval,
+        assignOverlapLanes: _assignOverlapLanes,
+        timelineBounds: _timelineBounds
+    };
 
     window.renderMiniCalendar = function() {
         const miniCalendar = document.getElementById('miniCalendar');
@@ -527,12 +643,12 @@
         if (isProvisorio) {
             actionBadgeHtml = `<button class="btn btn-sm btn-warning btn-ativar-provisorio"
                     onclick="event.stopPropagation(); openEditAppointmentModalById('${app.id}')"
-                    title="Editar cadastro provisório"><i class="bi bi-pencil-square"></i> Editar cadastro</button>`;
+                    title="Editar cadastro provisório"><i class="bi bi-pencil-square"></i> <span class="appointment-action-label">Editar cadastro</span></button>`;
         } else if (status === 'atendido') {
             actionBadgeHtml = `<span class="atendido-badge"><i class="bi bi-check-circle-fill"></i> ATENDIDO</span>`;
         } else if (status === 'faltou') {
             actionBadgeHtml = `<span class="faltou-badge"><i class="bi bi-x-circle-fill"></i> FALTOU</span>
-                    <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+                    <button class="checkin-btn ms-2" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Chegou atrasado - Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> <span class="appointment-action-label">Check In</span></button>`;
         } else if (isWaiting) {
             actionBadgeHtml = `
                     <span class="waiting-badge"><i class="bi bi-hourglass-split"></i> Aguardando</span>
@@ -544,7 +660,7 @@
                     </button>
                 `;
         } else {
-            actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> Check In</button>`;
+            actionBadgeHtml = `<button class="checkin-btn" onclick="event.stopPropagation(); doCheckin('${app.id}')" title="Fazer Check-in"><i class="bi bi-box-arrow-in-right"></i> <span class="appointment-action-label">Check In</span></button>`;
         }
 
         if (isProvisorio && (window.isSecretary || window.isDoctor)) {
@@ -552,7 +668,7 @@
             const existingCpf = app.extendedProps?.cpf || '';
             actionBadgeHtml += `<button class="btn btn-sm btn-warning ms-1 btn-ativar-provisorio"
                     onclick="event.stopPropagation(); abrirModalAtivacao(${patientId}, '${patientName.replace(/'/g,"\\'")}', ${doctorId || 'null'}, '${(existingPhone || '').replace(/'/g,"\\'")}', '${(existingCpf || '').replace(/'/g,"\\'")}')"
-                    title="Ativar cadastro deste paciente"><i class="bi bi-person-check"></i> Ativar</button>`;
+                    title="Ativar cadastro deste paciente"><i class="bi bi-person-check"></i> <span class="appointment-action-label">Ativar</span></button>`;
         }
 
         if (isSurgeryMap && patientId) {
@@ -604,7 +720,6 @@
     window.renderDayView = function() {
         const appointmentsGrid = document.getElementById('appointmentsGrid');
         if (!appointmentsGrid) return;
-        appointmentsGrid.innerHTML = '';
         updateProvisorioBadge();
 
         console.log("Renderizando Agenda. Filtro Médico ID:", currentDoctorFilter);
@@ -638,14 +753,26 @@
         }
 
         if (dayAppointments.length === 0) {
+            renderTimeColumn();
+            _renderAppointmentGridLines(
+                appointmentsGrid,
+                (AGENDA_DEFAULT_END_MINUTES - AGENDA_DEFAULT_START_MINUTES) / AGENDA_SLOT_MINUTES
+            );
             appointmentsGrid.innerHTML = '<div class="empty-schedule">Nenhum agendamento para este dia</div>';
             return;
         }
 
-        dayAppointments.sort((a, b) => parseLocalDateTime(a.start) - parseLocalDateTime(b.start));
+        const intervals = dayAppointments.map(_appointmentInterval).filter(Boolean);
+        const bounds = _timelineBounds(intervals);
+        const laidOutIntervals = _assignOverlapLanes(intervals);
+        const slotCount = (bounds.endMinutes - bounds.startMinutes) / AGENDA_SLOT_MINUTES;
+        renderTimeColumn(bounds.startMinutes, bounds.endMinutes);
+        _renderAppointmentGridLines(appointmentsGrid, slotCount);
 
-        dayAppointments.forEach(app => {
-            appointmentsGrid.appendChild(_buildAppointmentBlock(app));
+        laidOutIntervals.forEach(interval => {
+            const block = _buildAppointmentBlock(interval.app);
+            _positionAppointmentBlock(block, interval, bounds.startMinutes, bounds.endMinutes);
+            appointmentsGrid.appendChild(block);
         });
     };
 
@@ -766,22 +893,14 @@
                 const oldMap = {};
                 appointmentsList.forEach(a => { oldMap[String(a.id)] = a; });
 
-                let anyChanged = false;
-                newData.forEach(newApp => {
+                const anyChanged = newData.some(newApp => {
                     const oldApp = oldMap[String(newApp.id)];
-                    if (!oldApp) return;
-                    if (_getAppointmentStateKey(newApp) !== _getAppointmentStateKey(oldApp)) {
-                        const existing = document.querySelector(`[data-appointment-id="${newApp.id}"]`);
-                        if (existing) {
-                            existing.parentNode.replaceChild(_buildAppointmentBlock(newApp), existing);
-                        }
-                        anyChanged = true;
-                    }
+                    return oldApp && _getAppointmentStateKey(newApp) !== _getAppointmentStateKey(oldApp);
                 });
 
                 appointmentsList = newData;
                 _updateLastUpdatedLabel();
-                if (anyChanged) updateProvisorioBadge();
+                if (anyChanged) renderDayView();
                 if (anyChanged && calendar && currentView === 'month') calendar.refetchEvents();
             })
             .catch(err => console.error('Erro no auto-refresh da agenda:', err));
