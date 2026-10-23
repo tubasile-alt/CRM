@@ -90,6 +90,9 @@ class Config:
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     WTF_CSRF_TIME_LIMIT = None
+    # Fora de produção (pré-visualização do Replit roda `python app.py` sem debug), recarrega
+    # templates alterados no disco; sem isso o processo serve a página antiga até ser reiniciado.
+    TEMPLATES_AUTO_RELOAD = not IS_PRODUCTION
 
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
     MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
