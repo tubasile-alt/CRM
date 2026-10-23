@@ -78,6 +78,9 @@ VAPID_PUBLIC_KEY = "BHzw6CWhYX4iACdK0WZQ4jJnFnA7jyNEuMFMaTu-1WMIu24G5mZQY7Gw3rbY
 VAPID_CLAIMS_EMAIL = "Tubasile@gmail.com"
 TRACKER_API_URL = "https://capillary-tracker-79bq5dkzhx.replit.app"
 
+[userenv.production]
+PIP_USER = "0"
+
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 120000
