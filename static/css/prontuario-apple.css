@@ -1116,14 +1116,8 @@
 }
 
 .prontuario-shell .pr-panel-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
     padding: 14px 18px;
-    border: none;
     background: #fff;
-    text-align: left;
 }
 
 .prontuario-shell .pr-panel-head h5 {
@@ -1131,15 +1125,6 @@
     font-size: 0.9375rem;
     font-weight: 700;
     color: var(--aa-label);
-}
-
-.prontuario-shell .pr-panel-head .bi-chevron-down {
-    color: var(--aa-label-3);
-    transition: transform 200ms var(--aa-ease);
-}
-
-.prontuario-shell .pr-panel-head.collapsed .bi-chevron-down {
-    transform: rotate(-90deg);
 }
 
 .prontuario-shell #clinicalRightPanel {
