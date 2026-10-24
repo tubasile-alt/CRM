@@ -93,7 +93,6 @@
         startWaitingClock();
         setupWebcamHandlers();
         _setupDragToReschedule();
-        _setupSidebarToggle();
 
         // Polling automático: atualiza apenas blocos com status alterado, a cada 60 segundos.
         // Ignora quando há um modal aberto para não interromper interações em curso.
@@ -1005,21 +1004,6 @@
             _hideToast();
             showAlert(err.message || 'Erro ao remarcar', 'danger');
         });
-    }
-
-    // Celular/tablet: a barra lateral vira gaveta, aberta pelo botão de menu
-    function _setupSidebarToggle() {
-        const btn = document.getElementById('agMenuBtn');
-        const scrim = document.getElementById('agScrim');
-        if (!btn || !scrim) return;
-        const setOpen = open => {
-            document.body.classList.toggle('ag-side-open', open);
-            btn.setAttribute('aria-expanded', String(open));
-            scrim.hidden = !open;
-        };
-        btn.addEventListener('click', () => setOpen(!document.body.classList.contains('ag-side-open')));
-        scrim.addEventListener('click', () => setOpen(false));
-        document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
     }
 
     let _toastTimer = null;

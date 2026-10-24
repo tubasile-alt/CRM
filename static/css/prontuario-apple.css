@@ -1,0 +1,1300 @@
+/* ==================== PRONTUÁRIO — LAYOUT CLEAN ====================
+ * Só apresentação: mesmos campos, IDs e ações de antes.
+ * Barra lateral, cores e gaveta do celular vêm de app-shell.css.
+ * Regras prefixadas com .prontuario-shell para prevalecer sobre o <style> do template.
+ */
+
+/* ---------- Base ---------- */
+
+.prontuario-shell .pr-capsule {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    border-radius: 999px;
+    background: var(--aa-fill);
+    color: var(--aa-accent);
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 6px 14px;
+    white-space: nowrap;
+    transition: background-color 120ms ease, transform 100ms ease-out;
+}
+
+.prontuario-shell .pr-capsule:hover {
+    background: var(--aa-fill-2);
+}
+
+.prontuario-shell .pr-capsule.pr-primary {
+    background: var(--aa-accent);
+    color: #fff;
+}
+
+.prontuario-shell .pr-capsule.pr-success {
+    background: var(--aa-green);
+    color: #fff;
+    font-weight: 600;
+    padding: 8px 18px;
+}
+
+.prontuario-shell .pr-capsule.pr-success:hover {
+    background: #2fb14f;
+}
+
+.prontuario-shell .pr-icon-btn {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--aa-label-3);
+    font-size: 0.9rem;
+    padding: 0;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.prontuario-shell .pr-icon-btn:hover {
+    background: var(--aa-fill);
+    color: var(--aa-accent);
+}
+
+.prontuario-shell .pr-icon-btn-lg {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: var(--aa-fill);
+    color: var(--aa-label-2);
+    font-size: 1.05rem;
+}
+
+.prontuario-shell .pr-link {
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--aa-accent);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.prontuario-shell .pr-label {
+    font-size: 0.8125rem;
+    color: var(--aa-label-3);
+}
+
+.prontuario-shell .pr-capsule:active,
+.prontuario-shell .pr-icon-btn:active,
+.prontuario-shell .pr-seg label:active,
+.prontuario-shell .pr-tabs .nav-link:active {
+    transform: scale(0.96);
+    transition: transform 100ms ease-out;
+}
+
+/* ---------- Cabeçalho do paciente ---------- */
+
+.prontuario-shell .pr-header {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    margin: -26px -30px 16px;
+    padding: 14px 30px;
+    background: rgba(245, 246, 248, 0.88);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid var(--aa-separator);
+}
+
+.prontuario-shell .pr-header-main {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.prontuario-shell .patient-photo-container {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.prontuario-shell .pr-photo {
+    width: 60px;
+    height: 74px;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: 1px solid var(--aa-separator);
+    cursor: pointer;
+}
+
+.prontuario-shell .pr-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.prontuario-shell .pr-photo-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: #adb5bd;
+    font-size: 0.6875rem;
+    font-weight: 500;
+}
+
+.prontuario-shell .pr-photo-placeholder i {
+    font-size: 1.25rem;
+}
+
+.prontuario-shell .pr-photo-delete {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    background: var(--aa-red);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+}
+
+.prontuario-shell .pr-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.prontuario-shell .pr-name-line {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+}
+
+.prontuario-shell .prontuario-patient-name {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin: 0;
+    min-width: 0;
+}
+
+.prontuario-shell .prontuario-patient-name-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--aa-label);
+    overflow-wrap: anywhere;
+}
+
+.prontuario-shell .prontuario-patient-age {
+    font-size: 0.95rem;
+    font-weight: 400;
+    color: var(--aa-label-3);
+    white-space: nowrap;
+}
+
+.prontuario-shell .pr-stars {
+    font-size: 0.85rem;
+}
+
+.prontuario-shell .pr-attention {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(255, 59, 48, 0.1);
+    color: #b0201a;
+    white-space: nowrap;
+}
+
+.prontuario-shell .pr-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-top: 4px;
+    font-size: 0.875rem;
+    color: var(--aa-label-2);
+}
+
+.prontuario-shell .pr-meta i {
+    color: var(--aa-label-3);
+}
+
+.prontuario-shell .pr-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #b8bcc2;
+}
+
+.prontuario-shell .pr-meta-sep {
+    width: 1px;
+    height: 14px;
+    margin: 0 4px;
+    background: var(--aa-separator);
+}
+
+.prontuario-shell .pr-tag-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.prontuario-shell .pr-tag-chips:empty {
+    display: none;
+}
+
+.prontuario-shell .pr-tag-chip {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--tag-color, #0050a0) 13%, #fff);
+    color: var(--tag-color, #0050a0);
+}
+
+.prontuario-shell .pr-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.prontuario-shell .pr-tags-editor {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--aa-separator);
+}
+
+.prontuario-shell .pr-tag-toggle {
+    display: inline-block;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--tag-color);
+    color: var(--tag-color);
+    background: #fff;
+    cursor: pointer;
+}
+
+.prontuario-shell .btn-check:checked + .pr-tag-toggle {
+    background: var(--tag-color);
+    color: #fff;
+}
+
+/* ---------- Resumo IA (uma linha) ---------- */
+
+.prontuario-shell .pr-ai {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: linear-gradient(90deg, rgba(0, 152, 217, 0.08), rgba(0, 152, 217, 0.02));
+    font-size: 0.875rem;
+    color: var(--aa-label-2);
+}
+
+.prontuario-shell .pr-ai-icon {
+    color: var(--aa-brand-medium);
+    font-size: 1rem;
+}
+
+.prontuario-shell .pr-ai-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.prontuario-shell .pr-ai-line {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.prontuario-shell .pr-ai-line b {
+    color: var(--aa-label);
+    margin-right: 4px;
+}
+
+.prontuario-shell .pr-ai .ai-summary-text {
+    display: inline;
+    white-space: nowrap;
+}
+
+.prontuario-shell .pr-ai .ai-summary-meta {
+    display: none;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: var(--aa-label-3);
+}
+
+.prontuario-shell .pr-ai .ai-summary-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.prontuario-shell .pr-ai.is-open {
+    align-items: flex-start;
+}
+
+.prontuario-shell .pr-ai.is-open .pr-ai-line {
+    white-space: normal;
+}
+
+.prontuario-shell .pr-ai.is-open .ai-summary-text {
+    white-space: pre-line;
+}
+
+.prontuario-shell .pr-ai.is-open .ai-summary-meta {
+    display: flex;
+}
+
+/* ---------- Linha do tempo (mesma marcação, visual mais leve) ---------- */
+
+.prontuario-shell .pr-timeline-card {
+    border: 1px solid var(--aa-separator) !important;
+    border-radius: 18px;
+    box-shadow: none !important;
+}
+
+.prontuario-shell .pr-timeline-card .card-body {
+    padding: 6px 8px 4px !important;
+}
+
+.prontuario-shell .consultation-timeline-container {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+}
+
+.prontuario-shell .consultation-timeline-container > .d-flex {
+    padding-top: 14px !important;
+    padding-bottom: 6px !important;
+    gap: 8px !important;
+}
+
+.prontuario-shell .timeline-item {
+    min-width: 116px !important;
+}
+
+.prontuario-shell .timeline-date {
+    color: var(--aa-label-2) !important;
+    font-size: 0.75rem;
+    font-weight: 600 !important;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: 4px !important;
+}
+
+.prontuario-shell .timeline-date .text-xs {
+    font-weight: 500;
+    color: var(--aa-label-3);
+}
+
+.prontuario-shell .consultation-timeline-container .timeline-dot-wrapper {
+    height: 64px;
+}
+
+.prontuario-shell .consultation-timeline-container .timeline-dot-wrapper::before {
+    top: 17px;
+    height: 2px;
+    background: #e3e8ee;
+}
+
+.prontuario-shell .consultation-timeline-container .timeline-dot-wrapper .timeline-dot {
+    top: 10px;
+    width: 16px !important;
+    height: 16px !important;
+    border-width: 3px !important;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+}
+
+.prontuario-shell .timeline-dot.bg-primary { background-color: var(--aa-brand-deep) !important; }
+.prontuario-shell .timeline-dot.bg-success { background-color: var(--aa-green) !important; }
+.prontuario-shell .timeline-dot.bg-danger { background-color: var(--aa-red) !important; }
+.prontuario-shell .timeline-dot.bg-warning { background-color: #ffcc00 !important; }
+
+.prontuario-shell .consultation-timeline-container .timeline-dot-wrapper .timeline-keyword-bubble {
+    top: 34px;
+    max-width: 120px;
+    padding: 2px 8px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    color: var(--aa-label-2);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.prontuario-shell .timeline-popover {
+    top: 30px !important;
+    border-radius: 14px !important;
+    border-color: var(--aa-separator) !important;
+    box-shadow: 0 12px 30px rgba(0, 40, 90, 0.16) !important;
+}
+
+/* ---------- Janelas de preenchimento ---------- */
+
+.prontuario-shell #prontuarioMainLayout {
+    --bs-gutter-x: 16px;
+}
+
+.prontuario-shell .pr-window {
+    border: 1px solid var(--aa-separator);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: none;
+}
+
+.prontuario-shell .pr-window-head {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #fff;
+    border-bottom: 1px solid var(--aa-separator);
+}
+
+.prontuario-shell .pr-category {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.prontuario-shell .pr-seg {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: 9px;
+    background: var(--aa-fill-2);
+}
+
+.prontuario-shell .pr-seg label {
+    padding: 5px 12px;
+    border-radius: 7px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--aa-label);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 200ms var(--aa-ease), box-shadow 200ms var(--aa-ease);
+}
+
+.prontuario-shell .pr-seg label i {
+    color: var(--aa-label-3);
+    margin-right: 2px;
+}
+
+.prontuario-shell .pr-seg .btn-check:checked + label {
+    background: #fff;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.prontuario-shell .pr-seg .btn-check:checked + label i {
+    color: var(--aa-accent);
+}
+
+.prontuario-shell .pr-seg .btn-check:focus-visible + label {
+    outline: 2px solid rgba(0, 80, 160, 0.35);
+    outline-offset: 1px;
+}
+
+.prontuario-shell .pr-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    margin: 0;
+    border: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.prontuario-shell .pr-tabs .nav-link {
+    padding: 6px 10px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--aa-label-2);
+    font-size: 0.8125rem;
+    white-space: nowrap;
+}
+
+.prontuario-shell .pr-tabs .nav-link:hover {
+    background: var(--aa-fill);
+}
+
+.prontuario-shell .pr-tabs .nav-link.active {
+    background: rgba(0, 80, 160, 0.09);
+    color: var(--aa-accent);
+    font-weight: 600;
+}
+
+.prontuario-shell .pr-window > .card-body {
+    padding: 18px 22px 22px;
+}
+
+.prontuario-shell .pr-timer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+    padding: 8px 8px 8px 14px;
+    border-radius: 999px;
+    background: rgba(52, 199, 89, 0.08);
+}
+
+.prontuario-shell .pr-timer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.prontuario-shell .pr-timer-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--aa-green);
+    box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.5);
+    animation: pr-pulse 2s ease-out infinite;
+}
+
+.prontuario-shell .pr-timer-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--aa-green-text);
+    font-variant-numeric: tabular-nums;
+}
+
+@keyframes pr-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.45); }
+    70% { box-shadow: 0 0 0 7px rgba(52, 199, 89, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); }
+}
+
+/* Campos e botões dentro das abas */
+.prontuario-shell .pr-window .form-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--aa-label);
+}
+
+.prontuario-shell .pr-window textarea.form-control {
+    border: 1px solid var(--aa-separator);
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+}
+
+.prontuario-shell .pr-window .form-control,
+.prontuario-shell .pr-window .form-select {
+    border-color: var(--aa-separator);
+    border-radius: 10px;
+}
+
+.prontuario-shell .pr-window .form-control:focus,
+.prontuario-shell .pr-window .form-select:focus {
+    border-color: rgba(0, 80, 160, 0.45);
+    box-shadow: 0 0 0 3px rgba(0, 152, 217, 0.15);
+}
+
+.prontuario-shell .pr-window .btn {
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+.prontuario-shell .pr-window .btn-outline-primary,
+.prontuario-shell .pr-window .btn-outline-secondary {
+    border-color: transparent;
+    background: var(--aa-fill);
+    color: var(--aa-accent);
+}
+
+.prontuario-shell .pr-window .btn-outline-primary:hover,
+.prontuario-shell .pr-window .btn-outline-secondary:hover {
+    background: var(--aa-fill-2);
+    color: var(--aa-accent);
+}
+
+.prontuario-shell .pr-window .btn-outline-success,
+.prontuario-shell #clinicalRightPanel .btn-outline-success {
+    border-color: transparent;
+    background: rgba(52, 199, 89, 0.12);
+    color: var(--aa-green-text);
+}
+
+.prontuario-shell .pr-window .btn-outline-danger,
+.prontuario-shell #clinicalRightPanel .btn-outline-danger {
+    border-color: transparent;
+    background: rgba(255, 59, 48, 0.08);
+    color: #b0201a;
+}
+
+.prontuario-shell .pr-window .btn-outline-success:hover,
+.prontuario-shell #clinicalRightPanel .btn-outline-success:hover {
+    background: rgba(52, 199, 89, 0.2);
+    color: var(--aa-green-text);
+}
+
+.prontuario-shell .pr-window .btn-outline-danger:hover,
+.prontuario-shell #clinicalRightPanel .btn-outline-danger:hover {
+    background: rgba(255, 59, 48, 0.14);
+    color: #b0201a;
+}
+
+.prontuario-shell .pr-window .badge.bg-secondary {
+    background: var(--aa-fill-2) !important;
+    color: var(--aa-label-2);
+    font-weight: 600;
+    border-radius: 999px;
+}
+
+.prontuario-shell .pr-window .btn-primary {
+    background: var(--aa-accent);
+    border-color: var(--aa-accent);
+}
+
+.prontuario-shell .pr-window .btn-success {
+    background: var(--aa-green);
+    border-color: var(--aa-green);
+}
+
+.prontuario-shell .pr-window h6 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--aa-label);
+}
+
+.prontuario-shell .pr-window .alert {
+    border: none;
+    border-radius: 12px;
+    background: var(--aa-fill);
+    color: var(--aa-label-2);
+    font-size: 0.8125rem;
+    padding: 10px 14px;
+}
+
+.prontuario-shell .pr-window .bg-light {
+    background: #f7f8fa !important;
+}
+
+.prontuario-shell .pr-window .border.rounded,
+.prontuario-shell .pr-window .rounded.border {
+    border-color: transparent !important;
+    border-radius: 12px !important;
+}
+
+/* Planejamento (Cosmiatria) */
+.prontuario-shell #cosmeticPlanTable {
+    font-size: 0.875rem;
+}
+
+.prontuario-shell #cosmeticPlanTable thead th {
+    border-bottom: 1px solid var(--aa-separator);
+    color: var(--aa-label-3);
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding-bottom: 8px;
+}
+
+.prontuario-shell #cosmeticPlanTable td {
+    border-color: var(--aa-separator);
+    padding: 10px 6px;
+    vertical-align: middle;
+}
+
+.prontuario-shell #cosmiatria-total,
+.prontuario-shell .pr-window .alert-info strong {
+    color: var(--aa-label);
+}
+
+/* Linha de adicionar procedimento: nome e procedimento em cima; valor, meses e Adicionar embaixo */
+.prontuario-shell #planejamento .row.g-2.mb-2 {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 8px;
+}
+
+.prontuario-shell #planejamento .row.g-2.mb-2 > [class*="col-"] {
+    width: auto;
+    max-width: none;
+    padding: 0;
+    margin: 0;
+}
+
+.prontuario-shell #planejamento .row.g-2.mb-2 > .col-md-3,
+.prontuario-shell #planejamento .row.g-2.mb-2 > .col-md-4 {
+    grid-column: span 3;
+}
+
+.prontuario-shell #planejamento .row.g-2.mb-2 > .col-md-2:nth-of-type(3) {
+    grid-column: span 3;
+}
+
+.prontuario-shell #planejamento .row.g-2.mb-2 > .col-md-1 {
+    grid-column: span 1;
+}
+
+.prontuario-shell #planejamento .row.g-2.mb-2 > .col-md-2:last-child {
+    grid-column: span 2;
+}
+
+/* Planejamento cirúrgico e cirurgias (Transplante): opções como controles segmentados e chips */
+.prontuario-shell #transplante .btn-group,
+.prontuario-shell #surgery .btn-group {
+    display: inline-flex;
+    width: auto !important;
+    max-width: 100%;
+    padding: 2px;
+    border-radius: 9px;
+    background: var(--aa-fill-2);
+}
+
+.prontuario-shell #transplante .btn-group > .btn,
+.prontuario-shell #surgery .btn-group > .btn {
+    border: none !important;
+    border-radius: 7px !important;
+    background: transparent;
+    color: var(--aa-label);
+    font-size: 0.8125rem;
+    padding: 5px 14px;
+    margin: 0 !important;
+}
+
+.prontuario-shell #transplante .btn-check:checked + .btn,
+.prontuario-shell #surgery .btn-check:checked + .btn {
+    background: #fff;
+    color: var(--aa-accent);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.prontuario-shell #transplante > .mb-4,
+.prontuario-shell #transplante > .mb-3 {
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--aa-separator);
+}
+
+.prontuario-shell #transplante .form-check,
+.prontuario-shell #surgery .form-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 6px 6px 0;
+    padding: 6px 12px;
+    border: 1px solid var(--aa-separator);
+    border-radius: 999px;
+    background: #fff;
+    min-height: 0;
+}
+
+.prontuario-shell #transplante .form-check .form-check-input,
+.prontuario-shell #surgery .form-check .form-check-input {
+    float: none;
+    margin: 0;
+}
+
+.prontuario-shell #transplante .form-check:has(.form-check-input:checked),
+.prontuario-shell #surgery .form-check:has(.form-check-input:checked) {
+    background: rgba(0, 80, 160, 0.08);
+    border-color: rgba(0, 80, 160, 0.25);
+    color: var(--aa-accent);
+    font-weight: 600;
+}
+
+.prontuario-shell #transplante .form-check-label,
+.prontuario-shell #surgery .form-check-label {
+    font-size: 0.8125rem;
+    cursor: pointer;
+}
+
+.prontuario-shell #transplante .col-md-6:has(> .form-check),
+.prontuario-shell #transplante .mb-3:has(> .form-check) {
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+}
+
+.prontuario-shell #transplante .mb-3:has(> .form-check) > .form-label {
+    width: 100%;
+}
+
+.prontuario-shell .norwood-card {
+    border: 1px solid var(--aa-separator);
+    border-radius: 12px;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.prontuario-shell .norwood-card:hover {
+    border-color: rgba(0, 80, 160, 0.3);
+}
+
+.prontuario-shell .norwood-card.selected {
+    border: 1px solid var(--aa-accent);
+    box-shadow: 0 0 0 3px rgba(0, 80, 160, 0.12);
+    color: var(--aa-accent);
+}
+
+/* Conduta: evoluções e resumo do transplante */
+.prontuario-shell #evolutionHistorySection {
+    border: none !important;
+    border-radius: 14px !important;
+    background: #f7f9fb !important;
+}
+
+.prontuario-shell #evolutionHistorySection .text-success {
+    color: var(--aa-label-3) !important;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+}
+
+.prontuario-shell #transplantPlanningSummaryInEvolution {
+    border: 1px solid rgba(255, 204, 0, 0.35) !important;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.prontuario-shell #transplantPlanningSummaryInEvolution .card-header {
+    background: rgba(255, 204, 0, 0.18) !important;
+    border-bottom: none;
+}
+
+/* ---------- Coluna da direita: histórico em destaque + painel ---------- */
+
+.prontuario-shell .pr-side {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.prontuario-shell .pr-history {
+    border: 1px solid var(--aa-separator);
+    border-radius: 18px;
+    box-shadow: none;
+}
+
+.prontuario-shell .pr-history-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 18px 18px 4px;
+}
+
+.prontuario-shell .pr-history-head h5 {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.prontuario-shell .pr-count {
+    font-size: 0.8125rem;
+    color: var(--aa-label-3);
+    font-variant-numeric: tabular-nums;
+}
+
+.prontuario-shell .pr-history-body {
+    max-height: 72vh;
+    overflow-y: auto;
+    padding: 6px 12px 12px;
+}
+
+.prontuario-shell #consultationsAccordion {
+    display: block;
+}
+
+.prontuario-shell #consultationsAccordion .accordion-item.consultation-card {
+    position: relative;
+    margin: 0 !important;
+    padding-left: 22px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+}
+
+/* Trilho vertical e marcador de cada atendimento */
+.prontuario-shell #consultationsAccordion .consultation-card::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e8edf2;
+}
+
+.prontuario-shell #consultationsAccordion .consultation-card:first-child::before {
+    top: 20px;
+}
+
+.prontuario-shell #consultationsAccordion .consultation-card:last-child::before {
+    bottom: calc(100% - 20px);
+}
+
+.prontuario-shell #consultationsAccordion .consultation-card::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 15px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--aa-brand-deep);
+    box-shadow: 0 0 0 3px #fff;
+}
+
+.prontuario-shell .consultation-summary-toggle {
+    padding: 0;
+    border-radius: 12px !important;
+    background: transparent;
+    box-shadow: none !important;
+}
+
+.prontuario-shell .consultation-summary-toggle:not(.collapsed) {
+    background: #f6f9fc;
+}
+
+.prontuario-shell .consultation-summary-toggle::after {
+    position: absolute;
+    top: 12px;
+    right: 10px;
+    margin: 0;
+    width: 0.9rem;
+    height: 0.9rem;
+    background-size: 0.9rem;
+    opacity: 0.45;
+}
+
+.prontuario-shell .consultation-summary-inner {
+    display: block;
+    padding: 9px 30px 10px 8px;
+}
+
+.prontuario-shell .consultation-summary-main {
+    gap: 4px;
+}
+
+.prontuario-shell .consultation-summary-topline {
+    gap: 6px;
+}
+
+.prontuario-shell .history-date-text {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--aa-label);
+}
+
+.prontuario-shell .history-date-text .bi {
+    display: none;
+}
+
+.prontuario-shell .history-category-pill,
+.prontuario-shell .history-status-pill {
+    min-height: 0;
+    padding: 2px 9px;
+    border: none;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+}
+
+.prontuario-shell .history-category-pill {
+    background: rgba(0, 152, 217, 0.1);
+    color: var(--aa-accent);
+}
+
+.prontuario-shell .history-status-pill {
+    background: rgba(255, 149, 0, 0.14);
+    color: var(--aa-orange-text);
+}
+
+.prontuario-shell .history-meta-line {
+    font-size: 0.75rem;
+    color: var(--aa-label-3);
+}
+
+.prontuario-shell .history-preview-line,
+.prontuario-shell .history-preview-empty {
+    font-size: 0.8125rem;
+    color: var(--aa-label-2);
+}
+
+.prontuario-shell .history-preview-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--aa-label-3);
+}
+
+.prontuario-shell .history-preview-label .bi {
+    display: none;
+}
+
+.prontuario-shell .history-action-area {
+    justify-content: flex-start;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 0;
+}
+
+.prontuario-shell .history-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--aa-fill);
+    font-size: 0.85rem;
+    opacity: 1;
+}
+
+.prontuario-shell .history-action-btn:hover {
+    background: var(--aa-fill-2);
+    transform: none;
+}
+
+.prontuario-shell #consultationsAccordion .accordion-body {
+    padding: 6px 8px 14px !important;
+    font-size: 0.875rem;
+    color: var(--aa-label-2);
+}
+
+.prontuario-shell #consultationsAccordion .accordion-body h6 {
+    margin-bottom: 2px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--aa-label-3) !important;
+}
+
+.prontuario-shell #consultationsAccordion .accordion-body h6 .bi {
+    display: none;
+}
+
+/* Painel lateral (Cosmiatria / Planejamento cirúrgico / consulta do histórico) */
+.prontuario-shell #cosmeticRightColumn {
+    flex: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+}
+
+.prontuario-shell .prontuario-right-panel-card {
+    border: 1px solid var(--aa-separator);
+    border-radius: 18px;
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.prontuario-shell .pr-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 14px 18px;
+    border: none;
+    background: #fff;
+    text-align: left;
+}
+
+.prontuario-shell .pr-panel-head h5 {
+    margin: 0;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--aa-label);
+}
+
+.prontuario-shell .pr-panel-head .bi-chevron-down {
+    color: var(--aa-label-3);
+    transition: transform 200ms var(--aa-ease);
+}
+
+.prontuario-shell .pr-panel-head.collapsed .bi-chevron-down {
+    transform: rotate(-90deg);
+}
+
+.prontuario-shell #clinicalRightPanel {
+    padding: 0 18px 16px;
+    font-size: 0.875rem;
+}
+
+.prontuario-shell #clinicalRightPanel .card {
+    border: 1px solid var(--aa-separator) !important;
+    border-radius: 12px;
+    box-shadow: none !important;
+}
+
+.prontuario-shell #clinicalRightPanel .bg-light {
+    background: #f7f8fa !important;
+}
+
+.prontuario-shell #clinicalRightPanel .btn {
+    border-radius: 8px;
+}
+
+.prontuario-shell #clinicalRightPanel .text-primary {
+    color: var(--aa-accent) !important;
+}
+
+/* Histórico de cirurgias */
+.prontuario-shell .pr-card {
+    border: 1px solid var(--aa-separator);
+    border-radius: 18px;
+    box-shadow: none;
+    overflow: hidden;
+}
+
+.prontuario-shell .pr-card-head {
+    padding: 14px 18px;
+    background: #fff;
+    border-bottom: 1px solid var(--aa-separator);
+}
+
+.prontuario-shell .pr-card-head h5 {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.prontuario-shell .pr-card-head .bi {
+    color: var(--aa-brand-medium);
+}
+
+/* ---------- Telas menores ---------- */
+
+@media (max-width: 991.98px) {
+    .prontuario-shell .pr-header {
+        margin: -72px -16px 16px;
+        padding: 64px 16px 12px;
+    }
+
+    .prontuario-shell .pr-header-main {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .prontuario-shell .pr-header-actions {
+        margin-left: auto;
+    }
+
+    .prontuario-shell .pr-history-body {
+        max-height: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .prontuario-shell .pr-header {
+        position: static;
+        padding-top: 14px;
+    }
+
+    .prontuario-shell .pr-header-actions {
+        order: -1;
+        width: 100%;
+        justify-content: flex-end;
+        min-height: 42px;
+    }
+
+    .prontuario-shell .pr-header-text {
+        flex: 1 1 calc(100% - 80px);
+    }
+
+    .prontuario-shell .prontuario-patient-name-text {
+        font-size: 1.2rem;
+    }
+
+    .prontuario-shell .pr-meta-sep {
+        display: none;
+    }
+
+    .prontuario-shell .pr-seg {
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .prontuario-shell .pr-ai-more {
+        display: none;
+    }
+
+    .prontuario-shell .pr-ai .pr-ai-line {
+        white-space: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    .prontuario-shell .pr-window > .card-body {
+        padding: 14px;
+    }
+
+    .prontuario-shell .pr-tags-editor {
+        flex-direction: column;
+    }
+}
+
+/* ---------- Acessibilidade ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .prontuario-shell .pr-timer-dot {
+        animation: none;
+    }
+
+    .prontuario-shell .pr-capsule:active,
+    .prontuario-shell .pr-icon-btn:active,
+    .prontuario-shell .pr-seg label:active,
+    .prontuario-shell .pr-tabs .nav-link:active {
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .prontuario-shell .pr-header {
+        background: var(--aa-page);
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+}
+
+@media print {
+    .prontuario-shell .pr-header {
+        position: static;
+        margin: 0 0 12px;
+        background: #fff;
+    }
+
+    .prontuario-shell .pr-header-actions,
+    .prontuario-shell .pr-timer-bar,
+    .prontuario-shell .ai-summary-refresh,
+    .prontuario-shell .pr-ai-more {
+        display: none !important;
+    }
+}

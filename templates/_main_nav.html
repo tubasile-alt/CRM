@@ -46,3 +46,37 @@
 {% endif %}
 <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right"></i> Sair</a></li>
 {% endmacro %}
+
+{# Barra lateral escura do app (Agenda, Prontuário). Conteúdo extra da página entra por
+   {% call main_nav.app_sidebar() %}…{% endcall %}, entre o menu e o usuário.
+   Requer app-shell.css e a classe "app-shell" no <body>. #}
+{% macro app_sidebar(aria_label='Navegação principal') %}
+<aside class="ag-sidebar" id="agSidebar" aria-label="{{ aria_label }}">
+    <a class="ag-logo" href="{{ url_for('index') }}">
+        <img src="{{ url_for('static', filename='img/logo_basile_branco.png') }}" alt="Clínica Basile">
+    </a>
+
+    <nav class="ag-side-nav">
+        {{ main_nav_links('sidebar') }}
+    </nav>
+
+    {% if caller is defined %}{{ caller() }}{% endif %}
+
+    <div class="ag-side-user dropup">
+        <button class="ag-user-btn" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+            <span class="ag-avatar">{{ (current_user.name or '?')[:1] }}</span>
+            <span class="ag-user-text"><b>{{ current_user.name }}</b><small>{{ 'Médico' if current_user.is_doctor() else 'Secretária' }}</small></span>
+            <i class="bi bi-three-dots"></i>
+        </button>
+        <a href="#" id="toggle-chat-sound" class="ag-icon-btn" title="Alternar som do chat"><i class="bi bi-volume-up" id="chat-sound-icon"></i></a>
+        <ul class="dropdown-menu">
+            {{ user_menu_items() }}
+        </ul>
+    </div>
+</aside>
+<button class="ag-menu-btn" type="button" id="agMenuBtn" aria-controls="agSidebar" aria-expanded="false" aria-label="Abrir menu">
+    <i class="bi bi-list"></i>
+</button>
+<div class="ag-scrim" id="agScrim" hidden></div>
+<script src="{{ url_for('static', filename='js/app-shell.js') }}" defer></script>
+{% endmacro %}

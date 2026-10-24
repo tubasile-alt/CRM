@@ -4,23 +4,15 @@
 
 {% block extra_css %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.css" rel="stylesheet">
-<link href="{{ url_for('static', filename='css/agenda-apple.css') }}?v=20261023-sidebar" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/app-shell.css') }}?v=20261023-shell" rel="stylesheet">
+<link href="{{ url_for('static', filename='css/agenda-apple.css') }}?v=20261023-shell" rel="stylesheet">
 {% endblock %}
 
-{% block body_class %}agenda-shell{% endblock %}
+{% block body_class %}app-shell agenda-shell{% endblock %}
 
 {% block main_nav %}
 {% import "_main_nav.html" as main_nav with context %}
-{% set is_doc = current_user.is_doctor() %}
-<aside class="ag-sidebar" id="agSidebar" aria-label="Navegação e resumo do dia">
-    <a class="ag-logo" href="{{ url_for('index') }}">
-        <img src="{{ url_for('static', filename='img/logo_basile_branco.png') }}" alt="Clínica Basile">
-    </a>
-
-    <nav class="ag-side-nav">
-        {{ main_nav.main_nav_links('sidebar') }}
-    </nav>
-
+{% call main_nav.app_sidebar('Navegação e resumo do dia') %}
     <div class="mini-calendar" id="miniCalendar"></div>
 
     <div class="ag-side-section">
@@ -38,23 +30,7 @@
             <span>Pend. ativação</span><b id="provisorioCount">0</b>
         </div>
     </div>
-
-    <div class="ag-side-user dropup">
-        <button class="ag-user-btn" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-            <span class="ag-avatar">{{ (current_user.name or '?')[:1] }}</span>
-            <span class="ag-user-text"><b>{{ current_user.name }}</b><small>{{ 'Médico' if is_doc else 'Secretária' }}</small></span>
-            <i class="bi bi-three-dots"></i>
-        </button>
-        <a href="#" id="toggle-chat-sound" class="ag-icon-btn" title="Alternar som do chat"><i class="bi bi-volume-up" id="chat-sound-icon"></i></a>
-        <ul class="dropdown-menu">
-            {{ main_nav.user_menu_items() }}
-        </ul>
-    </div>
-</aside>
-<button class="ag-menu-btn" type="button" id="agMenuBtn" aria-controls="agSidebar" aria-expanded="false" aria-label="Abrir menu">
-    <i class="bi bi-list"></i>
-</button>
-<div class="ag-scrim" id="agScrim" hidden></div>
+{% endcall %}
 {% endblock %}
 
 {% block content %}
@@ -759,6 +735,6 @@ let currentView = 'day';
 </script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/locales/pt-br.global.min.js"></script>
-<script src="{{ url_for('static', filename='js/agenda.js') }}?v=20261023-sidebar2"></script>
+<script src="{{ url_for('static', filename='js/agenda.js') }}?v=20261023-shell"></script>
 <script src="{{ url_for('static', filename='js/checkout.js') }}"></script>
 {% endblock %}
