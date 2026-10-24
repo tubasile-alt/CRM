@@ -1241,11 +1241,8 @@
         scrollbar-width: none;
     }
 
-    .prontuario-shell .pr-ai-more {
-        display: none;
-    }
-
-    .prontuario-shell .pr-ai .pr-ai-line {
+    /* Fechado: duas linhas; "Ver mais" continua disponível para abrir o texto completo */
+    .prontuario-shell .pr-ai:not(.is-open) .pr-ai-line {
         white-space: normal;
         display: -webkit-box;
         -webkit-line-clamp: 2;
